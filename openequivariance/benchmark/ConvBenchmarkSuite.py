@@ -9,7 +9,8 @@ from openequivariance.implementations.convolution.ConvolutionBase import *
 logger = getLogger()
 
 def load_graph(filename):
-    coords, rows, cols, name = [None] * 4 
+    coords, rows, cols = [None] * 3
+    name = pathlib.Path(filename).stem
     with open(filename, 'rb') as f:
         logger.info(f"Loading {name} from pickle...")
         result = pickle.load(f)
