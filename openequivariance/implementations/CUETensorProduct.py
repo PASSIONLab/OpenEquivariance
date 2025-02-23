@@ -82,7 +82,7 @@ class CUETensorProduct(TensorProductBase):
                 math_dtype=torch_dtype
             )
             self.cue_tp.to('cuda')
-            self.cue_tp = torch.compile(self.cue_tp, fullgraph=True, mode="default")
+            #self.cue_tp = torch.compile(self.cue_tp, fullgraph=True, mode="default")
             self.forward = self.cue_tp.__call__
         
         if isinstance(config, FullyConnectedTPProblem):

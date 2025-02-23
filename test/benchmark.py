@@ -25,6 +25,7 @@ FCTPP = FullyConnectedTPProblem
 
 implementation_map = {
     'e3nn': E3NNTensorProductCompiledMaxAutotuneCUDAGraphs,
+    'e3nn_uncompiled': E3NNTensorProduct,
     'cue': CUETensorProduct,
     'oeq': LoopUnrollTP
 }
@@ -87,7 +88,7 @@ def benchmark_uvu(params):
 
             problems.append(problem)
  
-    tests = [TestDefinition(implementation, problem, direction, correctness=True, benchmark=True) 
+    tests = [TestDefinition(implementation, problem, direction, correctness=False, benchmark=True) 
              for implementation, problem, direction
              in itertools.product(implementations, problems, directions)]
 
@@ -103,6 +104,12 @@ def benchmark_uvu(params):
             CTPP('64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e + 64x3o + 64x3e',  '0e + 1o + 2e + 3o', '64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e + 64x3o + 64x3e', 
                     'nequip-revmd17-benzene', irrep_dtype=np.float64, weight_dtype=np.float64), direction, correctness=True, benchmark=True) 
                     for direction in ['forward', 'backward']])
+
+    # Don't benchmark benzene at all if user disables it 
+    if params.limited_memory:
+        tests = [test for test in tests if test.implementation == LoopUnrollTP
+                or test.implementation == CUETensorProduct 
+                or ('benzene' not in test.problem.label and test.problem.irrep_dtype != np.float64)]
 
     bench_suite = TestBenchmarkSuite(
         correctness_threshold = 5e-5,
@@ -123,7 +130,7 @@ def benchmark_roofline(params):
     directions = [  'forward',
                     'backward']
 
-    tests = [TestDefinition(implementation, problem, direction, correctness=True, benchmark=True) 
+    tests = [TestDefinition(implementation, problem, direction, correctness=False, benchmark=True) 
              for implementation, problem, direction
              in itertools.product(implementations, roofline_configs, directions)]
 
@@ -247,13 +254,14 @@ if __name__=='__main__':
     parser_uvu.add_argument("--batch_size", "-b", type=int, default=50000, help="Batch size for benchmark")
     parser_uvu.add_argument("--implementations", "-i", type=str, nargs='+', 
             default=['e3nn', 'cue', 'oeq'], help="Implementations to benchmark",
-            choices=['e3nn', 'cue', 'oeq'])
+            choices=['e3nn', 'e3nn_uncompiled', 'cue', 'oeq'])
     parser_uvu.add_argument("--directions", "-d", type=str, nargs='+',
             default=['forward', 'backward'], help="Directions to benchmark",
             choices=['forward', 'backward'])
     parser_uvu.add_argument("--datatypes", "-t", type=str, nargs='+',
             default=['float32', 'float64'], help="Data types to benchmark",
             choices=['float32', 'float64'])
+    parser_uvu.add_argument("--limited-memory", action="store_true", help="Disable some tests that have high memory usage for e3nn.")
     parser_uvu.add_argument("--plot", action="store_true", help="Plot the results.")
     parser_uvu.set_defaults(func=benchmark_uvu)
 

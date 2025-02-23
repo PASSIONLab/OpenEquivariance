@@ -6,14 +6,16 @@ from openequivariance.benchmark.plotting import *
 def plot_uvu(data_folder):
     data_folder = pathlib.Path(data_folder)
     benchmarks, metadata = load_benchmarks(data_folder)
+    configs = metadata["config_labels"]
+    implementations = metadata["implementations"] 
+
     for benchmark in benchmarks:
         if benchmark["implementation_name"] == "E3NNTensorProductCompiledMaxAutotuneCUDAGraphs":
             benchmark["implementation_name"] = "E3NNTensorProduct"
 
-    configs = metadata["config_labels"]
-    implementations =  [ "E3NNTensorProduct", 
-                        "CUETensorProduct", "LoopUnrollTP"]
-
+    for i, implementation in enumerate(implementations):
+        if implementation == "E3NNTensorProductCompiledMaxAutotuneCUDAGraphs":
+            implementations[i] = "E3NNTensorProduct"
 
     def calculate_tp_per_sec(exp):
         return exp["benchmark results"]["batch_size"] / (np.mean(exp["benchmark results"]["time_millis"]) * 0.001)
@@ -28,7 +30,10 @@ def plot_uvu(data_folder):
                                         "direction": direction, 
                                         "implementation_name": impl
                                         }, match_one=True)
-                dataf32[direction][desc][labelmap[impl]] = calculate_tp_per_sec(exp)
+                if exp is not None:
+                    dataf32[direction][desc][labelmap[impl]] = calculate_tp_per_sec(exp)
+                else:
+                    dataf32[direction][desc][labelmap[impl]] = 0.0 
                     
     dataf64 = {"forward": {}, "backward": {}}
     for i, desc in enumerate(configs):
@@ -40,8 +45,12 @@ def plot_uvu(data_folder):
                                         "direction": direction, 
                                         "implementation_name": impl
                                         }, match_one=True)
-                dataf64[direction][desc][labelmap[impl]] = calculate_tp_per_sec(exp)
-        
+
+                if exp is not None:
+                    dataf64[direction][desc][labelmap[impl]] = calculate_tp_per_sec(exp)
+                else:
+                    dataf64[direction][desc][labelmap[impl]] = 0.0
+
     fig = plt.figure(figsize=(7, 7))
     gs = fig.add_gridspec(2, 2)
     axs = gs.subplots(sharex=True)

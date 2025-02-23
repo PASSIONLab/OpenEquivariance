@@ -70,7 +70,7 @@ def filter(benchmarks, base, match_one=True):
             filtered_results.append(benchmark)
         
     if len(filtered_results) == 0:
-        print("WARNING: Filter matched no experiments")
+        #print("WARNING: Filter matched no experiments")
         return None
     
     if len(filtered_results) > 1 and match_one:
