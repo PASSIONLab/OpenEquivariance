@@ -41,7 +41,8 @@ def run_paper_uvw_benchmark(params) -> pathlib.Path:
             num_iter=100,
             bench_batch_size=params.batch_size,
             prng_seed=11111,
-            torch_op=True
+            torch_op=True,
+            test_name="uvw"
         )
     
     logger.setLevel(logging.INFO)

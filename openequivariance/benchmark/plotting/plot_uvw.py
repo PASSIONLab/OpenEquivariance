@@ -1,43 +1,15 @@
-import os
-import pathlib
-import sys
-
 import numpy as np
 import matplotlib.pyplot as plt
+import os, json, pathlib, sys
+from openequivariance.benchmark.plotting import *
 
-
-from plotting_utils import (
-    BENCHMARK_FOLDER,
-    FIGURES_FOLDER, 
-    Project, 
-    impl_to_project_func, 
-    project_to_color_map,
-    sort_impls_by_display_order,
-    get_latest_experiment_path,
-    set_grid, 
-    calculate_tp_per_sec,
-    )
-
-sys.path.insert(1, os.path.join(sys.path[0], '../../../'))
-from openequivariance.benchmark.analysis_utils import load_benchmarks, grouped_barchart, filter
-from openequivariance.benchmark.logging_utils import getLogger
-
-
-
-
-def plot_uvw_benchmark(experiment_path : pathlib.Path) -> None:
-    
-    benchmarks, metadata = load_benchmarks(BENCHMARK_FOLDER, latest_experiment_path.name)
+def plot_uvw(data_folder):
+    data_folder = pathlib.Path(data_folder)
+    benchmarks, metadata = load_benchmarks(data_folder)
 
     configs = metadata['config_labels']
-    # config_labels = metadata['config_labels']
     implementations = metadata['implementations']
     directions = metadata['directions']
-
-    # sort_impls_by_display_order(implementations)
-
-    labelfunc = impl_to_project_func
-    colormap = project_to_color_map
 
     dataf32 = {"forward": {}, "backward": {}}
     for i, desc in enumerate(configs):
@@ -50,7 +22,7 @@ def plot_uvw_benchmark(experiment_path : pathlib.Path) -> None:
                                             "direction": direction, 
                                             "implementation_name": impl
                                             }, match_one=True)
-                    dataf32[direction][desc][labelfunc(impl)] = calculate_tp_per_sec(exp)
+                    dataf32[direction][desc][labelmap[impl]] = calculate_tp_per_sec(exp)
 
     dataf64 = {"forward": {}, "backward": {}}
     for i, desc in enumerate(configs):
@@ -63,7 +35,7 @@ def plot_uvw_benchmark(experiment_path : pathlib.Path) -> None:
                                             "direction": direction, 
                                             "implementation_name": impl
                                             }, match_one=True)
-                    dataf64[direction][desc][labelfunc(impl)] = calculate_tp_per_sec(exp)               
+                    dataf64[direction][desc][labelmap[impl]] = calculate_tp_per_sec(exp)               
 
     plt.rcParams['font.family'] = 'serif'
     plt.rcParams.update({'font.size': 11})
@@ -96,8 +68,23 @@ def plot_uvw_benchmark(experiment_path : pathlib.Path) -> None:
 
     fig.show()
     fig.tight_layout()
-    fig.savefig(str(FIGURES_FOLDER / "uvw_throughput_comparison.pdf"))
+    fig.savefig(str(data_folder / "uvw_throughput_comparison.pdf"))
 
-if __name__ == "__main__":
-    latest_experiment_path = get_latest_experiment_path()
-    plot_uvw_benchmark(latest_experiment_path)
+    speedup_table = []
+    for direction in ['forward', 'backward']:
+        for impl in ['e3nn', 'cuE']:
+            for dtype_label, dtype_set in [('f32', dataf32), ('f64', dataf64)]:
+                speedups = [measurement['ours'] / measurement[impl] for label, measurement in dtype_set[direction].items() if impl in measurement and "DiffDock" in label]
+                stats = np.min(speedups), np.mean(speedups), np.median(speedups), np.max(speedups)
+                stats = [f"{stat:.2f}" for stat in stats]
+
+                dir_print = direction
+                if direction == "forward":
+                    dir_print += "  "
+                result = [dir_print, impl, dtype_label] + stats
+                speedup_table.append(result)
+
+    print("DiffDock")
+    print('\t\t'.join(['Direction', 'Base', 'dtype', 'min', 'mean', 'med', 'max']))
+    for row in speedup_table:
+        print('\t\t'.join(row))

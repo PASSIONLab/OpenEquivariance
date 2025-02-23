@@ -216,6 +216,10 @@ def plot(params):
     if test_name == "uvu":        
         plotting.plot_uvu(params.data_folder)
 
+    if test_name == "uvw":        
+        plotting.plot_uvw(params.data_folder)
+
+
 if __name__=='__main__':
     logger.setLevel(logging.INFO)
 
