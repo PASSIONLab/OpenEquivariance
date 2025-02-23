@@ -158,35 +158,36 @@ def benchmark_convolution(params):
         
         graphs.append(load_graph(str(target_path)))
 
-    configs = [ ChannelwiseTPP("128x0e+128x1o+128x2e", 
-                    "1x0e+1x1o+1x2e+1x3o",
-                    "128x0e+128x1o+128x2e+128x3o"),
-                ChannelwiseTPP("128x0e+128x1o+128x2e", 
-                    "1x0e+1x1o+1x2e+1x3o",
-                    "128x0e+128x1o+128x2e+128x3o"),
-                ] # MACE-large 
+    if not params.disable_bench:
+        configs = [ ChannelwiseTPP("128x0e+128x1o+128x2e", 
+                        "1x0e+1x1o+1x2e+1x3o",
+                        "128x0e+128x1o+128x2e+128x3o"),
+                    ChannelwiseTPP("128x0e+128x1o+128x2e", 
+                        "1x0e+1x1o+1x2e+1x3o",
+                        "128x0e+128x1o+128x2e+128x3o"),
+                    ] # MACE-large 
 
-    configs[1].irrep_dtype = np.float64
-    configs[1].weight_dtype = np.float64
+        configs[1].irrep_dtype = np.float64
+        configs[1].weight_dtype = np.float64
 
-    bench = ConvBenchmarkSuite(configs, torch_op=True, test_name="convolution") 
+        bench = ConvBenchmarkSuite(configs, torch_op=True, test_name="convolution") 
 
-    implementations = [ LoopUnrollConvScatterSum, 
-                        CUEConv,
-                        LoopUnrollConvDeterministic, 
-                        LoopUnrollConvAtomic
-                        ]
+        implementations = [ LoopUnrollConvScatterSum, 
+                            CUEConv,
+                            LoopUnrollConvDeterministic, 
+                            LoopUnrollConvAtomic
+                            ]
 
-    for graph in graphs: 
-        for direction in ["forward", "backward"]:
-            bench.run(
-                    implementations = implementations,
-                    graph = graph,
-                    direction=direction, 
-                    correctness=False,
-                    double_backward_correctness=False,
-                    benchmark=True,
-                    output_folder=params.output_folder)
+        for graph in graphs: 
+            for direction in ["forward", "backward"]:
+                bench.run(
+                        implementations = implementations,
+                        graph = graph,
+                        direction=direction, 
+                        correctness=False,
+                        double_backward_correctness=False,
+                        benchmark=True,
+                        output_folder=params.output_folder)
             
 
 def correctness(params):
@@ -255,8 +256,7 @@ if __name__=='__main__':
 
     parser_conv = subparsers.add_parser('conv', help='Run the convolution benchmark')
     parser_conv.add_argument("--data", type=str, help="Folder containing graph data", required=True)
-    parser_conv.add_argument("--no_download", action='store_true', default=False, help="Download data if it does not exist")
-    parser_conv.add_argument("--run_bench", action='store_true', help="Run benchmarks (disable to only download data)")
+    parser_conv.add_argument("--disable_bench", action='store_true', help="Disable benchmark (downloads data if needed)")
     parser_conv.set_defaults(func=benchmark_convolution)
 
     parser_uvu = subparsers.add_parser('uvw', help='Run the UVW kernel benchmark without fusion') 
