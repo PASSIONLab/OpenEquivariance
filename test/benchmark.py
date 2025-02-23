@@ -112,7 +112,10 @@ def benchmark_uvu(params):
         prng_seed=11111,
         test_name="uvu")
 
-    bench_suite.run(tests, params.output_folder)
+    data_folder = bench_suite.run(tests, params.output_folder)
+
+    if params.plot:
+        plot({"data_folder": data_folder})
 
 def benchmark_roofline(params):
     implementations =   [LoopUnrollTP, 
@@ -210,19 +213,24 @@ def correctness(params):
             
 def plot(params):
     import openequivariance.benchmark.plotting as plotting
-    test_name = None
-    with open(pathlib.Path(params.data_folder) / "metadata.json", 'r') as f:
+    data_folder, test_name = None, None
+    if isinstance(params, dict):
+        data_folder = params["data_folder"]
+    else:
+        data_folder = params.data_folder
+
+    with open(pathlib.Path(data_folder) / "metadata.json", 'r') as f:
         metadata = json.load(f)
         test_name = metadata["test_name"]
 
     if test_name == "uvu":        
-        plotting.plot_uvu(params.data_folder)
+        plotting.plot_uvu(data_folder)
     elif test_name == "uvw":        
-        plotting.plot_uvw(params.data_folder)
+        plotting.plot_uvw(data_folder)
     elif test_name == "roofline":        
-        plotting.plot_roofline(params.data_folder)
+        plotting.plot_roofline(data_folder)
     elif test_name == "convolution":
-        plotting.plot_convolution(params.data_folder)
+        plotting.plot_convolution(data_folder)
 
 if __name__=='__main__':
     logger.setLevel(logging.INFO)
@@ -246,6 +254,7 @@ if __name__=='__main__':
     parser_uvu.add_argument("--datatypes", "-t", type=str, nargs='+',
             default=['float32', 'float64'], help="Data types to benchmark",
             choices=['float32', 'float64'])
+    parser_uvu.add_argument("--plot", action="store_true", help="Plot the results.")
     parser_uvu.set_defaults(func=benchmark_uvu)
 
     parser_roofline = subparsers.add_parser('roofline', help='Run the roofline comparison')
@@ -266,7 +275,7 @@ if __name__=='__main__':
             choices=['forward', 'backward'])
     parser_uvu.set_defaults(func=run_paper_uvw_benchmark)
 
-    parser_plot = subparsers.add_parser('plot', help="Generate a plot for a set of benchmarks.")
+    parser_plot = subparsers.add_parser('plot', help="Generate a plot for a folder of benchmarks.")
     parser_plot.add_argument("data_folder", type=str)
     parser_plot.set_defaults(func=plot)
 
