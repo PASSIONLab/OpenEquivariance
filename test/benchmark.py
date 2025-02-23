@@ -125,10 +125,8 @@ def benchmark_uvu(params):
         plot({"data_folder": data_folder})
 
 def benchmark_roofline(params):
-    implementations =   [LoopUnrollTP, 
-                        CUETensorProduct]
-    directions = [  'forward',
-                    'backward']
+    implementations =   [LoopUnrollTP, CUETensorProduct]
+    directions = ['forward', 'backward']
 
     tests = [TestDefinition(implementation, problem, direction, correctness=False, benchmark=True) 
              for implementation, problem, direction
@@ -141,10 +139,13 @@ def benchmark_roofline(params):
         bench_batch_size=200000,
         prng_seed=11111,
         torch_op=False,
-        test_name="roofline"
-    )
+        test_name="roofline")
 
-    bench_suite.run(tests, params.output_folder)
+    data_folder = bench_suite.run(tests, params.output_folder)
+
+    if params.plot:
+        plot({"data_folder": data_folder})
+
 
 def benchmark_convolution(params):
     filenames = [   "covid_spike_radius3.0.pickle", 
@@ -266,6 +267,7 @@ if __name__=='__main__':
     parser_uvu.set_defaults(func=benchmark_uvu)
 
     parser_roofline = subparsers.add_parser('roofline', help='Run the roofline comparison')
+    parser_roofline.add_argument("--plot", action="store_true", help="Plot the results.")
     parser_roofline.set_defaults(func=benchmark_roofline)
 
     parser_correctness = subparsers.add_parser('correctness', help='Run correctness tests')
