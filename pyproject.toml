@@ -6,8 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "openequivariance"
 version = "0.1.0"
 authors = [
-  { name="Austin Scott Glover" },
-  { name="Vivek Bharadwaj" }
+  { name="Austin Glover" },
+  { name="Vivek Bharadwaj" },
+  { name="Aydin Buluc" },
+  { name="James Demmel" }
 ]
 description = "A fast GPU JIT kernel generator for the Clebsch-Gordon Tensor Product"
 requires-python = ">=3.11"

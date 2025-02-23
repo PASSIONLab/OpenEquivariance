@@ -292,12 +292,13 @@ if __name__=='__main__':
     parser_conv.add_argument("--plot", action="store_true", help="Plot the results.")
     parser_conv.set_defaults(func=benchmark_convolution)
 
-    parser_uvu = subparsers.add_parser('uvw', help='Run the UVW kernel benchmark without fusion') 
-    parser_uvu.add_argument("--batch_size", "-b", type=int, default=50000, help="Batch size for benchmark")
-    parser_uvu.add_argument("--directions", "-d", type=str, nargs='+',
+    parser_uvw = subparsers.add_parser('uvw', help='Run the UVW kernel benchmark without fusion') 
+    parser_uvw.add_argument("--batch_size", "-b", type=int, default=50000, help="Batch size for benchmark")
+    parser_uvw.add_argument("--directions", "-d", type=str, nargs='+',
             default=['forward', 'backward'], help="Directions to benchmark",
             choices=['forward', 'backward'])
-    parser_uvu.set_defaults(func=run_paper_uvw_benchmark)
+    parser_uvw.add_argument("--plot", action="store_true", help="Plot the results.")
+    parser_uvw.set_defaults(func=run_paper_uvw_benchmark)
 
     parser_plot = subparsers.add_parser('plot', help="Generate a plot for a folder of benchmarks.")
     parser_plot.add_argument("data_folder", type=str)
