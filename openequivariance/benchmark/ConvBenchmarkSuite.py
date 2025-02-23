@@ -37,16 +37,17 @@ class ConvBenchmarkSuite:
         self.exp_count = 0
         self.test_name = test_name 
 
+        self.millis_since_epoch = round(time.time() * 1000)
+
     def run(self, graph, implementations, direction, output_folder=None, correctness=True, double_backward_correctness=False, benchmark=True):
-        millis_since_epoch = round(time.time() * 1000)
         if output_folder is None:
             if oeq._check_package_editable():
-                output_folder = oeq._editable_install_output_path / f"{millis_since_epoch}"
+                output_folder = oeq._editable_install_output_path / f"{self.millis_since_epoch}"
             else:
                 raise ValueError("output folder must be specified for non-editable installs.")
         else:
             output_folder = pathlib.Path(output_folder) 
-        output_folder.mkdir(parents=True)
+        output_folder.mkdir(parents=True, exist_ok=True)
 
         metadata = {
             "test_name": self.test_name, 
@@ -114,3 +115,5 @@ class ConvBenchmarkSuite:
                 self.exp_count += 1
 
                 logger.info(f'Finished {tc_name}, graph {graph.name}')
+        
+        return output_folder

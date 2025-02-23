@@ -153,14 +153,14 @@ def benchmark_convolution(params):
                     "carbon_lattice_radius6.0.pickle"]
     download_prefix = "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
 
-    if not Path(params.folder).exists():
-        os.makedirs(params.folder, exist_ok=True) 
+    if not Path(params.data).exists():
+        os.makedirs(params.data, exist_ok=True)
 
     graphs = []
     for filename in filenames:
-        target_path = Path(params.folder) / filename 
+        target_path = Path(params.data) / filename 
         if not target_path.exists():
-            if params.no_download:
+            if params.disable_download:
                 logging.critical(f"Error, {target_path} does not exist.")
                 exit(1)
             else:
@@ -186,12 +186,17 @@ def benchmark_convolution(params):
         implementations = [ LoopUnrollConvScatterSum, 
                             CUEConv,
                             LoopUnrollConvDeterministic, 
-                            LoopUnrollConvAtomic
-                            ]
+                            LoopUnrollConvAtomic]
 
+        if params.limited_memory:
+            implementations = [impl for impl in implementations 
+                    if impl != LoopUnrollConvScatterSum
+                    and impl != CUEConv]
+
+        output_folder = None
         for graph in graphs: 
             for direction in ["forward", "backward"]:
-                bench.run(
+                output_folder = bench.run(
                         implementations = implementations,
                         graph = graph,
                         direction=direction, 
@@ -199,7 +204,13 @@ def benchmark_convolution(params):
                         double_backward_correctness=False,
                         benchmark=True,
                         output_folder=params.output_folder)
-            
+
+    if params.plot:
+        if not params.limited_memory:
+            plot({"data_folder": data_folder})
+        else:
+            logger.critical("Cannot plot convolution speedups over cuE with --limited-memory flag enabled.")
+
 
 def correctness(params):
     implementations = [LoopUnrollTP]
@@ -262,7 +273,7 @@ if __name__=='__main__':
     parser_uvu.add_argument("--datatypes", "-t", type=str, nargs='+',
             default=['float32', 'float64'], help="Data types to benchmark",
             choices=['float32', 'float64'])
-    parser_uvu.add_argument("--limited-memory", action="store_true", help="Disable some tests that have high memory usage for e3nn.")
+    parser_uvu.add_argument("--limited-memory", action="store_true", help="Disable tests requiring large amounts of memory.")
     parser_uvu.add_argument("--plot", action="store_true", help="Plot the results.")
     parser_uvu.set_defaults(func=benchmark_uvu)
 
@@ -273,9 +284,12 @@ if __name__=='__main__':
     parser_correctness = subparsers.add_parser('correctness', help='Run correctness tests')
     parser_correctness.set_defaults(func=correctness)
 
-    parser_conv = subparsers.add_parser('conv', help='Run the convolution benchmark')
+    parser_conv = subparsers.add_parser('conv', help='Run the fused convolution kernel benchmark')
     parser_conv.add_argument("--data", type=str, help="Folder containing graph data", required=True)
+    parser_conv.add_argument("--disable_download", action='store_true', help="Disable downloading data files if they do not exist")
     parser_conv.add_argument("--disable_bench", action='store_true', help="Disable benchmark (downloads data if needed)")
+    parser_conv.add_argument("--limited-memory", action="store_true", help="Disable tests requiring large amounts of memory.")
+    parser_conv.add_argument("--plot", action="store_true", help="Plot the results.")
     parser_conv.set_defaults(func=benchmark_convolution)
 
     parser_uvu = subparsers.add_parser('uvw', help='Run the UVW kernel benchmark without fusion') 
