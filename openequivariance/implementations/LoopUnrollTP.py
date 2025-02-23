@@ -49,15 +49,18 @@ class LoopUnrollTP(TensorProductBase):
                     include_scratch=self.is_uvw,
                     stream_weights=self.is_uvw)
 
+        # Latent error: warps per block must be a multiple of 4 or we run into
+        # problems for uvw, float64 backward pass. Need to eventually fix.
+
         try:
             generate_forward_schedule(8)
         except Exception as e:
-            generate_forward_schedule(6)
+            generate_forward_schedule(4)
 
         try:
             generate_backward_schedule(8)
         except Exception as e:
-            generate_backward_schedule(6)
+            generate_backward_schedule(4)
 
 
         self.jit_kernel = template.render(
