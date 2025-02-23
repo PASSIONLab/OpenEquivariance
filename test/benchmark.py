@@ -1,9 +1,9 @@
+import numpy as np
+import numpy.linalg as la
+
 import itertools, logging, argparse, os
 from pathlib import Path
 import urllib.request
-
-import numpy as np
-import numpy.linalg as la
 
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.extlib import DeviceProp
@@ -211,7 +211,7 @@ def plot(params):
     test_name = None
     with open(pathlib.Path(params.data_folder) / "metadata.json", 'r') as f:
         metadata = json.load(f)
-        test_name = metadata.test_name
+        test_name = metadata["test_name"]
 
     if test_name == "uvu":        
         plotting.plot_uvu(params.data_folder)
@@ -259,7 +259,9 @@ if __name__=='__main__':
             choices=['forward', 'backward'])
     parser_uvu.set_defaults(func=run_paper_uvw_benchmark)
 
-    parser_plot = subparsers.add_parser('plot', help="Generate a plot for the results.")
+    parser_plot = subparsers.add_parser('plot', help="Generate a plot for a set of benchmarks.")
+    parser_plot.add_argument("data_folder", type=str)
+    parser_plot.set_defaults(func=plot)
 
     args = parser.parse_args()
     args.func(args)

@@ -4,7 +4,8 @@ import os, json, pathlib, sys
 from openequivariance.benchmark.plotting import *
 
 def plot_uvu(data_folder):
-    benchmarks, metadata = load_benchmarks(pathlib.Path(data_folder))
+    data_folder = pathlib.Path(data_folder)
+    benchmarks, metadata = load_benchmarks(data_folder)
     for benchmark in benchmarks:
         if benchmark["implementation_name"] == "E3NNTensorProductCompiledMaxAutotuneCUDAGraphs":
             benchmark["implementation_name"] = "E3NNTensorProduct"

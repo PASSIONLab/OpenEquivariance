@@ -294,9 +294,6 @@ def roofline_plot(draw_bounds, cpu_roofs, mem_bottlenecks, AI_v, datapoints, com
 plt.rcParams['font.family'] = 'serif'
 plt.rcParams.update({'font.size': 11})
 
-sys.path.insert(1, os.path.join(sys.path[0], '..'))
-from openequivariance.benchmark.analysis_utils import *
-
 labelmap = {"E3NNTensorProduct": "e3nn", "CUETensorProduct": "cuE", "LoopUnrollTP": "ours",
             "E3NNTensorProductCompiledCUDAGraphs": "e3nn",
             "LoopUnrollConvScatterSum": "fast-scattersum", "CUEConvolution": "cuE-scattersum", 
