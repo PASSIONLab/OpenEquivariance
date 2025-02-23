@@ -99,7 +99,7 @@ class TestBenchmarkSuite:
             else:
                 raise ValueError("output folder must be specified for non-editable installs.")
         else:
-            output_folder = pathlib.Path(output_folder) / f"{millis_since_epoch}"        
+            output_folder = pathlib.Path(output_folder)
 
         TestBenchmarkSuite.validate_inputs(test_list)
         output_folder.mkdir(parents=True)

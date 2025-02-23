@@ -109,8 +109,8 @@ def benchmark_uvu(params):
         num_warmup=100,
         num_iter=100,
         bench_batch_size=params.batch_size,
-        prng_seed=11111
-    )
+        prng_seed=11111,
+        test_name="uvu")
 
     bench_suite.run(tests, params.output_folder)
 
@@ -205,6 +205,16 @@ def benchmark_convolution(params):
                     double_backward_correctness=False,
                     benchmark=True,
                     output_folder=params.output_folder)
+            
+def plot(params):
+    import openequivariance.benchmark.plotting as plotting
+    test_name = None
+    with open(pathlib.Path(params.data_folder) / "metadata.json", 'r') as f:
+        metadata = json.load(f)
+        test_name = metadata.test_name
+
+    if test_name == "uvu":        
+        plotting.plot_uvu(params.data_folder)
 
 if __name__=='__main__':
     logger.setLevel(logging.INFO)
@@ -237,7 +247,7 @@ if __name__=='__main__':
     parser_correctness.set_defaults(func=correctness)
 
     parser_conv = subparsers.add_parser('conv', help='Run the convolution benchmark')
-    parser_conv.add_argument("--folder", type=str, help="Folder containing graph data", required=True)
+    parser_conv.add_argument("--data", type=str, help="Folder containing graph data", required=True)
     parser_conv.add_argument("--no_download", action='store_true', default=False, help="Download data if it does not exist")
     parser_conv.add_argument("--run_bench", action='store_true', help="Run benchmarks (disable to only download data)")
     parser_conv.set_defaults(func=benchmark_convolution)
@@ -248,6 +258,8 @@ if __name__=='__main__':
             default=['forward', 'backward'], help="Directions to benchmark",
             choices=['forward', 'backward'])
     parser_uvu.set_defaults(func=run_paper_uvw_benchmark)
+
+    parser_plot = subparsers.add_parser('plot', help="Generate a plot for the results.")
 
     args = parser.parse_args()
     args.func(args)

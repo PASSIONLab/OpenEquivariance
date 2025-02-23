@@ -21,12 +21,12 @@ def load_graph(filename):
 
 class ConvBenchmarkSuite:
     def __init__(self, configs, 
-        num_warmup = 10,
-        num_iter = 30,
-        reference_impl=None,
-        torch_op=True,
-        prng_seed = 12345
-    ):
+            num_warmup = 10,
+            num_iter = 30,
+            reference_impl=None,
+            torch_op=True,
+            test_name=None,
+            prng_seed = 12345):
         self.configs = configs
         self.num_warmup = num_warmup
         self.num_iter = num_iter
@@ -35,6 +35,7 @@ class ConvBenchmarkSuite:
         self.correctness_threshold = 1e-5
         self.torch_op = torch_op
         self.exp_count = 0
+        self.test_name = test_name 
 
     def run(self, graph, implementations, direction, output_folder=None, correctness=True, double_backward_correctness=False, benchmark=True):
         millis_since_epoch = round(time.time() * 1000)
@@ -44,11 +45,11 @@ class ConvBenchmarkSuite:
             else:
                 raise ValueError("output folder must be specified for non-editable installs.")
         else:
-            output_folder = pathlib.Path(output_folder) / f"{millis_since_epoch}"
+            output_folder = pathlib.Path(output_folder) 
         output_folder.mkdir(parents=True)
 
         metadata = {
-            "test_name": "Convolution",
+            "test_name": self.test_name, 
             "configs": [str(config) for config in self.configs], 
             "implementations": [impl.name() for impl in implementations],
             "graph": graph.name
