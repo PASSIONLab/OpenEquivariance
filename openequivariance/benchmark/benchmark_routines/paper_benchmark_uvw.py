@@ -24,11 +24,12 @@ def run_paper_uvw_benchmark(params) -> pathlib.Path:
         problem.irrep_dtype = np.float64
         problem.weight_dtype = np.float64
     
-    problems += float64_problems
+    #problems += float64_problems
+    #problems = float64_problems
 
     implementations = [
-        E3NNTensorProductCompiledCUDAGraphs,
-        CUETensorProduct,
+        #E3NNTensorProductCompiledCUDAGraphs,
+        #CUETensorProduct,
         LoopUnrollTP]
 
     tests = [TestDefinition(implementation, problem, direction, correctness=True, benchmark=True) 

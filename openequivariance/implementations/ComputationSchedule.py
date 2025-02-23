@@ -87,7 +87,7 @@ class ComputationSegment:
         #self.interactions.sort(key=lambda x: (x[2], x[0], x[1]))
 
 
-def create_schedule_case2(instructions, memory_per_warp, calculate_smem):
+def create_schedule_case2(instructions, memory_per_warp, calculate_smem, direction):
     segments = []
     cL1 = set([inst[0] for inst in instructions])  
     cL2 = set([inst[1] for inst in instructions])  
@@ -115,7 +115,7 @@ def create_schedule_case2(instructions, memory_per_warp, calculate_smem):
 
     return segments
 
-def create_schedule_case3(instructions, memory_per_warp, calculate_smem):
+def create_schedule_case3(instructions, memory_per_warp, calculate_smem, direction):
     segments = []
     cL1, cL2, cL3, cinst = set(), set(), set(), []
 
@@ -359,11 +359,11 @@ class ComputationSchedule:
         try:
             if schedule_type != 2:
                 raise Exception("Asked for schedule case 3.")
-            self.segments = create_schedule_case2(self.new_instructions, self.memory_per_warp, calculate_smem)
+            self.segments = create_schedule_case2(self.new_instructions, self.memory_per_warp, calculate_smem, direction)
             logger.info(f"{direction.title()} case 2 scheduling succeeded with {len(self.segments)} segments.") 
             schedule2_succeeded = True
         except Exception as e:
-            self.segments = create_schedule_case3(self.new_instructions, self.memory_per_warp, calculate_smem) 
+            self.segments = create_schedule_case3(self.new_instructions, self.memory_per_warp, calculate_smem, direction) 
             logger.info(f"{direction.title()} case 3 scheduling succeeded with {len(self.segments)} segments.")
 
         for i in range(len(self.segments)):
