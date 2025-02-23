@@ -37,6 +37,7 @@ class TestBenchmarkSuite:
     reference_implementation : Optional[type[TensorProductBase]] = None
     correctness_threshold : float = 5e-7
     torch_op : bool = True
+    test_name: str = None
 
     @staticmethod
     def validate_inputs(test_list : list[TestDefinition]) -> None:
@@ -105,6 +106,7 @@ class TestBenchmarkSuite:
         output_folder.mkdir(parents=True)
 
         metadata = TestBenchmarkSuite.generate_metadata(test_list)
+        metadata["test_name"] = self.test_name 
 
         with open(os.path.join(output_folder,'metadata.json'), 'w') as f:
             json.dump(metadata, f, indent=2) 

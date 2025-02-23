@@ -159,17 +159,17 @@ def benchmark_convolution(params):
         graphs.append(load_graph(str(target_path)))
 
     configs = [ ChannelwiseTPP("128x0e+128x1o+128x2e", 
-                "1x0e+1x1o+1x2e+1x3o",
-                "128x0e+128x1o+128x2e+128x3o"),
+                    "1x0e+1x1o+1x2e+1x3o",
+                    "128x0e+128x1o+128x2e+128x3o"),
                 ChannelwiseTPP("128x0e+128x1o+128x2e", 
-                "1x0e+1x1o+1x2e+1x3o",
-                "128x0e+128x1o+128x2e+128x3o"),
+                    "1x0e+1x1o+1x2e+1x3o",
+                    "128x0e+128x1o+128x2e+128x3o"),
                 ] # MACE-large 
 
     configs[1].irrep_dtype = np.float64
     configs[1].weight_dtype = np.float64
 
-    bench = ConvBenchmarkSuite(configs, torch_op=True)
+    bench = ConvBenchmarkSuite(configs, torch_op=True, test_name="convolution") 
 
     implementations = [ LoopUnrollConvScatterSum, 
                         CUEConv,
@@ -220,7 +220,8 @@ def plot(params):
         plotting.plot_uvw(params.data_folder)
     elif test_name == "roofline":        
         plotting.plot_roofline(params.data_folder)
-
+    elif test_name == "convolution":
+        plotting.plot_convolution(params.data_folder)
 
 if __name__=='__main__':
     logger.setLevel(logging.INFO)
