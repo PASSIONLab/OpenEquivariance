@@ -47,7 +47,10 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
         for(int k = 0; k < {{L2[v].mul}}; k++) {
             {%- if problem.instructions[k].connection_mode == "uvu" %}
-                weight = weights_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id];
+                if(lane_id < {{L1[u].mul}}) {
+                    weight = weights_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id];
+                }
+
                 #pragma unroll
                 for(int j = 0; j < {{L2[v].ir.dim}}; j++)
                     l2_vec[j] = L2_smem[j + {{L2.slices()[v].start}} + k * {{L2[v].ir.dim}}] * weight;
@@ -161,7 +164,9 @@ __device__ __forceinline__ void backward_loop_unroll_{{id}}(
             {%- endif %}
 
             {%- if problem.instructions[k].connection_mode == "uvu" %}
-                weight = weights_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id];
+                if(lane_id < {{L1[u].mul}}) {
+                    weight = weights_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id];
+                }
                 weight_grad = 0.0;
 
                 {%- for i in range(tensor.nnz) %} 
@@ -238,7 +243,9 @@ __device__ __forceinline__ void backward_loop_unroll_{{id}}(
             {%- endif %}
 
             {%- if problem.instructions[k].connection_mode != "uvw" %}
-                weights_grad_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id] = weight_grad;
+                if(lane_id < {{L1[u].mul}}) {
+                    weights_grad_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id] = weight_grad;
+                }
             {%- endif %}
         }
 
