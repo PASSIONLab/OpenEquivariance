@@ -36,10 +36,8 @@ datatype_map = {
 }
 
 mace_conv = [
-    ("128x0e+128x1o+128x2e", "1x0e+1x1o+1x2e+1x3o", "128x0e+128x1o+128x2e+128x3o", 
-    "mace-large"),
-    ("128x0e+128x1o", "1x0e+1x1o+1x2e+1x3o", "128x0e+128x1o+128x2e", 
-    "mace-medium")
+    ("128x0e+128x1o+128x2e", "1x0e+1x1o+1x2e+1x3o", "128x0e+128x1o+128x2e+128x3o", "mace-large"),
+    ("128x0e+128x1o", "1x0e+1x1o+1x2e+1x3o", "128x0e+128x1o+128x2e", "mace-medium")
 ]
 
 nequip_conv = [
@@ -105,10 +103,11 @@ def benchmark_uvu(params):
                     'nequip-revmd17-benzene', irrep_dtype=np.float64, weight_dtype=np.float64), direction, correctness=True, benchmark=True) 
                     for direction in ['forward', 'backward']])
 
-    # Don't benchmark benzene at all if user disables it 
+    # Remove some more configurations for GPUs with limited memory 
     if params.limited_memory:
-        tests = [test for test in tests if test.implementation == LoopUnrollTP
-                or test.implementation == CUETensorProduct 
+        tests = [test for test in tests if 
+                (test.implementation == LoopUnrollTP and 'benzene' not in test.problem.label)
+                or (test.implementation == CUETensorProduct and 'benzene' not in test.problem.label)
                 or ('benzene' not in test.problem.label and test.problem.irrep_dtype != np.float64)]
 
     bench_suite = TestBenchmarkSuite(

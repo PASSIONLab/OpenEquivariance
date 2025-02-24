@@ -114,20 +114,19 @@ class E3NNTensorProductCompiledCUDAGraphs(E3NNTensorProductCompiled):
         torch_compile_kwargs = {
             'fullgraph':True,
             'backend': 'inductor',
-            'options':
-            {   
-            'triton.cudagraphs':True,
-            },
+            'options': { 'triton.cudagraphs': True}
         }
         super().__init__(config, torch_compile_kwargs, torch_op=torch_op)
 
 class E3NNTensorProductCompiledMaxAutotuneCUDAGraphs(E3NNTensorProductCompiled):
     def __init__(self, config : TPProblem, torch_op=True):
-         
-        TORCH_COMPILE_AUTOTUNING_DIR.mkdir(exist_ok=True)
+        global torch
+        import torch
 
+        TORCH_COMPILE_AUTOTUNING_DIR.mkdir(exist_ok=True)
         os.environ['TORCHINDUCTOR_CACHE_DIR'] = str(TORCH_COMPILE_AUTOTUNING_DIR)
         os.environ['TRITON_CACHE_DIR'] = str(TORCH_COMPILE_AUTOTUNING_DIR)
+        torch._dynamo.config.cache_size_limit = 64
 
         torch_compile_kwargs = {
             'fullgraph':True,
