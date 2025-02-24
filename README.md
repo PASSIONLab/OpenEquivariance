@@ -186,21 +186,24 @@ Run it with the following invocations:
 python benchmark.py -o outputs/uvu uvu --plot
 python benchmark.py -o outputs/uvu uvw --plot
 python benchmark.py -o outputs/roofline roofline --plot
+python benchmark.py -o outputs/conv conv --plot --data data/molecular_structures
 ```
 
 If your GPU has limited memory, you might want to try
 the `--limited-memory` flag to disable some expensive
 tests and / or reduce the batch size with `-b`. Here's a set
-of working invocations for the A5000:
+of invocations for an A5000 GPU:
 
 ```bash
 python benchmark.py -o outputs/uvu uvu --limited-memory --plot
 python benchmark.py -o outputs/uvu uvu -b 25000 --plot
 python benchmark.py -o outputs/roofline roofline --plot
+python benchmark.py -o outputs/conv conv --data data/molecular_structures --limited-memory
 ```
 Note that for GPUs besides the one we used in our 
 testing, the roofline slope / peak will be incorrect, and your results
-may differ from the ones we've reported. 
+may differ from the ones we've reported. The plots for the convolution fusion
+experiments also require a GPU with a minimum of 40GB of memory. 
 
 ## Tensor products we accelerate 
 e3nn supports a variety of connection modes for CG tensor products. We support 

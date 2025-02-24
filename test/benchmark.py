@@ -85,13 +85,12 @@ def benchmark_uvu(params):
                 problem.weight_dtype = np.float64
 
             problems.append(problem)
- 
+
     tests = [TestDefinition(implementation, problem, direction, correctness=False, benchmark=True) 
              for implementation, problem, direction
              in itertools.product(implementations, problems, directions)]
 
-    # Handle the float64 Benzene case specially
-    # since we run out of memory with torch compile
+    # Handle the float64 Benzene case, since we run out of memory with torch compile
     tests = [test for test in tests
             if 'benzene' not in test.problem.label
             or test.implementation != E3NNTensorProductCompiledMaxAutotuneCUDAGraphs 
@@ -100,7 +99,7 @@ def benchmark_uvu(params):
     if 'e3nn' in params.implementations and 'float64' in params.datatypes:
         tests.extend([TestDefinition(E3NNTensorProduct, 
             CTPP('64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e + 64x3o + 64x3e',  '0e + 1o + 2e + 3o', '64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e + 64x3o + 64x3e', 
-                    'nequip-revmd17-benzene', irrep_dtype=np.float64, weight_dtype=np.float64), direction, correctness=True, benchmark=True) 
+                    'nequip-revmd17-benzene', irrep_dtype=np.float64, weight_dtype=np.float64), direction, correctness=False, benchmark=True) 
                     for direction in ['forward', 'backward']])
 
     # Remove some more configurations for GPUs with limited memory 
@@ -206,7 +205,7 @@ def benchmark_convolution(params):
 
     if params.plot:
         if not params.limited_memory:
-            plot({"data_folder": data_folder})
+            plot({"data_folder": output_folder})
         else:
             logger.critical("Cannot plot convolution speedups over cuE with --limited-memory flag enabled.")
 
