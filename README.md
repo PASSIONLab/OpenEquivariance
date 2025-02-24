@@ -196,7 +196,7 @@ of invocations for an A5000 GPU:
 
 ```bash
 python benchmark.py -o outputs/uvu uvu --limited-memory --plot
-python benchmark.py -o outputs/uvu uvu -b 25000 --plot
+python benchmark.py -o outputs/uvw uvw -b 25000 --plot
 python benchmark.py -o outputs/roofline roofline --plot
 python benchmark.py -o outputs/conv conv --data data/molecular_structures --limited-memory
 ```
