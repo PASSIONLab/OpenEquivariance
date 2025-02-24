@@ -191,7 +191,10 @@ python benchmark.py -o outputs/conv conv --plot --data data/molecular_structures
 
 If your GPU has limited memory, you might want to try
 the `--limited-memory` flag to disable some expensive
-tests and / or reduce the batch size with `-b`. Here's a set
+tests and / or reduce the batch size with `-b`. Run
+`python benchmark.py --help` for a full list of flags.
+
+Here's a set
 of invocations for an A5000 GPU:
 
 ```bash
