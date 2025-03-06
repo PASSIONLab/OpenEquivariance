@@ -15,8 +15,6 @@ from torch.utils.benchmark import Timer
 from mace.calculators import mace_mp
 from torch.profiler import profile, record_function, ProfilerActivity
 
-from openequivariance import package_root
-
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -146,6 +144,7 @@ def create_model_cueq(hidden_irreps, max_ell, device, cueq_config=None):
     return model_cueq.to(device)
 
 def main():
+    print("WARNING: You need a modified version of MACE to run this driver.")
     parser = argparse.ArgumentParser()
     parser.add_argument("xyz_file", type=str, help="Path to xyz file")
     parser.add_argument("--device", type=str, default="cuda", choices=["cpu", "cuda"])
@@ -154,15 +153,14 @@ def main():
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--hidden_irreps", type=str, default="128x0e + 128x1o + 128x2e")
     parser.add_argument("--output_folder", type=str, default=None)
+    parser.add_argument("--implementations", "-i", type=str, nargs='+', 
+            default=['e3nn', 'cue', 'oeq'], help="Implementations to benchmark",
+            choices=['e3nn', 'cue', 'oeq'])
+
     args = parser.parse_args()
 
     output_folder = args.output_folder
-
-    if output_folder is None:
-        millis_since_epoch = round(time.time() * 1000)
-        output_folder = pathlib.Path(f'{package_root}/outputs/{millis_since_epoch}')
-    else:
-        output_folder = pathlib.Path(output_folder)
+    output_folder = pathlib.Path(output_folder)
 
     for dtype_str, dtype in [   ("f32", torch.float32),
                                 ("f64", torch.float64)
@@ -202,19 +200,22 @@ def main():
         print(f"Hidden irreps: {hidden_irreps}")
         print(f"Number of iterations: {args.num_iters}\n")
 
-        model_e3nn = create_model(hidden_irreps, args.max_ell, device)
-        measurement_e3nn = benchmark_model(model_e3nn, batch_dict, args.num_iters, label=f"e3nn_{dtype_str}", output_folder=output_folder)
-        print(f"E3NN Measurement:\n{measurement_e3nn}")
+        if 'e3nn' in args.implementations:
+            model_e3nn = create_model(hidden_irreps, args.max_ell, device)
+            measurement_e3nn = benchmark_model(model_e3nn, batch_dict, args.num_iters, label=f"e3nn_{dtype_str}", output_folder=output_folder)
+            print(f"E3NN Measurement:\n{measurement_e3nn}")
 
-        model_oeq = create_model_oeq(hidden_irreps, args.max_ell, device)
-        measurement_oeq = benchmark_model(model_oeq, batch_dict, args.num_iters, label=f"ours_{dtype_str}", output_folder=output_folder)
-        print(f"\nFast TP (ours) Measurement:\n{measurement_oeq}")
-        print(f"\nSpeedup: {measurement_e3nn.mean / measurement_oeq.mean:.2f}x")
-         
-        model_cueq = create_model_cueq(hidden_irreps, args.max_ell, device)
-        measurement_cueq = benchmark_model(model_cueq, batch_dict, args.num_iters, label=f"cuE_{dtype_str}", output_folder=output_folder)
-        print(f"\nCUET Measurement:\n{measurement_cueq}")
-        print(f"\nSpeedup: {measurement_e3nn.mean / measurement_cueq.mean:.2f}x")
+        if 'oeq' in args.implementations:
+            model_oeq = create_model_oeq(hidden_irreps, args.max_ell, device)
+            measurement_oeq = benchmark_model(model_oeq, batch_dict, args.num_iters, label=f"ours_{dtype_str}", output_folder=output_folder)
+            print(f"\nOpenEquivariance Measurement:\n{measurement_oeq}")
+            #print(f"\nSpeedup: {measurement_e3nn.mean / measurement_oeq.mean:.2f}x")
+
+        if 'cue' in args.implementations:
+            model_cueq = create_model_cueq(hidden_irreps, args.max_ell, device)
+            measurement_cueq = benchmark_model(model_cueq, batch_dict, args.num_iters, label=f"cuE_{dtype_str}", output_folder=output_folder)
+            print(f"\nCUET Measurement:\n{measurement_cueq}")
+            #print(f"\nSpeedup: {measurement_e3nn.mean / measurement_cueq.mean:.2f}x")
 
 
 if __name__ == "__main__":
