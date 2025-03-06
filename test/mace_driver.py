@@ -115,7 +115,7 @@ def benchmark_model(model, batch, num_iterations=100, warmup=100, label=None, ou
             "cuda_time_profile": analyze_trace(trace_file)
         }, f, indent=4) 
 
-    print(run_inference())
+    #print(run_inference())
 
     return measurement
 
@@ -152,7 +152,7 @@ def main():
     parser.add_argument("--max_ell", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--hidden_irreps", type=str, default="128x0e + 128x1o + 128x2e")
-    parser.add_argument("--output_folder", type=str, default=None)
+    parser.add_argument("--output_folder", '-o', type=str, default=None)
     parser.add_argument("--implementations", "-i", type=str, nargs='+', 
             default=['e3nn', 'cue', 'oeq'], help="Implementations to benchmark",
             choices=['e3nn', 'cue', 'oeq'])
