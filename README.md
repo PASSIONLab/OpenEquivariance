@@ -141,32 +141,6 @@ know by filing a bug and try a development build (see
 below). After installation, you should be able 
 to run the example above.
 
-### Development build 
-The steps below assume that you're using a bash shell and have a C / C++ 
-compiler that CMake can find. If not, you can install [gxx](https://anaconda.org/conda-forge/gxx/) from `conda-forge`. 
-
-1. **Setup**: Create an environment (or activate an existing one) with 
-  our core dependencies: 
-    ```bash
-    conda create -c conda-forge --name my_env python=3.11 pybind11 cmake nvidia::cuda-toolkit
-    conda activate my_env 
-    ``` 
-
-2. **Install**: Build our package and install via `pip`: 
-    ```bash
-    git clone https://github.com/PASSIONLab/OpenEquivariance
-    cd OpenEquivariance 
-    sh dev_build.sh 
-    pip install . # Use pip install -e . for an editable install 
-    ``` 
-
-3. **Test**: You're ready to go!
-
-You don't have to install NVIDIA's CUDA toolkit or CMake if they exist on your
-platform, but you're responsible for setting LD_LIBRARY_PATH so that libraries
-are findable at runtime. Installing the CUDA toolkit via `conda` takes care of this for
-you. 
-
 ### Build to replicate our benchmarks 
 To run our benchmark suite, you'll also need the following packages: 
 - `e3nn`, 
@@ -207,6 +181,34 @@ Note that for GPUs besides the one we used in our
 testing, the roofline slope / peak will be incorrect, and your results
 may differ from the ones we've reported. The plots for the convolution fusion
 experiments also require a GPU with a minimum of 40GB of memory. 
+
+### Running MACE
+We have modified MACE to use our accelerated kernels instead
+of the standard e3nn backend. Here are the steps to replicate
+our MACE benchmark:
+
+1. Install `oeq` and our modified version of MACE:
+```bash
+pip uninstall mace-torch
+pip install git+https://github.com/PASSIONLab/OpenEquivariance
+pip install git+https://github.com/vbharadwaj-bk/mace_oeq
+```
+
+2. Download the `carbon.xyz` data file, available at <https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/>. 
+   This graph has 158K edges. If you used the original e3nn backend, you would need a GPU with 80GB
+   of memory to run the experiments. `oeq` provides a memory-efficient equivariant convolution, so we expect
+   the test to succeed.
+
+3. Benchmark OpenEquivariance: 
+```bash
+python test/mace_driver.py carbon.xyz -o outputs/mace_tests -i oeq
+```
+
+4. If you have a GPU with 80GB of memory OR supply a smaller molecular graph
+   as the xyz argument, you can run the full benchmark that includes `e3nn` and `cue`: 
+```bash
+python test/mace_driver.py carbon.xyz -o outputs/mace_tests -i e3nn cue oeq
+```
 
 ## Tensor products we accelerate 
 e3nn supports a variety of connection modes for CG tensor products. We support 
