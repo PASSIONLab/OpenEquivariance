@@ -195,7 +195,7 @@ pip install git+https://github.com/vbharadwaj-bk/mace_oeq
 ```
 
 2. Download the `carbon.xyz` data file, available at <https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/>. 
-   This graph has 158K edges. If you used the original e3nn backend, you would need a GPU with 80GB
+   This graph has 158K edges. With the original e3nn backend, you would need a GPU with 80GB
    of memory to run the experiments. `oeq` provides a memory-efficient equivariant convolution, so we expect
    the test to succeed.
 
@@ -205,7 +205,7 @@ python test/mace_driver.py carbon.xyz -o outputs/mace_tests -i oeq
 ```
 
 4. If you have a GPU with 80GB of memory OR supply a smaller molecular graph
-   as the xyz argument, you can run the full benchmark that includes `e3nn` and `cue`: 
+   as the input file, you can run the full benchmark that includes `e3nn` and `cue`: 
 ```bash
 python test/mace_driver.py carbon.xyz -o outputs/mace_tests -i e3nn cue oeq
 ```
