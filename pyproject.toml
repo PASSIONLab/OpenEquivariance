@@ -15,7 +15,8 @@ description = "A fast GPU JIT kernel generator for the Clebsch-Gordon Tensor Pro
 requires-python = ">=3.11"
 dependencies = [
   "ninja",
-  "torch"
+  "jinja2",
+  "torch",
 ]
 
 [tool.setuptools.packages.find]
