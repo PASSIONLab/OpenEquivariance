@@ -13,11 +13,46 @@ authors = [
 ]
 description = "A fast GPU JIT kernel generator for the Clebsch-Gordon Tensor Product"
 requires-python = ">=3.11"
+
 dependencies = [
   "ninja",
   "jinja2",
   "torch",
+  "numpy",
+]
+
+[project.optional-dependencies]
+bench = [
+  "matplotlib",
+  "e3nn",
+  "e3nn_jax",
+  "cuequivariance",
+  "cuequivariance-torch",
+  "cuequivariance-ops-torch-cu12",
+]
+
+test = [
+  "pytest",
+  "pytest-cov",
+]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
 ]
 
 [tool.setuptools.packages.find]
 include = ["openequivariance*"]
+
+[tool.setuptools.package_data]
+# Including shared objects and empty files under extlib
+"openequivariance.extlib" = ["*.so", "*.empty"]
+
+# Including CUDA header files and Jinja templates under templates
+"openequivariance.templates" = ["*.cuh", "*.jinja"]
+
+# Including all files in the extension subdirectories
+"openequivariance.extension" = ["*"]
+"openequivariance.extension.convolution" = ["*"]
+"openequivariance.extension.tensorproducts" = ["*"]
+"openequivariance.extension.util" = ["*"]
