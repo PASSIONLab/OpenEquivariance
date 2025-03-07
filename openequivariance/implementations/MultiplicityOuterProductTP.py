@@ -1,3 +1,5 @@
+__all__ = ["MultiplicityOuterProductTP"]
+
 import numpy as np
 
 from openequivariance.benchmark.e3nn_lite_utils import calc_weight_offsets
