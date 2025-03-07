@@ -150,7 +150,7 @@ To run our benchmark suite, you'll also need the following packages:
 - `matplotlib` (to reproduce our figures) 
 
 You can get all the necessary dependencies in 
-`env_benchmarking.yaml` 
+`benchmarking_requirements.txt` 
 
 We conducted our benchmarks on an NVIDIA A100-SXM-80GB GPU at
 Lawrence Berkeley National Laboratory. Your results may differ 

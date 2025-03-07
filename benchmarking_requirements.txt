@@ -1,0 +1,12 @@
+setuptools
+numpy
+jinja2
+pybind11
+matplotlib
+torch
+e3nn
+e3nn_jax
+cuequivariance
+cuequivariance-jax
+cuequivariance-torch
+cuequivariance-ops-torch-cu12
