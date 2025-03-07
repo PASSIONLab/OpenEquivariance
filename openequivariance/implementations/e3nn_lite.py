@@ -35,6 +35,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
+__all__ = [
+    "Irrep",
+    "_MulIr",
+    "Irreps",
+    "Instruction",
+    "TPProblem",
+    "wigner_3j",
+]
+
 import itertools
 from typing import Tuple, NamedTuple, Union, List, Any, Optional
 from math import sqrt, prod
