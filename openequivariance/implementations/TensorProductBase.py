@@ -11,10 +11,6 @@ logger = getLogger()
 class TensorProductBase:
     next_tp_id = 0 # Used to assign unique IDs to each TP instance 
 
-    @staticmethod
-    def load_cg_tensor(l1, l2, l3):
-        return wigner_3j(l1, l2, l3) 
-
     '''
     Each class implementation of a TensorProduct uses
     a different internal representation, which it can
