@@ -19,5 +19,14 @@ dependencies = [
   "torch",
 ]
 
+[project.optional-dependencies]
+bench = [
+  "matplotlib",
+  "e3nn",
+  "cuequivariance",
+  "cuequivariance-torch",
+  "cuequivariance-ops-torch-cu12",
+]
+
 [tool.setuptools.packages.find]
 include = ["openequivariance*"]
