@@ -149,8 +149,11 @@ To run our benchmark suite, you'll also need the following packages:
 - `cuEquivariance-ops-torch-cu11` OR `cuEquivariance-ops-torch-cu12` 
 - `matplotlib` (to reproduce our figures) 
 
-You can get all the necessary dependencies in 
-`benchmarking_requirements.txt` 
+You can get all the necessary dependencies via our optional dependencies `[bench]`
+
+```bash
+pip install "git+https://github.com/PASSIONLab/OpenEquivariance[bench]"
+```
 
 We conducted our benchmarks on an NVIDIA A100-SXM-80GB GPU at
 Lawrence Berkeley National Laboratory. Your results may differ 
