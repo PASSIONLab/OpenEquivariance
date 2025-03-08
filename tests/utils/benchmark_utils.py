@@ -1,16 +1,19 @@
+import functools
+
 import numpy as np
 
-from openequivariance.benchmark.random_buffer_utils import get_random_buffers_forward, get_random_buffers_backward
-from openequivariance.benchmark.perf_metrics_utils import (
+from tests.utils.random_buffer_utils import get_random_buffers_forward, get_random_buffers_backward
+from tests.utils.perf_metrics_utils import (
     calculate_minimum_flops_forward, 
     calculate_minimum_memory_streamed_forward, 
     calculate_minimum_memory_streamed_backward,
     )
-from openequivariance.benchmark.e3nn_lite_utils import calculate_total_nnz
+
 from openequivariance.implementations.TensorProductBase import TensorProductBase
 from openequivariance.implementations.e3nn_lite import TPProblem
 from openequivariance.implementations.CUETensorProduct import CUETensorProduct
-from openequivariance.benchmark.logging_utils import getLogger, bcolors 
+from openequivariance.logging_utils import getLogger, bcolors 
+from openequivariance.interface.wigner_3j import wigner_3j
 
 logger = getLogger()
 
@@ -186,3 +189,23 @@ def benchmark_backward(
             )
 
         return result
+
+def calculate_total_nnz(tpp : TPProblem) -> int:
+        """
+        To make sure you don't over count repeat CGs which get used multiple times 
+        """
+        nnz_by_l_combo = {}
+        for ins in tpp.instructions: # type : Instruction
+            l1 = tpp.irreps_in1[ins.i_in1].ir.l 
+            l2 = tpp.irreps_in2[ins.i_in2].ir.l
+            l3 = tpp.irreps_out[ins.i_out].ir.l
+            assert isinstance(l1, int)
+            assert isinstance(l2, int)
+            assert isinstance(l3, int)
+            nnz_by_l_combo[(l1,l2,l3)] =  count_cg_non_zero(l1,l2,l3)
+        return sum(nnz_by_l_combo.values())
+
+# Non Zeros 
+@functools.lru_cache(typed=True)
+def count_cg_non_zero(l1, l2, l3) -> int:
+    return np.count_nonzero(wigner_3j(l1, l2, l3))

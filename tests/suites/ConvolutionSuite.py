@@ -4,7 +4,7 @@ import numpy.linalg as la
 import os
 
 import openequivariance as oeq
-from openequivariance.benchmark.logging_utils import *
+from openequivariance.logging_utils import *
 from openequivariance.implementations.convolution.ConvolutionBase import *
 logger = getLogger()
 
@@ -19,7 +19,7 @@ def load_graph(filename):
 
     return CoordGraph(coords, rows.astype(np.int64), cols.astype(np.int64), name)
 
-class ConvBenchmarkSuite:
+class ConvolutionSuite:
     def __init__(self, configs, 
             num_warmup = 10,
             num_iter = 30,

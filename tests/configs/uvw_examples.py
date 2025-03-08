@@ -1,4 +1,4 @@
-from openequivariance.benchmark.tpp_creation_utils import FullyConnectedTPProblem as FCTPP
+from openequivariance.interface.tpp_creation_utils import FullyConnectedTPProblem as FCTPP
 
 __all__ = ["e3nn_torch_tetris", "e3nn_torch_tetris_polynomial", "diffdock_configs"]
 
@@ -14,7 +14,6 @@ e3nn_torch_tetris = [
     # 1st Layer
     FCTPP("50x0e + 50x1o + 50x2e", "1x0e", "250x0e + 50x1o + 50x1e + 50x2o + 50x2e"), #sc
     FCTPP("50x0e + 50x1o + 50x2e", "1x0e", "50x0e + 50x1o + 50x2e"), #lin1 
-    # FCTPP("50x0e + 50x1o + 50x2e", "1x0e + 1x1o + 1x2e",  "150x0e + 200x1o + 100x1e + 100x2o + 200x2e"), #tp
     FCTPP("150x0e + 200x1o + 100x1e + 100x2o + 200x2e", "1x0e", "250x0e + 50x1o + 50x1e + 50x2o + 50x2e"), #lin2
     FCTPP("150x0e + 200x1o + 100x1e + 100x2o + 200x2e", "1x0e", "1x0e"), #alpha
 

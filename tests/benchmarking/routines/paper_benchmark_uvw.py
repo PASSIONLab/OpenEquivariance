@@ -1,13 +1,13 @@
 import itertools, sys, os, logging, copy, pathlib
 import numpy as np
 
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.logging_utils import getLogger
 from openequivariance.implementations.E3NNTensorProduct import E3NNTensorProductCompiledCUDAGraphs
 from openequivariance.implementations.CUETensorProduct import CUETensorProduct
 from openequivariance.implementations.LoopUnrollTP import LoopUnrollTP
-from openequivariance.benchmark.TestBenchmarkSuite import TestBenchmarkSuite, TestDefinition, Direction
-from openequivariance.benchmark.tpp_creation_utils import FullyConnectedTPProblem
-from configurations import e3nn_torch_tetris_polynomial, diffdock_configs
+from tests.suites.TensorProductSuite import TensorProductSuite, TestDefinition, Direction
+from openequivariance.interface.tpp_creation_utils import FullyConnectedTPProblem
+from configs import e3nn_torch_tetris_polynomial, diffdock_configs
 
 logger = getLogger()
 
@@ -35,7 +35,7 @@ def run_paper_uvw_benchmark(params) -> pathlib.Path:
                 for problem, direction, implementation
                 in itertools.product(problems, params.directions, implementations)]
 
-    bench_suite = TestBenchmarkSuite(
+    bench_suite = TensorProductSuite(
             correctness_threshold = 5e-5,
             num_warmup=100,
             num_iter=100,

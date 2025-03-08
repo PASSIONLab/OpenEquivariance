@@ -1,4 +1,4 @@
-from openequivariance.benchmark.tpp_creation_utils import FullyConnectedTPProblem as FCTPP
+from openequivariance.interface.tpp_creation_utils import FullyConnectedTPProblem as FCTPP
 
 __all__ = [
     "basic_fully_connected_problems",

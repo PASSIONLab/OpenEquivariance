@@ -3,7 +3,7 @@ import numpy.linalg as la
 
 from openequivariance.implementations.CUETensorProduct import CUETensorProduct
 from openequivariance.implementations.convolution.ConvolutionBase import *
-from openequivariance.benchmark.tpp_creation_utils import *
+from openequivariance.interface.tpp_creation_utils import *
 
 class CUEConv(ConvolutionBase):
     def __init__(self, config, idx_dtype=np.int64, torch_op=True):

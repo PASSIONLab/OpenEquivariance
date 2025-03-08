@@ -10,10 +10,10 @@ import openequivariance as oeq
 from openequivariance.extlib import DeviceProp
 from openequivariance.implementations.TensorProductBase import TensorProductBase
 
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.logging_utils import getLogger
 from openequivariance.extlib import *
 from openequivariance.implementations.e3nn_lite import TPProblem
-from openequivariance.benchmark.correctness_utils import correctness_forward, correctness_backward
+from tests.utils.correctness_utils import correctness_forward, correctness_backward
 from openequivariance.benchmark.benchmark_utils import benchmark_forward, benchmark_backward
 
 logger = getLogger()
@@ -28,7 +28,7 @@ class TestDefinition(NamedTuple):
     benchmark : bool = True
 
 @dataclass(init=True, repr=False, eq=False)
-class TestBenchmarkSuite:
+class TensorProductSuite:
     num_warmup : int = 10
     num_iter : int = 30
     correctness_batch_size : int = 10_000
@@ -37,7 +37,7 @@ class TestBenchmarkSuite:
     reference_implementation : Optional[type[TensorProductBase]] = None
     correctness_threshold : float = 5e-7
     torch_op : bool = True
-    test_name: str = None
+    test_name : Optional[str] = None
 
     @staticmethod
     def validate_inputs(test_list : list[TestDefinition]) -> None:
@@ -102,10 +102,10 @@ class TestBenchmarkSuite:
         else:
             output_folder = pathlib.Path(output_folder)
 
-        TestBenchmarkSuite.validate_inputs(test_list)
+        TensorProductSuite.validate_inputs(test_list)
         output_folder.mkdir(parents=True)
 
-        metadata = TestBenchmarkSuite.generate_metadata(test_list)
+        metadata = TensorProductSuite.generate_metadata(test_list)
         metadata["test_name"] = self.test_name 
 
         with open(os.path.join(output_folder,'metadata.json'), 'w') as f:

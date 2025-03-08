@@ -2,7 +2,7 @@ import numpy as np
 from openequivariance.extlib import *
 from openequivariance.implementations.e3nn_lite import *
 from itertools import accumulate
-from openequivariance.benchmark.logging_utils import *
+from openequivariance.logging_utils import *
 from openequivariance.implementations.TensorProductBase import *
 logger = getLogger()
 

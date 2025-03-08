@@ -1,6 +1,6 @@
 # Examples from the README 
 import logging
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.logging_utils import getLogger
 logger = getLogger()
 logger.setLevel(logging.ERROR)
 

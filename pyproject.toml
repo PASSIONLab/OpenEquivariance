@@ -36,6 +36,10 @@ test = [
   "pytest-cov",
 ]
 
+lint = [
+  "ruff"
+]
+
 [tool.pytest.ini_options]
 addopts = [
     "--import-mode=importlib",

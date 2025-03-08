@@ -5,12 +5,12 @@ import os
 
 import openequivariance
 from openequivariance.extlib import *
-from openequivariance.benchmark.tpp_creation_utils import *
+from openequivariance.interface.tpp_creation_utils import *
 from openequivariance.implementations.convolution.LoopUnrollConv import *
 from openequivariance.implementations.convolution.CUEConv import *
 
-from openequivariance.benchmark.logging_utils import *
-from openequivariance.benchmark.ConvBenchmarkSuite import *
+from openequivariance.logging_utils import *
+from tests.suites.ConvolutionSuite import *
 logger = getLogger()
 
 if __name__=='__main__':
@@ -39,7 +39,7 @@ if __name__=='__main__':
     graph.cols = graph.cols[:cut_size]
     graph.nnz = cut_size
 
-    bench = ConvBenchmarkSuite(
+    bench = ConvolutionSuite(
         configs, torch_op=True)
     bench.run( graph,
             [   LoopUnrollConvScatterSum, 
