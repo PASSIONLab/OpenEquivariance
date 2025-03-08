@@ -1,19 +1,15 @@
-import pickle, pathlib, typing
+import typing
 from math import prod
 import numpy as np
 import numpy.linalg as la
 from openequivariance.extlib import *
 
-from openequivariance.implementations.e3nn_lite import TPProblem, wigner_3j
-from openequivariance.benchmark.logging_utils import getLogger, bcolors
+from openequivariance.implementations.e3nn_lite import TPProblem
+from openequivariance.logging_utils import getLogger, bcolors
 logger = getLogger()
 
 class TensorProductBase:
     next_tp_id = 0 # Used to assign unique IDs to each TP instance 
-
-    @staticmethod
-    def load_cg_tensor(l1, l2, l3):
-        return wigner_3j(l1, l2, l3) 
 
     '''
     Each class implementation of a TensorProduct uses

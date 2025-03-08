@@ -3,8 +3,8 @@ from typing import Optional
 from openequivariance.implementations.TensorProductBase import TensorProductBase
 from openequivariance.implementations.CUETensorProduct import CUETensorProduct 
 from openequivariance.implementations.e3nn_lite import TPProblem
-from openequivariance.benchmark.random_buffer_utils import get_random_buffers_forward, get_random_buffers_backward
-from openequivariance.benchmark.logging_utils import getLogger, bcolors 
+from tests.utils.random_buffer_utils import get_random_buffers_forward, get_random_buffers_backward
+from openequivariance.logging_utils import getLogger, bcolors 
 import numpy as np 
 import numpy.linalg as la
 

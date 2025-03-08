@@ -1,11 +1,11 @@
 import numpy as np
 import numpy.linalg as la
 from openequivariance.extlib import *
-from openequivariance.benchmark.random_buffer_utils import * 
+from tests.utils.random_buffer_utils import * 
 from openequivariance.implementations.TensorProductBase import *
 
-from openequivariance.benchmark.logging_utils import getLogger, bcolors 
-from openequivariance.benchmark.correctness_utils import check_similiarity
+from openequivariance.logging_utils import getLogger, bcolors 
+from tests.utils.correctness_utils import check_similiarity
 logger = getLogger()
 
 def flops_data_per_tp(config, direction):

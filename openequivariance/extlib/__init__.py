@@ -1,7 +1,7 @@
 import os, warnings, tempfile
 from pathlib import Path
 
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.logging_utils import getLogger
 
 oeq_root = str(Path(__file__).parent.parent)
 

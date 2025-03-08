@@ -156,7 +156,7 @@ We conducted our benchmarks on an NVIDIA A100-SXM-80GB GPU at
 Lawrence Berkeley National Laboratory. Your results may differ 
 a different GPU.
 
-The file `test/benchmark.py` can reproduce the figures in 
+The file `benchmarking/benchmark.py` can reproduce the figures in 
 our paper an A100-SXM4-80GB GPU. 
 Run it with the following invocations: 
 ```bash
@@ -204,13 +204,13 @@ pip install git+https://github.com/vbharadwaj-bk/mace_oeq
 
 3. Benchmark OpenEquivariance: 
 ```bash
-python test/mace_driver.py carbon.xyz -o outputs/mace_tests -i oeq
+python benchmarking/mace_driver.py carbon.xyz -o outputs/mace_tests -i oeq
 ```
 
 4. If you have a GPU with 80GB of memory OR supply a smaller molecular graph
    as the input file, you can run the full benchmark that includes `e3nn` and `cue`: 
 ```bash
-python test/mace_driver.py carbon.xyz -o outputs/mace_tests -i e3nn cue oeq
+python benchmarking/mace_driver.py carbon.xyz -o outputs/mace_tests -i e3nn cue oeq
 ```
 
 ## Tensor products we accelerate 

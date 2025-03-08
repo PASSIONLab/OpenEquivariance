@@ -3,22 +3,24 @@ import itertools, typing, os
 import numpy as np
 import numpy.linalg as la
 
-from openequivariance.benchmark.logging_utils import *
-from openequivariance.implementations.e3nn_lite import *
-from openequivariance.benchmark.e3nn_lite_utils import *
-from openequivariance.extlib import *
-from openequivariance.benchmark.random_buffer_utils import get_random_buffers_forward, get_random_buffers_backward
-from openequivariance.benchmark.TestBenchmarkSuite import TestBenchmarkSuite, TestDefinition, Direction
-from openequivariance.benchmark.tpp_creation_utils import *
-from openequivariance.implementations.LoopUnrollTP import LoopUnrollTP
-from openequivariance.implementations.NumpyTensorProduct import NumpyTensorProduct
-from openequivariance.implementations.MultiplicityOuterProductTP import MultiplicityOuterProductTP
-from openequivariance.implementations.E3NNTensorProduct import (
+import openequivariance as oeq 
+
+from oeq.benchmark.logging_utils import *
+from oeq.implementations.e3nn_lite import *
+from oeq.benchmark.e3nn_lite_utils import *
+from oeq.extlib import *
+from oeq.benchmark.random_buffer_utils import get_random_buffers_forward, get_random_buffers_backward
+from oeq.benchmark.TestBenchmarkSuite import TestBenchmarkSuite, TestDefinition, Direction
+from oeq.benchmark.tpp_creation_utils import *
+from oeq.implementations.LoopUnrollTP import LoopUnrollTP
+from oeq.implementations.NumpyTensorProduct import NumpyTensorProduct
+from oeq.implementations.MultiplicityOuterProductTP import MultiplicityOuterProductTP
+from oeq.implementations.E3NNTensorProduct import (
     E3NNTensorProduct, 
     E3NNTensorProductCompiledCUDAGraphs, 
     E3NNTensorProductCompiledMaxAutotuneCUDAGraphs,
     )
-from openequivariance.implementations.CUETensorProduct import CUETensorProduct
+from oeq.implementations.CUETensorProduct import CUETensorProduct
 
 logger = getLogger()
 
@@ -122,38 +124,7 @@ if __name__=='__main__':
 
     FCTPP = FullyConnectedTPProblem
     ChannelTPP = ChannelwiseTPP 
-    basic_fully_connected_problems = [
-        FCTPP("1x1e", "1x1e", "1x1e"),
-        FCTPP("1x1e", "1x1e", "2x1e"),
-        FCTPP("1x1e", "2x1e", "1x1e"), 
-        FCTPP("2x1e", "1x1e", "1x1e"),
-        FCTPP("2x1e", "2x1e", "1x1e"),
-        FCTPP("2x1e", "2x1e", "2x1e"),
-        FCTPP("2x1e", "2x1e", "4x1e") 
-    ]
-
-    increasing_multiplicity_fully_connected_problems = [
-        FCTPP("2x1e", "2x1e", "2x1e"),
-        FCTPP("4x1e", "4x1e", "4x1e"),
-        FCTPP("8x1e", "8x1e", "8x1e"),
-        FCTPP("16x1e", "16x1e", "16x1e"),
-        FCTPP("32x1e", "32x1e", "32x1e"),
-    ]
-
-    full_size_uvw_case = [
-        FCTPP("32x1e", "32x1e", "32x1e"),
-        FCTPP("32x2e", "32x2e", "32x2e"),
-        FCTPP("32x3e", "32x3e", "32x3e"),
-        FCTPP("32x4e", "32x4e", "32x4e"),
-        FCTPP("32x5e", "32x5e", "32x5e"),
-    ]
-
-    basic_multi_interaction_problems = [
-        FCTPP("2x1e + 1x0e", "2x1e", "4x1e"),
-        FCTPP("2x1e", "2x1e + 1x0e", "4x1e"),
-        FCTPP("2x1e + 1x0e", "2x1e + 1x0e", "4x1e"),
-        FCTPP("32x1e + 32x0e", "32x1e + 32x0e", "32x1e + 32x0e"),
-    ]
+    
 
     conv_problems = [  
         #FCTPP("32x0e + 32x0e + 24x1e + 24x1o + 16x2e + 16x2o", "1x0e+1x1o+1x2e+1x3o", "0o + 6x0e")
