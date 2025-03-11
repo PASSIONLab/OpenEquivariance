@@ -100,7 +100,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 }
 {%- endmacro %}
 
-{%- macro generate_segment_kernel_backward(id, segment) %}
+{%- macro generate_segment_kernel_backward(id, segment, warp_size) %}
 {%- set L1, L2, L3, interactions, problem = segment.L1, segment.L2, segment.L3, segment.interactions, segment.problem %}
 
 {%- set L1_irrep_lengths = L1 | map(attribute="ir") | map(attribute="dim") | list %}
@@ -230,7 +230,7 @@ __device__ __forceinline__ void backward_loop_unroll_{{id}}(
                         l2_grad[j] = 0.0;
                     }
                     #pragma unroll
-                    for (int offset = 16; offset > 0; offset /= 2) {
+                    for (int offset = {{ warp_size  // 2}}; offset > 0; offset /= 2) {
                         l2_grad[j] += __shfl_down_sync(FULL_MASK, l2_grad[j], offset);
                     } 
                 }

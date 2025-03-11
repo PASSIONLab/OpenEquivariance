@@ -45,7 +45,7 @@ else:
         extra_link_args = [ '-Wl,--no-as-needed', '-lhiprtc']
 
         def postprocess(kernel):
-            kernel = kernel.replace("__syncwarp();", "")
+            kernel = kernel.replace("__syncwarp();", "__threadfence_block();")
             kernel = kernel.replace("__shfl_down_sync(FULL_MASK,", "__shfl_down(")
             return kernel 
         postprocess_kernel = postprocess

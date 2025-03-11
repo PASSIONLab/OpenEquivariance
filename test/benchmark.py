@@ -221,6 +221,7 @@ def correctness(params):
 
     bench_suite = TestBenchmarkSuite(
         correctness_threshold = 5e-5,
+        correctness_batch_size=1000,
         num_warmup=100,
         num_iter=100,
         prng_seed=11111,

@@ -133,7 +133,7 @@ __global__ void forward(
 }
 
 {%- for i, segment in enumerate(backward_schedule.segments) %}
-{{ generate_segment_kernel_backward(i, segment) }}
+{{ generate_segment_kernel_backward(i, segment, backward_schedule.launch_config.warp_size) }}
 {%- endfor %}
 
 {{ generate_fixup_kernel("fixup_backward", backward_schedule.launch_config.warp_size, backward_schedule.L1.dim, backward_workspace_offset) }}

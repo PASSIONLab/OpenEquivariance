@@ -258,9 +258,11 @@ class ComputationSchedule:
         # Stream weights on the fly before pre-loading 
         self.stream_weights = stream_weights 
 
+        launch_config = KernelLaunchConfig()
+
         # Step 1: Break the irreps and the instructions into chunks of at most 32 x 32 x 32. 
 
-        self.problem_splitter = ProblemSplitter(config, 32)
+        self.problem_splitter = ProblemSplitter(config, launch_config.warp_size)
         self.updated_config = self.problem_splitter.output
         self.L1, self.L2, self.L3 = self.updated_config.irreps_in1, self.updated_config.irreps_in2, self.updated_config.irreps_out 
         self.new_instructions = self.updated_config.instructions
@@ -417,9 +419,8 @@ class ComputationSchedule:
         true_max_smem = max([seg.smem["total"] for seg in self.segments])
         self.memory_per_warp = true_max_smem
 
-        launch_config = KernelLaunchConfig()
         launch_config.num_blocks = block_count
-        launch_config.num_threads = warps_per_block * 32
+        launch_config.num_threads = warps_per_block * launch_config.warp_size
         launch_config.smem = self.memory_per_warp * warps_per_block 
         logger.info(f"{direction.title()} pass needs {launch_config.smem // 1000} KB of shared memory.")
         self.launch_config = launch_config
