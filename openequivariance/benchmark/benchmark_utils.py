@@ -49,9 +49,9 @@ def calculate_performance_statistics(
             "bandwidth_gbps": bandwidth_gbps,
         }
 
-        logger.info(f"{bcolors.OKCYAN}Avg. Throughput: {bcolors.ENDC} {bcolors.WARNING}{np.mean(throughputs_gflops):.2f} ± {np.std(throughputs_gflops):.2f} GFLOPS{bcolors.ENDC}")
-        logger.info(f"{bcolors.OKCYAN}Avg. Bandwidth : {bcolors.ENDC} {bcolors.WARNING}{np.mean(bandwidth_gbps)    :.2f} ± {np.std(bandwidth_gbps)    :.2f} GBPS{bcolors.ENDC}")
-        logger.info(f"{bcolors.OKCYAN}Avg. Walltime  : {bcolors.ENDC} {bcolors.WARNING}{np.mean(time_millis)       :.2f} ± {np.std(time_millis)       :.2f} mS{bcolors.ENDC}")
+        logger.info(f"{bcolors.OKCYAN}Avg. Throughput: {bcolors.ENDC} {bcolors.WARNING}{np.mean(throughputs_gflops):.2f} ± {np.std(throughputs_gflops):.2f} GFLOPs{bcolors.ENDC}")
+        logger.info(f"{bcolors.OKCYAN}Avg. Bandwidth : {bcolors.ENDC} {bcolors.WARNING}{np.mean(bandwidth_gbps)    :.2f} ± {np.std(bandwidth_gbps)    :.2f} GBPs{bcolors.ENDC}")
+        logger.info(f"{bcolors.OKCYAN}Avg. Walltime  : {bcolors.ENDC} {bcolors.WARNING}{np.mean(time_millis)       :.2f} ± {np.std(time_millis)       :.2f} ms{bcolors.ENDC}")
         return result 
 
 def benchmark_forward(
