@@ -28,5 +28,9 @@ bench = [
   "cuequivariance-ops-torch-cu12",
 ]
 
+dev = [
+  "pytest",
+]
+
 [tool.setuptools.packages.find]
 include = ["openequivariance*"]
