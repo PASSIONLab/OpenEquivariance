@@ -2,13 +2,13 @@ import numpy as np
 import numpy.linalg as la
 
 from openequivariance.implementations.convolution.ConvolutionBase import *
-from openequivariance.implementations.NumpyTensorProduct import *
+from openequivariance.implementations.E3NNTensorProduct import *
 
 class NumpyConv(ConvolutionBase):
     def __init__(self, config):
         self.config = config 
         self.L1, self.L2, self.L3 = config.irreps_in1, config.irreps_in2, config.irreps_out
-        self.reference_tp = NumpyTensorProduct(config)
+        self.reference_tp = E3NNTensorProduct(config)
 
     @staticmethod
     def name():
