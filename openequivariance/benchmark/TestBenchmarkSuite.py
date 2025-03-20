@@ -38,6 +38,8 @@ class TestBenchmarkSuite:
     correctness_threshold : float = 5e-7
     torch_op : bool = True
     test_name: str = None
+    metadata: dict = None
+    results: list = None
 
     @staticmethod
     def validate_inputs(test_list : list[TestDefinition]) -> None:
@@ -92,7 +94,8 @@ class TestBenchmarkSuite:
 
         return metadata
 
-    def run(self, test_list : list[TestDefinition], output_folder=None) -> pathlib.Path:
+    def run(self, test_list : list[TestDefinition], output_folder=None, progressbar=False) -> pathlib.Path:
+        self.results = []
         millis_since_epoch = round(time.time() * 1000)
         if output_folder is None:
             if oeq._check_package_editable():
@@ -111,7 +114,13 @@ class TestBenchmarkSuite:
         with open(os.path.join(output_folder,'metadata.json'), 'w') as f:
             json.dump(metadata, f, indent=2) 
 
-        for test_ID, test in enumerate(test_list): 
+        target_iterable = enumerate(test_list)
+        if progressbar:
+            import tqdm
+            target_iterable = tqdm.tqdm(target_iterable, desc=self.test_name, 
+                                        total=len(test_list))
+
+        for test_ID, test in target_iterable: 
             impl = test.implementation
             tpp = test.problem
 
@@ -191,6 +200,9 @@ class TestBenchmarkSuite:
             with open(fname, 'w') as f:
                 json.dump(result, f, indent=2)
 
+            self.results.append(result)
             logger.info(f'Finished Test ID: {test_ID}')
-        
+
+        self.metadata = metadata
+
         return output_folder
