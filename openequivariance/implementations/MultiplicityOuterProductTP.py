@@ -1,9 +1,10 @@
+__all__ = ["MultiplicityOuterProductTP"]
+
 import numpy as np
 
-from openequivariance.benchmark.e3nn_lite_utils import calc_weight_offsets
 from openequivariance.benchmark.e3nn_lite_utils import Irrep, _MulIr, Irreps, TPProblem, Instruction
 from openequivariance.implementations.TensorProductBase import TensorProductBase 
-from openequivariance.benchmark.logging_utils import getLogger, bcolors 
+from openequivariance.logging_utils import getLogger, bcolors 
 from jinja2 import Environment, PackageLoader
 
 from openequivariance.extlib import KernelLaunchConfig, JITTPImpl, DeviceProp
@@ -182,3 +183,19 @@ class MultiplicityOuterProductTP(TensorProductBase):
     @staticmethod
     def name():
         return "MultiplicityOuterProductTP"
+
+def calc_weight_offsets(tpp : TPProblem) -> list[int]:
+    """
+    Returns a list of weight offsets for every instruction. 
+    """
+    assert isinstance(tpp, TPProblem)
+    offset = 0
+    offsets = []
+    for ins in tpp.instructions:
+        assert isinstance(ins, Instruction) 
+        offsets.append(offset)
+        if ins.has_weight:
+            flatsize = math.prod(ins.path_shape)
+            offset += flatsize
+    return offsets     
+        

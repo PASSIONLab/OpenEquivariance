@@ -1,3 +1,5 @@
+__all__ = ["LoopUnrollTP"]
+
 import numpy as np
 
 from openequivariance.extlib import *
@@ -5,8 +7,9 @@ from openequivariance.templates.jinja_utils import *
 from openequivariance.implementations.ComputationSchedule import ComputationSchedule 
 
 from openequivariance.implementations.TensorProductBase import TensorProductBase 
-from openequivariance.benchmark.logging_utils import getLogger, bcolors
+from openequivariance.logging_utils import getLogger, bcolors
 from openequivariance.benchmark.e3nn_lite_utils import count_cg_non_zero
+
 logger = getLogger()
 
 class LoopUnrollTP(TensorProductBase):

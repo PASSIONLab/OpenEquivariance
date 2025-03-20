@@ -1,9 +1,8 @@
 import math
 
-from openequivariance.benchmark.e3nn_lite_utils import count_cg_non_zero, sparse_outer_product_work
 from openequivariance.implementations.TensorProductBase import TensorProductBase
 from openequivariance.implementations.e3nn_lite import TPProblem
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.logging_utils import getLogger
 import numpy as np
 
 logger = getLogger()
@@ -76,3 +75,6 @@ def calculate_minimum_flops_backward(tpp : TPProblem, batch_size : int) -> dict:
     This is assuming that you form those values and reuse them once per CG decomp.
     """
     raise NotImplementedError("this needs to be implemented properly")
+
+def sparse_outer_product_work(cg : np.ndarray) -> int: 
+    return np.sum(np.max(cg != 0, axis=2))

@@ -17,6 +17,7 @@ dependencies = [
   "ninja",
   "jinja2",
   "torch",
+  "numpy",
 ]
 
 [project.optional-dependencies]
