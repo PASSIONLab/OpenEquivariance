@@ -1,4 +1,5 @@
 import pytest
+from pytest_check import check
 
 import openequivariance as oeq 
 from openequivariance.implementations.e3nn_lite import TPProblem
@@ -30,28 +31,16 @@ def test_tp_backward_correctness(real_world_tpp, test_impl):
         test_implementation=test_impl,
         reference_implementation=None, 
         batch_size=1000,
-        correctness_threshold=1e-6,
-        prng_seed=12345
-        )
-    
-    assert result["weight_grad"]["pass"]
-    assert result["in1_grad"]["pass"]
-    assert result["in2_grad"]["pass"]
-
-def test_tp_backward_correctness(real_world_tpp, test_impl):
-    
-    result = correctness_backward(
-        problem=real_world_tpp,
-        test_implementation=test_impl,
-        reference_implementation=None, 
-        batch_size=1000,
         correctness_threshold=1e-4,
         prng_seed=12345
         )
     
-    assert result["weight_grad"]["pass"]
-    assert result["in1_grad"]["pass"]
-    assert result["in2_grad"]["pass"]
+    with check: 
+        assert result["weight_grad"]["pass"]
+    with check:
+        assert result["in1_grad"]["pass"]
+    with check:
+        assert result["in2_grad"]["pass"]
 
 @pytest.mark.skip(reason="This is failing but it might be my fault")
 def test_tp_double_backward_correctness(real_world_tpp, test_impl):
@@ -64,8 +53,12 @@ def test_tp_double_backward_correctness(real_world_tpp, test_impl):
         correctness_threshold = 1e-4,
         prng_seed = 12345)
     
-    assert result["output_grad"]["pass"]
-    assert result["in1_grad"]["pass"]    
-    assert result["in2_grad"]["pass"]   
-    assert result["weights_grad"]["pass"]    
+    with check:
+        assert result["output_grad"]["pass"]
+    with check: 
+        assert result["in1_grad"]["pass"]   
+    with check:      
+        assert result["in2_grad"]["pass"]   
+    with check: 
+        assert result["weights_grad"]["pass"]    
     
