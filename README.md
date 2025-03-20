@@ -260,7 +260,7 @@ Our codebase includes a lightweight clone of
 [e3nn](https://e3nn.org/)'s frontend interface (in particular, the 
 `TensorProduct` and `Irreps` classes). We removed references to Pytorch
 and separated the implementation from the problem description (for future
-frontend support outside of torch). Thank you to the current
+frontend support outside of torch). We also extacted the Wigner 3j tensor generating code from QuTiP. Thank you to the current
 developers and maintainers! 
 
 ## Copyright
