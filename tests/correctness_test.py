@@ -14,7 +14,7 @@ def id_naming_func(obj):
 def test_tp_forward_correctness(production_model_tpp, test_impl):
     
     result = correctness_forward(
-        problem=real_world_tpp,
+        problem=production_model_tpp,
         test_implementation=test_impl,
         reference_implementation=None, 
         batch_size=1000,
@@ -27,7 +27,7 @@ def test_tp_forward_correctness(production_model_tpp, test_impl):
 def test_tp_backward_correctness(production_model_tpp, test_impl):
     
     result = correctness_backward(
-        problem=real_world_tpp,
+        problem=production_model_tpp,
         test_implementation=test_impl,
         reference_implementation=None, 
         batch_size=1000,
@@ -46,7 +46,7 @@ def test_tp_backward_correctness(production_model_tpp, test_impl):
 def test_tp_double_backward_correctness(production_model_tpp, test_impl):
 
     result = correctness_double_backward(
-        problem = real_world_tpp,  
+        problem = production_model_tpp,  
         test_implementation = test_impl, 
         reference_implementation = None,
         batch_size = 1000, 
