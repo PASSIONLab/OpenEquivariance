@@ -11,7 +11,7 @@ from openequivariance.benchmark.correctness_utils import correctness_forward, co
 def id_naming_func(obj):
     return obj.label if isinstance(obj, TPProblem) else obj
 
-def test_tp_forward_correctness(real_world_tpp, test_impl):
+def test_tp_forward_correctness(production_model_tpp, test_impl):
     
     result = correctness_forward(
         problem=real_world_tpp,
@@ -24,7 +24,7 @@ def test_tp_forward_correctness(real_world_tpp, test_impl):
     
     assert result["output"]["pass"]
 
-def test_tp_backward_correctness(real_world_tpp, test_impl):
+def test_tp_backward_correctness(production_model_tpp, test_impl):
     
     result = correctness_backward(
         problem=real_world_tpp,
@@ -42,8 +42,8 @@ def test_tp_backward_correctness(real_world_tpp, test_impl):
     with check:
         assert result["in2_grad"]["pass"]
 
-@pytest.mark.skip(reason="This is failing but it might be my fault")
-def test_tp_double_backward_correctness(real_world_tpp, test_impl):
+@pytest.mark.skip(reason="Need to add weight reordering in double-backward")
+def test_tp_double_backward_correctness(production_model_tpp, test_impl):
 
     result = correctness_double_backward(
         problem = real_world_tpp,  
