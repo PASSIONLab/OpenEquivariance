@@ -11,7 +11,6 @@ from openequivariance.benchmark.random_buffer_utils import get_random_buffers_fo
 from openequivariance.benchmark.TestBenchmarkSuite import TestBenchmarkSuite, TestDefinition, Direction
 from openequivariance.benchmark.tpp_creation_utils import *
 from openequivariance.implementations.LoopUnrollTP import LoopUnrollTP
-from openequivariance.implementations.NumpyTensorProduct import NumpyTensorProduct
 from openequivariance.implementations.MultiplicityOuterProductTP import MultiplicityOuterProductTP
 from openequivariance.implementations.E3NNTensorProduct import (
     E3NNTensorProduct, 
@@ -213,7 +212,6 @@ if __name__=='__main__':
         num_iter=30,
         correctness_batch_size=10,
         bench_batch_size=50_000,
-        #reference_implementation=NumpyTensorProduct,
         prng_seed=11111,
         torch_op=False
     )

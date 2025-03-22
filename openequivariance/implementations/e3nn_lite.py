@@ -367,6 +367,7 @@ class TPProblem:
     shared_weights: bool
     internal_weights: bool
     weight_numel: int
+    label : str
     _profiling_str: str
     _in1_dim: int
     _in2_dim: int
@@ -406,7 +407,7 @@ class TPProblem:
         self.out_var = out_var
         self.irrep_normalization = irrep_normalization
         self.path_normalization = path_normalization
-        self.label = label
+        self.label = label if label is not None else ""
         del irreps_in1, irreps_in2, irreps_out
 
         instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
