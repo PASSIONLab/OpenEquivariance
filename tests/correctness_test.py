@@ -65,7 +65,8 @@ class TPCorrectness:
             assert result["weights_grad"]["pass"]
 
 class TestProductionModels(TPCorrectness):
-    from openequivariance.benchmark.benchmark_configs import e3nn_torch_tetris_polynomial, diffdock_configs
+    from openequivariance.benchmark.benchmark_configs \
+            import e3nn_torch_tetris_polynomial, diffdock_configs
     production_model_tpps = list(chain(
             e3nn_torch_tetris_polynomial, 
             diffdock_configs))
@@ -84,20 +85,18 @@ class TestUVUSingleIrrep(TPCorrectness):
         (16, 3, 16), (16, 4, 16), (16, 8, 16), (24, 24, 24), (32, 32, 32) 
     ]
     
-    irs = [ 
-        (0, 0, 0), (1, 1, 1), (1, 0, 1), (1, 2, 1),
-        (2, 0, 2), (2, 2, 4), (2, 2, 2), (5, 3, 5), (7, 2, 5) 
-    ]
+    irs = [ (0, 0, 0), (1, 1, 1), (1, 0, 1), (1, 2, 1),
+        (2, 0, 2), (2, 2, 4), (2, 2, 2), (5, 3, 5), (7, 2, 5) ]
     
     def id_func(m, i): 
-        return f"({m[0]}x{i[0]}e) x ({m[1]}x{i[1]}e) -> ({m[2]}x{i[2]})"
+        return f"({m[0]}x{i[0]}e) x ({m[1]}x{i[1]}e) -> ({m[2]}x{i[2]}e)"
 
-    @pytest.fixture(params=product(muls, irs), ids = lambda x: TestUVUSingleIrrep.id_func(x[0], x[1])) 
+    @pytest.fixture(params=product(muls, irs), 
+                    ids = lambda x: TestUVUSingleIrrep.id_func(x[0], x[1])) 
     def problem(self, request, dtype):
-        mul, ir = request.param[0], request.param[1]
+        m, i = request.param[0], request.param[1]
         instructions=[(0, 0, 0, "uvu", True)]
-        c =f"{mul[0]}x{ir[0]}e", f"{mul[0]}x{ir[0]}e", f"{mul[1]}x{ir[1]}e",
-        return oeq.TPProblem(c[0], c[1], c[2], 
+        return oeq.TPProblem(f"{m[0]}x{i[0]}e", f"{m[1]}x{i[1]}e", f"{m[2]}x{i[2]}e",
                              instructions, shared_weights=False, 
                              internal_weights=False,
                              irrep_dtype=dtype, weight_dtype=dtype)
