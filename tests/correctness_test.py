@@ -18,6 +18,12 @@ def dtype(request):
     return request.param
 
 class TPCorrectness:
+    def check_result(self, result, fieldname):
+        with check:
+            error = result[fieldname]["diff_Linf_norm"]
+            thresh = result["thresh"]
+            assert result[fieldname]["pass"], f"{fieldname} observed error={error} >= {thresh}"
+
     def test_tp_fwd(self, problem, implementation): 
         result = correctness_forward(
             problem=problem,
@@ -26,8 +32,8 @@ class TPCorrectness:
             batch_size=1000,
             correctness_threshold=1e-5,
             prng_seed=12345)
-        
-        assert result["output"]["pass"]
+
+        self.check_result(result, "output")
 
     def test_tp_bwd(self, problem, implementation): 
         result = correctness_backward(
@@ -37,13 +43,10 @@ class TPCorrectness:
             batch_size=1000,
             correctness_threshold=1e-4,
             prng_seed=12345)
-        
-        with check: 
-            assert result["weight_grad"]["pass"]
-        with check:
-            assert result["in1_grad"]["pass"]
-        with check:
-            assert result["in2_grad"]["pass"]
+
+        self.check_result(result, "weight_grad")
+        self.check_result(result, "in1_grad")
+        self.check_result(result, "in2_grad")
 
     @pytest.mark.skip(reason="Need to add weight reordering in double-backward")
     def test_tp_double_bwd(self, problem, implementation):
@@ -54,15 +57,11 @@ class TPCorrectness:
             batch_size = 1000,
             correctness_threshold = 1e-4,
             prng_seed = 12345)
-        
-        with check:
-            assert result["output_grad"]["pass"]
-        with check: 
-            assert result["in1_grad"]["pass"] 
-        with check:      
-            assert result["in2_grad"]["pass"] 
-        with check: 
-            assert result["weights_grad"]["pass"]
+
+        self.check_result(result, "output_grad")
+        self.check_result(result, "in1_grad")
+        self.check_result(result, "in2_grad")
+        self.check_result(result, "weights_grad")
 
 class TestProductionModels(TPCorrectness):
     from openequivariance.benchmark.benchmark_configs \
@@ -116,7 +115,7 @@ class TestUVWSingleIrrep(TPCorrectness):
         (2, 0, 2), (2, 2, 4), (2, 2, 2), (5, 3, 5), (7, 2, 5) ]
     
     def id_func(m, i): 
-        return f"({m[0]}x{i[0]}e) x ({m[1]}x{i[1]}e) -> ({m[2]}x{i[2]}e)"
+        return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
 
     @pytest.fixture(params=product(muls, irs), 
                     ids = lambda x: TestUVWSingleIrrep.id_func(x[0], x[1])) 
