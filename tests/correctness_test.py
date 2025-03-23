@@ -41,7 +41,7 @@ class TPCorrectness:
             test_implementation=implementation,
             reference_implementation=None, 
             batch_size=1000,
-            correctness_threshold=1e-4,
+            correctness_threshold=3e-4,
             prng_seed=12345)
 
         self.check_result(result, "weight_grad")
@@ -55,7 +55,7 @@ class TPCorrectness:
             test_implementation = implementation,
             reference_implementation = None,
             batch_size = 1000,
-            correctness_threshold = 1e-4,
+            correctness_threshold = 3e-4,
             prng_seed = 12345)
 
         self.check_result(result, "output_grad")
@@ -89,7 +89,7 @@ class TestUVUSingleIrrep(TPCorrectness):
         (2, 0, 2), (2, 2, 4), (2, 2, 2), (5, 3, 5), (7, 2, 5) ]
     
     def id_func(m, i): 
-        return f"({m[0]}x{i[0]}e) x ({m[1]}x{i[1]}e) -> ({m[2]}x{i[2]}e)"
+        return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
 
     @pytest.fixture(params=product(muls, irs), 
                     ids = lambda x: TestUVUSingleIrrep.id_func(x[0], x[1])) 

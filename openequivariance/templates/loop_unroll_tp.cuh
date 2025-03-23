@@ -11,9 +11,7 @@
 {%- for i, inst in enumerate(problem.instructions) %}
     {%- set u, v, w, _ = interactions[i] %}
     {%- if inst.connection_mode == "uvw" %}
-        {{generate_matmul("matmul_fwd_%d" % i, L3[w].mul, L3[w].ir.dim, L1[u].mul, 4, True)}}
-        {{generate_matmul("matmul_bwd_A_%d" % i, L1[u].mul, L3[w].ir.dim, L3[w].mul, 4, True, A_CMAJOR=False, accum=False)}}
-        {{generate_matmul("matmul_bwd_B_%d" % i, L3[w].mul, L1[u].mul, L3[w].ir.dim, 4, False, A_CMAJOR=False, accum=False)}}
+        {{generate_matmul("matmul_fwd_%d_%d" % (id, i), L3[w].mul, L3[w].ir.dim, L1[u].mul, 4, True)}}
     {%- endif %}
 {%- endfor %}
 
@@ -31,7 +29,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
     int offset;
 
     {%- set num_interact = interactions | length %}
-    
+
     {%- for k in range(num_interact) %}
         {%- set u, v, w, tensor = interactions[k] %}
         {%- set weight_start, _, _ = problem.weight_range_and_shape_for_instruction(k)%}
@@ -77,7 +75,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                 {{transpose_store(L1[u].mul, L3[w].ir.dim, 'scratch', '0', 'l3_vec', '=', '1.0')}}
                 __syncwarp();
                 offset = {{ L3.slices()[w].start}}; 
-                matmul_fwd_{{k}}(weights_smem, scratch, L3_smem + offset);
+                matmul_fwd_{{id}}_{{k}}(weights_smem, scratch, L3_smem + offset);
                 __syncwarp();
 
                 #pragma unroll
@@ -106,6 +104,14 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 {%- set L1_irrep_lengths = L1 | map(attribute="ir") | map(attribute="dim") | list %}
 {%- set L2_irrep_lengths = L2 | map(attribute="ir") | map(attribute="dim") | list %}
 {%- set L3_irrep_lengths = L3 | map(attribute="ir") | map(attribute="dim") | list %}
+
+{%- for i, inst in enumerate(problem.instructions) %}
+    {%- set u, v, w, _ = interactions[i] %}
+    {%- if inst.connection_mode == "uvw" %}
+        {{generate_matmul("matmul_bwd_A_%d_%d" % (id, i), L1[u].mul, L3[w].ir.dim, L3[w].mul, 4, True, A_CMAJOR=False, accum=False)}}
+        {{generate_matmul("matmul_bwd_B_%d_%d" % (id, i), L3[w].mul, L1[u].mul, L3[w].ir.dim, 4, False, A_CMAJOR=False, accum=False)}}
+    {%- endif %}
+{%- endfor %}
 
 __device__ __forceinline__ void backward_loop_unroll_{{id}}(
         const IRREP_T* L1_smem,
@@ -186,7 +192,7 @@ __device__ __forceinline__ void backward_loop_unroll_{{id}}(
 
                     __syncwarp();
                     offset = {{ L3.slices()[w].start}}; 
-                    matmul_bwd_A_{{k}}(weights_smem, L3_grad_smem + offset, scratch);
+                    matmul_bwd_A_{{id}}_{{k}}(weights_smem, L3_grad_smem + offset, scratch);
                     __syncwarp();
 
                     {{transpose_load(L1[u].mul, L3[w].ir.dim, 'scratch', '0', 'l3_grad')}}
@@ -211,7 +217,7 @@ __device__ __forceinline__ void backward_loop_unroll_{{id}}(
                     {{ reg_store(L1[u].mul, L3[w].ir.dim, "scratch", "0", "l3_grad", "=", 1.0) }}
 
                     __syncwarp(); 
-                    matmul_bwd_B_{{k}}(L3_grad_smem + offset, scratch, weights_smem);
+                    matmul_bwd_B_{{id}}_{{k}}(L3_grad_smem + offset, scratch, weights_smem);
                     __syncwarp();
 
                     tmp = weights_grad + {{weight_start}} + k * {{slice_size}} + lane_id;

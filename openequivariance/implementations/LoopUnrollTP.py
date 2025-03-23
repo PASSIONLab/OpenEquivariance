@@ -62,10 +62,12 @@ class LoopUnrollTP(TensorProductBase):
         except Exception as e:
             generate_backward_schedule(4)
 
-
         self.jit_kernel = template.render(
             forward_schedule=self.forward_schedule,
             backward_schedule=self.backward_schedule)
+
+        with open("scratch.txt", "w") as f:
+            f.write(self.jit_kernel)
 
         logger.info("Starting NVRTC")
         self.internal = JITTPImpl(self.jit_kernel,
@@ -83,8 +85,6 @@ class LoopUnrollTP(TensorProductBase):
         self.reorder_weights_oeq_to_e3nn = lambda input, output, has_batch_dim: \
                 self.forward_schedule.reorder_weights(input, output, "backward", has_batch_dim) 
 
-        #with open("scratch.txt", "w") as f:
-        #    f.write(self.jit_kernel)
 
     @staticmethod
     def name():
