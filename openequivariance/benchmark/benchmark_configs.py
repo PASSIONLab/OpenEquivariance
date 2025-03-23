@@ -41,7 +41,7 @@ e3nn_torch_tetris_polynomial = [
 ]
 
 # https://github.com/gcorso/DiffDock/blob/b4704d94de74d8cb2acbe7ec84ad234c09e78009/models/tensor_layers.py#L299
-# specific irreps come from vivek's communication with diff dock team
+# specific irreps come from vivek's communication with DiffDock team
 diffdock_configs = [
     FCTPP("10x1o + 10x1e + 48x0e + 48x0o", "1x0e + 1x1o",        "10x1o + 10x1e + 48x0e + 48x0o", shared_weights=False, label='DiffDock-L=1'),
     FCTPP("10x1o + 10x1e + 48x0e + 48x0o", "1x0e + 1x1o + 1x2e", "10x1o + 10x1e + 48x0e + 48x0o", shared_weights=False, label='DiffDock-L=2'),

@@ -22,7 +22,7 @@ class TPCorrectness:
         with check:
             error = result[fieldname]["diff_Linf_norm"]
             thresh = result["thresh"]
-            assert result[fieldname]["pass"], f"{fieldname} observed error={error} >= {thresh}"
+            assert result[fieldname]["pass"], f"{fieldname} observed error={error:.2f} >= {thresh}"
 
     def test_tp_fwd(self, problem, implementation): 
         result = correctness_forward(
@@ -113,7 +113,10 @@ class TestUVWSingleIrrep(TPCorrectness):
     
     irs = [ (0, 0, 0), (1, 1, 1), (1, 0, 1), (1, 2, 1),
         (2, 0, 2), (2, 2, 4), (2, 2, 2), (5, 3, 5), (7, 2, 5) ]
-    
+
+    #muls = [(48, 1, 48)]
+    #irs = [(5, 7, 5)]
+
     def id_func(m, i): 
         return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
 

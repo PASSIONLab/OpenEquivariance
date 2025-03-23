@@ -56,7 +56,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                 {# Stream weights here #}
                 {%- set slice_size = L3[w].mul * L1[u].mul %}
                 {
-                    WEIGHT_T* tmp = weights + {{weight_start}} + k * {{slice_size}} + lane_id;
+                    WEIGHT_T* tmp = weights + {{segment.weight_offset + weight_start}} + k * {{slice_size}} + lane_id;
                     ROW_OPERATION({{slice_size}}, j, weights_smem[j + lane_id] = tmp[j];)
                 }
                 #pragma unroll
@@ -171,7 +171,7 @@ __device__ __forceinline__ void backward_loop_unroll_{{id}}(
 
             {%- if problem.instructions[k].connection_mode == "uvu" %}
                 if(lane_id < {{L1[u].mul}}) {
-                    weight = weights_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id];
+                    weight = weights_smem[{{segment.weight_offset + weight_start}} + k * {{L1[u].mul}} + lane_id];
                 }
                 weight_grad = 0.0;
 
@@ -220,7 +220,7 @@ __device__ __forceinline__ void backward_loop_unroll_{{id}}(
                     matmul_bwd_B_{{id}}_{{k}}(L3_grad_smem + offset, scratch, weights_smem);
                     __syncwarp();
 
-                    tmp = weights_grad + {{weight_start}} + k * {{slice_size}} + lane_id;
+                    tmp = weights_grad + {{segment.weight_offset + weight_start}} + k * {{slice_size}} + lane_id;
                     {%- if problem.shared_weights %}
                         ROW_OPERATION({{slice_size}}, j, atomicAdd(tmp + j, weights_smem[j + lane_id]);)
                     {%- else %}

@@ -170,18 +170,18 @@ if __name__=='__main__':
 
         #FCTPP("10x1o + 10x1e + 48x0e + 48x0o", "1x0e + 1x1o + 1x2e", "10x1o + 10x1e + 48x0e + 48x0o", shared_weights=False, label='DiffDock L = 2'),
 
-        #SingleInstruction("32x5e", "1x3e", "32x5e", "uvu", True),
+        SingleInstruction("48x5e", "1x7e", "48x5e", "uvw", True),
         #ChannelwiseTPP("128x0e+128x1o+128x2e", 
         #        "1x0e+1x1o+1x2e+1x3o",
         #        "128x0e+128x1o+128x2e+128x3o")
         #ChannelwiseTPP("48x0e", "2x0e", "48x0e")
         #FCTPP("48x0e", "2x0e", "1x0e", shared_weights=False),
-        FCTPP("10x1o + 10x1e + 48x0e", "1x0e + 1x1o + 1x2e", "10x1o + 10x1e + 48x0e", shared_weights=False, label='DiffDock-L=2'),
+        #FCTPP("10x1o + 10x1e + 48x0e", "1x0e + 1x1o + 1x2e", "10x1o + 10x1e + 48x0e", shared_weights=False, label='DiffDock-L=2'),
     ]
 
-    #for problem in conv_problems:
-    #    problem.irrep_dtype = np.float64
-    #    problem.weight_dtype = np.float64
+    for problem in conv_problems:
+        problem.irrep_dtype = np.float64
+        problem.weight_dtype = np.float64
 
     problems = list(itertools.chain(
         # basic_fully_connected_problems,
@@ -199,10 +199,10 @@ if __name__=='__main__':
         #ManyOneUVWTP
         ]
 
-    directions = ['backward'] 
+    directions = ['forward', 'backward'] 
 
     tests = [TestDefinition(implementation, problem, direction, 
-                correctness=True, benchmark=True) 
+                correctness=True, benchmark=False) 
              for problem, direction, implementation
              in itertools.product(problems, directions, implementations)]
  
