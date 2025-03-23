@@ -66,9 +66,6 @@ class LoopUnrollTP(TensorProductBase):
             forward_schedule=self.forward_schedule,
             backward_schedule=self.backward_schedule)
 
-        with open("scratch.txt", "w") as f:
-            f.write(self.jit_kernel)
-
         logger.info("Starting NVRTC")
         self.internal = JITTPImpl(self.jit_kernel,
                 self.forward_schedule.launch_config,
