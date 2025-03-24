@@ -65,8 +65,9 @@ class TPCorrectness:
 
 class TestProductionModels(TPCorrectness):
     from openequivariance.benchmark.benchmark_configs \
-            import e3nn_torch_tetris_polynomial, diffdock_configs
+            import e3nn_torch_tetris_polynomial, diffdock_configs, mace_nequip_problems
     production_model_tpps = list(chain(
+            mace_nequip_problems,
             e3nn_torch_tetris_polynomial, 
             diffdock_configs))
 
