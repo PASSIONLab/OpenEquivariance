@@ -47,18 +47,22 @@ class LoopUnrollTP(TensorProductBase):
                     irrep_dtype = config.irrep_dtype,
                     weight_dtype = config.weight_dtype,
                     include_scratch=self.is_uvw,
-                    stream_weights=self.is_uvw)
+                    stream_weights=self.is_uvw,
+                    schedule_type=3)
 
         # Latent error: warps per block must be a multiple of 4 or we run into
         # problems for uvw, float64 backward pass. Need to eventually fix.
-
         try:
             generate_forward_schedule(8)
         except Exception as e:
             generate_forward_schedule(4)
 
         try:
-            generate_backward_schedule(8)
+            if L3.dim > 15000 and config.irrep_dtype==np.float64:
+                # Long output irreps --> reduce warp count for more resources 
+                generate_backward_schedule(6) 
+            else:
+                generate_backward_schedule(8)
         except Exception as e:
             generate_backward_schedule(4)
 
@@ -72,7 +76,7 @@ class LoopUnrollTP(TensorProductBase):
                 self.backward_schedule.launch_config)
         logger.info("Kernel compiled!")
 
-        logger.info(f"CUDA Kernel File Size: {len(self.jit_kernel) // 1000} KB")
+        logger.info(f"CUDA Kernel File Size: {len(self.jit_kernel) // 1024} KB")
 
         if self.torch_op:
             self.setup_torch_custom_op()

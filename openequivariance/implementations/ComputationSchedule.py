@@ -301,6 +301,7 @@ class ComputationSchedule:
             for i, name in enumerate(smem):
                 smem[name]["offset"] = range_offsets[i]
 
+            # Pad for alignment, in case we want to perform vectorized loads later 
             smem["total"] = sum([smem[name]["size"] for name in smem])
 
             return smem
@@ -421,7 +422,7 @@ class ComputationSchedule:
         launch_config.num_blocks = block_count
         launch_config.num_threads = warps_per_block * 32
         launch_config.smem = self.memory_per_warp * warps_per_block 
-        logger.info(f"{direction.title()} pass needs {launch_config.smem // 1000} KB of shared memory.")
+        logger.info(f"{direction.title()} pass needs {launch_config.smem // 1024} KB of shared memory.")
         self.launch_config = launch_config
 
     def reorder_weights(self, weights_in, weights_out, direction, has_batch_dim):
