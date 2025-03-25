@@ -11,7 +11,6 @@ from openequivariance.benchmark.random_buffer_utils import get_random_buffers_fo
 from openequivariance.benchmark.TestBenchmarkSuite import TestBenchmarkSuite, TestDefinition, Direction
 from openequivariance.benchmark.tpp_creation_utils import *
 from openequivariance.implementations.LoopUnrollTP import LoopUnrollTP
-from openequivariance.implementations.NumpyTensorProduct import NumpyTensorProduct
 from openequivariance.implementations.MultiplicityOuterProductTP import MultiplicityOuterProductTP
 from openequivariance.implementations.E3NNTensorProduct import (
     E3NNTensorProduct, 
@@ -171,18 +170,22 @@ if __name__=='__main__':
 
         #FCTPP("10x1o + 10x1e + 48x0e + 48x0o", "1x0e + 1x1o + 1x2e", "10x1o + 10x1e + 48x0e + 48x0o", shared_weights=False, label='DiffDock L = 2'),
 
-        #SingleInstruction("32x5e", "1x3e", "32x5e", "uvu", True),
+        #ChannelwiseTPP("128x0e+128x1o+128x2e", "1x0e+1x1o+1x2e+1x3o", "128x0e+128x1o+128x2e+128x3o", "mace-large"),
+        ChannelwiseTPP('64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e + 64x3o + 64x3e',  '0e + 1o + 2e + 3o', '64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e + 64x3o + 64x3e', 
+                'nequip-revmd17-benzene')
+
+        #SingleInstruction("49x2e", "1x2e", "49x4e", "uvw", True),
         #ChannelwiseTPP("128x0e+128x1o+128x2e", 
         #        "1x0e+1x1o+1x2e+1x3o",
         #        "128x0e+128x1o+128x2e+128x3o")
         #ChannelwiseTPP("48x0e", "2x0e", "48x0e")
         #FCTPP("48x0e", "2x0e", "1x0e", shared_weights=False),
-        FCTPP("10x1o + 10x1e + 48x0e", "1x0e + 1x1o + 1x2e", "10x1o + 10x1e + 48x0e", shared_weights=False, label='DiffDock-L=2'),
+        #FCTPP("10x1o + 10x1e + 48x0e", "1x0e + 1x1o + 1x2e", "10x1o + 10x1e + 48x0e", shared_weights=False, label='DiffDock-L=2'),
     ]
 
-    #for problem in conv_problems:
-    #    problem.irrep_dtype = np.float64
-    #    problem.weight_dtype = np.float64
+    for problem in conv_problems:
+        problem.irrep_dtype = np.float64
+        problem.weight_dtype = np.float64
 
     problems = list(itertools.chain(
         # basic_fully_connected_problems,
@@ -203,7 +206,7 @@ if __name__=='__main__':
     directions = ['backward'] 
 
     tests = [TestDefinition(implementation, problem, direction, 
-                correctness=True, benchmark=True) 
+                correctness=True, benchmark=False) 
              for problem, direction, implementation
              in itertools.product(problems, directions, implementations)]
  
@@ -211,9 +214,8 @@ if __name__=='__main__':
         correctness_threshold = 5e-5,
         num_warmup=100,
         num_iter=30,
-        correctness_batch_size=10,
+        correctness_batch_size=1,
         bench_batch_size=50_000,
-        #reference_implementation=NumpyTensorProduct,
         prng_seed=11111,
         torch_op=False
     )

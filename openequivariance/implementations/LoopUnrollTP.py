@@ -47,11 +47,11 @@ class LoopUnrollTP(TensorProductBase):
                     irrep_dtype = config.irrep_dtype,
                     weight_dtype = config.weight_dtype,
                     include_scratch=self.is_uvw,
-                    stream_weights=self.is_uvw)
+                    stream_weights=self.is_uvw,
+                    schedule_type=3)
 
         # Latent error: warps per block must be a multiple of 4 or we run into
         # problems for uvw, float64 backward pass. Need to eventually fix.
-
         try:
             generate_forward_schedule(8)
         except Exception as e:
@@ -73,7 +73,7 @@ class LoopUnrollTP(TensorProductBase):
                 self.backward_schedule.launch_config)
         logger.info("Kernel compiled!")
 
-        logger.info(f"CUDA Kernel File Size: {len(self.jit_kernel) // 1000} KB")
+        logger.info(f"CUDA Kernel File Size: {len(self.jit_kernel) // 1024} KB")
 
         if self.torch_op:
             self.setup_torch_custom_op()
@@ -83,8 +83,6 @@ class LoopUnrollTP(TensorProductBase):
         self.reorder_weights_oeq_to_e3nn = lambda input, output, has_batch_dim: \
                 self.forward_schedule.reorder_weights(input, output, "backward", has_batch_dim) 
 
-        #with open("scratch.txt", "w") as f:
-        #    f.write(self.jit_kernel)
 
     @staticmethod
     def name():

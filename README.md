@@ -149,41 +149,53 @@ To run our benchmark suite, you'll also need the following packages:
 - `cuEquivariance-ops-torch-cu11` OR `cuEquivariance-ops-torch-cu12` 
 - `matplotlib` (to reproduce our figures) 
 
-You can get all the necessary dependencies in 
-`env_benchmarking.yaml` 
+You can get all the necessary dependencies via our optional dependencies `[bench]`
+
+```bash
+pip install "git+https://github.com/PASSIONLab/OpenEquivariance[bench]"
+```
 
 We conducted our benchmarks on an NVIDIA A100-SXM-80GB GPU at
 Lawrence Berkeley National Laboratory. Your results may differ 
 a different GPU.
 
-The file `test/benchmark.py` can reproduce the figures in 
+The file `tests/benchmark.py` can reproduce the figures in 
 our paper an A100-SXM4-80GB GPU. 
 Run it with the following invocations: 
 ```bash
-python test/benchmark.py -o outputs/uvu uvu --plot
-python test/benchmark.py -o outputs/uvu uvw --plot
-python test/benchmark.py -o outputs/roofline roofline --plot
-python test/benchmark.py -o outputs/conv conv --plot --data data/molecular_structures
+python tests/benchmark.py -o outputs/uvu uvu --plot
+python tests/benchmark.py -o outputs/uvu uvw --plot
+python tests/benchmark.py -o outputs/roofline roofline --plot
+python tests/benchmark.py -o outputs/conv conv --plot --data data/molecular_structures
 ```
 
 If your GPU has limited memory, you might want to try
 the `--limited-memory` flag to disable some expensive
 tests and / or reduce the batch size with `-b`. Run
-`python test/benchmark.py --help` for a full list of flags.
+`python tests/benchmark.py --help` for a full list of flags.
 
 Here's a set
 of invocations for an A5000 GPU:
 
 ```bash
-python test/benchmark.py -o outputs/uvu uvu --limited-memory --plot
-python test/benchmark.py -o outputs/uvw uvw -b 25000 --plot
-python test/benchmark.py -o outputs/roofline roofline --plot
-python test/benchmark.py -o outputs/conv conv --data data/molecular_structures --limited-memory
+python tests/benchmark.py -o outputs/uvu uvu --limited-memory --plot
+python tests/benchmark.py -o outputs/uvw uvw -b 25000 --plot
+python tests/benchmark.py -o outputs/roofline roofline --plot
+python tests/benchmark.py -o outputs/conv conv --data data/molecular_structures --limited-memory
 ```
 Note that for GPUs besides the one we used in our 
 testing, the roofline slope / peak will be incorrect, and your results
 may differ from the ones we've reported. The plots for the convolution fusion
 experiments also require a GPU with a minimum of 40GB of memory. 
+
+### Testing Correctness
+See the `dev` dependencies in `pyproject.toml`; you'll need `e3nn`,
+`pytest`, and `pytest-check` installed. We have started rolling out tests to cover 
+all of our functionality, which you can run with 
+```bash
+pytest tests/correctness_test.py 
+```
+Browse the file to select specific tests.
 
 ### Running MACE
 We have modified MACE to use our accelerated kernels instead
@@ -204,13 +216,13 @@ pip install git+https://github.com/vbharadwaj-bk/mace_oeq
 
 3. Benchmark OpenEquivariance: 
 ```bash
-python test/mace_driver.py carbon.xyz -o outputs/mace_tests -i oeq
+python tests/mace_driver.py carbon.xyz -o outputs/mace_tests -i oeq
 ```
 
 4. If you have a GPU with 80GB of memory OR supply a smaller molecular graph
    as the input file, you can run the full benchmark that includes `e3nn` and `cue`: 
 ```bash
-python test/mace_driver.py carbon.xyz -o outputs/mace_tests -i e3nn cue oeq
+python tests/mace_driver.py carbon.xyz -o outputs/mace_tests -i e3nn cue oeq
 ```
 
 ## Tensor products we accelerate 
@@ -257,7 +269,7 @@ Our codebase includes a lightweight clone of
 [e3nn](https://e3nn.org/)'s frontend interface (in particular, the 
 `TensorProduct` and `Irreps` classes). We removed references to Pytorch
 and separated the implementation from the problem description (for future
-frontend support outside of torch). Thank you to the current
+frontend support outside of torch). We also extracted the Wigner 3j tensor generating code from QuTiP. Thank you to the current
 developers and maintainers! 
 
 ## Copyright

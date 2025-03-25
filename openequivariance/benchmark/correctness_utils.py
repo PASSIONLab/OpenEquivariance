@@ -45,7 +45,7 @@ def correctness_forward(
 
     result = {
         "thresh": correctness_threshold, 
-        "batch_size":batch_size
+        "batch_size": batch_size
     }
  
     in1, in2, weights, out = get_random_buffers_forward(problem, batch_size, prng_seed)
@@ -94,7 +94,8 @@ def correctness_backward(
         reference_implementation = E3NNTensorProduct
 
     result = {
-        "thresh": correctness_threshold, 
+        "thresh": correctness_threshold,
+        "batch_size": batch_size
     }
     
     # run reference
@@ -179,7 +180,11 @@ def correctness_double_backward(
         from openequivariance.implementations.E3NNTensorProduct import E3NNTensorProduct
         reference_implementation = E3NNTensorProduct
 
-    result = {}
+    result = {
+        "thresh": correctness_threshold,
+        "batch_size": batch_size
+    }
+
     tensors = []
     for impl in [test_implementation, reference_implementation]:
         tp = impl(problem, torch_op=True)

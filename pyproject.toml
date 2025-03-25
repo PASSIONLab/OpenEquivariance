@@ -12,11 +12,32 @@ authors = [
   { name="James Demmel" }
 ]
 description = "A fast GPU JIT kernel generator for the Clebsch-Gordon Tensor Product"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
   "ninja",
-  "torch"
+  "jinja2",
+  "torch",
+]
+
+[project.optional-dependencies]
+bench = [
+  "matplotlib",
+  "e3nn",
+  "tqdm",
+  "cuequivariance",
+  "cuequivariance-torch",
+  "cuequivariance-ops-torch-cu12",
+]
+
+dev = [
+  "pytest",
+  "pytest-check",
 ]
 
 [tool.setuptools.packages.find]
 include = ["openequivariance*"]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]

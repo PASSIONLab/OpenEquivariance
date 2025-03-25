@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.linalg as la
 
-import itertools, logging, argparse, os
+import itertools, logging, argparse, os, copy
 from pathlib import Path
 import urllib.request
 
@@ -35,25 +35,6 @@ datatype_map = {
     'float64': np.float64
 }
 
-mace_conv = [
-    ("128x0e+128x1o+128x2e", "1x0e+1x1o+1x2e+1x3o", "128x0e+128x1o+128x2e+128x3o", "mace-large"),
-    ("128x0e+128x1o", "1x0e+1x1o+1x2e+1x3o", "128x0e+128x1o+128x2e", "mace-medium")
-]
-
-nequip_conv = [
-    ('32x0o + 32x0e + 32x1o + 32x1e + 32x2o + 32x2e', '0e + 1o + 2e', '32x0o + 32x0e + 32x1o + 32x1e + 32x2o + 32x2e', 
-            'nequip-lips'),
-    ('64x0o + 64x0e + 64x1o + 64x1e', '0e + 1o', '64x0o + 64x0e + 64x1o + 64x1e',
-            'nequip-revmd17-aspirin'),
-    ('64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e', '0e + 1o + 2e', '64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e',
-            'nequip-revmd17-toluene'),
-    ('64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e + 64x3o + 64x3e',  '0e + 1o + 2e + 3o', '64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e + 64x3o + 64x3e', 
-            'nequip-revmd17-benzene'),
-    ('32x0o + 32x0e + 32x1o + 32x1e', '0e + 1o', '32x0o + 32x0e + 32x1o + 32x1e', 
-            'nequip-water'),
-]
-
-
 roofline_configs = [
     SingleInstruction(L1, L2, L3, cm, f"[{i+1}]#{L1} x {L2} -> {L3} ({cm})")
     for i, (L1, L2, L3, cm) in enumerate([
@@ -69,22 +50,20 @@ roofline_configs = [
 ]
 
 def benchmark_uvu(params):
+    from openequivariance.benchmark.benchmark_configs \
+            import mace_nequip_problems 
+
+    float64_problems = copy.deepcopy(mace_nequip_problems)
+    for problem in float64_problems: 
+        problem.irrep_dtype = np.float64
+        problem.weight_dtype = np.float64 
+    problems = mace_nequip_problems + float64_problems
+
     implementations = [
         implementation_map[impl] for impl in params.implementations
     ] 
     directions = params.directions
     datatypes = [datatype_map[dt] for dt in params.datatypes]
-
-    problems = []
-    for dtype in datatypes:
-        for config in mace_conv + nequip_conv:
-            problem = CTPP(*config) # float32 by default
-
-            if dtype == np.float64:
-                problem.irrep_dtype = np.float64
-                problem.weight_dtype = np.float64
-
-            problems.append(problem)
 
     tests = [TestDefinition(implementation, problem, direction, correctness=False, benchmark=True) 
              for implementation, problem, direction
@@ -208,27 +187,7 @@ def benchmark_convolution(params):
             plot({"data_folder": output_folder})
         else:
             logger.critical("Cannot plot convolution speedups over cuE with --limited-memory flag enabled.")
-
-
-def correctness(params):
-    implementations = [LoopUnrollTP]
-    directions = [ 'forward', 'backward']
-    problems = [CTPP(*config) for config in mace_conv + nequip_conv]
-
-    tests = [TestDefinition(implementation, problem, direction, correctness=True, benchmark=False) 
-             for implementation, problem, direction
-             in itertools.product(implementations, problems, directions)]
-
-    bench_suite = TestBenchmarkSuite(
-        correctness_threshold = 5e-5,
-        correctness_batch_size=1000,
-        num_warmup=100,
-        num_iter=100,
-        prng_seed=11111,
-        torch_op=False)
-
-    bench_suite.run(tests, params.output_folder)
-            
+ 
 def plot(params):
     import openequivariance.benchmark.plotting as plotting
     data_folder, test_name = None, None
@@ -279,9 +238,6 @@ if __name__=='__main__':
     parser_roofline = subparsers.add_parser('roofline', help='Run the roofline comparison')
     parser_roofline.add_argument("--plot", action="store_true", help="Plot the results.")
     parser_roofline.set_defaults(func=benchmark_roofline)
-
-    parser_correctness = subparsers.add_parser('correctness', help='Run correctness tests')
-    parser_correctness.set_defaults(func=correctness)
 
     parser_conv = subparsers.add_parser('conv', help='Run the fused convolution kernel benchmark')
     parser_conv.add_argument("--data", type=str, help="Folder containing graph data", required=True)
