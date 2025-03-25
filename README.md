@@ -188,6 +188,15 @@ testing, the roofline slope / peak will be incorrect, and your results
 may differ from the ones we've reported. The plots for the convolution fusion
 experiments also require a GPU with a minimum of 40GB of memory. 
 
+### Testing Correctness
+See the `dev` dependencies in `pyproject.toml`; you'll need `e3nn`,
+`pytest`, and `pytest-check` installed. We have started rolling out tests to cover 
+all of our functionality, which you can run with 
+```bash
+pytest tests/correctness_test.py 
+```
+Browse the file to select specific tests.
+
 ### Running MACE
 We have modified MACE to use our accelerated kernels instead
 of the standard e3nn backend. Here are the steps to replicate

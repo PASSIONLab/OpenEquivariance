@@ -239,9 +239,6 @@ if __name__=='__main__':
     parser_roofline.add_argument("--plot", action="store_true", help="Plot the results.")
     parser_roofline.set_defaults(func=benchmark_roofline)
 
-    parser_correctness = subparsers.add_parser('correctness', help='Run correctness tests')
-    parser_correctness.set_defaults(func=correctness)
-
     parser_conv = subparsers.add_parser('conv', help='Run the fused convolution kernel benchmark')
     parser_conv.add_argument("--data", type=str, help="Folder containing graph data", required=True)
     parser_conv.add_argument("--disable_download", action='store_true', help="Disable downloading data files if they do not exist")
