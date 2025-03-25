@@ -41,6 +41,7 @@ __global__ void forward(
         {%- endif %}
 
         {%- for i, segment in enumerate(forward_schedule.segments) %} {
+            __syncwarp();
             {{ declare_smem_variables(segment, "smem") }}
             {{ load_ir_segments(segment.L1Map, "l1", "L1_smem", "j") }}
             {{ load_ir_segments(segment.L2Map, "l2", "L2_smem", "j") }}
@@ -95,6 +96,7 @@ __global__ void backward(
             {{ load_ir_segments(segment.L2Map, "l2_shft", "L2_smem", "j") }}
             {{ load_ir_segments(segment.L3Map, "l3_shft", "L3_grad_smem", "j") }}
 
+            __syncwarp();
             {%- if not segment.L1Map.persist_load %}
                 ROW_OPERATION({{segment.L1.dim}}, j, L1_grad_smem[j + lane_id] = 0.0f;)
             {%- endif %}

@@ -58,11 +58,7 @@ class LoopUnrollTP(TensorProductBase):
             generate_forward_schedule(4)
 
         try:
-            if L3.dim > 15000 and config.irrep_dtype==np.float64:
-                # Long output irreps --> reduce warp count for more resources 
-                generate_backward_schedule(6) 
-            else:
-                generate_backward_schedule(8)
+            generate_backward_schedule(8)
         except Exception as e:
             generate_backward_schedule(4)
 
