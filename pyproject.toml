@@ -23,6 +23,7 @@ dependencies = [
 bench = [
   "matplotlib",
   "e3nn",
+  "tqdm",
   "cuequivariance",
   "cuequivariance-torch",
   "cuequivariance-ops-torch-cu12",
