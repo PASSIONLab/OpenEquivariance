@@ -4,6 +4,7 @@ import argparse
 import logging
 from pathlib import Path
 
+from ase import Atoms
 import ase.io
 import numpy as np
 import torch
@@ -55,31 +56,6 @@ def analyze_trace(trace_file):
         "other_kernels_ms": other_kernels / 1000.
     }
 
-def create_model(hidden_irreps, max_ell, device, cueq_config=None):
-    table = tools.AtomicNumberTable([8, 82, 53, 55])
-    model_config = {
-        "r_max": 6.0,
-        "num_bessel": 8,
-        "num_polynomial_cutoff": 6,
-        "max_ell": max_ell,
-        "interaction_cls": modules.interaction_classes["RealAgnosticResidualInteractionBlock"],
-        "interaction_cls_first": modules.interaction_classes["RealAgnosticResidualInteractionBlock"],
-        "num_interactions": 2,
-        "num_elements": len(table),
-        "hidden_irreps": o3.Irreps(hidden_irreps),
-        "MLP_irreps": o3.Irreps("16x0e"),
-        "gate": torch.nn.functional.silu,
-        "atomic_energies": torch.ones(len(table)),
-        "avg_num_neighbors": 8,
-        "atomic_numbers": table.zs,
-        "correlation": 3,
-        "radial_type": "bessel",
-        "num_elements": 4,
-        "cueq_config": cueq_config,
-        "atomic_inter_scale": 1.0,
-        "atomic_inter_shift": 0.0,
-    }
-    return modules.ScaleShiftMACE(**model_config).to(device)
 
 def benchmark_model(model, batch, num_iterations=100, warmup=100, label=None, output_folder=None):
     def run_inference():
@@ -115,12 +91,27 @@ def benchmark_model(model, batch, num_iterations=100, warmup=100, label=None, ou
             "cuda_time_profile": analyze_trace(trace_file)
         }, f, indent=4) 
 
-    #print(run_inference())
-
     return measurement
 
-def create_model_oeq(hidden_irreps, max_ell, device, cueq_config=None):
-    source_model = create_model(hidden_irreps, max_ell, device, cueq_config)
+def get_e3nn_model(source_model, device):
+    from mace.tools.scripts_utils import extract_config_mace_model
+    config = extract_config_mace_model(source_model)
+    config["oeq_config"] = {"enabled": False}
+    target_model = source_model.__class__(**config).to(device)
+
+    source_dict = source_model.state_dict()
+    target_dict = target_model.state_dict()
+
+    # To migrate openequivariance, we should transfer all keys
+    for key in target_dict:
+        if key in source_dict:
+            target_dict[key] = source_dict[key]
+
+    target_model.load_state_dict(target_dict)
+
+    return target_model.to(device)
+
+def get_oeq_model(source_model, device):
     from mace.tools.scripts_utils import extract_config_mace_model
     config = extract_config_mace_model(source_model)
     config["oeq_config"] = {"enabled": True, "conv_fusion": "deterministic"}
@@ -138,10 +129,19 @@ def create_model_oeq(hidden_irreps, max_ell, device, cueq_config=None):
     return target_model.to(device)
 
 
-def create_model_cueq(hidden_irreps, max_ell, device, cueq_config=None):
-    source_model = create_model(hidden_irreps, max_ell, device, cueq_config)
+def get_cueq_model(source_model, device):
     model_cueq = run_e3nn_to_cueq(source_model)
     return model_cueq.to(device)
+
+def get_implementation_model(source_model, implementation, device):
+    if implementation == 'oeq':
+        return get_oeq_model(source_model, device)
+    if implementation == 'cue':
+        return get_cueq_model(source_model, device)
+    if implementation == 'e3nn':
+        return get_e3nn_model(source_model, device)
+    else: 
+        raise ValueError("not a valid model implementation")
 
 def main():
     print("WARNING: You need a modified version of MACE to run this driver.")
@@ -151,8 +151,7 @@ def main():
     parser.add_argument("--num_iters", type=int, default=100)
     parser.add_argument("--max_ell", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--hidden_irreps", type=str, default="128x0e + 128x1o + 128x2e")
-    parser.add_argument("--output_folder", '-o', type=str, default=None)
+    parser.add_argument("--output_folder", '-o', type=str, required=True)
     parser.add_argument("--implementations", "-i", type=str, nargs='+', 
             default=['e3nn', 'cue', 'oeq'], help="Implementations to benchmark",
             choices=['e3nn', 'cue', 'oeq'])
@@ -162,17 +161,23 @@ def main():
     output_folder = args.output_folder
     output_folder = pathlib.Path(output_folder)
 
-    for dtype_str, dtype in [   ("f32", torch.float32),
-                                ("f64", torch.float64)
+    for dtype_str, dtype, mace_dtype_str in [   
+            ("f32", torch.float32, "float32"),
+            ("f64", torch.float64, "float64"),
                             ]:
         torch.set_default_dtype(dtype)
         device = torch.device(args.device)
-        hidden_irreps = o3.Irreps(args.hidden_irreps)
 
-        # Create dataset
+        # # Create dataset
         atoms_list = ase.io.read(args.xyz_file, index=":")
-        #table = tools.AtomicNumberTable(list(set(np.concatenate([atoms.numbers for atoms in atoms_list]))))
-        table = tools.AtomicNumberTable([6, 82, 53, 55])
+        assert isinstance(atoms_list, list)
+
+        model_selection_str = 'large'
+        source_calculator = mace_mp(model=model_selection_str, default_dtype=mace_dtype_str)
+        source_model = mace_mp(model=model_selection_str, default_dtype=mace_dtype_str, return_raw_model=True)
+        source_model.to(device=device, dtype=dtype)
+
+        table = source_calculator.z_table
         data_loader = torch_geometric.dataloader.DataLoader(
             dataset=[data.AtomicData.from_config(
                 data.config_from_atoms(atoms),
@@ -185,37 +190,40 @@ def main():
         )
         batch = next(iter(data_loader)).to(device)
         batch_dict = batch.to_dict()
-
+        for k,v in batch_dict.items():
+            if k not in ["index", "head", "node_attrs", "batch", "edge_index"]:
+                batch_dict[k] = v.to(dtype=dtype)
+        
         output_folder.mkdir(parents=True, exist_ok=True)
 
         traces_folder = output_folder / "traces"
         traces_folder.mkdir(parents=True, exist_ok=True) 
 
-        # Compile is still not working for MACE and cueq; turned off for now
+         # Compile is still not working for MACE and cueq; turned off for now
         print("\nBenchmarking Configuration:")
         print(f"Number of atoms: {len(atoms_list[0])}")
         print(f"Number of edges: {batch['edge_index'].shape[1]}")
         print(f"Batch size: {min(len(atoms_list), args.batch_size)}")
         print(f"Device: {args.device}")
-        print(f"Hidden irreps: {hidden_irreps}")
         print(f"Number of iterations: {args.num_iters}\n")
+       
+        for implementation in args.implementations:
+     
+            model = get_implementation_model(source_model, implementation, device)
+            measurement = benchmark_model(model, batch_dict, args.num_iters, label=f"{implementation}_{dtype_str}", output_folder=output_folder)
+            print(f"{implementation} Measurement:\n{measurement}")
 
-        if 'e3nn' in args.implementations:
-            model_e3nn = create_model(hidden_irreps, args.max_ell, device)
-            measurement_e3nn = benchmark_model(model_e3nn, batch_dict, args.num_iters, label=f"e3nn_{dtype_str}", output_folder=output_folder)
-            print(f"E3NN Measurement:\n{measurement_e3nn}")
+        # if 'oeq' in args.implementations:
+        #     model_oeq = create_model_oeq(hidden_irreps, args.max_ell, device)
+        #     measurement_oeq = benchmark_model(model_oeq, batch_dict, args.num_iters, label=f"ours_{dtype_str}", output_folder=output_folder)
+        #     print(f"\nOpenEquivariance Measurement:\n{measurement_oeq}")
+        #     #print(f"\nSpeedup: {measurement_e3nn.mean / measurement_oeq.mean:.2f}x")
 
-        if 'oeq' in args.implementations:
-            model_oeq = create_model_oeq(hidden_irreps, args.max_ell, device)
-            measurement_oeq = benchmark_model(model_oeq, batch_dict, args.num_iters, label=f"ours_{dtype_str}", output_folder=output_folder)
-            print(f"\nOpenEquivariance Measurement:\n{measurement_oeq}")
-            #print(f"\nSpeedup: {measurement_e3nn.mean / measurement_oeq.mean:.2f}x")
-
-        if 'cue' in args.implementations:
-            model_cueq = create_model_cueq(hidden_irreps, args.max_ell, device)
-            measurement_cueq = benchmark_model(model_cueq, batch_dict, args.num_iters, label=f"cuE_{dtype_str}", output_folder=output_folder)
-            print(f"\nCUET Measurement:\n{measurement_cueq}")
-            #print(f"\nSpeedup: {measurement_e3nn.mean / measurement_cueq.mean:.2f}x")
+        # if 'cue' in args.implementations:
+        #     model_cueq = create_model_cueq(hidden_irreps, args.max_ell, device)
+        #     measurement_cueq = benchmark_model(model_cueq, batch_dict, args.num_iters, label=f"cuE_{dtype_str}", output_folder=output_folder)
+        #     print(f"\nCUET Measurement:\n{measurement_cueq}")
+        #     #print(f"\nSpeedup: {measurement_e3nn.mean / measurement_cueq.mean:.2f}x")
 
 
 if __name__ == "__main__":
