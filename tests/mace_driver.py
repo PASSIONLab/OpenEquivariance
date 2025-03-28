@@ -160,7 +160,7 @@ def main():
 
     output_folder = args.output_folder
     output_folder = pathlib.Path(output_folder)
-
+    
     for dtype_str, dtype, mace_dtype_str in [   
             ("f32", torch.float32, "float32"),
             ("f64", torch.float64, "float64"),
@@ -168,62 +168,50 @@ def main():
         torch.set_default_dtype(dtype)
         device = torch.device(args.device)
 
-        # # Create dataset
-        atoms_list = ase.io.read(args.xyz_file, index=":")
-        assert isinstance(atoms_list, list)
+        for model_str in ['small', 'medium', 'large']:
+            source_model = mace_mp(model=model_str, default_dtype=mace_dtype_str, return_raw_model=True)
+            source_model.to(device=device, dtype=dtype)
 
-        model_selection_str = 'large'
-        source_calculator = mace_mp(model=model_selection_str, default_dtype=mace_dtype_str)
-        source_model = mace_mp(model=model_selection_str, default_dtype=mace_dtype_str, return_raw_model=True)
-        source_model.to(device=device, dtype=dtype)
+            # # Create dataset
+            atoms_list = ase.io.read(args.xyz_file, index=":")
+            assert isinstance(atoms_list, list)
 
-        table = source_calculator.z_table
-        data_loader = torch_geometric.dataloader.DataLoader(
-            dataset=[data.AtomicData.from_config(
-                data.config_from_atoms(atoms),
-                z_table=table,
-                cutoff=6.0
-            ) for atoms in atoms_list],
-            batch_size=min(len(atoms_list), args.batch_size),
-            shuffle=False,
-            drop_last=False,
-        )
-        batch = next(iter(data_loader)).to(device)
-        batch_dict = batch.to_dict()
-        for k,v in batch_dict.items():
-            if k not in ["index", "head", "node_attrs", "batch", "edge_index"]:
-                batch_dict[k] = v.to(dtype=dtype)
+            z_table = tools.utils.AtomicNumberTable([int(z) for z in source_model.atomic_numbers])
+
+            data_loader = torch_geometric.dataloader.DataLoader(
+                dataset=[data.AtomicData.from_config(
+                    data.config_from_atoms(atoms),
+                    z_table=z_table,
+                    cutoff=6.0
+                ) for atoms in atoms_list],
+                batch_size=min(len(atoms_list), args.batch_size),
+                shuffle=False,
+                drop_last=False,
+            )
+            batch = next(iter(data_loader)).to(device)
+            batch_dict = batch.to_dict()
+            for k,v in batch_dict.items():
+                if k not in ["index", "head", "node_attrs", "batch", "edge_index"]:
+                    batch_dict[k] = v.to(dtype=dtype)
+            
+            output_folder.mkdir(parents=True, exist_ok=True)
+
+            traces_folder = output_folder / "traces"
+            traces_folder.mkdir(parents=True, exist_ok=True) 
+
+            # Compile is still not working for MACE and cueq; turned off for now
+            print("\nBenchmarking Configuration:")
+            print(f"Number of atoms: {len(atoms_list[0])}")
+            print(f"Model Size: {model_str}")
+            print(f"Number of edges: {batch['edge_index'].shape[1]}")
+            print(f"Batch size: {min(len(atoms_list), args.batch_size)}")
+            print(f"Device: {args.device}")
+            print(f"Number of iterations: {args.num_iters}\n")
         
-        output_folder.mkdir(parents=True, exist_ok=True)
-
-        traces_folder = output_folder / "traces"
-        traces_folder.mkdir(parents=True, exist_ok=True) 
-
-         # Compile is still not working for MACE and cueq; turned off for now
-        print("\nBenchmarking Configuration:")
-        print(f"Number of atoms: {len(atoms_list[0])}")
-        print(f"Number of edges: {batch['edge_index'].shape[1]}")
-        print(f"Batch size: {min(len(atoms_list), args.batch_size)}")
-        print(f"Device: {args.device}")
-        print(f"Number of iterations: {args.num_iters}\n")
-       
-        for implementation in args.implementations:
-     
-            model = get_implementation_model(source_model, implementation, device)
-            measurement = benchmark_model(model, batch_dict, args.num_iters, label=f"{implementation}_{dtype_str}", output_folder=output_folder)
-            print(f"{implementation} Measurement:\n{measurement}")
-
-        # if 'oeq' in args.implementations:
-        #     model_oeq = create_model_oeq(hidden_irreps, args.max_ell, device)
-        #     measurement_oeq = benchmark_model(model_oeq, batch_dict, args.num_iters, label=f"ours_{dtype_str}", output_folder=output_folder)
-        #     print(f"\nOpenEquivariance Measurement:\n{measurement_oeq}")
-        #     #print(f"\nSpeedup: {measurement_e3nn.mean / measurement_oeq.mean:.2f}x")
-
-        # if 'cue' in args.implementations:
-        #     model_cueq = create_model_cueq(hidden_irreps, args.max_ell, device)
-        #     measurement_cueq = benchmark_model(model_cueq, batch_dict, args.num_iters, label=f"cuE_{dtype_str}", output_folder=output_folder)
-        #     print(f"\nCUET Measurement:\n{measurement_cueq}")
-        #     #print(f"\nSpeedup: {measurement_e3nn.mean / measurement_cueq.mean:.2f}x")
+            for implementation in args.implementations:
+                model = get_implementation_model(source_model, implementation, device)
+                measurement = benchmark_model(model, batch_dict, args.num_iters, label=f"{implementation}_{model_str}_{dtype_str}", output_folder=output_folder)
+                print(f"{implementation} Measurement:\n{measurement}")
 
 
 if __name__ == "__main__":
