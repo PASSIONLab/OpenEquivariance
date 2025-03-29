@@ -66,25 +66,41 @@ public:
         }
     }
 
-    void group_gemm(void* weights, void* vectors, void* output, 
-            int64_t* v_offsets, int m, int k) {
+    void group_gemm(void* A_raw, void* B_raw, void* C_raw, 
+            int64_t* v_offsets, int m, int k, int ragged_inner) {
+        /*
+        * Performs one of two batched GEMMs with a single ragged dimension:
+        * 
+        * a) If ragged_inner = 0, multiplies each M x K row-major weight matrix A
+        *    against B, where B is stored in column-major order with each matrix of
+        *    dimensions K x [offset_diff]. Output has dimensions M x [offset_diff],
+        *    stored in column-major order. 
+        * b) If ragged_inner = 1, multiplies each M x [offset_diff] A matrix 
+        *    against each B K x [offset_diff] matrix transposed to produce a 
+        *    M x K matrix output.
+        */
 
-        T* w_start = static_cast<T>(weights);
-        T* v_start = static_cast<T>(vectors);
+        T* A = static_cast<T>(A_raw);
+        T* B = static_cast<T>(B_raw);
 
         for(int i = 0; i < num_W; i++) {
-            m_array[i] = m;
-            k_array[i] = k;
-            n_array[i] = static_cast<int>(v_offsets[i+1] - v_offsets[i]);
+            if(ragged_inner == 0) {
+                m_array[i] = m;
+                k_array[i] = k;
+                n_array[i] = static_cast<int>(v_offsets[i+1] - v_offsets[i]);
 
-            Aarray[i] = weights + (m * k) * i;
-            lda_array[i] = m;    // TODO: Check this!
-            
-            Barray[i] = vectors + (k * v_offsets[i]); 
-            ldb_array[i] = n_array[i]; // TODO: Check this! 
+                Aarray[i] = A + (m * k) * i;
+                lda_array[i] = m;    // TODO: Check this!
+                
+                Barray[i] = B + (k * v_offsets[i]); 
+                ldb_array[i] = k; // TODO: Check this! 
 
-            Carray[i] = output + (m * v_offsets[i]);
-            ldc_array[i] = m * v_offsets[i]; // TODO: Check this! 
+                Carray[i] = output + (m * v_offsets[i]);
+                ldc_array[i] = m; // TODO: Check this!
+                
+                transa_array[i] = CUBLAS_OP_T;
+                transa_array[i] = CUBLAS_OP_N;
+            }
         }
 
         if(std::is_same<T, float>::value) {
@@ -116,14 +132,14 @@ public:
 
     void group_gemm_intptr(uint64_t weights, 
             uint64_t vectors, uint64_t output, 
-            uint64_t v_offsets, int m, int k) {
+            uint64_t v_offsets, int m, int k, int ragged_inner) {
         
         group_gemm(
             reinterpret_cast<void*>(weights), 
             reinterpret_cast<void*>(vectors), 
             reinterpret_cast<void*>(output), 
             reinterpret_cast<int64_t*>(v_offsets), 
-            m, k);
+            m, k, ragged_inner);
     }
 
     ~GroupMMCUDA() { 
