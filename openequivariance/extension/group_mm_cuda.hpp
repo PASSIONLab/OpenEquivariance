@@ -27,6 +27,7 @@ class GroupMMCUDA {
     vector<int> lda_array; 
     vector<T*> Barray;
     vector<int> ldb_array;
+
     vector<T> beta_array;
     vector<T*> Carray;
     vector<int> ldc_array;
@@ -34,10 +35,8 @@ class GroupMMCUDA {
     vector<int> group_size;
 
 public:
-    GroupMMCUDA(int num_W) 
-            num_weight_matrices(num_W, 0),
-            transa_array(num_W, 0),
-            transb_array(num_W, 0),
+    GroupMMCUDA(int num_W) : 
+            num_W(num_W),
 
             m_array(num_W, 0),
             n_array(num_W, 0),
@@ -54,7 +53,7 @@ public:
             Barray(num_W, nullptr),
             ldb_array(num_W, 0),
 
-            beta_array(num_W, 0),
+            beta_array(num_W, 0.0),
             Carray(num_W, nullptr),
             ldc_array(num_W, 0),
 
@@ -80,8 +79,9 @@ public:
         *    M x K matrix output.
         */
 
-        T* A = static_cast<T>(A_raw);
-        T* B = static_cast<T>(B_raw);
+        T* A = reinterpret_cast<T*>(A_raw);
+        T* B = reinterpret_cast<T*>(B_raw);
+        T* C = reinterpret_cast<T*>(C_raw);
 
         for(int i = 0; i < num_W; i++) {
             if(ragged_inner == 0) {
@@ -95,7 +95,7 @@ public:
                 Barray[i] = B + (k * v_offsets[i]); 
                 ldb_array[i] = k; // TODO: Check this! 
 
-                Carray[i] = output + (m * v_offsets[i]);
+                Carray[i] = C + (m * v_offsets[i]);
                 ldc_array[i] = m; // TODO: Check this!
                 
                 transa_array[i] = CUBLAS_OP_T;
@@ -118,12 +118,14 @@ public:
                 beta_array.data(),
                 Carray.data(),
                 ldc_array.data(),
-                num_W,
+                1,
                 group_size.data());
 
             if (stat != CUBLAS_STATUS_SUCCESS) {
                 throw std::logic_error("Grouped GEMM failed!");
             }
+            cudaDeviceSynchronize();
+            cout << "STAT: " << stat << endl;
         }
         else {
             throw std::logic_error("Double precision support in progress");
