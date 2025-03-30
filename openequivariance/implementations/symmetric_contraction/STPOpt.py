@@ -9,11 +9,11 @@ from openequivariance.extlib import *
     
 
 if __name__ == '__main__':
-    num_elements = 2
-    batch_size = 3 # Selected arbitrarily, assume that the tensor is not ragged in its last dimension
+    num_elements = 10
+    batch_size = 30 # Selected arbitrarily, assume that the tensor is not ragged in its last dimension
 
-    M = 4 
-    K = 2
+    M = 64 
+    K = 128
     A = torch.randn(num_elements, M, K).to('cuda')
     B = torch.randn(num_elements * batch_size, K).to('cuda')
     C = torch.zeros(num_elements * batch_size, M).to('cuda')
@@ -58,3 +58,5 @@ if __name__ == '__main__':
     
     print(torch.norm(ground_truth_grad))
     print(torch.norm(Ag))
+
+    print(torch.norm(ground_truth_grad - Ag))

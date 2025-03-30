@@ -103,21 +103,22 @@ public:
                 transb_array[i] = CUBLAS_OP_N;
             }
             else {
-                m_array[i] = m;
+                m_array[i] = k;
                 k_array[i] = static_cast<int>(ragged_counts[i]);
-                n_array[i] = k;
+                n_array[i] = m;
 
-                Aarray[i] = A + (m * ragged_offset);
-                lda_array[i] = m;
+                Aarray[i] = B + (k * ragged_offset);
+                lda_array[i] = k;
 
-                Barray[i] = B + (k * ragged_offset);
-                ldb_array[i] = k;
+                Barray[i] = A + (m * ragged_offset);
+                ldb_array[i] = m;
                 
                 Carray[i] = C + (m * k) * i;
-                ldc_array[i] = m;
+                ldc_array[i] = k;
 
                 transa_array[i] = CUBLAS_OP_N;
                 transb_array[i] = CUBLAS_OP_T;
+
             }
             ragged_offset += ragged_counts[i];
         }
