@@ -18,10 +18,10 @@ if __name__ == '__main__':
     B = torch.randn(num_elements * batch_size, K).to('cuda')
     C = torch.zeros(num_elements * batch_size, M).to('cuda')
 
-    offsets = torch.zeros(num_elements + 1, dtype=torch.int64, device='cpu')
+    ragged_counts = torch.zeros(num_elements, dtype=torch.int64, device='cpu')
 
     for i in range(num_elements):
-        offsets[i+1] = (i+1) * batch_size
+        ragged_counts[i] = batch_size 
 
     ground_truth = torch.zeros_like(C) 
 
@@ -33,10 +33,28 @@ if __name__ == '__main__':
     group_mm = GroupMM_F32(num_elements)
     group_mm.group_gemm(A.contiguous().data_ptr(), 
                         B.contiguous().data_ptr(),
-                        C.data_ptr(), offsets.data_ptr(),
+                        C.data_ptr(), ragged_counts.data_ptr(),
                         M, K, 0)
 
     print(torch.norm(ground_truth - C))
 
     #print(ground_truth)
     #print(C)
+
+    C_g = torch.randn(num_elements * batch_size, M).to('cuda')
+    ground_truth_grad = torch.zeros_like(A)
+
+    for i in range(num_elements):
+        Cg_slice = C_g[batch_size * i:batch_size * (i+1)]
+        B_slice = B[batch_size * i:batch_size * (i+1)]
+        ground_truth_grad[i] = Cg_slice.T @ B_slice 
+
+    Ag = torch.zeros_like(A)
+
+    group_mm.group_gemm(C_g.contiguous().data_ptr(), 
+                        B.contiguous().data_ptr(),
+                        Ag.data_ptr(), ragged_counts.data_ptr(),
+                        M, K, 1)
+    
+    print(torch.norm(ground_truth_grad))
+    print(torch.norm(Ag))

@@ -42,7 +42,7 @@ public:
             n_array(num_W, 0),
             k_array(num_W, 0),
 
-            transa_array(num_W, CUBLAS_OP_T),
+            transa_array(num_W, CUBLAS_OP_N),
             transb_array(num_W, CUBLAS_OP_N),
 
             alpha_array(num_W, 1.0),
@@ -66,7 +66,7 @@ public:
     }
 
     void group_gemm(void* A_raw, void* B_raw, void* C_raw, 
-            int64_t* v_offsets, int m, int k, int ragged_inner) {
+            int64_t* ragged_counts, int m, int k, int ragged_inner) {
         /*
         * Performs one of two batched GEMMs with a single ragged dimension:
         * 
@@ -83,21 +83,43 @@ public:
         T* B = reinterpret_cast<T*>(B_raw);
         T* C = reinterpret_cast<T*>(C_raw);
 
+        int64_t ragged_offset = 0; 
         for(int i = 0; i < num_W; i++) {
             if(ragged_inner == 0) {
                 m_array[i] = m;
                 k_array[i] = k;
-                n_array[i] = static_cast<int>(v_offsets[i+1] - v_offsets[i]);
+                n_array[i] = static_cast<int>(ragged_counts[i]);
 
                 Aarray[i] = A + (m * k) * i;
-                lda_array[i] = k;    // TODO: Check this!
+                lda_array[i] = k; 
                 
-                Barray[i] = B + (k * v_offsets[i]); 
-                ldb_array[i] = k; // TODO: Check this! 
+                Barray[i] = B + (k * ragged_offset); 
+                ldb_array[i] = k; 
 
-                Carray[i] = C + (m * v_offsets[i]);
-                ldc_array[i] = m; // TODO: Check this!     
+                Carray[i] = C + (m * ragged_offset); 
+                ldc_array[i] = m; 
+               
+                transa_array[i] = CUBLAS_OP_T;
+                transb_array[i] = CUBLAS_OP_N;
             }
+            else {
+                m_array[i] = m;
+                k_array[i] = static_cast<int>(ragged_counts[i]);
+                n_array[i] = k;
+
+                Aarray[i] = A + (m * ragged_offset);
+                lda_array[i] = m;
+
+                Barray[i] = B + (k * ragged_offset);
+                ldb_array[i] = k;
+                
+                Carray[i] = C + (m * k) * i;
+                ldc_array[i] = m;
+
+                transa_array[i] = CUBLAS_OP_N;
+                transb_array[i] = CUBLAS_OP_T;
+            }
+            ragged_offset += ragged_counts[i];
         }
 
         if(std::is_same<T, float>::value) {
@@ -123,19 +145,19 @@ public:
             }
         }
         else {
-            throw std::logic_error("Double precision support in progress");
+            throw std::logic_error("Double precision support in progress.");
         }
     }
 
     void group_gemm_intptr(uint64_t weights, 
             uint64_t vectors, uint64_t output, 
-            uint64_t v_offsets, int m, int k, int ragged_inner) {
+            uint64_t ragged_counts, int m, int k, int ragged_inner) {
         
         group_gemm(
             reinterpret_cast<void*>(weights), 
             reinterpret_cast<void*>(vectors), 
             reinterpret_cast<void*>(output), 
-            reinterpret_cast<int64_t*>(v_offsets), 
+            reinterpret_cast<int64_t*>(ragged_counts), 
             m, k, ragged_inner);
     }
 
@@ -143,4 +165,3 @@ public:
         cublasDestroy(handle);
     }
 };
-
