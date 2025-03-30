@@ -42,7 +42,7 @@ public:
             n_array(num_W, 0),
             k_array(num_W, 0),
 
-            transa_array(num_W, CUBLAS_OP_N),
+            transa_array(num_W, CUBLAS_OP_T),
             transb_array(num_W, CUBLAS_OP_N),
 
             alpha_array(num_W, 1.0),
@@ -90,16 +90,13 @@ public:
                 n_array[i] = static_cast<int>(v_offsets[i+1] - v_offsets[i]);
 
                 Aarray[i] = A + (m * k) * i;
-                lda_array[i] = m;    // TODO: Check this!
+                lda_array[i] = k;    // TODO: Check this!
                 
                 Barray[i] = B + (k * v_offsets[i]); 
                 ldb_array[i] = k; // TODO: Check this! 
 
                 Carray[i] = C + (m * v_offsets[i]);
-                ldc_array[i] = m; // TODO: Check this!
-                
-                transa_array[i] = CUBLAS_OP_T;
-                transa_array[i] = CUBLAS_OP_N;
+                ldc_array[i] = m; // TODO: Check this!     
             }
         }
 
@@ -118,14 +115,12 @@ public:
                 beta_array.data(),
                 Carray.data(),
                 ldc_array.data(),
-                1,
+                num_W,
                 group_size.data());
 
             if (stat != CUBLAS_STATUS_SUCCESS) {
                 throw std::logic_error("Grouped GEMM failed!");
             }
-            cudaDeviceSynchronize();
-            cout << "STAT: " << stat << endl;
         }
         else {
             throw std::logic_error("Double precision support in progress");
