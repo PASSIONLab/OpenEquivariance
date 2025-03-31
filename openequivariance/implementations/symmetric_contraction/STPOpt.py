@@ -72,11 +72,11 @@ class GroupMM:
 
 if __name__ == '__main__':
     torch.manual_seed(0)
-    num_elements = 1
-    batch_size = 1 # Selected arbitrarily, assume that the tensor is not ragged in its last dimension
+    num_elements = 10
+    batch_size = 30 # Selected arbitrarily, assume that the tensor is not ragged in its last dimension
 
-    M = 2 
-    K = 4
+    M = 64 
+    K = 123
     ragged_counts = torch.zeros(num_elements, dtype=torch.int64, device='cpu')
 
     for i in range(num_elements):
@@ -117,48 +117,6 @@ if __name__ == '__main__':
         print(torch.norm(A_grad_gt - A.grad))
         print(torch.norm(B_grad_gt - B.grad))
 
-    # ===================== TEST DOUBLE BACKWARD =====================
-    #print("TESTING DOUBLE BACKWARD")
-
-    #A.grad *= 0 
-    #B.grad *= 0 
-
-    #for i in range(num_elements):
-    #    B_slice = B[batch_size * i:batch_size * (i+1)]
-    #    ground_truth[batch_size * i:batch_size * (i+1)] = (A[i] @ B_slice.T).T
-
-    #ground_truth.backward(C_g, inputs=[A, B], create_graph=True, retain_graph=True) 
-    #dummy = torch.norm(A.grad) + torch.norm(B.grad)
-    #dummy_grad = torch.randn_like(dummy)
-    #dummy.backward(gradient=dummy_grad, inputs=[C_g, A, B], retain_graph=True)
-
-    #A_db_grad = A.grad.detach().clone()
-    #B_db_grad = B.grad.detach().clone()
-    #C_db_grad = C_g.grad.detach().clone()
-
-    #A.grad[:] = 0.0
-    #B.grad[:] = 0.0
-    #C_g.grad[:] = 0.0
-
-    #C = group_mm.forward(A, B, ragged_counts)
-
-    #C.backward(C_g, inputs=[A, B], create_graph=True, retain_graph=True)
-    #dummy = torch.norm(A.grad) + torch.norm(B.grad)
-    #dummy.backward(gradient=dummy_grad, inputs=[C_g, A, B], retain_graph=True)
-
-    #print(torch.norm(A.grad - A_db_grad))
-    #print(torch.norm(B.grad - B_db_grad))
-    #print(torch.norm(C_g.grad - C_db_grad))
-
-    #print(torch.norm(A_db_grad))
-    #print(torch.norm(B_db_grad))
-    #print(torch.norm(C_db_grad))
-
-    #print(torch.norm(A.grad))
-    #print(torch.norm(B.grad))
-    #print(torch.norm(C_g.grad))
-
-
     def test_backward_1():
         print("TESTING BACKWARD_1!")
         group_mm = GroupMM(torch.float32, num_elements)
@@ -195,5 +153,55 @@ if __name__ == '__main__':
         print(torch.norm(A.grad - A_grad_gt))
         print(torch.norm(B.grad - B_grad_gt))
 
+    def test_double_backward():
+        torch.autograd.set_detect_anomaly(True)
+        group_mm = GroupMM(torch.float32, num_elements)
+        A = torch.randn(num_elements, M, K).to('cuda')
+        B = torch.randn(num_elements * batch_size, K).to('cuda')
+
+        #A_c = A.clone().detach()
+        #B_c = B.clone().detach()
+        A_c = torch.randn_like(A)
+        B_c = torch.randn_like(B)
+
+        A_c.requires_grad = True
+        B_c.requires_grad = True
+
+        A.requires_grad = True
+        B.requires_grad = True
+
+        ground_truth = torch.zeros(num_elements * batch_size, M, device='cuda') 
+
+        # Test the forward pass 
+        for i in range(num_elements):
+            B_slice = B[batch_size * i:batch_size * (i+1)]
+            ground_truth[batch_size * i:batch_size * (i+1)] = (A[i] @ B_slice.T).T
+
+        #ground_truth = group_mm.group_gemm(A, B, ragged_counts, M, K, 0)
+
+
+        C_g = torch.randn(num_elements * batch_size, M).to('cuda')
+
+        #C_gc = C_g.clone().detach()
+        C_gc = torch.randn_like(C_g)
+
+        C_g.requires_grad = True
+        C_gc.requires_grad = True 
+
+        ground_truth.backward(C_g, inputs=[A, B], create_graph=True, retain_graph=True) 
+        dummy = torch.norm(A.grad) + torch.norm(B.grad)
+        dummy_grad = torch.randn_like(dummy)
+
+        dummy.backward(gradient=dummy_grad, inputs=[C_g, A, B])
+
+        A_grad_gt = A.grad
+        B_grad_gt = B.grad
+        C_grad_gt = C_g.grad
+
+        print(torch.norm(A_grad_gt))
+        print(torch.norm(B_grad_gt))
+        print(torch.norm(C_grad_gt))
+
     test_backward_0()
     test_backward_1()
+    test_double_backward()
