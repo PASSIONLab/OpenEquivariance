@@ -6,16 +6,17 @@
 #include "group_mm_cuda.hpp"
 using JITKernel = CUJITKernel;
 using Allocator = CUDA_Allocator;
-using GroupMM_F32 = GroupMMCUDA<float>; 
-using GroupMM_F64 = GroupMMCUDA<double>; 
+
+template<typename T>
+using GroupMM = GroupMMCUDA<T>; 
 #endif
 
 #ifdef HIP
 #include "backend_hip.hpp"
 using JITKernel = HIPJITKernel;
 using Allocator = HIP_Allocator;
-using GroupMM_F32 = GroupMMHIP<float>; 
-using GroupMM_F64 = GroupMMHIP<double>; 
+template<typename T>
+using GroupMM = GroupMMHIP<T>; 
 #endif
 
 #include "buffer.hpp"
@@ -69,7 +70,7 @@ PYBIND11_MODULE(kernel_wrapper, m) {
         .def("stop_clock_get_elapsed", &GPUTimer::stop_clock_get_elapsed)
         .def("clear_L2_cache", &GPUTimer::clear_L2_cache);
 
-    py::class_<GroupMM_F32>(m, "GroupMM_F32")
+    py::class_<GroupMM<float>>(m, "GroupMM_F32")
         .def(py::init<int>())
-        .def("group_gemm", &GroupMM_F32::group_gemm_intptr);
+        .def("group_gemm", &GroupMM<float>::group_gemm_intptr);
 }

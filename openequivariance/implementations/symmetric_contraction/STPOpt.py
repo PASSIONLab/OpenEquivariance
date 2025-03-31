@@ -2,11 +2,72 @@ import torch
 
 from openequivariance.extlib import *
 
-#class STPOpt:
-#    def __init__(self, num_elements):
-#        self.group_mm = GroupMM(num_elements)
+class GroupMM:
+    next_id = 0
+    def __init__(self, dtype, num_elements):
+        self.id = GroupMM.next_id
+        self.num_elements = num_elements
+        GroupMM.next_id += 1
 
-    
+        if dtype==torch.float32:
+            self.internal = GroupMM_F32(num_elements) 
+        else:
+            self.internal = GroupMM_F64(num_elements)
+
+
+        @torch.library.custom_op(f"openequivariance::group_gemm{self.id}", mutates_args=(), device_types="cuda")
+        def group_gemm(A: torch.Tensor, B: torch.Tensor, 
+                        ragged_counts: torch.Tensor, M: int, K: int, ragged_inner: int) -> torch.Tensor:
+            '''
+            If ragged_inner == 0:
+                A is 3D, num_weights x M x K
+                B is batch_size x K
+                C is batch_size x M
+            If ragged_inner == 1:    (needed for the backward pass)
+                A is batch_size x M
+                B is batch_size x K
+                C is 3D, num_weights x M x K 
+            '''
+            shape = None
+            if ragged_inner == 0:
+                shape = (B.shape[0], M)
+            elif ragged_inner == 1:
+                shape = (num_elements, M, K)
+
+            C = torch.zeros(shape, device='cuda')
+            self.internal.group_gemm(A.contiguous().data_ptr(), 
+                                B.contiguous().data_ptr(),
+                                C.data_ptr(), ragged_counts.data_ptr(),
+                                M, K, ragged_inner)
+            return C
+
+        @group_gemm.register_fake
+        def _(A, B, ragged_counts, M, K, ragged_inner):
+            if ragged_inner == 0:
+                return A.empty_like(B.shape[0], M)
+            elif ragged_inner == 1:
+                return A.empty_like(num_elements, M, K)
+
+        self.group_gemm = group_gemm
+
+        def setup_context(ctx, inputs, output):
+            ctx.A, ctx.B, ctx.ragged_counts, ctx.M, ctx.K, ctx.ragged_inner = inputs
+
+        def backward(ctx, grad_output):
+            grad_A, grad_B = None, None
+            if ctx.ragged_inner == 0:
+                grad_A = group_gemm(grad_output, ctx.B, ctx.ragged_counts, ctx.M, ctx.K, 1)
+                grad_B = group_gemm(ctx.A.transpose(1, 2), grad_output, ctx.ragged_counts, ctx.K, ctx.M, 0)
+            elif ctx.ragged_inner == 1:
+                grad_A = group_gemm(grad_output, ctx.B, ctx.ragged_counts, ctx.K, ctx.M, 0)
+                grad_B = group_gemm(grad_output.transpose(1, 2), ctx.A, ctx.ragged_counts, ctx.M, ctx.K, 0)
+
+            return grad_A, grad_B, None, None, None, None 
+
+        self.group_gemm.register_autograd(backward, setup_context=setup_context)
+
+    def forward(self, weights, vectors, bincounts):
+        return self.group_gemm(weights, vectors, bincounts, weights.shape[1], weights.shape[2], 0)
 
 if __name__ == '__main__':
     num_elements = 10
