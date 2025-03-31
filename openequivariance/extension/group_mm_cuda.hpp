@@ -118,7 +118,6 @@ public:
 
                 transa_array[i] = CUBLAS_OP_N;
                 transb_array[i] = CUBLAS_OP_T;
-
             }
             ragged_offset += ragged_counts[i];
         }
@@ -141,7 +140,9 @@ public:
                 num_W,
                 group_size.data());
 
-            if (stat != CUBLAS_STATUS_SUCCESS) {
+            cudaStat = cudaDeviceSynchronize();
+
+            if (stat != CUBLAS_STATUS_SUCCESS || cudaStat != 0) {
                 throw std::logic_error("Grouped GEMM failed!");
             }
         }
