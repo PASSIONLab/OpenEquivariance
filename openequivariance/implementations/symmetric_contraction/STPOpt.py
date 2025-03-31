@@ -95,7 +95,7 @@ if __name__ == '__main__':
         ground_truth[batch_size * i:batch_size * (i+1)] = (A[i] @ B_slice.T).T
 
     C_g = torch.randn(num_elements * batch_size, M).to('cuda')
-    ground_truth.backward(C_g, inputs=[A, B])
+    ground_truth.backward(C_g, inputs=[A, B]) 
     
     A_grad_gt = A.grad.detach().clone()
     B_grad_gt = B.grad.detach().clone()
@@ -112,25 +112,22 @@ if __name__ == '__main__':
     print(torch.norm(A_grad_gt - A.grad))
     print(torch.norm(B_grad_gt - B.grad))
 
-    #print(ground_truth)
-    #print(C)
+    # ===================== TEST DOUBLE BACKWARD =====================
+    print("TESTING DOUBLE BACKWARD")
 
-    #C_g = torch.randn(num_elements * batch_size, M).to('cuda')
-    #ground_truth_grad = torch.zeros_like(A)
+    for i in range(num_elements):
+        B_slice = B[batch_size * i:batch_size * (i+1)]
+        ground_truth[batch_size * i:batch_size * (i+1)] = (A[i] @ B_slice.T).T
 
-    #for i in range(num_elements):
-    #    Cg_slice = C_g[batch_size * i:batch_size * (i+1)]
-    #    B_slice = B[batch_size * i:batch_size * (i+1)]
-    #    ground_truth_grad[i] = Cg_slice.T @ B_slice 
+    ground_truth.backward(C_g, inputs=[A, B], create_graph=True, retain_grpah=True) 
+    dummy = torch.norm(A.grad) + torch.norm(B.grad)
+    dummy_grad = torch.randn_like(dummy)
+    dummy.backward(gradient=dummy_grad, retain_graph=True, inputs=[C_g, A, B])
 
-    #Ag = torch.zeros_like(A)
+    print(A.grad)
+    print(B.grad)
+    print(C_g.grad)
 
-    #group_mm.group_gemm(C_g.contiguous().data_ptr(), 
-    #                    B.contiguous().data_ptr(),
-    #                    Ag.data_ptr(), ragged_counts.data_ptr(),
-    #                    M, K, 1)
-    
-    #print(torch.norm(ground_truth_grad))
-    #print(torch.norm(Ag))
-
-    #print(torch.norm(ground_truth_grad - Ag))
+    A.grad[:] = 0.0
+    B.grad[:] = 0.0
+    C_g.grad[:] = 0.0
