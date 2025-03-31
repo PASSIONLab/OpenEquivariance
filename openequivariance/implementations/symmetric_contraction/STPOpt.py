@@ -70,7 +70,9 @@ class GroupMM:
     def forward(self, weights, vectors, bincounts):
         return self.group_gemm(weights, vectors, bincounts, weights.shape[1], weights.shape[2], 0)
 
-if __name__ == '__main__':
+
+
+def test_group_matmul():
     torch.manual_seed(0)
     num_elements = 10
     batch_size = 30 # Selected arbitrarily, assume that the tensor is not ragged in its last dimension
@@ -159,8 +161,6 @@ if __name__ == '__main__':
         A = torch.randn(num_elements, M, K).to('cuda')
         B = torch.randn(num_elements * batch_size, K).to('cuda')
 
-        #A_c = A.clone().detach()
-        #B_c = B.clone().detach()
         A_c = torch.randn_like(A)
         B_c = torch.randn_like(B)
 
@@ -172,17 +172,11 @@ if __name__ == '__main__':
 
         ground_truth = torch.zeros(num_elements * batch_size, M, device='cuda') 
 
-        # Test the forward pass 
         for i in range(num_elements):
             B_slice = B[batch_size * i:batch_size * (i+1)]
             ground_truth[batch_size * i:batch_size * (i+1)] = (A[i] @ B_slice.T).T
 
-        #ground_truth = group_mm.group_gemm(A, B, ragged_counts, M, K, 0)
-
-
         C_g = torch.randn(num_elements * batch_size, M).to('cuda')
-
-        #C_gc = C_g.clone().detach()
         C_gc = torch.randn_like(C_g)
 
         C_g.requires_grad = True
