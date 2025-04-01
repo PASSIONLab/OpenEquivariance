@@ -66,10 +66,10 @@ public:
                 lda = k; strideA = M * K; 
                 
                 B = B_base + (k * batch_size * ragged_offset); 
-                ldb = k; strideB = K * N; 
+                ldb = K * batch_size; strideB = K; 
 
-                C = C_based + (m * batch_size * ragged_offset); 
-                ldc = m; strideC = M * N; 
+                C = C_base + (m * batch_size * ragged_offset); 
+                ldc = M * batch_size; strideC = M; 
                
                 transa = CUBLAS_OP_T;
                 transb = CUBLAS_OP_N;
@@ -80,10 +80,10 @@ public:
                 N = m;
 
                 A = B_base + (k * batch_size * ragged_offset);
-                lda = k; strideA = M * K; 
+                lda = k * batch_size; strideA = M; 
 
                 B = A_base + (m * batch_size * ragged_offset);
-                ldb = m; strideB = K * N;
+                ldb = m * batch_size; strideB = N;
                 
                 C = C_base + (m * k * batch_size * i);
                 ldc = k; strideC = M * N;
@@ -99,7 +99,7 @@ public:
                         transa, transb, 
                         M, N, K,
                         &alpha,
-                        A, lda, strideA 
+                        A, lda, strideA,
                         B, ldb, strideB, 
                         &beta, 
                         C, ldc, strideC,
