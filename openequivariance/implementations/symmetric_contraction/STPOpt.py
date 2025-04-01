@@ -140,7 +140,7 @@ def test_group_matmul():
 
         print(torch.norm(C - ground_truth)) 
 
-        C_g = torch.randn(num_elements, M, K).to('cuda')
+        C_g = torch.randn(num_elements, num_features, M, K).to('cuda')
         C_g.requires_grad = True
 
         ground_truth.backward(C_g, inputs=[A, B])
@@ -156,9 +156,45 @@ def test_group_matmul():
         print(torch.norm(A.grad - A_grad_gt))
         print(torch.norm(B.grad - B_grad_gt))
 
+
+    def test_double_backward():
+        torch.autograd.set_detect_anomaly(True)
+        group_mm = GroupMM(torch.float32, num_elements, num_features)
+        A = torch.randn(num_elements, num_features, M, K).to('cuda')
+        B = torch.randn(num_elements * vpe, num_features, K).to('cuda')
+
+        A.requires_grad = True
+        B.requires_grad = True
+
+        ground_truth = torch.zeros(num_elements * vpe, num_features, M, device='cuda')
+        #ground_truth = group_mm.group_gemm(A, B, ragged_counts, M, K, 0)
+
+        # Test the forward pass 
+        for i in range(num_elements):
+            B_slice = B[vpe * i:vpe * (i+1)]
+            ground_truth[vpe * i:vpe * (i+1)] = (A[i] @ B_slice.permute(1, 2, 0)).permute(2, 0, 1)
+
+        C_g = torch.randn(num_elements * vpe, num_features, M).to('cuda')
+        C_g.requires_grad = True 
+
+        ground_truth.backward(C_g, inputs=[A, B], create_graph=True, retain_graph=True) 
+        dummy = torch.norm(A.grad) + torch.norm(B.grad)
+        dummy_grad = torch.randn_like(dummy)
+
+        dummy.backward(gradient=dummy_grad, inputs=[C_g, A, B])
+
+        A_grad_gt = A.grad
+        B_grad_gt = B.grad
+        C_grad_gt = C_g.grad
+
+        print(torch.norm(A_grad_gt))
+        print(torch.norm(B_grad_gt))
+        print(torch.norm(C_grad_gt))
+
+
     #test_backward_0()
-    test_backward_1()
-    #test_double_backward()
+    #test_backward_1()
+    test_double_backward()
 
 
 if __name__=='__main__':
