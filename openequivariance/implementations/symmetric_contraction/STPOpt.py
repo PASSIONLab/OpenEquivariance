@@ -24,9 +24,9 @@ class GroupMM:
                 B is batch_size x num_features x K
                 C is batch_size x num_features x M
             If ragged_inner == 1:    (needed for the backward pass)
-                A is batch_size x M
-                B is batch_size x K
-                C is 3D, num_weights x M x K 
+                A is batch_size x num_features x M
+                B is batch_size x num_features K
+                C is 3D, num_weights x num_features M x K 
             '''
             shape = None
             if ragged_inner == 0:
@@ -39,7 +39,6 @@ class GroupMM:
                                 B.contiguous().data_ptr(),
                                 C.data_ptr(), ragged_counts.data_ptr(),
                                 M, K, ragged_inner)
-
             return C
 
         @group_gemm.register_fake
@@ -56,6 +55,7 @@ class GroupMM:
 
         def backward(ctx, grad_output):
             grad_A, grad_B = None, None
+
             if ctx.ragged_inner == 0:
                 grad_A = group_gemm(grad_output, ctx.B, ctx.ragged_counts, ctx.M, ctx.K, 1)
                 grad_B = group_gemm(ctx.A.transpose(2, 3), grad_output, ctx.ragged_counts, ctx.K, ctx.M, 0)
@@ -86,8 +86,8 @@ def test_group_matmul():
         ragged_counts[i] = vpe 
 
     def test_backward_0():
-        group_mm = GroupMM(torch.float32, num_elements)
-        A = torch.randn(num_elements, M, K).to('cuda')
+        group_mm = GroupMM(torch.float32, num_elements, num_features)
+        A = torch.randn(num_elements, num_features, M, K).to('cuda')
         B = torch.randn(num_elements * vpe, num_features, K).to('cuda')
 
         A.requires_grad = True
@@ -98,7 +98,7 @@ def test_group_matmul():
         # Test the forward pass 
         for i in range(num_elements):
             B_slice = B[vpe * i:vpe * (i+1)]
-            ground_truth[vpe * i:vpe * (i+1)] = (A[i] @ B_slice.transpose(1, 2)).transpose(1, 2)
+            ground_truth[vpe * i:vpe * (i+1)] = (A[i] @ B_slice.permute(1, 2, 0)).permute(2, 0, 1)
 
         C_g = torch.randn(num_elements * vpe, num_features, M).to('cuda')
         C_g.requires_grad = True
@@ -119,6 +119,47 @@ def test_group_matmul():
         print(torch.norm(A_grad_gt - A.grad))
         print(torch.norm(B_grad_gt - B.grad))
 
-    test_backward_0()
-    #test_backward_1()
+    def test_backward_1():
+        print("TESTING BACKWARD_1!")
+        group_mm = GroupMM(torch.float32, num_elements, num_features)
+
+        A = torch.zeros(num_elements * vpe, num_features, M, device='cuda')
+        B = torch.randn(num_elements * vpe, num_features, K).to('cuda')
+        A.requires_grad = True
+        B.requires_grad = True
+
+        ground_truth = torch.zeros(num_elements, num_features, M, K).to('cuda')
+
+        for i in range(num_elements):
+            A_slice = A[vpe * i:vpe * (i+1)]
+            B_slice = B[vpe * i:vpe * (i+1)]
+
+            ground_truth[i] = A_slice.permute(1, 2, 0) @ B_slice.permute(1, 0, 2)
+
+        C = group_mm.group_gemm(A, B, ragged_counts, M, K, 1)
+
+        print(torch.norm(C - ground_truth)) 
+
+        C_g = torch.randn(num_elements, M, K).to('cuda')
+        C_g.requires_grad = True
+
+        ground_truth.backward(C_g, inputs=[A, B])
+
+        A_grad_gt = A.grad.detach().clone()
+        B_grad_gt = B.grad.detach().clone()
+
+        A.grad[:] = 0.0
+        B.grad[:] = 0.0
+
+        C.backward(C_g, inputs=[A, B])
+
+        print(torch.norm(A.grad - A_grad_gt))
+        print(torch.norm(B.grad - B_grad_gt))
+
+    #test_backward_0()
+    test_backward_1()
     #test_double_backward()
+
+
+if __name__=='__main__':
+    test_group_matmul()
