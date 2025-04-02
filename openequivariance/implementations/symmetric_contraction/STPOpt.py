@@ -72,19 +72,12 @@ class GroupMM:
 
 # --------------------------------------------------------------------------
 from typing import Dict, Optional, Union
-import time
 
-import opt_einsum_fx
 import torch
-import torch.fx
 from e3nn import o3
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
-
 from mace.tools.cg import U_matrix_real
-
-BATCH_EXAMPLE = 10
-ALPHABET = ["w", "x", "v", "n", "z", "r", "t", "y", "u", "o", "p", "s"]
 
 @compile_mode("script")
 class Contraction(torch.nn.Module):
@@ -123,35 +116,12 @@ class Contraction(torch.nn.Module):
         self.num_equivariance = 2 * irrep_out.lmax + 1
         
         for i in range(correlation, 0, -1):
-            # Shapes definying
+            # Shapes defining
             num_params = self.U_tensors(i).size()[-1]
             num_equivariance = 2 * irrep_out.lmax + 1
             num_ell = self.U_tensors(i).size()[-2]
 
             if i == correlation:
-                parse_subscript_main = (
-                    [ALPHABET[j] for j in range(i + min(irrep_out.lmax, 1) - 1)]
-                    + ["ik,ekc,bci,be -> bc"]
-                    + [ALPHABET[j] for j in range(i + min(irrep_out.lmax, 1) - 1)]
-                )
-                graph_module_main = torch.fx.symbolic_trace(
-                    lambda x, y, w, z: torch.einsum(
-                        "".join(parse_subscript_main), x, y, w, z
-                    )
-                )
-
-                # Optimizing the contractions
-                self.graph_opt_main = opt_einsum_fx.optimize_einsums_full(
-                    model=graph_module_main,
-                    example_inputs=(
-                        torch.randn(
-                            [num_equivariance] + [num_ell] * i + [num_params]
-                        ).squeeze(0),
-                        torch.randn((num_elements, num_params, self.num_features)),
-                        torch.randn((BATCH_EXAMPLE, self.num_features, num_ell)),
-                        torch.randn((BATCH_EXAMPLE, num_elements)),
-                    ),
-                )
                 # Parameters for the product basis
                 w = torch.nn.Parameter(
                     torch.randn((num_elements, num_params, self.num_features))
@@ -159,95 +129,52 @@ class Contraction(torch.nn.Module):
                 )
                 self.weights_max = w
             else:
-                # Generate optimized contractions equations
-                parse_subscript_weighting = (
-                    [ALPHABET[j] for j in range(i + min(irrep_out.lmax, 1))]
-                    + ["k,ekc->ec"]
-                    + [ALPHABET[j] for j in range(i + min(irrep_out.lmax, 1))]
-                )
-                parse_subscript_features = (
-                    ["bc"]
-                    + [ALPHABET[j] for j in range(i - 1 + min(irrep_out.lmax, 1))]
-                    + ["i,bci->bc"]
-                    + [ALPHABET[j] for j in range(i - 1 + min(irrep_out.lmax, 1))]
-                )
-
-                # Symbolic tracing of contractions
-                graph_module_weighting = torch.fx.symbolic_trace(
-                    lambda x, y: torch.einsum(
-                        "".join(parse_subscript_weighting), x, y
-                    )
-                )
-                graph_module_features = torch.fx.symbolic_trace(
-                    lambda x, y: torch.einsum("".join(parse_subscript_features), x, y)
-                )
-
-                # Optimizing the contractions
-                graph_opt_weighting = opt_einsum_fx.optimize_einsums_full(
-                    model=graph_module_weighting,
-                    example_inputs=(
-                        torch.randn(
-                            [num_equivariance] + [num_ell] * i + [num_params]
-                        ).squeeze(0),
-                        torch.randn((num_elements, num_params, self.num_features))
-                    ),
-                )
-                graph_opt_features = opt_einsum_fx.optimize_einsums_full(
-                    model=graph_module_features,
-                    example_inputs=(
-                        torch.randn(
-                            [BATCH_EXAMPLE, self.num_features, num_equivariance]
-                            + [num_ell] * i
-                        ).squeeze(2),
-                        torch.randn((BATCH_EXAMPLE, self.num_features, num_ell)),
-                    ),
-                )
-                self.contractions_weighting.append(graph_opt_weighting)
-                self.contractions_features.append(graph_opt_features)
                 # Parameters for the product basis
                 w = torch.nn.Parameter(
                     torch.randn((num_elements, num_params, self.num_features))
                     / num_params
                 )
                 self.weights.append(w)
+                
         if not internal_weights:
             self.weights = weights[:-1]
             self.weights_max = weights[-1]
 
-        U = self.U_tensors(self.correlation)
-        num_params = U.shape[-1]
-        permutation = [U.dim() - 1] + list(range(U.dim()))[:-1]
-        U_permuted = U.permute(permutation).reshape(num_params, -1)
-        self.register_buffer("U_max_permuted", U_permuted)
+        # Permute the U matrices
+        for i in range(correlation, 0, -1):
+            U = self.U_tensors(i)
+            num_params = U.shape[-1]
+            permutation = [U.dim() - 1] + list(range(U.dim()))[:-1]
+            U_permuted = U.permute(permutation).reshape(num_params, -1)
+            self.register_buffer(f"U_permuted_{i}", U_permuted)
 
     def forward(self, x: torch.Tensor, bincount: torch.Tensor, sorted_indices: torch.Tensor):
         U = self.U_tensors(self.correlation)
         num_params = U.shape[-1]
         num_ell = U.shape[-2]
-        U_weights = self.weights_max.transpose(1, 2) @ self.U_permuted()
+        U_weights = self.weights_max.transpose(1, 2).reshape(-1, num_params) @ self.U_permuted(self.correlation)
 
         out = self.groupMM.forward(U_weights.view(self.num_elements, self.num_features, -1, num_ell), x, bincount)
         out = out.view([x.shape[0], self.num_features] + list(U.shape[:-2]))
         
-        for i, (weight, contract_weights, contract_features) in enumerate(
-            zip(self.weights, self.contractions_weighting, self.contractions_features)
-        ):  
-            c_tensor = contract_weights(
-                self.U_tensors(self.correlation - i - 1),
-                weight
-            )
-
+        for i, weight in enumerate(self.weights):  
+            U = self.U_tensors(self.correlation - i - 1)
+            U_perm = self.U_permuted(self.correlation - i - 1)
+            c_tensor = weight.transpose(1, 2).reshape(-1, weight.shape[1]) @ U_perm
+            c_tensor = c_tensor.view([weight.shape[0], weight.shape[2]] + list(U.shape[:-1]))
             c_tensor = c_tensor[sorted_indices] + out
+            
             s = c_tensor.shape
-            out = torch.bmm(c_tensor.view(s[0] * s[1], -1, s[-1]), x.view(s[0] * s[1], s[-1], 1)).view(s[:-1])
+            out = torch.sum(c_tensor.view(s[0] * s[1], -1, s[-1]) * x.view(s[0] * s[1], 1, s[-1]), dim=2).view(s[:-1])
+            #out = torch.bmm(c_tensor.view(s[0] * s[1], -1, s[-1]), x.view(s[0] * s[1], s[-1], 1)).view(s[:-1])
 
         return out.view(out.shape[0], -1)
     
     def U_tensors(self, nu: int):
         return dict(self.named_buffers())[f"U_matrix_{nu}"]
 
-    def U_permuted(self):
-        return dict(self.named_buffers())[f"U_max_permuted"]
+    def U_permuted(self, nu: int):
+        return dict(self.named_buffers())[f"U_permuted_{nu}"]
 
 @compile_mode("script")
 class SymmetricContraction(CodeGenMixin, torch.nn.Module):
@@ -318,6 +245,10 @@ class SymmetricContraction(CodeGenMixin, torch.nn.Module):
         outs = [contraction(x, bincount, sorted_indices) for contraction in self.contractions]
         outs_cat = torch.cat(outs, dim=-1)[inverse_perm]
         return outs_cat
+
+
+
+# --------------------------------------------------------------------------
 
 def test_group_matmul():
     torch.manual_seed(0)
