@@ -44,9 +44,9 @@ class GroupMM:
         @group_gemm.register_fake
         def _(A, B, ragged_counts, M, K, ragged_inner):
             if ragged_inner == 0:
-                return A.empty_like(B.shape[0], B.shape[1], M)
+                return A.new_empty(B.shape[0], B.shape[1], M)
             elif ragged_inner == 1:
-                return A.empty_like(num_elements, B.shape[1], batch_size, M, K)
+                return A.new_empty(num_elements, batch_size, M, K)
 
         self.group_gemm = group_gemm
 
@@ -70,7 +70,254 @@ class GroupMM:
     def forward(self, weights, vectors, bincounts):
         return self.group_gemm(weights, vectors, bincounts, weights.shape[2], weights.shape[3], 0)
 
+# --------------------------------------------------------------------------
+from typing import Dict, Optional, Union
+import time
 
+import opt_einsum_fx
+import torch
+import torch.fx
+from e3nn import o3
+from e3nn.util.codegen import CodeGenMixin
+from e3nn.util.jit import compile_mode
+
+from mace.tools.cg import U_matrix_real
+
+BATCH_EXAMPLE = 10
+ALPHABET = ["w", "x", "v", "n", "z", "r", "t", "y", "u", "o", "p", "s"]
+
+@compile_mode("script")
+class Contraction(torch.nn.Module):
+    def __init__(
+        self,
+        irreps_in: o3.Irreps,
+        irrep_out: o3.Irreps,
+        correlation: int,
+        internal_weights: bool = True,
+        num_elements: Optional[int] = None,
+        weights: Optional[torch.Tensor] = None,
+    ) -> None:
+        super().__init__()
+
+        self.num_elements = num_elements
+        self.num_features = irreps_in.count((0, 1))
+        self.coupling_irreps = o3.Irreps([irrep.ir for irrep in irreps_in])
+        self.correlation = correlation
+        dtype = torch.get_default_dtype()
+        for nu in range(1, correlation + 1):
+            U_matrix = U_matrix_real(
+                irreps_in=self.coupling_irreps,
+                irreps_out=irrep_out,
+                correlation=nu,
+                dtype=dtype,
+            )[-1]
+            self.register_buffer(f"U_matrix_{nu}", U_matrix)
+
+        # Tensor contraction equations
+        self.contractions_weighting = torch.nn.ModuleList()
+        self.contractions_features = torch.nn.ModuleList()
+
+        # Create weight for product basis
+        self.weights = torch.nn.ParameterList([])
+        self.groupMM = GroupMM(torch.get_default_dtype(), num_elements, self.num_features)
+        self.num_equivariance = 2 * irrep_out.lmax + 1
+        
+        for i in range(correlation, 0, -1):
+            # Shapes definying
+            num_params = self.U_tensors(i).size()[-1]
+            num_equivariance = 2 * irrep_out.lmax + 1
+            num_ell = self.U_tensors(i).size()[-2]
+
+            if i == correlation:
+                parse_subscript_main = (
+                    [ALPHABET[j] for j in range(i + min(irrep_out.lmax, 1) - 1)]
+                    + ["ik,ekc,bci,be -> bc"]
+                    + [ALPHABET[j] for j in range(i + min(irrep_out.lmax, 1) - 1)]
+                )
+                graph_module_main = torch.fx.symbolic_trace(
+                    lambda x, y, w, z: torch.einsum(
+                        "".join(parse_subscript_main), x, y, w, z
+                    )
+                )
+
+                # Optimizing the contractions
+                self.graph_opt_main = opt_einsum_fx.optimize_einsums_full(
+                    model=graph_module_main,
+                    example_inputs=(
+                        torch.randn(
+                            [num_equivariance] + [num_ell] * i + [num_params]
+                        ).squeeze(0),
+                        torch.randn((num_elements, num_params, self.num_features)),
+                        torch.randn((BATCH_EXAMPLE, self.num_features, num_ell)),
+                        torch.randn((BATCH_EXAMPLE, num_elements)),
+                    ),
+                )
+                # Parameters for the product basis
+                w = torch.nn.Parameter(
+                    torch.randn((num_elements, num_params, self.num_features))
+                    / num_params
+                )
+                self.weights_max = w
+            else:
+                # Generate optimized contractions equations
+                parse_subscript_weighting = (
+                    [ALPHABET[j] for j in range(i + min(irrep_out.lmax, 1))]
+                    + ["k,ekc->ec"]
+                    + [ALPHABET[j] for j in range(i + min(irrep_out.lmax, 1))]
+                )
+                parse_subscript_features = (
+                    ["bc"]
+                    + [ALPHABET[j] for j in range(i - 1 + min(irrep_out.lmax, 1))]
+                    + ["i,bci->bc"]
+                    + [ALPHABET[j] for j in range(i - 1 + min(irrep_out.lmax, 1))]
+                )
+
+                # Symbolic tracing of contractions
+                graph_module_weighting = torch.fx.symbolic_trace(
+                    lambda x, y: torch.einsum(
+                        "".join(parse_subscript_weighting), x, y
+                    )
+                )
+                graph_module_features = torch.fx.symbolic_trace(
+                    lambda x, y: torch.einsum("".join(parse_subscript_features), x, y)
+                )
+
+                # Optimizing the contractions
+                graph_opt_weighting = opt_einsum_fx.optimize_einsums_full(
+                    model=graph_module_weighting,
+                    example_inputs=(
+                        torch.randn(
+                            [num_equivariance] + [num_ell] * i + [num_params]
+                        ).squeeze(0),
+                        torch.randn((num_elements, num_params, self.num_features))
+                    ),
+                )
+                graph_opt_features = opt_einsum_fx.optimize_einsums_full(
+                    model=graph_module_features,
+                    example_inputs=(
+                        torch.randn(
+                            [BATCH_EXAMPLE, self.num_features, num_equivariance]
+                            + [num_ell] * i
+                        ).squeeze(2),
+                        torch.randn((BATCH_EXAMPLE, self.num_features, num_ell)),
+                    ),
+                )
+                self.contractions_weighting.append(graph_opt_weighting)
+                self.contractions_features.append(graph_opt_features)
+                # Parameters for the product basis
+                w = torch.nn.Parameter(
+                    torch.randn((num_elements, num_params, self.num_features))
+                    / num_params
+                )
+                self.weights.append(w)
+        if not internal_weights:
+            self.weights = weights[:-1]
+            self.weights_max = weights[-1]
+
+        U = self.U_tensors(self.correlation)
+        num_params = U.shape[-1]
+        permutation = [U.dim() - 1] + list(range(U.dim()))[:-1]
+        U_permuted = U.permute(permutation).reshape(num_params, -1)
+        self.register_buffer("U_max_permuted", U_permuted)
+
+    def forward(self, x: torch.Tensor, bincount: torch.Tensor, sorted_indices: torch.Tensor):
+        U = self.U_tensors(self.correlation)
+        num_params = U.shape[-1]
+        num_ell = U.shape[-2]
+        U_weights = self.weights_max.transpose(1, 2) @ self.U_permuted()
+
+        out = self.groupMM.forward(U_weights.view(self.num_elements, self.num_features, -1, num_ell), x, bincount)
+        out = out.view([x.shape[0], self.num_features] + list(U.shape[:-2]))
+        
+        for i, (weight, contract_weights, contract_features) in enumerate(
+            zip(self.weights, self.contractions_weighting, self.contractions_features)
+        ):  
+            c_tensor = contract_weights(
+                self.U_tensors(self.correlation - i - 1),
+                weight
+            )
+
+            c_tensor = c_tensor[sorted_indices] + out
+            s = c_tensor.shape
+            out = torch.bmm(c_tensor.view(s[0] * s[1], -1, s[-1]), x.view(s[0] * s[1], s[-1], 1)).view(s[:-1])
+
+        return out.view(out.shape[0], -1)
+    
+    def U_tensors(self, nu: int):
+        return dict(self.named_buffers())[f"U_matrix_{nu}"]
+
+    def U_permuted(self):
+        return dict(self.named_buffers())[f"U_max_permuted"]
+
+@compile_mode("script")
+class SymmetricContraction(CodeGenMixin, torch.nn.Module):
+    def __init__(
+        self,
+        irreps_in: o3.Irreps,
+        irreps_out: o3.Irreps,
+        correlation: Union[int, Dict[str, int]],
+        irrep_normalization: str = "component",
+        path_normalization: str = "element",
+        internal_weights: Optional[bool] = None,
+        shared_weights: Optional[bool  ] = None,
+        num_elements: Optional[int] = None,
+    ) -> None:
+        super().__init__()
+
+        self.num_elements = num_elements
+        if irrep_normalization is None:
+            irrep_normalization = "component"
+
+        if path_normalization is None:
+            path_normalization = "element"
+
+        assert irrep_normalization in ["component", "norm", "none"]
+        assert path_normalization in ["element", "path", "none"]
+
+        self.irreps_in = o3.Irreps(irreps_in)
+        self.irreps_out = o3.Irreps(irreps_out)
+
+        del irreps_in, irreps_out
+
+        if not isinstance(correlation, tuple):
+            corr = correlation
+            correlation = {}
+            for irrep_out in self.irreps_out:
+                correlation[irrep_out] = corr
+
+        assert shared_weights or not internal_weights
+
+        if internal_weights is None:
+            internal_weights = True
+
+        self.internal_weights = internal_weights
+        self.shared_weights = shared_weights
+
+        del internal_weights, shared_weights
+
+        self.contractions = torch.nn.ModuleList()
+        for irrep_out in self.irreps_out:
+            self.contractions.append(
+                Contraction(
+                    irreps_in=self.irreps_in,
+                    irrep_out=o3.Irreps(str(irrep_out.ir)),
+                    correlation=correlation[irrep_out],
+                    internal_weights=self.internal_weights,
+                    num_elements=num_elements,
+                    weights=self.shared_weights,
+                )
+            )
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor):
+        indices = torch.argmax(y, dim=1)
+        bincount = torch.bincount(indices, minlength=self.num_elements).to('cpu')
+        permutation = torch.argsort(indices)
+        inverse_perm = torch.argsort(permutation)
+        sorted_indices = indices[permutation]
+        x = x[permutation]
+        outs = [contraction(x, bincount, sorted_indices) for contraction in self.contractions]
+        outs_cat = torch.cat(outs, dim=-1)[inverse_perm]
+        return outs_cat
 
 def test_group_matmul():
     torch.manual_seed(0)
@@ -192,8 +439,8 @@ def test_group_matmul():
         print(torch.norm(C_grad_gt))
 
 
-    #test_backward_0()
-    #test_backward_1()
+    test_backward_0()
+    test_backward_1()
     test_double_backward()
 
 
