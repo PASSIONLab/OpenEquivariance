@@ -73,4 +73,7 @@ PYBIND11_MODULE(kernel_wrapper, m) {
     py::class_<GroupMM<float>>(m, "GroupMM_F32")
         .def(py::init<int, int>())
         .def("group_gemm", &GroupMM<float>::group_gemm_intptr);
+    py::class_<GroupMM<double>>(m, "GroupMM_F64")
+        .def(py::init<int, int>())
+        .def("group_gemm", &GroupMM<double>::group_gemm_intptr);
 }

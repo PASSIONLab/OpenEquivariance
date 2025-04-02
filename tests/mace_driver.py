@@ -57,7 +57,7 @@ def analyze_trace(trace_file):
     }
 
 def create_model(hidden_irreps, max_ell, device, cueq_config=None):
-    table = tools.AtomicNumberTable([8, 82, 53, 55, 5, 8, 7, 4, 2])
+    table = tools.AtomicNumberTable([6, 82, 53, 55, 5, 8, 7, 4, 2])
     model_config = {
         "r_max": 6.0,
         "num_bessel": 8,
@@ -115,7 +115,7 @@ def benchmark_model(model, batch, num_iterations=100, warmup=100, label=None, ou
             "cuda_time_profile": analyze_trace(trace_file)
         }, f, indent=4) 
 
-    #print(run_inference())
+    print(run_inference())
 
     return measurement
 
@@ -206,11 +206,11 @@ def main():
             print(f"E3NN Measurement:\n{measurement_e3nn}")
 
         if 'oeq' in args.implementations:
-            #model_oeq = create_model_oeq(hidden_irreps, args.max_ell, device)
-            create_model = lambda device: create_model_oeq(hidden_irreps, args.max_ell, device)
+            model_oeq = create_model_oeq(hidden_irreps, args.max_ell, device)
+            #create_model = lambda device: create_model_oeq(hidden_irreps, args.max_ell, device)
 
-            tmp_model = mace_compile.prepare(create_model)(device)
-            model_oeq = torch.compile(tmp_model, mode="default", dynamic=True)
+            #tmp_model = mace_compile.prepare(create_model)(device)
+            #model_oeq = torch.compile(tmp_model, mode="default", dynamic=True)
 
             measurement_oeq = benchmark_model(model_oeq, batch_dict, args.num_iters, label=f"ours_{dtype_str}", output_folder=output_folder)
             print(f"\nOpenEquivariance Measurement:\n{measurement_oeq}")

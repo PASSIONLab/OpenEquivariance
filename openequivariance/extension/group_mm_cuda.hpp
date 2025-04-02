@@ -98,19 +98,29 @@ public:
                     stat = cublasSgemmStridedBatched(handle,
                         transa, transb, 
                         M, N, K,
-                        &alpha,
-                        A, lda, strideA,
-                        B, ldb, strideB, 
-                        &beta, 
-                        C, ldc, strideC,
+                        reinterpret_cast<float*>(&alpha),
+                        reinterpret_cast<float*>(A), lda, strideA,
+                        reinterpret_cast<float*>(B), ldb, strideB, 
+                        reinterpret_cast<float*>(&beta), 
+                        reinterpret_cast<float*>(C), ldc, strideC,
                         batch_size);
-
-                    if (stat != CUBLAS_STATUS_SUCCESS) {
-                        throw std::logic_error("Grouped GEMM failed!");
-                    }
+                }
+                else if(std::is_same<T, double>::value) {
+                    stat = cublasDgemmStridedBatched(handle,
+                        transa, transb, 
+                        M, N, K,
+                        reinterpret_cast<double*>(&alpha),
+                        reinterpret_cast<double*>(A), lda, strideA,
+                        reinterpret_cast<double*>(B), ldb, strideB, 
+                        reinterpret_cast<double*>(&beta), 
+                        reinterpret_cast<double*>(C), ldc, strideC,
+                        batch_size);
                 }
                 else {
                     throw std::logic_error("Double precision support in progress.");
+                }
+                if (stat != CUBLAS_STATUS_SUCCESS) {
+                    throw std::logic_error("Grouped GEMM failed!");
                 }
             }
         }
