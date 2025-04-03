@@ -115,7 +115,7 @@ def benchmark_model(model, batch, num_iterations=100, warmup=100, label=None, ou
             "cuda_time_profile": analyze_trace(trace_file)
         }, f, indent=4) 
 
-    print(run_inference())
+    #print(run_inference())
 
     return measurement
 
@@ -207,11 +207,6 @@ def main():
 
         if 'oeq' in args.implementations:
             model_oeq = create_model_oeq(hidden_irreps, args.max_ell, device)
-            #create_model = lambda device: create_model_oeq(hidden_irreps, args.max_ell, device)
-
-            #tmp_model = mace_compile.prepare(create_model)(device)
-            #model_oeq = torch.compile(tmp_model, mode="default", dynamic=True)
-
             measurement_oeq = benchmark_model(model_oeq, batch_dict, args.num_iters, label=f"ours_{dtype_str}", output_folder=output_folder)
             print(f"\nOpenEquivariance Measurement:\n{measurement_oeq}")
             #print(f"\nSpeedup: {measurement_e3nn.mean / measurement_oeq.mean:.2f}x")
