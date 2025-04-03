@@ -63,7 +63,7 @@ class LoopUnrollTP(TensorProductBase):
             generate_backward_schedule(4)
 
 
-        self.jit_kernel = postprocess(template.render(
+        self.jit_kernel = postprocess_kernel(template.render(
             forward_schedule=self.forward_schedule,
             backward_schedule=self.backward_schedule))
 
