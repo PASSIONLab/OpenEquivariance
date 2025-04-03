@@ -14,6 +14,7 @@ from mace.tools import torch_geometric
 from torch.utils.benchmark import Timer
 from mace.calculators import mace_mp
 from torch.profiler import profile, record_function, ProfilerActivity
+from mace.tools import compile as mace_compile
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -56,7 +57,7 @@ def analyze_trace(trace_file):
     }
 
 def create_model(hidden_irreps, max_ell, device, cueq_config=None):
-    table = tools.AtomicNumberTable([8, 82, 53, 55])
+    table = tools.AtomicNumberTable([6, 82, 53, 55, 5, 8, 7, 4, 2])
     model_config = {
         "r_max": 6.0,
         "num_bessel": 8,
@@ -74,7 +75,6 @@ def create_model(hidden_irreps, max_ell, device, cueq_config=None):
         "atomic_numbers": table.zs,
         "correlation": 3,
         "radial_type": "bessel",
-        "num_elements": 4,
         "cueq_config": cueq_config,
         "atomic_inter_scale": 1.0,
         "atomic_inter_shift": 0.0,
@@ -172,7 +172,7 @@ def main():
         # Create dataset
         atoms_list = ase.io.read(args.xyz_file, index=":")
         #table = tools.AtomicNumberTable(list(set(np.concatenate([atoms.numbers for atoms in atoms_list]))))
-        table = tools.AtomicNumberTable([6, 82, 53, 55])
+        table = tools.AtomicNumberTable([6, 82, 53, 55, 5, 8, 7, 4, 2])
         data_loader = torch_geometric.dataloader.DataLoader(
             dataset=[data.AtomicData.from_config(
                 data.config_from_atoms(atoms),
