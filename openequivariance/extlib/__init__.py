@@ -13,6 +13,7 @@ if len(candidates) == 1:
     build_ext = False 
 
 kernel_wrapper = None
+torch_wrapper = None
 
 postprocess_kernel = lambda kernel: kernel
 
@@ -25,7 +26,8 @@ else:
     global torch
     import torch
 
-    sources = ['kernel_wrapper.cpp']
+    generic_sources = ['kernel_wrapper.cpp']
+    aten_sources = ['torch_wrapper.cpp']
     extra_cflags=["-O3"]
 
     include_dirs, extra_link_args = ['util'], None 
@@ -52,16 +54,28 @@ else:
 
         extra_cflags.append("-DHIP")
 
-    sources = [oeq_root + '/extension/' + src for src in sources]
+    generic_sources = [oeq_root + '/extension/' + src for src in generic_sources]
+    aten_sources = [oeq_root + '/extension/' + src for src in aten_sources]
+
     include_dirs = [oeq_root + '/extension/' + d for d in include_dirs] + include_paths('cuda')
 
     with warnings.catch_warnings():
 #        with tempfile.TemporaryDirectory() as tmpdir: // Might be needed for RocM
         warnings.simplefilter("ignore")
-        kernel_wrapper = torch.utils.cpp_extension.load("kernel_wrapper",
-            sources,
+        #kernel_wrapper = torch.utils.cpp_extension.load("kernel_wrapper",
+        #    generic_sources,
+        #    extra_cflags=extra_cflags,
+        #    extra_include_paths=include_dirs,
+        #    extra_ldflags=extra_link_args)
+
+        # Need to locate the correct compiler here... 
+        torch_wrapper = torch.utils.cpp_extension.load("torch_wrapper",
+            aten_sources,
             extra_cflags=extra_cflags,
             extra_include_paths=include_dirs,
             extra_ldflags=extra_link_args)
+        torch.ops.load_library(torch_wrapper.__file__)
 
-from kernel_wrapper import *
+        print("Torch ops load library succeeded!")
+
+#from kernel_wrapper import *

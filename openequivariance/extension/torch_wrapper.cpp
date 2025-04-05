@@ -56,7 +56,7 @@ public:
                     internal(kernel_plaintext, fwd_config, bwd_config)
     { }
 
-    std::tuple<string, tuple<int, int, int>, tuple<int, int, int>, int> __obj_flatten__() {
+    std::tuple<string, tuple<int64_t, int64_t, int64_t>, tuple<int64_t, int64_t, int64_t>, int64_t> __obj_flatten__() {
         return std::tuple(internal.kernel_plaintext, fwd_conf_tup, bwd_conf_tup, L3_dim);
     }
 };
@@ -96,11 +96,11 @@ TORCH_LIBRARY_FRAGMENT(torch_wrapper, m) {
         .def_pickle(
             // __getstate__
             [](const c10::intrusive_ptr<TorchJITProduct>& self)
-                -> std::tuple<string, tuple<int, int, int>, tuple<int, int, int>, int>  {
+                -> std::tuple<string, tuple<int64_t, int64_t, int64_t>, tuple<int64_t, int64_t, int64_t>, int64_t>  {
               return self->__obj_flatten__(); 
             },
             // __setstate__
-            [](std::tuple<string, tuple<int, int, int>, tuple<int, int, int>, int> state)
+            [](std::tuple<string, tuple<int64_t, int64_t, int64_t>, tuple<int64_t, int64_t, int64_t>, int64_t> state)
                 -> c10::intrusive_ptr<TorchJITProduct> {
               return c10::make_intrusive<TorchJITProduct>(get<0>(state), get<1>(state), get<2>(state), get<3>(state));
             });
