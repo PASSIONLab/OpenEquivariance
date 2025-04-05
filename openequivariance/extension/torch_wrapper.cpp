@@ -5,7 +5,7 @@
 #include <torch/all.h>
 #include <torch/library.h>
 
-#ifdef CUDA
+#ifdef CUDA_BACKEND
 #include "backend_cuda.hpp"
 #include "group_mm_cuda.hpp"
 using JITKernel = CUJITKernel;
@@ -15,7 +15,7 @@ template<typename T>
 using GroupMM = GroupMMCUDA<T>; 
 #endif
 
-#ifdef HIP
+#ifdef HIP_BACKEND
 #include "backend_hip.hpp"
 using JITKernel = HIPJITKernel;
 using Allocator = HIP_Allocator;
@@ -30,8 +30,8 @@ using GroupMM = GroupMMHIP<T>;
 using namespace std;
 namespace py = pybind11;
 
-void* data_ptr(const torch::Tensor &tensor) {
-    return reinterpret_cast<void*>(tensor.data_ptr<char>);
+inline void* data_ptr(const torch::Tensor &tensor) {
+    return reinterpret_cast<void*>(tensor.data_ptr<char>());
 }
 
 /*
@@ -39,12 +39,12 @@ void* data_ptr(const torch::Tensor &tensor) {
 * and shared memory in bytes (int, int, int). 
 */
 class __attribute__ ((visibility ("default"))) TorchJITProduct: public torch::CustomClassHolder {
-private:
+public:
     std::tuple<int64_t, int64_t, int64_t> fwd_conf_tup, bwd_conf_tup;
     int64_t L3_dim;
     KernelLaunchConfig fwd_config, bwd_config;
     JITTPImpl<JITKernel> internal;
-public:
+
     TorchJITProduct(string kernel_plaintext, 
                     tuple<int64_t, int64_t, int64_t> fwd_conf, 
                     tuple<int64_t, int64_t, int64_t> bwd_conf,
@@ -57,7 +57,7 @@ public:
     { }
 
     std::tuple<string, tuple<int64_t, int64_t, int64_t>, tuple<int64_t, int64_t, int64_t>, int64_t> __obj_flatten__() {
-        return std::tuple(internal.kernel_plaintext, fwd_conf_tup, bwd_conf_tup, L3_dim);
+        return std::tuple(internal.jit.kernel_plaintext, fwd_conf_tup, bwd_conf_tup, L3_dim);
     }
 };
 
@@ -67,20 +67,21 @@ torch::Tensor jit_tp_forward(
         const torch::Tensor &L2_in,
         const torch::Tensor &W) {
     
-    int64_t num_batch = L1_in.sizes[0];
-    torch::Tensor result = torch.zeros({L1_in.sizes[0], L3_dim}, L1_in.options());
+    int64_t num_batch = L1_in.sizes()[0];
+    torch::Tensor L3_out = torch::zeros({num_batch, jit_instance->L3_dim}, L1_in.options());
         
     at::Tensor L1_contig = L1_in.contiguous();
     at::Tensor L2_contig = L2_in.contiguous();
     at::Tensor W_contig = W.contiguous();
     
-    internal.exec_tensor_product(
+    jit_instance->internal.exec_tensor_product(
+            num_batch,
             data_ptr(L1_contig), 
-            data_ptr(L3_contig), 
-            data_ptr(result),
+            data_ptr(L2_contig), 
+            data_ptr(L3_out),
             data_ptr(W_contig));
     
-    return result;
+    return L3_out;
 }
 
 TORCH_LIBRARY_FRAGMENT(torch_wrapper, m) { 
@@ -90,7 +91,7 @@ TORCH_LIBRARY_FRAGMENT(torch_wrapper, m) {
                             tuple<int64_t, int64_t, int64_t>,
                             int64_t> ())
         .def("__obj_flatten__", &TorchJITProduct::__obj_flatten__)
-        .def("__len__", [](const c10::intrusive_ptr<>& obj) -> int64_t {
+        .def("__len__", [](const c10::intrusive_ptr<TorchJITProduct>& obj) -> int64_t {
             return 0;
         })
         .def_pickle(

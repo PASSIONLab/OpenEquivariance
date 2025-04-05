@@ -136,7 +136,6 @@ public:
 
 class __attribute__((visibility("default"))) HIPJITKernel {
 private:
-    string kernel_plaintext;
     hiprtcProgram prog;
 
     bool compiled = false;
@@ -148,6 +147,7 @@ private:
     vector<hipFunction_t> kernels;
 
 public:
+    string kernel_plaintext;
     HIPJITKernel(string plaintext) :
         kernel_plaintext(plaintext) {
 

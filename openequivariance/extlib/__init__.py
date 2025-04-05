@@ -42,7 +42,7 @@ else:
         except Exception as e:
             getLogger().info(str(e))
 
-        extra_cflags.append("-DCUDA")
+        extra_cflags.append("-DCUDA_BACKEND")
     elif torch.cuda.is_available() and torch.version.hip:
         extra_link_args = [ '-Wl,--no-as-needed', '-lhiprtc']
 
@@ -52,7 +52,7 @@ else:
             return kernel 
         postprocess_kernel = postprocess
 
-        extra_cflags.append("-DHIP")
+        extra_cflags.append("-DHIP_BACKEND")
 
     generic_sources = [oeq_root + '/extension/' + src for src in generic_sources]
     aten_sources = [oeq_root + '/extension/' + src for src in aten_sources]

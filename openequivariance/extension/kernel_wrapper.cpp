@@ -1,7 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 
-#ifdef CUDA
+#ifdef CUDA_BACKEND
 #include "backend_cuda.hpp"
 #include "group_mm_cuda.hpp"
 using JITKernel = CUJITKernel;
@@ -11,7 +11,7 @@ template<typename T>
 using GroupMM = GroupMMCUDA<T>; 
 #endif
 
-#ifdef HIP
+#ifdef HIP_BACKEND
 #include "backend_hip.hpp"
 using JITKernel = HIPJITKernel;
 using Allocator = HIP_Allocator;
