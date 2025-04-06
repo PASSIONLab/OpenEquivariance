@@ -31,7 +31,7 @@ using namespace std;
 namespace py = pybind11;
 
 inline void* data_ptr(const torch::Tensor &tensor) {
-    return reinterpret_cast<void*>(tensor.data_ptr<char>());
+    return reinterpret_cast<void*>(tensor.data_ptr<float>());
 }
 
 /*
