@@ -28,10 +28,11 @@ using GroupMM = GroupMMHIP<T>;
 #include "convolution.hpp"
 
 using namespace std;
-namespace py = pybind11;
+
+using Map_t=Dict<string, int64_t>; // Represent kernel dimensions / launch configurations as flat dictionaries 
 
 inline void* data_ptr(const torch::Tensor &tensor) {
-    return reinterpret_cast<void*>(tensor.data_ptr<float>());
+    return reinterpret_cast<void*>(tensor.data_ptr<float>()); // Not sure if this will work out-of-the-box for doubles 
 }
 
 /*
@@ -40,24 +41,36 @@ inline void* data_ptr(const torch::Tensor &tensor) {
 */
 class __attribute__ ((visibility ("default"))) TorchJITProduct: public torch::CustomClassHolder {
 public:
-    std::tuple<int64_t, int64_t, int64_t> fwd_conf_tup, bwd_conf_tup;
-    int64_t L3_dim;
-    KernelLaunchConfig fwd_config, bwd_config;
+    Map_t fwd_dict, bwd_dict, kernel_dims;
     JITTPImpl<JITKernel> internal;
 
+    int64_t L3_dim;
+
+
     TorchJITProduct(string kernel_plaintext, 
-                    tuple<int64_t, int64_t, int64_t> fwd_conf, 
-                    tuple<int64_t, int64_t, int64_t> bwd_conf,
-                    int64_t L3_dim) :
-                    fwd_conf_tup(fwd_conf),
-                    bwd_conf_tup(bwd_conf),
-                    fwd_config(get<0>(fwd_conf), get<1>(fwd_conf), get<2>(fwd_conf)),
-                    bwd_config(get<0>(bwd_conf), get<1>(bwd_conf), get<2>(bwd_conf)),
-                    internal(kernel_plaintext, fwd_config, bwd_config)
+                    Map_t fwd_dict_i, 
+                    Map_t bwd_dict_i, 
+                    Map_t kernel_dims_i) :
+                    fwd_dict(fwd_dict_i)
+                    bwd_dict(bwd_dict_i),
+                    kernel_dims(kernel_dims_i),
+                    internal(kernel_plaintext, 
+                            KernelLaunchConfig(
+                                fwd_dict.at("num_blocks"),
+                                fwd_dict.at("threads_per_block"),
+                                fwd_dict.at("smem")
+                            ),
+                            KernelLaunchConfig(
+                                bwd_dict.at("num_blocks"),
+                                bwd_dict.at("threads_per_block"),
+                                bwd_dict.at("smem")
+                            )
+                        ),
+                    L3_dim(kernel_dims.at("L3_dim"))
     { }
 
-    std::tuple<string, tuple<int64_t, int64_t, int64_t>, tuple<int64_t, int64_t, int64_t>, int64_t> __obj_flatten__() {
-        return std::tuple(internal.jit.kernel_plaintext, fwd_conf_tup, bwd_conf_tup, L3_dim);
+    tuple<string, Map_t, Map_t, Map_t> __obj_flatten__() {
+        return make_tuple(internal.jit.kernel_plaintext, fwd_dict, bwd_dict, kernel_dims); 
     }
 };
 
@@ -86,10 +99,7 @@ torch::Tensor jit_tp_forward(
 
 TORCH_LIBRARY_FRAGMENT(torch_wrapper, m) { 
     m.class_<TorchJITProduct>("TorchJITProduct")
-        .def(torch::init<   string, 
-                            tuple<int64_t, int64_t, int64_t>, 
-                            tuple<int64_t, int64_t, int64_t>,
-                            int64_t> ())
+        .def(torch::init<string, Map_t, Map_t, Map_t> ())
         .def("__obj_flatten__", &TorchJITProduct::__obj_flatten__)
         .def("__len__", [](const c10::intrusive_ptr<TorchJITProduct>& obj) -> int64_t {
             return 0;
@@ -97,14 +107,14 @@ TORCH_LIBRARY_FRAGMENT(torch_wrapper, m) {
         .def_pickle(
             // __getstate__
             [](const c10::intrusive_ptr<TorchJITProduct>& self)
-                -> std::tuple<string, tuple<int64_t, int64_t, int64_t>, tuple<int64_t, int64_t, int64_t>, int64_t>  {
+                -> tuple<string, Map_t, Map_t, Map_t> {
               return self->__obj_flatten__(); 
             },
             // __setstate__
-            [](std::tuple<string, tuple<int64_t, int64_t, int64_t>, tuple<int64_t, int64_t, int64_t>, int64_t> state)
+            [](tuple<string, Map_t, Map_t, Map_t>
                 -> c10::intrusive_ptr<TorchJITProduct> {
               return c10::make_intrusive<TorchJITProduct>(get<0>(state), get<1>(state), get<2>(state), get<3>(state));
-            });
+            }));
     m.def("jit_tp_forward(__torch__.torch.classes.torch_wrapper.TorchJITProduct jit, Tensor L1_in, Tensor L2_in, Tensor L3_in) -> Tensor");
 };
 

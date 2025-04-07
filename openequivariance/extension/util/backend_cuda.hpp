@@ -135,6 +135,13 @@ public:
         num_threads(num_threads_per_block),
         smem(smem) 
     { }
+
+
+    KernelLaunchConfig(int64_t num_blocks, int64_t num_threads_per_block, int64_t smem) :
+        KernelLaunchConfig( static_cast<uint32_t>(num_blocks),
+                            static_cast<uint32_t>(num_threads),
+                            static_cast<uint32_t>(smem)) 
+    { }
 };
 
 /*

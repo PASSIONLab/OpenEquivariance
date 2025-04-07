@@ -32,14 +32,14 @@ PYBIND11_MODULE(kernel_wrapper, m) {
         .def("exec_tensor_product", &GenericTensorProductImpl::exec_tensor_product_device_rawptrs)
         .def("backward", &GenericTensorProductImpl::backward_device_rawptrs);
     py::class_<JITTPImpl<JITKernel>, GenericTensorProductImpl>(m, "JITTPImpl")
-        .def(py::init<std::string, KernelLaunchConfig&, KernelLaunchConfig&>());
+        .def(py::init<std::string, KernelLaunchConfig, KernelLaunchConfig>());
 
     //============= Convolutions ===============
     py::class_<ConvolutionImpl>(m, "ConvolutionImpl")
         .def("exec_conv_rawptrs", &ConvolutionImpl::exec_conv_rawptrs)
         .def("backward_rawptrs", &ConvolutionImpl::backward_rawptrs);
     py::class_<JITConvImpl<JITKernel>, ConvolutionImpl>(m, "JITConvImpl")
-        .def(py::init<std::string, KernelLaunchConfig&, KernelLaunchConfig&>());
+        .def(py::init<std::string, KernelLaunchConfig, KernelLaunchConfig>());
 
     //============= Utilities ===============
     py::class_<KernelLaunchConfig>(m, "KernelLaunchConfig")
