@@ -1,7 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 
-#include <ATen/Operators.h>
 #include <torch/all.h>
 #include <torch/library.h>
 
@@ -29,31 +28,25 @@ using GroupMM = GroupMMHIP<T>;
 
 using namespace std;
 
-using Map_t=Dict<string, int64_t>; // Represent kernel dimensions / launch configurations as flat dictionaries 
+using Map_t=torch::Dict<string, int64_t>; // Represent kernel dimensions / launch configurations as flat dictionaries 
 
 inline void* data_ptr(const torch::Tensor &tensor) {
-    return reinterpret_cast<void*>(tensor.data_ptr<float>()); // Not sure if this will work out-of-the-box for doubles 
+    return reinterpret_cast<void*>(tensor.data_ptr<float>()); // Unsure if this will also work for doubles 
 }
 
-/*
-* Kernel launch configuration provides the number of blocks, number of threads per block, 
-* and shared memory in bytes (int, int, int). 
-*/
 class __attribute__ ((visibility ("default"))) TorchJITProduct: public torch::CustomClassHolder {
 public:
     Map_t fwd_dict, bwd_dict, kernel_dims;
     JITTPImpl<JITKernel> internal;
-
     int64_t L3_dim;
-
 
     TorchJITProduct(string kernel_plaintext, 
                     Map_t fwd_dict_i, 
                     Map_t bwd_dict_i, 
                     Map_t kernel_dims_i) :
-                    fwd_dict(fwd_dict_i)
-                    bwd_dict(bwd_dict_i),
-                    kernel_dims(kernel_dims_i),
+                    fwd_dict(fwd_dict_i.copy()),
+                    bwd_dict(bwd_dict_i.copy()),
+                    kernel_dims(kernel_dims_i.copy()),
                     internal(kernel_plaintext, 
                             KernelLaunchConfig(
                                 fwd_dict.at("num_blocks"),
@@ -70,7 +63,7 @@ public:
     { }
 
     tuple<string, Map_t, Map_t, Map_t> __obj_flatten__() {
-        return make_tuple(internal.jit.kernel_plaintext, fwd_dict, bwd_dict, kernel_dims); 
+        return make_tuple<string, Map_t, Map_t, Map_t>(internal.jit.kernel_plaintext, fwd_dict, bwd_dict, kernel_dims); 
     }
 };
 
@@ -111,10 +104,10 @@ TORCH_LIBRARY_FRAGMENT(torch_wrapper, m) {
               return self->__obj_flatten__(); 
             },
             // __setstate__
-            [](tuple<string, Map_t, Map_t, Map_t>
+            [](tuple<string, Map_t, Map_t, Map_t>& state)
                 -> c10::intrusive_ptr<TorchJITProduct> {
               return c10::make_intrusive<TorchJITProduct>(get<0>(state), get<1>(state), get<2>(state), get<3>(state));
-            }));
+            });
     m.def("jit_tp_forward(__torch__.torch.classes.torch_wrapper.TorchJITProduct jit, Tensor L1_in, Tensor L2_in, Tensor L3_in) -> Tensor");
 };
 
