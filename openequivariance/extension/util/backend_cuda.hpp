@@ -138,10 +138,10 @@ public:
     { }
 
 
-    KernelLaunchConfig(int64_t num_blocks, int64_t num_threads_per_block, int64_t smem) :
-        KernelLaunchConfig( static_cast<uint32_t>(num_blocks),
-                            static_cast<uint32_t>(num_threads),
-                            static_cast<uint32_t>(smem)) 
+    KernelLaunchConfig(int64_t num_blocks_i, int64_t num_threads_i, int64_t smem_i) :
+        KernelLaunchConfig( static_cast<uint32_t>(num_blocks_i),
+                            static_cast<uint32_t>(num_threads_i),
+                            static_cast<uint32_t>(smem_i)) 
     { }
 };
 

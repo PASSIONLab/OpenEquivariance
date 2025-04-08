@@ -9,7 +9,7 @@ from openequivariance.benchmark.logging_utils import getLogger, bcolors
 logger = getLogger()
 
 class TensorProductBase:
-    next_tp_id = 0 # Used to assign unique IDs to each TP instance 
+    next_tp_id = 0 # Assign unique IDs to each TP instance 
 
     @staticmethod
     def load_cg_tensor(l1, l2, l3):
@@ -155,13 +155,13 @@ class TensorProductBase:
     
     def benchmark_backward(
             self, 
-            num_warmup : int, 
-            num_iter : int, 
-            L1_in : np.ndarray, 
-            L2_in : np.ndarray, 
-            L3_buffer : np.ndarray, 
-            weights : np.ndarray, 
-            L1_grad : np.ndarray, 
+            num_warmup : int,
+            num_iter : int,
+            L1_in : np.ndarray,
+            L2_in : np.ndarray,
+            L3_buffer : np.ndarray,
+            weights : np.ndarray,
+            L1_grad : np.ndarray,
             L2_grad : np.ndarray,
             weights_grad : np.ndarray
             ) -> np.ndarray:

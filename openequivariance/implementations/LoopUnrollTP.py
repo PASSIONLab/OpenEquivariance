@@ -1,11 +1,11 @@
 import numpy as np
 
-from openequivariance.extlib import *
+import openequivariance.extlib as extlib
 from openequivariance.templates.jinja_utils import *
 from openequivariance.implementations.ComputationSchedule import ComputationSchedule 
 
 from openequivariance.implementations.TensorProductBase import TensorProductBase 
-from openequivariance.benchmark.logging_utils import getLogger, bcolors
+from openequivariance.benchmark.logging_utils import getLogger 
 from openequivariance.benchmark.e3nn_lite_utils import count_cg_non_zero
 logger = getLogger()
 
@@ -18,7 +18,7 @@ class LoopUnrollTP(TensorProductBase):
         template = env.get_template("loop_unroll_batch.cuh")
         env.globals['enumerate'] = enumerate 
 
-        dp = DeviceProp(0)
+        dp = extlib.DeviceProp(0)
 
         if len(config.instructions) == 0:
             raise ValueError("Tensor product problem has no valid intructions!")
@@ -31,7 +31,9 @@ class LoopUnrollTP(TensorProductBase):
 
         def generate_forward_schedule(warps_per_block):
             self.forward_schedule = ComputationSchedule(self.config, 
-                    smem_limit=dp.maxSharedMemPerBlock, warps_per_block=warps_per_block,
+                    smem_limit=dp.maxSharedMemPerBlock, 
+                    warps_per_block=warps_per_block,
+                    warp_size=dp.warpsize,
                     block_count=dp.multiprocessorCount * 4,
                     direction = "forward",
                     irrep_dtype = config.irrep_dtype,
@@ -41,7 +43,9 @@ class LoopUnrollTP(TensorProductBase):
 
         def generate_backward_schedule(warps_per_block):
             self.backward_schedule = ComputationSchedule(self.config, 
-                    smem_limit=dp.maxSharedMemPerBlock, warps_per_block=warps_per_block,
+                    smem_limit=dp.maxSharedMemPerBlock, 
+                    warps_per_block=warps_per_block,
+                    warp_size=dp.warpsize,
                     block_count=dp.multiprocessorCount * 3,
                     direction = "backward",
                     irrep_dtype = config.irrep_dtype,
@@ -63,14 +67,27 @@ class LoopUnrollTP(TensorProductBase):
             generate_backward_schedule(4)
 
 
-        self.jit_kernel = postprocess_kernel(template.render(
+        self.jit_kernel = extlib.postprocess_kernel(template.render(
             forward_schedule=self.forward_schedule,
             backward_schedule=self.backward_schedule))
 
+        internal_cls = None
+        if self.torch_op and extlib.TORCH_COMPILE:
+            global torch
+            import torch
+
+            internal_cls = torch.classes.torch_wrapper.TorchJITProduct
+            self.forward_op = torch.ops.torch_wrapper.jit_tp_forward
+            self.backward_op = torch.ops.torch_wrapper.jit_tp_backward
+            self.register_torch_fakes()
+        else:
+            internal_cls = extlib.JITTPImpl
+
         logger.info("Starting NVRTC")
-        self.internal = JITTPImpl(self.jit_kernel,
-                self.forward_schedule.launch_config,
-                self.backward_schedule.launch_config)
+        self.internal = internal_cls(self.jit_kernel,
+                vars(self.forward_schedule.launch_config),
+                vars(self.backward_schedule.launch_config),
+                {"L3_dim": self.L3.dim})
         logger.info("Kernel compiled!")
 
         logger.info(f"CUDA Kernel File Size: {len(self.jit_kernel) // 1024} KB")
@@ -83,6 +100,32 @@ class LoopUnrollTP(TensorProductBase):
         self.reorder_weights_oeq_to_e3nn = lambda input, output, has_batch_dim: \
                 self.forward_schedule.reorder_weights(input, output, "backward", has_batch_dim) 
 
+    def register_torch_fakes(self):
+        @torch._library.register_fake_class("torch_wrapper::TorchJITProduct")
+        class TorchJITProduct:
+            def __init__(self, kernel: str, 
+                        fwd_config: dict[str, int], 
+                        bwd_config: dict[str, int], 
+                        kernel_dims: dict[str, int]) -> None:
+                self.kernel, self.fwd_config, self.bwd_config, self.kernel_dims = kernel, fwd_config, bwd_config, kernel_dims
+
+            @classmethod
+            def __obj_unflatten__(cls, flattened_product):
+                return cls(*flattened_product)
+
+            def __len__(self):
+                return 0
+            
+            def __setstate__(self, state):
+                self.kernel, self.fwd_config, self.bwd_config, self.kernel_dims = state 
+
+        @torch.library.register_fake("torch_wrapper::jit_tp_forward")
+        def fake_forward(jit, L1_in, L2_in, W):
+            return L1_in.new_empty(L1_in.shape[0], self.kernel_dims["L3_dim"])
+
+        @torch.library.register_fake("torch_wrapper::jit_tp_backward")
+        def fake_backward(jit, L1_in, L2_in, W, L3_grad):
+            return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W) 
 
     @staticmethod
     def name():

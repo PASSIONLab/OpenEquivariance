@@ -12,10 +12,9 @@ candidates = [f for f in os.listdir(oeq_root + '/extlib')
 if len(candidates) == 1:
     build_ext = False 
 
-kernel_wrapper = None
 torch_wrapper = None
-
 postprocess_kernel = lambda kernel: kernel
+TORCH_COMPILE=True
 
 if not build_ext: 
     from openequivariance.extlib.kernel_wrapper import * 
@@ -31,7 +30,7 @@ else:
     extra_cflags=["-O3"]
 
     include_dirs, extra_link_args = ['util'], None 
-    if torch.cuda.is_available() and torch.version.cuda: 
+    if torch.cuda.is_available() and torch.version.cuda:
         extra_link_args = ['-Wl,--no-as-needed', '-lcuda', '-lcudart', '-lnvrtc']
 
         try:
@@ -60,15 +59,11 @@ else:
     include_dirs = [oeq_root + '/extension/' + d for d in include_dirs] + include_paths('cuda')
 
     with warnings.catch_warnings():
-#        with tempfile.TemporaryDirectory() as tmpdir: // Might be needed for RocM
+        #with tempfile.TemporaryDirectory() as tmpdir: // Might be needed for RocM
         warnings.simplefilter("ignore")
-        #kernel_wrapper = torch.utils.cpp_extension.load("kernel_wrapper",
-        #    generic_sources,
-        #    extra_cflags=extra_cflags,
-        #    extra_include_paths=include_dirs,
-        #    extra_ldflags=extra_link_args)
-
-        # Need to locate the correct compiler here... 
+        # If compiling torch fails (e.g. low gcc version), we should fall back to the
+        # version that takes integer pointers as args (but is untraceable to PyTorch JIT / export). 
+        extra_cflags.append("-DCOMPILE_TORCH")
         torch_wrapper = torch.utils.cpp_extension.load("torch_wrapper",
             aten_sources,
             extra_cflags=extra_cflags,
@@ -76,6 +71,4 @@ else:
             extra_ldflags=extra_link_args)
         torch.ops.load_library(torch_wrapper.__file__)
 
-        print("Torch ops load library succeeded!")
-
-#from kernel_wrapper import *
+from torch_wrapper import *
