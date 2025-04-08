@@ -79,7 +79,6 @@ class LoopUnrollTP(TensorProductBase):
             internal_cls = torch.classes.torch_wrapper.TorchJITProduct
             self.forward_op = torch.ops.torch_wrapper.jit_tp_forward
             self.backward_op = torch.ops.torch_wrapper.jit_tp_backward
-            self.register_torch_fakes()
         else:
             internal_cls = extlib.JITTPImpl
 
@@ -100,7 +99,11 @@ class LoopUnrollTP(TensorProductBase):
         self.reorder_weights_oeq_to_e3nn = lambda input, output, has_batch_dim: \
                 self.forward_schedule.reorder_weights(input, output, "backward", has_batch_dim) 
 
-    def register_torch_fakes(self):
+    @staticmethod
+    def register_torch_fakes():
+        global torch
+        import torch
+
         @torch._library.register_fake_class("torch_wrapper::TorchJITProduct")
         class TorchJITProduct:
             def __init__(self, kernel: str, 
@@ -160,3 +163,6 @@ class LoopUnrollTP(TensorProductBase):
             flop_count["backward"] *= 9 * batch_size
             flop_count["total"] = sum(flop_count.values())
             return flop_count
+        
+if extlib.TORCH_COMPILE: 
+    LoopUnrollTP.register_torch_fakes()

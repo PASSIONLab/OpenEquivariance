@@ -232,7 +232,7 @@ class TensorProductBase:
     def calculate_flops_backward(self, batch_size : int) -> dict:
         raise NotImplementedError("This needs to be implemented in your class")
     
-    def setup_torch_op(self):
+    def setup_torch_custom_op(self):
         if extlib.TORCH_COMPILE:
             self.setup_compile_ops()
         else:
@@ -246,7 +246,7 @@ class TensorProductBase:
             result = self.backward_op(ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, grad_output)
             return None, result[0], result[1], result[2]
 
-        self.forward_op.register_autograd(backward_helper, setup_context=setup_context)
+        torch.library.register_autograd("torch_wrapper::jit_tp_forward", backward_helper, setup_context=setup_context)
         self.forward = lambda L1, L2, W: self.forward_op(self.internal, L1, L2, W)
 
         # TODO: Need to set up double-backward!
