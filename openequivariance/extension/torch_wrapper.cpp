@@ -116,7 +116,7 @@ namespace py=pybind11;
                 data_ptr(L3_grad_contig)
         );
 
-        return tuple(L1_grad, L2_grad, L3_grad);
+        return tuple(L1_grad, L2_grad, W_grad);
     }
 
     TORCH_LIBRARY_FRAGMENT(torch_wrapper, m) { 

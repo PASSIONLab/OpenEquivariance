@@ -130,6 +130,20 @@ class LoopUnrollTP(TensorProductBase):
         def fake_backward(jit, L1_in, L2_in, W, L3_grad):
             return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W) 
 
+    @staticmethod    
+    def register_autograd():
+        def setup_context(ctx, inputs, output):
+            ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights = inputs
+        
+        def backward_helper(ctx, grad_output):
+            L1_grad, L2_grad, W_grad= torch.ops.torch_wrapper.jit_tp_backward(ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, grad_output)
+            return None, L1_grad, L2_grad, W_grad 
+
+        torch.library.register_autograd("torch_wrapper::jit_tp_forward", backward_helper, setup_context=setup_context)
+        LoopUnrollTP.forward = lambda self, L1, L2, W: torch.ops.torch_wrapper.jit_tp_forward(self.internal, L1, L2, W)
+
+    # TODO: Need to set up double-backward!
+
     @staticmethod
     def name():
         return "LoopUnrollTP"
@@ -165,4 +179,5 @@ class LoopUnrollTP(TensorProductBase):
             return flop_count
         
 if extlib.TORCH_COMPILE: 
-    LoopUnrollTP.register_torch_fakes()
+    LoopUnrollTP.register_torch_fakes() 
+    LoopUnrollTP.register_autograd()

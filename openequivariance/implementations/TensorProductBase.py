@@ -233,23 +233,8 @@ class TensorProductBase:
         raise NotImplementedError("This needs to be implemented in your class")
     
     def setup_torch_custom_op(self):
-        if extlib.TORCH_COMPILE:
-            self.setup_compile_ops()
-        else:
+        if not extlib.TORCH_COMPILE:
             self.setup_nocompile_ops()
-
-    def setup_compile_ops(self):
-        def setup_context(ctx, inputs, output):
-            ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights = inputs
-        
-        def backward_helper(ctx, grad_output):
-            result = self.backward_op(ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, grad_output)
-            return None, result[0], result[1], result[2]
-
-        torch.library.register_autograd("torch_wrapper::jit_tp_forward", backward_helper, setup_context=setup_context)
-        self.forward = lambda L1, L2, W: self.forward_op(self.internal, L1, L2, W)
-
-        # TODO: Need to set up double-backward!
 
     def setup_nocompile_ops(self):
         # ----------------- Forward pass -----------------
