@@ -2,6 +2,8 @@ import pickle, pathlib, typing
 from math import prod
 import numpy as np
 import numpy.linalg as la
+
+import openequivariance.extlib as extlib
 from openequivariance.extlib import *
 
 from openequivariance.implementations.e3nn_lite import TPProblem, wigner_3j
@@ -229,9 +231,27 @@ class TensorProductBase:
     
     def calculate_flops_backward(self, batch_size : int) -> dict:
         raise NotImplementedError("This needs to be implemented in your class")
+    
+    def setup_torch_op(self):
+        if extlib.TORCH_COMPILE:
+            self.setup_compile_ops()
+        else:
+            self.setup_nocompile_ops()
 
+    def setup_compile_ops(self):
+        def setup_context(ctx, inputs, output):
+            ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights = inputs
+        
+        def backward_helper(ctx, grad_output):
+            result = self.backward_op(ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, grad_output)
+            return None, result[0], result[1], result[2]
 
-    def setup_torch_custom_op(self):
+        self.forward_op.register_autograd(backward_helper, setup_context=setup_context)
+        self.forward = lambda L1, L2, W: self.forward_op(self.internal, L1, L2, W)
+
+        # TODO: Need to set up double-backward!
+
+    def setup_nocompile_ops(self):
         # ----------------- Forward pass -----------------
         @torch.library.custom_op(f"openequivariance::tp_forward{self.tp_id}", mutates_args=(), device_types="cuda")
         def forward(L1_in : torch.Tensor, L2_in : torch.Tensor, weights : torch.Tensor) -> torch.Tensor:
