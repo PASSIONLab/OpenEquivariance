@@ -2,6 +2,7 @@
 #include <pybind11/numpy.h>
 #include <iostream>
 #include <unordered_map>
+#include <stdexcept>
 
 #ifdef CUDA_BACKEND
     #include "backend_cuda.hpp"
@@ -37,7 +38,12 @@ namespace py=pybind11;
     using Map_t=torch::Dict<string, int64_t>;
 
     inline void* data_ptr(const torch::Tensor &tensor) {
-        return reinterpret_cast<void*>(tensor.data_ptr<float>()); // Not sure if this will work out-of-the-box for doubles 
+        if(tensor.dtype() == torch::kFloat)
+            return reinterpret_cast<void*>(tensor.data_ptr<float>());
+        else if(tensor.dtype() == torch::kDouble)
+            return reinterpret_cast<void*>(tensor.data_ptr<double>());
+        else
+            throw logic_error("Unsupported tensor datatype!");
     }
 
     class __attribute__ ((visibility ("default"))) TorchJITProduct : public torch::CustomClassHolder {
