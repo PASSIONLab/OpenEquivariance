@@ -13,12 +13,20 @@ from openequivariance.implementations.TensorProductBase import TensorProductBase
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.extlib import *
 from openequivariance.implementations.e3nn_lite import TPProblem
-from openequivariance.benchmark.correctness_utils import correctness_forward, correctness_backward
-from openequivariance.benchmark.benchmark_utils import benchmark_forward, benchmark_backward
+from openequivariance.benchmark.correctness_utils import (
+    correctness_forward, 
+    correctness_backward,
+    correctness_double_backward
+    )
+from openequivariance.benchmark.benchmark_utils import (
+    benchmark_forward, 
+    benchmark_backward,
+    benchmark_double_backward
+    )
 
 logger = getLogger()
 
-Direction = Literal['forward', 'backward']
+Direction = Literal['forward', 'backward', 'double_backward']
 
 class TestDefinition(NamedTuple):
     implementation : type[TensorProductBase]
@@ -37,9 +45,9 @@ class TestBenchmarkSuite:
     reference_implementation : Optional[type[TensorProductBase]] = None
     correctness_threshold : float = 5e-7
     torch_op : bool = True
-    test_name: str = None
-    metadata: dict = None
-    results: list = None
+    test_name: Optional[str] = None
+    metadata: Optional[dict] = None
+    results: Optional[list] = None
 
     @staticmethod
     def validate_inputs(test_list : list[TestDefinition]) -> None:
@@ -127,7 +135,7 @@ class TestBenchmarkSuite:
             logger.info(f'Starting Test ID: {test_ID}')
             logger.info(f'Config: {str(tpp)}')
             logger.info(f'Irrep dtype: {tpp.irrep_dtype.__name__}')
-            logger.info(f'Weight dype: {tpp.weight_dtype.__name__}')
+            logger.info(f'Weight dtype: {tpp.weight_dtype.__name__}')
             if(tpp.label):
                 logger.info(f'Label: {tpp.label}')
             logger.info(f'Implementation Name: {impl.name()}')
@@ -170,7 +178,6 @@ class TestBenchmarkSuite:
 
 
             if test.direction == 'backward':
-                pass 
                 if test.correctness: 
                     logger.info("Starting correctness check...")
                     result ['correctness results'] = correctness_backward(
@@ -191,6 +198,29 @@ class TestBenchmarkSuite:
                         num_iter=self.num_iter,
                         prng_seed=self.prng_seed,
                         torch_op=self.torch_op
+                    )
+            
+            if test.direction == 'double_backward':
+                if test.correctness:
+                    logger.info("Starting correctness check...")
+                    result ['correctness results'] = correctness_double_backward(
+                        problem=tpp,
+                        test_implementation=impl,
+                        reference_implementation=self.reference_implementation,
+                        batch_size=self.correctness_batch_size,
+                        correctness_threshold=self.correctness_threshold,
+                        prng_seed=self.prng_seed
+                    )
+                    logger.info("Finished correctness check...")
+                if test.benchmark: 
+                    result ['benchmark results'] = benchmark_double_backward(
+                        problem=tpp, 
+                        implementation=impl, 
+                        batch_size=self.bench_batch_size, 
+                        num_warmup=self.num_warmup, 
+                        num_iter=self.num_iter,
+                        prng_seed=self.prng_seed, 
+                        torch_op=self.torch_op, 
                     )
     
             fname = pathlib.Path(f"{output_folder}/{test_ID}_{impl.name()}.json")
