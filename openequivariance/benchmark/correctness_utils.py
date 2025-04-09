@@ -189,12 +189,16 @@ def correctness_double_backward(
     for impl in [test_implementation, reference_implementation]:
         tp = impl(problem, torch_op=True)
 
+        print(f"testing impl: {tp.name()}")
+        if impl == CUETensorProduct and problem.shared_weights :
+            weights = weights[np.newaxis, :] 
+            
         in1_torch = torch.tensor(in1, device='cuda', requires_grad=True)
         in2_torch = torch.tensor(in2, device='cuda', requires_grad=True)
         weights_torch = torch.tensor(weights, device='cuda', requires_grad=True)
 
         out_torch = tp.forward(in1_torch, in2_torch, weights_torch)
-        out_grad = torch.tensor(out_grad, device='cuda', requires_grad=True)
+        out_grad = out_torch.clone().detach().to(device='cuda').requires_grad_(True)
 
         out_torch.backward(out_grad, 
             create_graph=True,
@@ -207,15 +211,22 @@ def correctness_double_backward(
             retain_graph=True, 
             inputs=[out_grad, in1_torch, in2_torch, weights_torch])
 
+        temp = weights_torch.grad.detach().cpu().numpy()
+
+        # if impl == CUETensorProduct and problem.shared_weights :
+        #     temp = temp.squeeze()
+
         tensors.append((
             out_grad.grad.detach().cpu().numpy(),
             in1_torch.grad.detach().cpu().numpy(),
             in2_torch.grad.detach().cpu().numpy(),
-            weights_torch.grad.detach().cpu().numpy()
+            temp
         ))
 
+        
+
     for name, to_check, ground_truth in [
-        ("output_grad", tensors[0][0], tensors[1][0]),
+        ("output_double_grad", tensors[0][0], tensors[1][0]),
         ("in1_grad", tensors[0][1], tensors[1][1]),
         ("in2_grad", tensors[0][2], tensors[1][2]),
         ("weights_grad", tensors[0][3], tensors[1][3])
