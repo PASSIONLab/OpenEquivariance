@@ -58,7 +58,7 @@ class TPCorrectness:
             correctness_threshold = 3e-4,
             prng_seed = 12345)
 
-        self.check_result(result, "output_grad")
+        self.check_result(result, "output_double_grad")
         self.check_result(result, "in1_grad")
         self.check_result(result, "in2_grad")
         self.check_result(result, "weights_grad")
