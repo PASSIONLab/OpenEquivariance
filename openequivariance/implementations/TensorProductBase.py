@@ -217,6 +217,101 @@ class TensorProductBase:
                 time_millis[i] = timer.stop_clock_get_elapsed()
         
         return time_millis
+    
+    def benchmark_double_backward(
+            self, 
+            num_warmup : int, 
+            num_iter : int, 
+            L1_in : np.ndarray, 
+            L2_in : np.ndarray, 
+            L3_buffer : np.ndarray, 
+            weights : np.ndarray, 
+            L1_grad : np.ndarray, 
+            L2_grad : np.ndarray,
+            weights_grad : np.ndarray,
+            L3_double_grad : np.ndarray,
+            ) -> np.ndarray:
+        time_millis = np.zeros(num_iter, dtype=np.float32)
+        timer = GPUTimer()
+
+        if self.torch_op: 
+            torch_L1_in = torch.tensor(L1_in, requires_grad=True, device='cuda')
+            torch_L2_in = torch.tensor(L2_in, requires_grad=True, device='cuda') 
+            torch_weights = torch.tensor(weights, requires_grad=True, device='cuda')
+
+            torch_out = self(torch_L1_in, torch_L2_in, torch_weights)
+            torch_out_grad = torch_out.clone().detach().to(device='cuda').requires_grad_(True)
+
+            (torch_L1_grad, torch_L2_grad, torch_weights_grad) = torch.autograd.grad(
+                outputs=torch_out,
+                inputs=[torch_L1_in, torch_L2_in, torch_weights],
+                grad_outputs=torch_out_grad,
+                create_graph=True,
+                retain_graph=True
+            )
+
+            dummy = torch.norm(torch_L1_grad) + torch.norm(torch_L2_grad) + torch.norm(torch_weights_grad)
+            dummy_grad = torch.tensor(float(dummy), device='cuda', requires_grad=True)
+
+            torch_L1_grad = torch.tensor(L1_in, requires_grad=True, device='cuda')
+            torch_L2_grad = torch.tensor(L2_in, requires_grad=True, device='cuda')
+            torch_weights_grad = torch.tensor(weights_grad, requires_grad=True, device='cuda')
+            torch_L3_double_grad = torch.tensor(L3_double_grad, device='cuda', requires_grad=True)
+
+            
+            (torch_L1_grad, torch_L2_grad, torch_weights_grad, torch_L3_double_grad) = torch.autograd.grad(
+                outputs = dummy, 
+                inputs = [torch_L1_in, torch_L2_in, torch_weights, torch_out_grad], 
+                grad_outputs = dummy_grad, 
+                retain_graph=True)
+
+            for i in range(num_warmup): 
+                (torch_L1_grad, torch_L2_grad, torch_weights_grad, torch_L3_double_grad) = torch.autograd.grad(
+                outputs = dummy, 
+                inputs = [torch_L1_in, torch_L2_in, torch_weights, torch_out_grad], 
+                grad_outputs = dummy_grad, 
+                retain_graph=True)
+
+            for i in range(num_iter):
+                timer.clear_L2_cache()
+                timer.start()
+                (torch_L1_grad, torch_L2_grad, torch_weights_grad, torch_L3_double_grad) = torch.autograd.grad(
+                outputs = dummy, 
+                inputs = [torch_L1_in, torch_L2_in, torch_weights, torch_out_grad], 
+                grad_outputs = dummy_grad, 
+                retain_graph=True)
+                time_millis[i] = timer.stop_clock_get_elapsed()
+
+            L1_grad[:] = torch_L1_grad.numpy(force=True)
+            L2_grad[:] = torch_L2_grad.numpy(force=True)
+            weights_grad[:] = torch_weights_grad.numpy(force=True)
+            L3_double_grad[:] = torch_L3_double_grad.numpy(force=True)
+        else:
+            batch = L1_in.shape[0]
+            L1_d, L2_d, L3_d = DeviceBuffer(L1_in), DeviceBuffer(L2_in), DeviceBuffer(L3_buffer)
+            L1_grad_d, L2_grad_d = DeviceBuffer(L1_grad), DeviceBuffer(L2_grad)
+            weights_d, weights_grad_d = DeviceBuffer(weights), DeviceBuffer(weights_grad)
+
+            for i in range(num_warmup):
+                self.internal.double_backward(
+                        batch,
+                        L1_d.data_ptr(), L1_grad_d.data_ptr(),
+                        L2_d.data_ptr(), L2_grad_d.data_ptr(),
+                        weights_d.data_ptr(), weights_grad_d.data_ptr(), 
+                        L3_d.data_ptr())
+
+            for i in range(num_iter):
+                timer.clear_L2_cache()
+                timer.start()
+                self.internal.double_backward(
+                        batch,
+                        L1_d.data_ptr(), L1_grad_d.data_ptr(),
+                        L2_d.data_ptr(), L2_grad_d.data_ptr(),
+                        weights_d.data_ptr(), weights_grad_d.data_ptr(), 
+                        L3_d.data_ptr())
+                time_millis[i] = timer.stop_clock_get_elapsed()
+        
+        return time_millis
 
     def calculate_memory_streamed_forward(self, batch_size : int) -> dict: 
         raise NotImplementedError("This needs to be implemented in your class")
@@ -224,10 +319,16 @@ class TensorProductBase:
     def calculate_memory_streamed_backward(self, batch_size : int) -> dict: 
         raise NotImplementedError("This needs to be implemented in your class")
     
+    def calculate_memory_streamed_double_backward(self, batch_size : int) -> dict:
+        raise NotImplementedError("This needs to be implemented in your class")
+    
     def calculate_flops_forward(self, batch_size : int) -> dict:
         raise NotImplementedError("This needs to be implemented in your class")
     
     def calculate_flops_backward(self, batch_size : int) -> dict:
+        raise NotImplementedError("This needs to be implemented in your class")
+    
+    def calculate_flops_double_backward(self, batch_size : int) -> dict:
         raise NotImplementedError("This needs to be implemented in your class")
 
 
