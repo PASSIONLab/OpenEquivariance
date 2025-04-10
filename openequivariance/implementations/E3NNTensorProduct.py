@@ -21,13 +21,14 @@ class E3NNTensorProduct(TensorProductBase):
         global e3nn
         import torch
         import e3nn 
+        from e3nn import o3
         e3nn.set_optimization_defaults(jit_script_fx=False)
 
         assert(config.irrep_dtype == config.weight_dtype)
         if config.irrep_dtype == np.float64:
             torch.set_default_dtype(torch.float64)
 
-        self.e3nn_tp = e3nn.o3.TensorProduct(
+        self.e3nn_tp = o3.TensorProduct(
                     config.irreps_in1, 
                     config.irreps_in2, 
                     config.irreps_out, 
