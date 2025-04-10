@@ -71,6 +71,28 @@ namespace py=pybind11;
         tuple<string, Map_t, Map_t, Map_t> __obj_flatten__() {
             return tuple(internal.jit.kernel_plaintext, fwd_dict, bwd_dict, kernel_dims);
         }
+
+        void exec_tensor_product_device_rawptrs(int64_t num_batch, int64_t L1_in, int64_t L2_in, int64_t L3_out, int64_t weights) {    
+            internal.exec_tensor_product(
+                    num_batch,
+                    reinterpret_cast<void*>(L1_in), 
+                    reinterpret_cast<void*>(L2_in), 
+                    reinterpret_cast<void*>(L3_out), 
+                    reinterpret_cast<void*>(weights)); 
+        } 
+
+        void backward_device_rawptrs(int64_t num_batch,
+                int64_t L1_in, int64_t L1_grad,
+                int64_t L2_in, int64_t L2_grad, 
+                int64_t weight, int64_t weight_grad,
+                int64_t L3_grad) {
+            internal.backward(num_batch,
+                reinterpret_cast<void*>(L1_in), reinterpret_cast<void*>(L1_grad),
+                reinterpret_cast<void*>(L2_in), reinterpret_cast<void*>(L2_grad),
+                reinterpret_cast<void*>(weight), reinterpret_cast<void*>(weight_grad),
+                reinterpret_cast<void*>(L3_grad)
+            );
+        }
     };
 
     torch::Tensor jit_tp_forward(
@@ -129,6 +151,8 @@ namespace py=pybind11;
         m.class_<TorchJITProduct>("TorchJITProduct")
             .def(torch::init<string, Map_t, Map_t, Map_t>())
             .def("__obj_flatten__", &TorchJITProduct::__obj_flatten__)
+            .def("exec_tensor_product_rawptr", &TorchJITProduct::exec_tensor_product_device_rawptrs)
+            .def("backward_rawptr", &TorchJITProduct::backward_device_rawptrs)
             .def("__len__", [](const c10::intrusive_ptr<TorchJITProduct>& test) -> int64_t {
                 return 0;
             })
@@ -156,8 +180,8 @@ namespace py=pybind11;
 PYBIND11_MODULE(torch_wrapper, m) {
     //=========== Batch tensor products =========
     py::class_<GenericTensorProductImpl>(m, "GenericTensorProductImpl")
-        .def("exec_tensor_product", &GenericTensorProductImpl::exec_tensor_product_device_rawptrs)
-        .def("backward", &GenericTensorProductImpl::backward_device_rawptrs);
+        .def("exec_tensor_product_rawptr", &GenericTensorProductImpl::exec_tensor_product_device_rawptrs)
+        .def("backward_rawptr", &GenericTensorProductImpl::backward_device_rawptrs);
     py::class_<JITTPImpl<JITKernel>, GenericTensorProductImpl>(m, "JITTPImpl")
         .def(py::init<std::string, std::unordered_map<string, int64_t>, std::unordered_map<string, int64_t>>());
 
