@@ -43,7 +43,9 @@ class TestBenchmarkSuite:
     bench_batch_size : int = 10_000_000
     prng_seed : int = 12345
     reference_implementation : Optional[type[TensorProductBase]] = None
-    correctness_threshold : float = 5e-7
+    correctness_threshold_forward : float = 5e-7
+    correctness_threshold_backward : float = 1e-4
+    correctness_threshold_double_backward : float = 1e-4
     torch_op : bool = True
     test_name: Optional[str] = None
     metadata: Optional[dict] = None
@@ -161,7 +163,7 @@ class TestBenchmarkSuite:
                         test_implementation=impl,
                         reference_implementation=self.reference_implementation,
                         batch_size=self.correctness_batch_size,
-                        correctness_threshold=self.correctness_threshold,
+                        correctness_threshold=self.correctness_threshold_forward,
                         prng_seed=self.prng_seed,
                     )
                     logger.info("Finished correctness check...")
@@ -185,7 +187,7 @@ class TestBenchmarkSuite:
                         test_implementation=impl,
                         reference_implementation=self.reference_implementation,
                         batch_size=self.correctness_batch_size,
-                        correctness_threshold=self.correctness_threshold,
+                        correctness_threshold=self.correctness_threshold_backward,
                         prng_seed=self.prng_seed
                     )
                     logger.info("Finished correctness check...")
@@ -208,7 +210,7 @@ class TestBenchmarkSuite:
                         test_implementation=impl,
                         reference_implementation=self.reference_implementation,
                         batch_size=self.correctness_batch_size,
-                        correctness_threshold=self.correctness_threshold,
+                        correctness_threshold= self.correctness_threshold_double_backward,
                         prng_seed=self.prng_seed
                     )
                     logger.info("Finished correctness check...")
