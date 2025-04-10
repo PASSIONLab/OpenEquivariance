@@ -189,7 +189,6 @@ def correctness_double_backward(
     for impl in [test_implementation, reference_implementation]:
         tp = impl(problem, torch_op=True)
 
-        print(f"testing impl: {tp.name()}")
         if impl == CUETensorProduct and problem.shared_weights :
             weights = weights[np.newaxis, :] 
             
@@ -211,16 +210,11 @@ def correctness_double_backward(
             retain_graph=True, 
             inputs=[out_grad, in1_torch, in2_torch, weights_torch])
 
-        temp = weights_torch.grad.detach().cpu().numpy()
-
-        # if impl == CUETensorProduct and problem.shared_weights :
-        #     temp = temp.squeeze()
-
         tensors.append((
             out_grad.grad.detach().cpu().numpy(),
             in1_torch.grad.detach().cpu().numpy(),
             in2_torch.grad.detach().cpu().numpy(),
-            temp
+            weights_torch.grad.detach().cpu().numpy()
         ))
 
         
