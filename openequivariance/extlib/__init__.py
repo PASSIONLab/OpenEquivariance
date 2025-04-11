@@ -7,7 +7,7 @@ oeq_root = str(Path(__file__).parent.parent)
 
 build_ext = True 
 candidates = [f for f in os.listdir(oeq_root + '/extlib') 
-                if f.startswith('kernel_wrapper')]
+                if f.startswith('torch_wrapper')]
 
 if len(candidates) == 1:
     build_ext = False 
@@ -17,7 +17,7 @@ postprocess_kernel = lambda kernel: kernel
 TORCH_COMPILE=True
 
 if not build_ext: 
-    from openequivariance.extlib.kernel_wrapper import * 
+    from openequivariance.extlib.torch_wrapper import * 
 else:
     from setuptools import setup
     from torch.utils.cpp_extension import library_paths, include_paths
@@ -25,8 +25,7 @@ else:
     global torch
     import torch
 
-    generic_sources = ['kernel_wrapper.cpp']
-    aten_sources = ['torch_wrapper.cpp']
+    sources = ['torch_wrapper.cpp']
     extra_cflags=["-O3"]
 
     include_dirs, extra_link_args = ['util'], None 
@@ -53,9 +52,7 @@ else:
 
         extra_cflags.append("-DHIP_BACKEND")
 
-    generic_sources = [oeq_root + '/extension/' + src for src in generic_sources]
-    aten_sources = [oeq_root + '/extension/' + src for src in aten_sources]
-
+    aten_sources = [oeq_root + '/extension/' + src for src in sources]
     include_dirs = [oeq_root + '/extension/' + d for d in include_dirs] + include_paths('cuda')
 
     with warnings.catch_warnings():
@@ -63,12 +60,14 @@ else:
         warnings.simplefilter("ignore")
         # If compiling torch fails (e.g. low gcc version), we should fall back to the
         # version that takes integer pointers as args (but is untraceable to PyTorch JIT / export). 
-        extra_cflags.append("-DCOMPILE_TORCH")
-        torch_wrapper = torch.utils.cpp_extension.load("torch_wrapper",
-            aten_sources,
-            extra_cflags=extra_cflags,
-            extra_include_paths=include_dirs,
-            extra_ldflags=extra_link_args)
-        torch.ops.load_library(torch_wrapper.__file__)
+        try:
+            torch_wrapper = torch.utils.cpp_extension.load("torch_wrapper",
+                aten_sources, extra_cflags=extra_cflags + ["-DCOMPILE_TORCH"], extra_include_paths=include_dirs, extra_ldflags=extra_link_args)
+            torch.ops.load_library(torch_wrapper.__file__)
+        except Exception as e:
+            getLogger().warning("Warning, could not compile integrated PyTorch wrapper. Falling back to Pybind11" +
+                              ", but JITScript, compile fullgraph, and export will fail.")
+            torch_wrapper = torch.utils.cpp_extension.load("torch_wrapper",
+                aten_sources, extra_cflags=extra_cflags, extra_include_paths=include_dirs, extra_ldflags=extra_link_args)
 
 from torch_wrapper import *
