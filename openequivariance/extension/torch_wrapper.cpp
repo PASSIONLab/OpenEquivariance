@@ -68,8 +68,14 @@ namespace py=pybind11;
                 )),
             L3_dim(kernel_dims.at("L3_dim")) { }
 
-        tuple<string, Map_t, Map_t, Map_t> __obj_flatten__() {
-            return tuple(internal.jit.kernel_plaintext, fwd_dict, bwd_dict, kernel_dims);
+        tuple<  tuple<string, string>, 
+                tuple<string, Map_t>, 
+                tuple<string, Map_t>, 
+                tuple<string, Map_t>> __obj_flatten__() {
+            return tuple(tuple("kernel_plaintext", internal.jit.kernel_plaintext),
+                tuple("fwd_config", fwd_dict),
+                tuple("bwd_config", bwd_dict),
+                tuple("kernel_dims", kernel_dims));
         }
 
         void exec_tensor_product_device_rawptrs(int64_t num_batch, int64_t L1_in, int64_t L2_in, int64_t L3_out, int64_t weights) {    
@@ -160,7 +166,7 @@ namespace py=pybind11;
                 // __getstate__
                 [](const c10::intrusive_ptr<TorchJITProduct>& self)
                     -> tuple<string, Map_t, Map_t, Map_t> {
-                return self->__obj_flatten__(); 
+                    return tuple(self->internal.jit.kernel_plaintext, self->fwd_dict, self->bwd_dict, self->kernel_dims);
                 },
                 // __setstate__
                 [](tuple<string, Map_t, Map_t, Map_t> state)

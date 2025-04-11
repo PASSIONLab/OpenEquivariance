@@ -103,25 +103,38 @@ class LoopUnrollTP(TensorProductBase):
 
         @torch._library.register_fake_class("torch_wrapper::TorchJITProduct")
         class TorchJITProduct:
-            def __init__(self, kernel: str, 
+            def __init__(self, kernel_plaintext: str, 
                         fwd_config: dict[str, int], 
                         bwd_config: dict[str, int], 
                         kernel_dims: dict[str, int]) -> None:
-                self.kernel, self.fwd_config, self.bwd_config, self.kernel_dims = kernel, fwd_config, bwd_config, kernel_dims
+                self.kernel_plaintext, self.fwd_config, self.bwd_config, self.kernel_dims = kernel_plaintext, fwd_config, bwd_config, kernel_dims
 
             @classmethod
             def __obj_unflatten__(cls, flattened_product):
-                return cls(*flattened_product)
+                return cls(**dict(flattened_product))
 
             def __len__(self):
                 return 0
             
             def __setstate__(self, state):
-                self.kernel, self.fwd_config, self.bwd_config, self.kernel_dims = state 
+                self.kernel_plaintext, self.fwd_config, self.bwd_config, self.kernel_dims = state 
+            
+            def exec_tensor_product_rawptr(self,
+                    batch : int,
+                    L1_in: int, L2_in: int, L3_out: int, 
+                    weights: int) -> None:
+                pass
+
+            def backward_rawptr(self, batch_size: int,
+                    L1_in: int, L1_grad: int,
+                    L2_in: int, L2_grad: int,
+                    weights: int, weights_grad: int,
+                    L3_grad: int):
+                pass
 
         @torch.library.register_fake("torch_wrapper::jit_tp_forward")
         def fake_forward(jit, L1_in, L2_in, W):
-            return L1_in.new_empty(L1_in.shape[0], jit.kernel_dims["L3_dim"])
+            return L1_in.new_empty(L1_in.shape[0], jit.wrapped_obj.kernel_dims["L3_dim"]) 
 
         @torch.library.register_fake("torch_wrapper::jit_tp_backward")
         def fake_backward(jit, L1_in, L2_in, W, L3_grad):
