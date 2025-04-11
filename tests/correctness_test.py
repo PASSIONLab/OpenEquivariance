@@ -3,8 +3,6 @@ from pytest_check import check
 
 import numpy as np 
 import openequivariance as oeq
-from openequivariance.implementations.e3nn_lite import TPProblem
-from openequivariance.implementations.TensorProductBase import TensorProductBase
 from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance.benchmark.correctness_utils import correctness_forward, correctness_backward, correctness_double_backward
 from itertools import chain, product

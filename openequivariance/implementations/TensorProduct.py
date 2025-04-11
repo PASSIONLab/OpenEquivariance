@@ -1,12 +1,14 @@
 from openequivariance.implementations.LoopUnrollTP import LoopUnrollTP
+import torch
 
-class TensorProduct(LoopUnrollTP):
+class TensorProduct(torch.nn.Module, LoopUnrollTP):
     '''
-    Dispatcher class that selects the right implementation based on problem
-    configuration. Right now, it just subclasses LoopUnrollTP.
+    PyTorch-specialized dispatcher class that selects the right implementation based on problem
+    configuration. 
     '''
     def __init__(self, problem, torch_op=True):
-        super().__init__(problem, torch_op)
+        torch.nn.Module.__init__(self)
+        LoopUnrollTP.__init__(self, problem, torch_op)
 
     @staticmethod
     def name():
