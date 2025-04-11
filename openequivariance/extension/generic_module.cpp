@@ -16,6 +16,7 @@
 
 #ifdef HIP_BACKEND
     #include "backend_hip.hpp"
+    #include "group_mm_hip.hpp"
     using JITKernel = HIPJITKernel;
     using GPU_Allocator = HIP_Allocator;
 
