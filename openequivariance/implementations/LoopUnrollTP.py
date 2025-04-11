@@ -76,8 +76,6 @@ class LoopUnrollTP(TensorProductBase):
             import torch
 
             internal_cls = torch.classes.torch_wrapper.TorchJITProduct
-            self.forward_op = torch.ops.torch_wrapper.jit_tp_forward
-            self.backward_op = torch.ops.torch_wrapper.jit_tp_backward
         else:
             internal_cls = extlib.JITTPImpl
 
@@ -98,8 +96,8 @@ class LoopUnrollTP(TensorProductBase):
         self.reorder_weights_oeq_to_e3nn = lambda input, output, has_batch_dim: \
                 self.forward_schedule.reorder_weights(input, output, "backward", has_batch_dim) 
 
-    @staticmethod
-    def register_torch_fakes():
+    @classmethod
+    def register_torch_fakes(cls):
         global torch
         import torch
 
@@ -123,14 +121,14 @@ class LoopUnrollTP(TensorProductBase):
 
         @torch.library.register_fake("torch_wrapper::jit_tp_forward")
         def fake_forward(jit, L1_in, L2_in, W):
-            return L1_in.new_empty(L1_in.shape[0], self.kernel_dims["L3_dim"])
+            return L1_in.new_empty(L1_in.shape[0], jit.kernel_dims["L3_dim"])
 
         @torch.library.register_fake("torch_wrapper::jit_tp_backward")
         def fake_backward(jit, L1_in, L2_in, W, L3_grad):
             return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W) 
 
-    @staticmethod    
-    def register_autograd():
+    @classmethod
+    def register_autograd(cls):
         def setup_context(ctx, inputs, output):
             ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights = inputs
         
@@ -139,7 +137,6 @@ class LoopUnrollTP(TensorProductBase):
             return None, L1_grad, L2_grad, W_grad 
 
         torch.library.register_autograd("torch_wrapper::jit_tp_forward", backward_helper, setup_context=setup_context)
-        LoopUnrollTP.forward = lambda self, L1, L2, W: torch.ops.torch_wrapper.jit_tp_forward(self.internal, L1, L2, W)
 
         # TODO: Need to set up double-backward!
 

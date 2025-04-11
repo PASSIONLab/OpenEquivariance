@@ -1,3 +1,4 @@
+from openequivariance import extlib
 from openequivariance.implementations.LoopUnrollTP import LoopUnrollTP
 import torch
 
@@ -12,4 +13,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
 
     @staticmethod
     def name():
-        return LoopUnrollTP.name() 
+        return LoopUnrollTP.name()
+
+    def forward(self, L1: torch.Tensor, L2: torch.Tensor, W: torch.Tensor) -> torch.Tensor:
+        return torch.ops.torch_wrapper.jit_tp_forward(self.internal, L1, L2, W)

@@ -8,7 +8,7 @@ from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance.benchmark.correctness_utils import correctness_forward, correctness_backward, correctness_double_backward
 
 def test_jitscript_batch():
-    X_ir, Y_ir, Z_ir = "32x5e", "1x3e", "32x5e"
+    X_ir, Y_ir, Z_ir = oeq.Irreps("32x5e"), oeq.Irreps("1x3e"), oeq.Irreps("32x5e")
     problem = oeq.TPProblem(X_ir, Y_ir, Z_ir,
                             [(0, 0, 0, "uvu", True)], 
                             shared_weights=False, internal_weights=False,
@@ -24,6 +24,7 @@ def test_jitscript_batch():
     W = torch.rand(batch_size, problem.weight_numel, device='cuda', generator=gen)
 
     uncompiled_result = tp.forward(X, Y, W)
+    print(tp.forward)
 
     scripted_tp = torch.jit.script(tp)
     loaded_tp = None
