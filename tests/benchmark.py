@@ -8,7 +8,7 @@ import urllib.request
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.extlib import DeviceProp
 from openequivariance.implementations.E3NNTensorProduct import E3NNTensorProduct, E3NNTensorProductCompiledCUDAGraphs, E3NNTensorProductCompiledMaxAutotuneCUDAGraphs 
-from openequivariance.implementations.LoopUnrollTP import LoopUnrollTP
+from openequivariance.implementations.TensorProduct import TensorProduct 
 from openequivariance.implementations.CUETensorProduct import CUETensorProduct
 from openequivariance.benchmark.TestBenchmarkSuite import TestBenchmarkSuite, TestDefinition, Direction
 from openequivariance.benchmark.tpp_creation_utils import ChannelwiseTPP, FullyConnectedTPProblem, SingleInstruction
@@ -27,7 +27,7 @@ implementation_map = {
     'e3nn': E3NNTensorProductCompiledMaxAutotuneCUDAGraphs,
     'e3nn_uncompiled': E3NNTensorProduct,
     'cue': CUETensorProduct,
-    'oeq': LoopUnrollTP
+    'oeq': TensorProduct
 }
 
 datatype_map = {
@@ -84,7 +84,7 @@ def benchmark_uvu(params):
     # Remove some more configurations for GPUs with limited memory 
     if params.limited_memory:
         tests = [test for test in tests if 
-                (test.implementation == LoopUnrollTP and 'benzene' not in test.problem.label)
+                (test.implementation == TensorProduct and 'benzene' not in test.problem.label)
                 or (test.implementation == CUETensorProduct and 'benzene' not in test.problem.label)
                 or ('benzene' not in test.problem.label and test.problem.irrep_dtype != np.float64)]
 
@@ -102,7 +102,7 @@ def benchmark_uvu(params):
         plot({"data_folder": data_folder})
 
 def benchmark_roofline(params):
-    implementations =   [LoopUnrollTP, CUETensorProduct]
+    implementations =   [TensorProduct, CUETensorProduct]
     directions = ['forward', 'backward']
 
     tests = [TestDefinition(implementation, problem, direction, correctness=False, benchmark=True) 

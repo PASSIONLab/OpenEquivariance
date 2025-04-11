@@ -78,7 +78,8 @@ public:
     JITTPImpl(
             std::string jit_kernel,
             std::unordered_map<string, int64_t> fwd_dict, 
-            std::unordered_map<string, int64_t> bwd_dict
+            std::unordered_map<string, int64_t> bwd_dict,
+            std::unordered_map<string, int64_t> kernel_dims 
     ) : JITTPImpl(
             jit_kernel,
             KernelLaunchConfig(
