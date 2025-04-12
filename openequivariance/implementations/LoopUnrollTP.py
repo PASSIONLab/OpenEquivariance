@@ -142,16 +142,36 @@ class LoopUnrollTP(TensorProductBase):
 
     @classmethod
     def register_autograd(cls):
+        forward_op = torch.ops.torch_tp_jit.jit_tp_forward
+        backward_op = torch.ops.torch_tp_jit.jit_tp_backward
+
         def setup_context(ctx, inputs, output):
             ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights = inputs
         
-        def backward_helper(ctx, grad_output):
-            L1_grad, L2_grad, W_grad= torch.ops.torch_tp_jit.jit_tp_backward(ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, grad_output)
+        def backward(ctx, grad_output):
+            L1_grad, L2_grad, W_grad= backward_op(ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, grad_output)
             return None, L1_grad, L2_grad, W_grad 
 
-        torch.library.register_autograd("torch_tp_jit::jit_tp_forward", backward_helper, setup_context=setup_context)
+        torch.library.register_autograd("torch_tp_jit::jit_tp_forward", backward, setup_context=setup_context)
 
-        # TODO: Need to set up double-backward!
+        def setup_context_double_backward(ctx, inputs, output):
+            ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad = inputs 
+
+        def double_backward(ctx, E, F, G):
+            jit, A, B, C, D = ctx.jit, ctx.L1_in, ctx.L2_in, ctx.L3_grad, ctx.weights
+
+            op1 = backward_op(jit, E, F, D, C)
+            op2 = backward_op(jit, A, B, G, C)
+            op3 = forward_op(jit, E, B, D)
+            op4 = backward_op(jit, E, B, D, C) # op4 and op5 could be combined with op3 and op6 
+            op5 = backward_op(jit, A, F, D, C) 
+            op6 = forward_op(jit, A, F, D)
+            op7 = forward_op(jit, A, B, G)
+
+            return None, op1[0] + op2[0], op1[1] + op2[1], (op4[2] + op5[2]), (op3 + op6 + op7)
+
+        torch.library.register_autograd("torch_tp_jit::jit_tp_backward", double_backward, setup_context=setup_context_double_backward)
+
 
     @staticmethod
     def name():
