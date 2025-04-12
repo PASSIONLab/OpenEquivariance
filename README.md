@@ -166,7 +166,7 @@ our paper an A100-SXM4-80GB GPU.
 Run it with the following invocations: 
 ```bash
 python tests/benchmark.py -o outputs/uvu uvu --plot
-python tests/benchmark.py -o outputs/uvu uvw --plot
+python tests/benchmark.py -o outputs/uvw uvw --plot
 python tests/benchmark.py -o outputs/roofline roofline --plot
 python tests/benchmark.py -o outputs/conv conv --plot --data data/molecular_structures
 ```

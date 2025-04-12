@@ -1,6 +1,6 @@
 from openequivariance.implementations.convolution.ConvolutionBase import *
 from openequivariance.implementations.ComputationSchedule import ComputationSchedule
-from openequivariance.implementations.LoopUnrollTP import *
+from openequivariance.implementations.TensorProduct import *
 from openequivariance.templates.jinja_utils import *
 from openequivariance.extlib import *
 
@@ -118,7 +118,7 @@ class LoopUnrollConvScatterSum(ConvolutionBase):
 
         super().__init__(config, idx_dtype, torch_op, deterministic=False)
 
-        self.reference_tp = LoopUnrollTP(config, torch_op=torch_op)
+        self.reference_tp = TensorProduct(config, torch_op=torch_op)
         from openequivariance.implementations.convolution.scatter import scatter_sum
         self.scatter_sum = scatter_sum
 
