@@ -133,3 +133,26 @@ __global__ void backward(
         } {%- endfor %}
     }
 }
+
+/*
+* The double backward kernel involves two passes: one combining three forward calls (A),
+* and the second combining three backward calls (B).
+*/
+__global__ void double_backward_A(
+    size_t num_products,
+    void* L1_in, void* L2_in, void* W, void* L3_grad, // Inputs of backward op 
+    void* L1_dgrad, void* L2_dgrad, void* w_dgrad, // Gradients w.r.t outputs of backward op
+    void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad) {
+
+    printf("Hello world!");
+}
+
+
+__global__ void double_backward_B(
+    size_t num_products,
+    void* L1_in, void* L2_in, void* W, void* L3_grad, // Inputs of backward op 
+    void* L1_dgrad, void* L2_dgrad, void* w_dgrad, // Gradients w.r.t outputs of backward op
+    void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad) {
+
+    printf("Hello world!");
+}

@@ -63,15 +63,17 @@ public:
             jit(jit_kernel),
             forward_config(forward_config_i),  
             backward_config(backward_config_i) {
-        vector<string> kernels = {"forward", "backward"};
-        jit.compile(kernels, {{}, {}}); 
+        vector<string> kernels = {"forward", "backward", "double_backward_A", "double_backward_B"};
+        jit.compile(kernels, {{}, {}, {}, {}}); 
 
         if(forward_config.smem > 0) {
             jit.set_max_smem(0, forward_config.smem);
+            jit.set_max_smem(2, forward_config.smem);
         }
 
         if(backward_config.smem > 0) {
             jit.set_max_smem(1, backward_config.smem);
+            jit.set_max_smem(3, forward_config.smem);
         }
     }
 
@@ -112,6 +114,20 @@ public:
             void* L3_grad) {
         void *args[] = { &num_products, &L1_in, &L1_grad, &L2_in, &L2_grad, &weight, &weight_grad, &L3_grad};
         jit.execute(1, args, backward_config);
+    }
+
+    void double_backward(
+        size_t num_products,
+        void* L1_in, void* L2_in, void* W, void* L3_grad, // Inputs of backward op 
+        void* L1_dgrad, void* L2_dgrad, void* w_dgrad, // Gradients w.r.t outputs of backward op
+        void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad) {
+
+        void* args[] = { 
+            &num_products, &L1_in, &L2_in, &W, &L3_grad, &L1_dgrad, &L2_dgrad, &w_dgrad, 
+            &L1_grad, &L2_grad, &W_grad, &L3_dgrad
+        };
+        jit.execute(2, args, forward_config);
+        jit.execute(3, args, backward_config);
     }
 
     ~JITTPImpl() = default; 

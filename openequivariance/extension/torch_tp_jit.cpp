@@ -152,6 +152,43 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_backward(
     return tuple(L1_grad, L2_grad, W_grad);
 }
 
+tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_backward(
+        const c10::intrusive_ptr<TorchJITProduct> &jit_instance,
+        const torch::Tensor &L1_in, 
+        const torch::Tensor &L2_in, 
+        const torch::Tensor &W, 
+        const torch::Tensor &L3_grad, 
+        const torch::Tensor &L1_dgrad, 
+        const torch::Tensor &L2_dgrad, 
+        const torch::Tensor &W_dgrad) {
+
+    int64_t num_batch = L1_in.sizes()[0]; // Declaring outputs
+    torch::Tensor L1_grad = torch::empty(L1_in.sizes(), L1_in.options());
+    torch::Tensor L2_grad = torch::empty(L2_in.sizes(), L2_in.options());
+    torch::Tensor W_grad = torch::empty(W.sizes(), W.options());
+    torch::Tensor L3_dgrad = torch::empty(L3_grad.sizes(), L3_grad.options());
+
+    torch::Tensor L1_in_contig = L1_in.contiguous();
+    torch::Tensor L2_in_contig = L2_in.contiguous();
+    torch::Tensor W_contig = W.contiguous();
+    torch::Tensor L3_grad_contig = L3_grad.contiguous();
+
+    torch::Tensor L1_dgrad_contig = L1_dgrad.contiguous();
+    torch::Tensor L2_dgrad_contig = L2_dgrad.contiguous();
+    torch::Tensor W_dgrad_contig = W_dgrad.contiguous();
+
+    jit_instance->internal.backward(
+            num_batch, 
+            data_ptr(L1_in_contig), data_ptr(L1_grad),
+            data_ptr(L2_in_contig), data_ptr(L2_grad),
+            data_ptr(W_contig), data_ptr(W_grad),
+            data_ptr(L3_grad_contig)
+    );
+
+    return tuple(L1_grad, L2_grad, W_grad);
+}
+
+
 TORCH_LIBRARY_FRAGMENT(torch_tp_jit, m) { 
     m.class_<TorchJITProduct>("TorchJITProduct")
         .def(torch::init<string, Map_t, Map_t, Map_t>())
@@ -174,11 +211,13 @@ TORCH_LIBRARY_FRAGMENT(torch_tp_jit, m) {
             });
     m.def("jit_tp_forward(__torch__.torch.classes.torch_tp_jit.TorchJITProduct jit, Tensor L1_in, Tensor L2_in, Tensor W) -> Tensor");
     m.def("jit_tp_backward(__torch__.torch.classes.torch_tp_jit.TorchJITProduct jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad) -> (Tensor, Tensor, Tensor)");
+    m.def("jit_tp_double_backward(__torch__.torch.classes.torch_tp_jit.TorchJITProduct jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad) -> (Tensor, Tensor, Tensor, Tensor)");
 };
 
 TORCH_LIBRARY_IMPL(torch_tp_jit, CUDA, m) { 
     m.impl("jit_tp_forward", &jit_tp_forward);
     m.impl("jit_tp_backward", &jit_tp_backward);
+    m.impl("jit_tp_double_backward", &jit_tp_double_backward);
 };
 
 PYBIND11_MODULE(torch_tp_jit, m) {}
