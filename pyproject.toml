@@ -16,14 +16,15 @@ requires-python = ">=3.10"
 dependencies = [
   "ninja",
   "jinja2",
+  "numpy",
   "torch",
 ]
 
 [project.optional-dependencies]
 bench = [
   "matplotlib",
-  "e3nn",
   "tqdm",
+  "e3nn",
   "cuequivariance",
   "cuequivariance-torch",
   "cuequivariance-ops-torch-cu12",

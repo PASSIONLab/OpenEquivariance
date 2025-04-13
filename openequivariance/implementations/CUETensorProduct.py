@@ -77,7 +77,7 @@ class CUETensorProduct(TensorProductBase):
                 cue.Irreps(O3_e3nn, str(config.irreps_in1)),
                 cue.Irreps(O3_e3nn, str(config.irreps_in2)),
                 cue.Irreps(O3_e3nn, str(config.irreps_out)),
-                layout=cue.ir_mul,
+                layout=cue.mul_ir,
                 shared_weights=config.shared_weights,
                 internal_weights=config.internal_weights,
                 dtype=torch_dtype,
@@ -87,8 +87,10 @@ class CUETensorProduct(TensorProductBase):
             torch._dynamo.config.cache_size_limit = 64
 
             self.cue_tp.to('cuda')
-            self.cue_tp = torch.compile(self.cue_tp, fullgraph=True, mode="default")
+            # self.cue_tp = torch.compile(self.cue_tp, fullgraph=True, mode="default")
+            self.tp_correctness = self.cue_tp
             self.forward = self.cue_tp.__call__
+            self.forward_correctness = lambda x, y, W: self.tp_correctness(x, y, W)
         
         if isinstance(config, FullyConnectedTPProblem):
             e = cue.descriptors.fully_connected_tensor_product(
@@ -98,7 +100,7 @@ class CUETensorProduct(TensorProductBase):
             )
 
             assert(config.weight_numel == e.inputs[0].irreps.dim)
-            self.cue_tp = cuet.EquivariantTensorProduct(e, layout=cue.ir_mul,
+            self.cue_tp = cuet.EquivariantTensorProduct(e, layout=cue.mul_ir,
                     math_dtype=np_to_torch_dtype[config.irrep_dtype]) 
 
             self.cue_tp.to('cuda')
