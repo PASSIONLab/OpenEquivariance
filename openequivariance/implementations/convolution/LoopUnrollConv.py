@@ -31,7 +31,8 @@ class LoopUnrollConv(ConvolutionBase):
                 direction = "forward",
                 irrep_dtype = config.irrep_dtype,
                 weight_dtype = config.weight_dtype,
-                schedule_type=forward_schedule_type)
+                schedule_type=forward_schedule_type,
+                warp_size=dp.warpsize)
 
         self.backward_schedule = ComputationSchedule(self.config, 
                 smem_limit=dp.maxSharedMemPerBlock, warps_per_block=6,
@@ -39,7 +40,8 @@ class LoopUnrollConv(ConvolutionBase):
                 direction = "backward",
                 irrep_dtype = config.irrep_dtype,
                 weight_dtype = config.weight_dtype,
-                schedule_type=backward_schedule_type)
+                schedule_type=backward_schedule_type,
+                warp_size=dp.warpsize)
 
         if not deterministic:
             for segment in self.forward_schedule.segments:
@@ -82,8 +84,9 @@ class LoopUnrollConv(ConvolutionBase):
 
         logger.info("Starting NVRTC")
         self.internal = JITConvImpl(self.jit_kernel,
-                self.forward_schedule.launch_config, 
-                self.backward_schedule.launch_config)
+                vars(self.forward_schedule.launch_config), 
+                vars(self.backward_schedule.launch_config),
+                {"L3_dim": self.L3.dim})
         logger.info("Kernel compiled!")
 
     @staticmethod

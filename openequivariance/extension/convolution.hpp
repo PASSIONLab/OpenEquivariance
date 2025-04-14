@@ -118,6 +118,24 @@ public:
         }
     }
 
+    JITConvImpl(
+            std::string jit_kernel,
+            std::unordered_map<string, int64_t> fwd_dict, 
+            std::unordered_map<string, int64_t> bwd_dict,
+            std::unordered_map<string, int64_t> kernel_dims 
+    ) : JITConvImpl(
+            jit_kernel,
+            KernelLaunchConfig(
+                fwd_dict["num_blocks"],
+                fwd_dict["num_threads"],
+                fwd_dict["smem"]
+            ),
+            KernelLaunchConfig(
+                bwd_dict["num_blocks"],
+                bwd_dict["num_threads"],
+                bwd_dict["smem"]
+            )) { } 
+
     void exec_conv(
             void* L1_in,
             void* L2_in,
