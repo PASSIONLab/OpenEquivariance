@@ -176,7 +176,7 @@ class LoopUnrollTP(TensorProductBase):
             #op7 = forward_op(jit, A, B, G)
 
             #print("TORCH NORM")
-            #print(torch.norm(result[3] - op3 - op6 - op7))
+            #print(torch.norm(result[0] - op1[0] - op2[0]))
             #return None, op1[0] + op2[0], op1[1] + op2[1], (op4[2] + op5[2]), (op3 + op6 + op7)
 
         torch.library.register_autograd("torch_tp_jit::jit_tp_backward", double_backward, setup_context=setup_context_double_backward)

@@ -186,7 +186,7 @@ def correctness_double_backward(
     }
 
     tensors = []
-    for impl in [test_implementation, reference_implementation]:
+    for i, impl in enumerate([test_implementation, reference_implementation]):
         tp = impl(problem, torch_op=True)
 
         if impl == CUETensorProduct and problem.shared_weights :
@@ -206,6 +206,7 @@ def correctness_double_backward(
 
         dummy = torch.norm(in1_torch.grad) + torch.norm(in2_torch.grad) + torch.norm(weights_torch.grad)
         dummy_grad = torch.tensor(float(dummy_grad), device='cuda', requires_grad=True)
+
         dummy.backward(dummy_grad,
             retain_graph=True, 
             inputs=[out_grad, in1_torch, in2_torch, weights_torch])
@@ -216,8 +217,6 @@ def correctness_double_backward(
             in2_torch.grad.detach().cpu().numpy(),
             weights_torch.grad.detach().cpu().numpy()
         ))
-
-        
 
     for name, to_check, ground_truth in [
         ("output_double_grad", tensors[0][0], tensors[1][0]),
