@@ -3,8 +3,8 @@
 {% include 'common.cuh' %}
 {%- from 'macros.jinja' import
         transpose_load, transpose_store, 
-        load_ir_segments, store_ir_segments, 
-        declare_smem_variables,
+        load_ir_segments, load_ir_segments_force,
+        store_ir_segments, declare_smem_variables,
         set_launch_bound_variables with context %}
 
 {%- from 'loop_unroll_tp.cuh' import 
@@ -140,11 +140,64 @@ __global__ void backward(
 */
 __global__ void double_backward_A(
     size_t num_products,
-    void* L1_in, void* L2_in, void* W, void* L3_grad, // Inputs of backward op 
-    void* L1_dgrad, void* L2_dgrad, void* w_dgrad, // Gradients w.r.t outputs of backward op
-    void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad) {
+    IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad, // Inputs of backward op 
+    IRREP_T* L1_dgrad, IRREP_T* L2_dgrad, IRREP_T* W_dgrad, // Gradients w.r.t outputs of backward op
+    IRREP_T* L1_grad, IRREP_T* L2_grad, WEIGHT_T* W_grad, IRREP_T* L3_dgrad) {
 
-    printf("Hello world!");
+    extern __shared__ char s[];
+    {{ set_launch_bound_variables(forward_schedule.launch_config) }}
+    {%- set tpp = forward_schedule.updated_config %}
+    char* smem = s + {{forward_schedule.memory_per_warp}} * warp_loc; 
+
+    for(size_t i = start; i < end; i++) {
+        IRREP_T* l1 = L1_in + i * {{forward_schedule.L1.dim}} + lane_id;
+        IRREP_T* l2 = L2_in + i * {{forward_schedule.L2.dim}} + lane_id; 
+        IRREP_T* l3 = L3_dgrad + i * {{forward_schedule.L3.dim}} + lane_id;
+
+        IRREP_T* l1_dgrad = L1_dgrad + i * {{forward_schedule.L1.dim}} + lane_id;
+        IRREP_T* l2_dgrad = L2_dgrad + i * {{forward_schedule.L2.dim}} + lane_id;
+
+        {%- if not tpp.shared_weights %} 
+            WEIGHT_T* w = W + i * {{tpp.weight_numel}};
+            WEIGHT_T* w_dgrad = W_dgrad + i * {{tpp.weight_numel}};
+        {%- else %}
+            WEIGHT_T* w = W;
+            WEIGHT_T* w_dgrad = W_dgrad;
+        {%- endif %}
+
+        {%- for i, segment in enumerate(forward_schedule.segments) %} {
+            __syncwarp();
+            {{ declare_smem_variables(segment, "smem") }}
+            ROW_OPERATION({{segment.L3.dim}}, j, L3_smem[j + lane_id] = 0.0f;)
+            WEIGHT_T* w_buffer;
+
+            {{ load_ir_segments_force(segment.L1Map, "l1", "L1_smem", "j") }}
+            {{ load_ir_segments_force(segment.L2Map, "l2", "L2_smem", "j") }}
+            {% if not forward_schedule.stream_weights%}
+                ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = w_dgrad[{{segment.weight_offset}} + j + lane_id];)
+            {% endif %}
+            w_buffer = w_dgrad;
+
+            for(int n = 0; n < 3; n++) {
+                if(n == 1) {
+                    {% if not forward_schedule.stream_weights%}
+                        ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = w[{{segment.weight_offset}} + j + lane_id];)
+                    {% endif %}
+                    {{ load_ir_segments_force(segment.L2Map, "l2_dgrad", "L2_smem", "j") }}
+                    w_buffer = w;
+                }
+                else if(n == 2) {
+                    {{ load_ir_segments_force(segment.L2Map, "l2", "L2_smem", "j") }}
+                    {{ load_ir_segments_force(segment.L1Map, "l1_dgrad", "L1_smem", "j") }}
+                }
+                __syncwarp(); 
+                forward_loop_unroll_{{i}}(L1_smem, L2_smem, w_buffer, weights_smem, L3_smem, scratch_smem, lane_id);
+                __syncwarp();
+            }
+
+            {{ store_ir_segments(segment.L3Map, "l3", "L3_smem", "j") }}
+        } {%- endfor %}
+    }
 }
 
 
@@ -154,5 +207,5 @@ __global__ void double_backward_B(
     void* L1_dgrad, void* L2_dgrad, void* w_dgrad, // Gradients w.r.t outputs of backward op
     void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad) {
 
-    printf("Hello world!");
+    //printf("Hello world!");
 }

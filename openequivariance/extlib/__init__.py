@@ -70,6 +70,6 @@ else:
 
     if not TORCH_COMPILE:
         warnings.warn("Could not compile integrated PyTorch wrapper. Falling back to Pybind11" +
-                            f", but JITScript, compile fullgraph, and export will fail.")
+                            f", but JITScript, compile fullgraph, and export will fail.\n {torch_compile_exception}")
 
 from generic_module import *

@@ -68,6 +68,13 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
     {%- endif %}
 {%- endmacro %}
 
+{%- macro load_ir_segments_force(map, glb_ptr_shft, smem_ptr, loop_var) %}
+    {%- for (src_rng, dst_rng) in map.copy_ranges %}
+        {%- set range_len = src_rng.stop - src_rng.start %}
+        ROW_OPERATION({{range_len}}, {{loop_var}}, {{smem_ptr}}[{{loop_var}} + {{dst_rng.start}} + lane_id] = {{glb_ptr_shft}}[{{loop_var}} + {{src_rng.start}}];)
+    {%- endfor %} 
+{%- endmacro %}
+
 {%- macro store_ir_segments(map, glb_ptr_shft, smem_ptr, loop_var) %}
     {%- if not map.persist_store %}
         {%- for i, src_rng in enumerate(map.original_src_ranges) %}

@@ -77,7 +77,7 @@ class CUETensorProduct(TensorProductBase):
                 cue.Irreps(O3_e3nn, str(config.irreps_in1)),
                 cue.Irreps(O3_e3nn, str(config.irreps_in2)),
                 cue.Irreps(O3_e3nn, str(config.irreps_out)),
-                layout=cue.mul_ir,
+                layout=cue.ir_mul,
                 shared_weights=config.shared_weights,
                 internal_weights=config.internal_weights,
                 dtype=torch_dtype,
@@ -100,7 +100,7 @@ class CUETensorProduct(TensorProductBase):
             )
 
             assert(config.weight_numel == e.inputs[0].irreps.dim)
-            self.cue_tp = cuet.EquivariantTensorProduct(e, layout=cue.mul_ir,
+            self.cue_tp = cuet.EquivariantTensorProduct(e, layout=cue.ir_mul,
                     math_dtype=np_to_torch_dtype[config.irrep_dtype]) 
 
             self.cue_tp.to('cuda')

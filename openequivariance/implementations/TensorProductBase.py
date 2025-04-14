@@ -330,13 +330,10 @@ class TensorProductBase:
     def calculate_flops_backward(self, batch_size : int) -> dict:
         raise NotImplementedError("This needs to be implemented in your class")
     
-<<<<<<< HEAD
-=======
     def calculate_flops_double_backward(self, batch_size : int) -> dict:
         raise NotImplementedError("This needs to be implemented in your class")
 
 
->>>>>>> origin/double_backward_benchmark
     def setup_torch_custom_op(self):
         if not extlib.TORCH_COMPILE:
             self.setup_nocompile_ops()

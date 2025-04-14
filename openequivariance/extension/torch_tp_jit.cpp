@@ -177,15 +177,17 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_
     torch::Tensor L2_dgrad_contig = L2_dgrad.contiguous();
     torch::Tensor W_dgrad_contig = W_dgrad.contiguous();
 
-    jit_instance->internal.backward(
-            num_batch, 
-            data_ptr(L1_in_contig), data_ptr(L1_grad),
-            data_ptr(L2_in_contig), data_ptr(L2_grad),
-            data_ptr(W_contig), data_ptr(W_grad),
-            data_ptr(L3_grad_contig)
+    jit_instance->internal.double_backward(
+            num_batch,
+            data_ptr(L1_in_contig), data_ptr(L2_in_contig),
+            data_ptr(W_contig), data_ptr(L3_grad_contig),
+            data_ptr(L1_dgrad_contig), data_ptr(L2_dgrad_contig),
+            data_ptr(W_dgrad_contig),
+            data_ptr(L1_grad), data_ptr(L2_grad),
+            data_ptr(W_grad), data_ptr(L3_dgrad)
     );
 
-    return tuple(L1_grad, L2_grad, W_grad);
+    return tuple(L1_grad, L2_grad, W_grad, L3_dgrad); 
 }
 
 
