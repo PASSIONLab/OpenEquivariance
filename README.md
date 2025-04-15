@@ -125,11 +125,9 @@ print(torch.norm(Z))
 arbitrary order. 
 
 ## Installation 
-We currently support Linux systems only.
-We highly recommend that you use
+We currently support Linux systems only. We recommend that you use
 `conda` or `mamba` to set up a Python environment for installation.
 
-### Install via pip
 After activating an environment of your choice, run
 ```bash
 pip install git+https://github.com/PASSIONLab/OpenEquivariance
@@ -143,7 +141,7 @@ know by filing a bug and try a development build (see
 below). After installation, you should be able 
 to run the example above.
 
-### Build to replicate our benchmarks 
+## Replicating our benchmarks 
 To run our benchmark suite, you'll also need the following packages: 
 - `e3nn`, 
 - `cuEquivariance`
@@ -190,16 +188,29 @@ testing, the roofline slope / peak will be incorrect, and your results
 may differ from the ones we've reported. The plots for the convolution fusion
 experiments also require a GPU with a minimum of 40GB of memory. 
 
-### Testing Correctness
+## Testing Correctness
 See the `dev` dependencies in `pyproject.toml`; you'll need `e3nn`,
-`pytest`, and `pytest-check` installed. We have started rolling out tests to cover 
-all of our functionality, which you can run with 
+`pytest`, and `pytest-check` installed. You can test batch 
+tensor products and fused convolution tensor products as follows:
 ```bash
-pytest tests/correctness_test.py 
+pytest tests/batch_test.py 
+pytest tests/conv_test.py 
 ```
 Browse the file to select specific tests.
 
-### Running MACE
+## Compilation with JITScript, Export, and AOTInductor 
+OpenEquivariance is compatible with `torch.compile`, and we have
+started adding support for other PyTorch compilation tools. Currently,
+we support JITScript and `torch.export` for batch tensor products, with
+convolution support arriving soon. Demo the C++ model exports with
+```bash
+pytest tests/export_test.py 
+```
+NOTE: the AOTInductor test fails unless you are using a Nightly
+build of PyTorch past 4/10/2025 due to incomplete support for 
+TorchBind in earlier versions.
+
+## Running MACE
 We have modified MACE to use our accelerated kernels instead
 of the standard e3nn backend. Here are the steps to replicate
 our MACE benchmark:
