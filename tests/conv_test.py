@@ -3,7 +3,6 @@ from pytest_check import check
 
 import numpy as np 
 import openequivariance as oeq
-from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance.benchmark.ConvBenchmarkSuite import load_graph 
 from itertools import chain, product
 
@@ -31,14 +30,14 @@ class ConvCorrectness:
             assert result[fieldname]["pass"], f"{fieldname} observed error={error:.2f} >= {thresh}"
 
     @pytest.fixture(params=['atomic', 'deterministic'])
-    def conv_object(request, problem):
+    def conv_object(self, request, problem):
         if request.param == 'atomic':
             return oeq.TensorProductConv(problem, deterministic=False)
         elif request.param == 'deterministic':
             return oeq.TensorProductConv(problem, deterministic=True)
 
     def test_tp_fwd(self, conv_object, graph):
-        result = conv_object.test_correctness_double_backward(graph, 
+        result = conv_object.test_correctness_forward(graph, 
                 thresh=3e-05,
                 prng_seed=12345,
                 reference_implementation=None)
