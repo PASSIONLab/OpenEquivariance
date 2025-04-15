@@ -503,14 +503,14 @@ class ConvolutionBase:
         in1, in2, out_grad, weights, _, _, _ = get_random_buffers_backward_conv(self.config, graph.node_count, graph.nnz, prng_seed)  
         rng = np.random.default_rng(seed=prng_seed * 2)
         dummy_grad = rng.standard_normal(1) 
-    
+
         if reference_implementation is None:
             from openequivariance.implementations.convolution.E3NNConv import E3NNConv 
             reference_implementation = E3NNConv 
 
         reference_tp = reference_implementation(self.config, torch_op=True)
 
-        result = {}
+        result = {"thresh": thresh}
         tensors = []
         for i, tp in enumerate([self, reference_tp]):
             in1_torch = torch.tensor(in1, device='cuda', requires_grad=True)
@@ -526,9 +526,9 @@ class ConvolutionBase:
                 fwd_args.append(torch_transpose_perm)
 
             out_torch = tp.forward(*fwd_args)
-            out_grad = torch.tensor(out_grad, device='cuda', requires_grad=True)
+            out_grad_torch = torch.tensor(out_grad, device='cuda', requires_grad=True)
 
-            out_torch.backward(out_grad, 
+            out_torch.backward(out_grad_torch, 
                 create_graph=True,
                 retain_graph=True,
                 inputs=[in1_torch, in2_torch, weights_torch])
@@ -537,10 +537,10 @@ class ConvolutionBase:
             dummy_grad = torch.tensor(float(dummy_grad), device='cuda', requires_grad=True)
             dummy.backward(dummy_grad,
                 retain_graph=True, 
-                inputs=[out_grad, in1_torch, in2_torch, weights_torch])
+                inputs=[out_grad_torch, in1_torch, in2_torch, weights_torch])
 
             tensors.append((
-                out_grad.grad.detach().cpu().numpy(),
+                out_grad_torch.grad.detach().cpu().numpy(),
                 in1_torch.grad.detach().cpu().numpy(),
                 in2_torch.grad.detach().cpu().numpy(),
                 weights_torch.grad.detach().cpu().numpy()

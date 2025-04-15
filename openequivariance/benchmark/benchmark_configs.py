@@ -67,6 +67,8 @@ nequip_conv = [
             'nequip-water'),
 ]
 
+mace_problems = [CTPP(*config) for config in mace_conv]
+
 mace_nequip_problems = []
 for config in mace_conv + nequip_conv:
     mace_nequip_problems.append(CTPP(*config))
