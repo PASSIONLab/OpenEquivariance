@@ -20,7 +20,7 @@ def load_graph(filename):
     return CoordGraph(coords, rows.astype(np.int64), cols.astype(np.int64), name)
 
 class ConvBenchmarkSuite:
-    def __init__(self, configs, 
+    def __init__(self, configs,
             num_warmup = 10,
             num_iter = 30,
             reference_impl=None,
