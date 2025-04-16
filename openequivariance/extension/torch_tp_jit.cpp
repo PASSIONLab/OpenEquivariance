@@ -162,7 +162,7 @@ public:
     JITConvImpl<JITKernel> internal;
     int64_t L3_dim;
 
-    JITConvProduct(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t kernel_dims_i) :
+    TorchJITConv(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t kernel_dims_i) :
         fwd_dict(fwd_dict_i.copy()),
         bwd_dict(bwd_dict_i.copy()),
         kernel_dims(kernel_dims_i.copy()),
