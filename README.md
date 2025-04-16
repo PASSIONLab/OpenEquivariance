@@ -199,14 +199,14 @@ pytest tests/conv_test.py
 Browse the file to select specific tests.
 
 ## Compilation with JITScript, Export, and AOTInductor 
-OpenEquivariance is compatible with `torch.compile`, and we have
-started adding support for other PyTorch compilation tools. Currently,
-we support JITScript and `torch.export` for batch tensor products, with
-convolution support arriving soon. Demo the C++ model exports with
+OpenEquivariance supports model compilation with
+`torch.compile`, JITScript, `torch.export`, and AOTInductor. 
+Demo the C++ model exports with
 ```bash
 pytest tests/export_test.py 
 ```
-NOTE: the AOTInductor test fails unless you are using a Nightly
+NOTE: the AOTInductor test (and possibly export) fail 
+unless you are using a Nightly
 build of PyTorch past 4/10/2025 due to incomplete support for 
 TorchBind in earlier versions.
 
