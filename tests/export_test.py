@@ -23,35 +23,37 @@ def problem_and_irreps():
 @pytest.fixture(params=['batch', 'conv_det', 'conv_atomic'])
 def tp_and_inputs(request, problem_and_irreps):
     problem, X_ir, Y_ir, _ = problem_and_irreps
+    gen = torch.Generator(device='cuda')
+    gen.manual_seed(0)
 
     if request.param == 'batch':
         batch_size = 1000
-        gen = torch.Generator(device='cuda')
-        gen.manual_seed(0)
         X = torch.rand(batch_size, X_ir.dim, device='cuda', generator=gen)
         Y = torch.rand(batch_size, Y_ir.dim, device='cuda', generator=gen)
         W = torch.rand(batch_size, problem.weight_numel, device='cuda', generator=gen)
-        return oeq.TensorProduct(problem), [X, Y, W]
+        return oeq.TensorProduct(problem), (X, Y, W)
     else:
         node_ct, nonzero_ct = 3, 4
 
         # Receiver, sender indices for message passing GNN
         edge_index = EdgeIndex(
-                        [[0, 1, 1, 2],  # Receiver 
-                        [1, 0, 2, 1]], # Sender 
+                        [[0, 1, 1, 2],  
+                        [1, 0, 2, 1]], 
                         device='cuda',
                         dtype=torch.long)
-        _, sender_perm = edge_index.sort_by("col")            # Sort by sender index 
-        edge_index, receiver_perm = edge_index.sort_by("row") # Sort by receiver index
+
+        _, sender_perm = edge_index.sort_by("col")            
+        edge_index, receiver_perm = edge_index.sort_by("row") 
+        edge_index = [edge_index[0].detach(), edge_index[1].detach()]
 
         X = torch.rand(node_ct, X_ir.dim, device='cuda', generator=gen)
         Y = torch.rand(nonzero_ct, Y_ir.dim, device='cuda', generator=gen)
         W = torch.rand(nonzero_ct, problem.weight_numel, device='cuda', generator=gen)
 
         if request.param == 'conv_atomic':
-            return oeq.TensorProductConv(problem, torch_op=True, deterministic=False), [X, Y, W, edge_index[0], edge_index[1]]
+            return oeq.TensorProductConv(problem, torch_op=True, deterministic=False), (X, Y, W, edge_index[0], edge_index[1])
         elif request.param == 'conv_det':
-            return oeq.TensorProductConv(problem, torch_op=True, deterministic=True), [X, Y, W, edge_index[0], edge_index[1], sender_perm]
+            return oeq.TensorProductConv(problem, torch_op=True, deterministic=True), (X, Y, W, edge_index[0], edge_index[1], sender_perm)
 
 
 def test_jitscript(tp_and_inputs):
