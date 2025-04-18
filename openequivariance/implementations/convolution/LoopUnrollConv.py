@@ -160,9 +160,23 @@ class LoopUnrollConv(ConvolutionBase):
 
         torch.library.register_autograd("torch_tp_jit::jit_conv_forward", backward, setup_context=setup_context)
 
-        #def setup_context_double_backward(ctx, inputs, output):
-        #    ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad = inputs 
+        def setup_context_double_backward(ctx, inputs, output):
+            ctx.jit, ctx.L1_in, ctx.L2_in, ctx.W, ctx.grad_output, ctx.rows, ctx.cols, ctx.workspace_buffer, ctx.sender_perm = inputs
 
+        def double_backward(ctx, E, F, G):
+            jit, A, B, C, D, rows, cols, wspace, sender_perm = ctx.jit, ctx.L1_in, ctx.L2_in, ctx.W, ctx.grad_output, ctx.rows, ctx.cols, ctx.workspace_buffer, ctx.sender_perm
+
+            op1 = backward_op(jit, E, F, D, C, rows, cols, wspace, sender_perm)
+            op2 = backward_op(jit, A, B, G, C, rows, cols, wspace, sender_perm)
+            op3 = forward_op(jit, E, B, D, rows, cols, wspace, sender_perm)
+            op4 = backward_op(jit, E, B, D, C, rows, cols, wspace, sender_perm) # op4 and op5 could be combined with op3 and op6
+            op5 = backward_op(jit, A, F, D, C, rows, cols, wspace, sender_perm)
+            op6 = forward_op(jit, A, F, D, rows, cols, wspace, sender_perm)
+            op7 = forward_op(jit, A, B, G, rows, cols, wspace, sender_perm)
+
+            return None, op1[0] + op2[0], op1[1] + op2[1], (op4[2] + op5[2]), (op3 + op6 + op7), None, None, None, None
+
+        torch.library.register_autograd("torch_tp_jit::jit_conv_backward", double_backward, setup_context=setup_context_double_backward)
 
 if extlib.TORCH_COMPILE:
     LoopUnrollConv.register_torch_fakes()
