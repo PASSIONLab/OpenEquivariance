@@ -190,7 +190,7 @@ experiments also require a GPU with a minimum of 40GB of memory.
 
 ## Testing Correctness
 See the `dev` dependencies in `pyproject.toml`; you'll need `e3nn`,
-`pytest`, and `pytest-check` installed. You can test batch 
+`pytest`, `torch_geometric`, and `pytest-check` installed. You can test batch 
 tensor products and fused convolution tensor products as follows:
 ```bash
 pytest tests/batch_test.py 
