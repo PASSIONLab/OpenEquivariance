@@ -125,19 +125,6 @@ class LoopUnrollConv(ConvolutionBase):
             def __setstate__(self, state):
                 self.kernel_plaintext, self.fwd_config, self.bwd_config, self.kernel_dims = state 
             
-            #def exec_tensor_product_rawptr(self,
-            #        batch : int,
-            #        L1_in: int, L2_in: int, L3_out: int, 
-            #        weights: int) -> None:
-            #    pass
-
-            #def backward_rawptr(self, batch_size: int,
-            #        L1_in: int, L1_grad: int,
-            #        L2_in: int, L2_grad: int,
-            #        weights: int, weights_grad: int,
-            #        L3_grad: int):
-            #    pass
-
         @torch.library.register_fake("torch_tp_jit::jit_conv_forward")
         def fake_forward(jit, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm):
             return L1_in.new_empty(L1_in.shape[0], jit.wrapped_obj.kernel_dims["L3_dim"]) 

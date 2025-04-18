@@ -54,7 +54,7 @@ class TensorProductConvAtomic(TensorProductConv):
     def name():
         return "LoopUnrollConvAtomic"
 
-class TensorProductConvScatterSum(TensorProductConv):
+class TensorProductConvScatterSum(ConvolutionBase):
     def __init__(self, config, idx_dtype=np.int64, torch_op=True):
         assert(torch_op)
         global torch
