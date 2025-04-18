@@ -14,7 +14,7 @@ from openequivariance.benchmark.TestBenchmarkSuite import TestBenchmarkSuite, Te
 from openequivariance.benchmark.tpp_creation_utils import ChannelwiseTPP, FullyConnectedTPProblem, SingleInstruction
 from openequivariance.benchmark.benchmark_routines.paper_benchmark_uvw import run_paper_uvw_benchmark
 
-from openequivariance.implementations.convolution.LoopUnrollConv import *
+from openequivariance.implementations.convolution.TensorProductConv import *
 from openequivariance.implementations.convolution.CUEConv import *
 from openequivariance.benchmark.ConvBenchmarkSuite import *
 
@@ -160,14 +160,14 @@ def benchmark_convolution(params):
 
         bench = ConvBenchmarkSuite(configs, torch_op=True, test_name="convolution") 
 
-        implementations = [ LoopUnrollConvScatterSum, 
+        implementations = [ TensorProductConvScatterSum, 
                             CUEConv,
-                            LoopUnrollConvDeterministic, 
-                            LoopUnrollConvAtomic]
+                            TensorProductConvDeterministic, 
+                            TensorProductConvAtomic]
 
         if params.limited_memory:
             implementations = [impl for impl in implementations 
-                    if impl != LoopUnrollConvScatterSum
+                    if impl != TensorProductConvScatterSum 
                     and impl != CUEConv]
 
         output_folder = None
