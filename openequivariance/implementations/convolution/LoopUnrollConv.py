@@ -102,6 +102,72 @@ class LoopUnrollConv(ConvolutionBase):
     def name():
         return "LoopUnrollConv"
 
+    @classmethod
+    def register_torch_fakes(cls):
+        global torch
+        import torch
+
+        @torch._library.register_fake_class("torch_tp_jit::TorchJITConv")
+        class TorchJITConv:
+            def __init__(self, kernel_plaintext: str, 
+                        fwd_config: dict[str, int], 
+                        bwd_config: dict[str, int], 
+                        kernel_dims: dict[str, int]) -> None:
+                self.kernel_plaintext, self.fwd_config, self.bwd_config, self.kernel_dims = kernel_plaintext, fwd_config, bwd_config, kernel_dims
+
+            @classmethod
+            def __obj_unflatten__(cls, flattened_product):
+                return cls(**dict(flattened_product))
+
+            def __len__(self):
+                return 0
+            
+            def __setstate__(self, state):
+                self.kernel_plaintext, self.fwd_config, self.bwd_config, self.kernel_dims = state 
+            
+            #def exec_tensor_product_rawptr(self,
+            #        batch : int,
+            #        L1_in: int, L2_in: int, L3_out: int, 
+            #        weights: int) -> None:
+            #    pass
+
+            #def backward_rawptr(self, batch_size: int,
+            #        L1_in: int, L1_grad: int,
+            #        L2_in: int, L2_grad: int,
+            #        weights: int, weights_grad: int,
+            #        L3_grad: int):
+            #    pass
+
+        @torch.library.register_fake("torch_tp_jit::jit_conv_forward")
+        def fake_forward(jit, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm):
+            return L1_in.new_empty(L1_in.shape[0], jit.wrapped_obj.kernel_dims["L3_dim"]) 
+
+        @torch.library.register_fake("torch_tp_jit::jit_conv_backward")
+        def fake_backward(jit, L1_in, L2_in, W, L3_grad, rows, cols, workspace_buffer, sender_perm):
+            return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W) 
+
+    @classmethod
+    def register_autograd(cls):
+        forward_op = torch.ops.torch_tp_jit.jit_conv_forward
+        backward_op = torch.ops.torch_tp_jit.jit_conv_backward
+
+        def setup_context(ctx, inputs, output):
+            ctx.jit, ctx.L1_in, ctx.L2_in, ctx.W, ctx.rows, ctx.cols, ctx.workspace_buffer, ctx.sender_perm = inputs
+        
+        def backward(ctx, grad_output):
+            L1_grad, L2_grad, W_grad= backward_op(ctx.jit, ctx.L1_in, ctx.L2_in, ctx.W, grad_output, ctx.rows, ctx.cols, ctx.workspace_buffer, ctx.sender_perm)
+            return None, L1_grad, L2_grad, W_grad, None, None, None, None
+
+        torch.library.register_autograd("torch_tp_jit::jit_conv_forward", backward, setup_context=setup_context)
+
+        #def setup_context_double_backward(ctx, inputs, output):
+        #    ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad = inputs 
+
+
+if extlib.TORCH_COMPILE:
+    LoopUnrollConv.register_torch_fakes()
+    LoopUnrollConv.register_autograd()
+
 class LoopUnrollConvDeterministic(LoopUnrollConv):
     def __init__(self, config, 
             idx_dtype=np.int64, 
