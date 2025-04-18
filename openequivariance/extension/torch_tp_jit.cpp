@@ -43,6 +43,8 @@ inline void* data_ptr(const torch::Tensor &tensor) {
         return reinterpret_cast<void*>(tensor.data_ptr<double>());
     else if(tensor.dtype() == torch::kLong) 
         return reinterpret_cast<void*>(tensor.data_ptr<int64_t>());
+    else if(tensor.dtype() == torch::kByte) 
+        return reinterpret_cast<void*>(tensor.data_ptr<uint8_t>());
     else
         throw logic_error("Unsupported tensor datatype!");
 }
@@ -230,7 +232,8 @@ torch::Tensor jit_conv_forward(
         const torch::Tensor &W,
         const torch::Tensor &rows,
         const torch::Tensor &cols,
-        const torch::Tensor &workspace) {
+        const torch::Tensor &workspace,
+        const torch::Tensor &transpose_perm) {
 
     int64_t nnz = rows.sizes()[0];
     int64_t node_count = L1_in.sizes()[0];
@@ -341,7 +344,7 @@ TORCH_LIBRARY_FRAGMENT(torch_tp_jit, m) {
                 return c10::make_intrusive<TorchJITConv>(get<0>(state), get<1>(state), get<2>(state), get<3>(state));
             });
 
-    m.def("jit_conv_forward(__torch__.torch.classes.torch_tp_jit.TorchJITConv jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor rows, Tensor cols, Tensor workspace) -> Tensor");
+    m.def("jit_conv_forward(__torch__.torch.classes.torch_tp_jit.TorchJITConv jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> Tensor");
     m.def("jit_conv_backward(__torch__.torch.classes.torch_tp_jit.TorchJITConv jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor)");
 };
 

@@ -558,6 +558,10 @@ class ConvolutionBase:
 
 
     def setup_torch_module(self):
+        if not extlib.TORCH_COMPILE:
+            self.setup_nocompile_ops()
+
+    def setup_nocompile_ops(self):
         '''
         Need two different functions depending on whether the
         convolution is deterministic.

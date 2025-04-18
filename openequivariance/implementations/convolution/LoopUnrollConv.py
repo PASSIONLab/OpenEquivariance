@@ -83,8 +83,16 @@ class LoopUnrollConv(ConvolutionBase):
             backward_workspace_offset=self.backward_workspace_offset)
         self.jit_kernel = postprocess_kernel(self.jit_kernel)
 
+        if self.torch_op and extlib.TORCH_COMPILE:
+            global torch
+            import torch
+
+            internal_cls = torch.classes.torch_tp_jit.TorchJITConv
+        else:
+            internal_cls = JITConvImpl 
+
         logger.info("Starting NVRTC")
-        self.internal = JITConvImpl(self.jit_kernel,
+        self.internal = internal_cls(self.jit_kernel,
                 vars(self.forward_schedule.launch_config), 
                 vars(self.backward_schedule.launch_config),
                 {"L3_dim": self.L3.dim})
