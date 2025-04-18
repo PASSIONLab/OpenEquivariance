@@ -37,7 +37,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 class TensorProductConvDeterministic(TensorProductConv):
     def __init__(self, config, 
             idx_dtype=np.int64, 
-            torch_op=False):
+            torch_op=True):
         super().__init__(config, idx_dtype, torch_op, deterministic=True)
 
     @staticmethod
@@ -47,7 +47,7 @@ class TensorProductConvDeterministic(TensorProductConv):
 class TensorProductConvAtomic(TensorProductConv):
     def __init__(self, config, 
             idx_dtype=np.int64, 
-            torch_op=False):
+            torch_op=True):
         super().__init__(config, idx_dtype, torch_op, deterministic=False)
 
     @staticmethod
