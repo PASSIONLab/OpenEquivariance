@@ -237,7 +237,7 @@ torch::Tensor jit_conv_forward(
 
     int64_t nnz = rows.sizes()[0];
     int64_t node_count = L1_in.sizes()[0];
-    torch::Tensor L3_out = torch::zeros({nnz, jit_instance->L3_dim}, L1_in.options());
+    torch::Tensor L3_out = torch::zeros({node_count, jit_instance->L3_dim}, L1_in.options());
     
     torch::Tensor L1_contig = L1_in.contiguous();
     torch::Tensor L2_contig = L2_in.contiguous();
