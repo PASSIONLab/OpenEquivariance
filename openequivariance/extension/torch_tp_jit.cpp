@@ -1,4 +1,5 @@
-#include <pybind11/pybind11.h> #include <pybind11/numpy.h>
+#include <pybind11/pybind11.h> 
+#include <pybind11/numpy.h>
 #include <iostream>
 #include <unordered_map>
 #include <stdexcept>
@@ -171,6 +172,11 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_
     torch::Tensor L2_grad = torch::empty(L2_in.sizes(), L2_in.options());
     torch::Tensor W_grad = torch::empty(W.sizes(), W.options());
     torch::Tensor L3_dgrad = torch::empty(L3_grad.sizes(), L3_grad.options());
+
+    torch::Tensor L1_in_contig = L1_in.contiguous();
+    torch::Tensor L2_in_contig = L2_in.contiguous();
+    torch::Tensor W_contig = W.contiguous();
+    torch::Tensor L3_grad_contig = L3_grad.contiguous();
 
     torch::Tensor L1_dgrad_contig = L1_dgrad.contiguous();
     torch::Tensor L2_dgrad_contig = L2_dgrad.contiguous();
