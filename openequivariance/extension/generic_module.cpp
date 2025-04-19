@@ -47,7 +47,10 @@ PYBIND11_MODULE(generic_module, m) {
         .def("exec_conv_rawptrs", &ConvolutionImpl::exec_conv_rawptrs)
         .def("backward_rawptrs", &ConvolutionImpl::backward_rawptrs);
     py::class_<JITConvImpl<JITKernel>, ConvolutionImpl>(m, "JITConvImpl")
-        .def(py::init<std::string, KernelLaunchConfig, KernelLaunchConfig>());
+        .def(py::init<  std::string, 
+                        std::unordered_map<string, int64_t>, 
+                        std::unordered_map<string, int64_t>, 
+                        std::unordered_map<string, int64_t>>());
 
     py::class_<GroupMM<float>>(m, "GroupMM_F32")
         .def(py::init<int, int>())

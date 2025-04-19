@@ -57,7 +57,7 @@ else:
 
         try:
             torch_module = torch.utils.cpp_extension.load("torch_tp_jit",
-                torch_sources, extra_cflags=extra_cflags, extra_include_paths=include_dirs, extra_ldflags=extra_link_args)
+                torch_sources, extra_cflags=extra_cflags, extra_include_paths=include_dirs, extra_ldflags=extra_link_args) 
             torch.ops.load_library(torch_module.__file__)
         except Exception as e:
             # If compiling torch fails (e.g. low gcc version), we should fall back to the

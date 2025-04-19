@@ -31,7 +31,8 @@ class LoopUnrollConv(ConvolutionBase):
                 direction = "forward",
                 irrep_dtype = config.irrep_dtype,
                 weight_dtype = config.weight_dtype,
-                schedule_type=forward_schedule_type)
+                schedule_type=forward_schedule_type,
+                warp_size=dp.warpsize)
 
         self.backward_schedule = ComputationSchedule(self.config, 
                 smem_limit=dp.maxSharedMemPerBlock, warps_per_block=6,
@@ -39,7 +40,8 @@ class LoopUnrollConv(ConvolutionBase):
                 direction = "backward",
                 irrep_dtype = config.irrep_dtype,
                 weight_dtype = config.weight_dtype,
-                schedule_type=backward_schedule_type)
+                schedule_type=backward_schedule_type,
+                warp_size=dp.warpsize)
 
         if not deterministic:
             for segment in self.forward_schedule.segments:
@@ -58,12 +60,12 @@ class LoopUnrollConv(ConvolutionBase):
         self.forward_workspace_offset = None
         self.backward_workspace_offset = None
 
+        workspace_size = 1
         if deterministic:
             destination_index_bytes = 32 # Add extra to account for padding
             workspace_size = max(
                 (self.forward_schedule.L3.dim * np.dtype(config.irrep_dtype).itemsize + destination_index_bytes) * self.forward_schedule.total_warps,
                 (self.backward_schedule.L1.dim * np.dtype(config.irrep_dtype).itemsize + destination_index_bytes) * self.backward_schedule.total_warps)
-            self.allocate_workspace(workspace_size)
 
             self.forward_workspace_offset = self.forward_schedule.L3.dim * np.dtype(config.irrep_dtype).itemsize * self.forward_schedule.total_warps
             self.backward_workspace_offset = self.backward_schedule.L1.dim * np.dtype(config.irrep_dtype).itemsize * self.backward_schedule.total_warps
@@ -71,6 +73,7 @@ class LoopUnrollConv(ConvolutionBase):
             self.forward_workspace_offset = (self.forward_workspace_offset + 7) // 8 * 8
             self.backward_workspace_offset = (self.backward_workspace_offset + 7) // 8 * 8
 
+        self.allocate_workspace(workspace_size)
 
         self.jit_kernel = template.render(
             forward_schedule=self.forward_schedule,
@@ -80,72 +83,89 @@ class LoopUnrollConv(ConvolutionBase):
             backward_workspace_offset=self.backward_workspace_offset)
         self.jit_kernel = postprocess_kernel(self.jit_kernel)
 
+        if self.torch_op and extlib.TORCH_COMPILE:
+            global torch
+            import torch
+
+            internal_cls = torch.classes.torch_tp_jit.TorchJITConv
+        else:
+            internal_cls = JITConvImpl 
+
         logger.info("Starting NVRTC")
-        self.internal = JITConvImpl(self.jit_kernel,
-                self.forward_schedule.launch_config, 
-                self.backward_schedule.launch_config)
+        self.internal = internal_cls(self.jit_kernel,
+                vars(self.forward_schedule.launch_config), 
+                vars(self.backward_schedule.launch_config),
+                {"L3_dim": self.L3.dim})
         logger.info("Kernel compiled!")
 
     @staticmethod
     def name():
         return "LoopUnrollConv"
 
-class LoopUnrollConvDeterministic(LoopUnrollConv):
-    def __init__(self, config, 
-            idx_dtype=np.int64, 
-            torch_op=False):
-        super().__init__(config, idx_dtype, torch_op, deterministic=True)
-
-    @staticmethod
-    def name():
-        return "LoopUnrollConvDeterministic"
-
-class LoopUnrollConvAtomic(LoopUnrollConv):
-    def __init__(self, config, 
-            idx_dtype=np.int64, 
-            torch_op=False):
-        super().__init__(config, idx_dtype, torch_op, deterministic=False)
-
-    @staticmethod
-    def name():
-        return "LoopUnrollConvAtomic"
-
-class LoopUnrollConvScatterSum(ConvolutionBase):
-    def __init__(self, config, idx_dtype=np.int64, torch_op=True):
-        assert(torch_op)
+    @classmethod
+    def register_torch_fakes(cls):
         global torch
         import torch
 
-        super().__init__(config, idx_dtype, torch_op, deterministic=False)
+        @torch._library.register_fake_class("torch_tp_jit::TorchJITConv")
+        class TorchJITConv:
+            def __init__(self, kernel_plaintext: str, 
+                        fwd_config: dict[str, int], 
+                        bwd_config: dict[str, int], 
+                        kernel_dims: dict[str, int]) -> None:
+                self.kernel_plaintext, self.fwd_config, self.bwd_config, self.kernel_dims = kernel_plaintext, fwd_config, bwd_config, kernel_dims
 
-        self.reference_tp = TensorProduct(config, torch_op=torch_op)
-        from openequivariance.implementations.convolution.scatter import scatter_sum
-        self.scatter_sum = scatter_sum
+            @classmethod
+            def __obj_unflatten__(cls, flattened_product):
+                return cls(**dict(flattened_product))
 
-    def forward(self, L1_in, L2_in, weights, rows, cols):
-        tp_outputs = self.reference_tp(L1_in[cols], L2_in, weights)
-        return self.scatter_sum(src=tp_outputs, index=rows, dim=0, dim_size=L1_in.shape[0])
+            def __len__(self):
+                return 0
+            
+            def __setstate__(self, state):
+                self.kernel_plaintext, self.fwd_config, self.bwd_config, self.kernel_dims = state 
+            
+        @torch.library.register_fake("torch_tp_jit::jit_conv_forward")
+        def fake_forward(jit, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm):
+            return L1_in.new_empty(L1_in.shape[0], jit.wrapped_obj.kernel_dims["L3_dim"]) 
+
+        @torch.library.register_fake("torch_tp_jit::jit_conv_backward")
+        def fake_backward(jit, L1_in, L2_in, W, L3_grad, rows, cols, workspace_buffer, sender_perm):
+            return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W) 
+
+    @classmethod
+    def register_autograd(cls):
+        forward_op = torch.ops.torch_tp_jit.jit_conv_forward
+        backward_op = torch.ops.torch_tp_jit.jit_conv_backward
+
+        def setup_context(ctx, inputs, output):
+            ctx.jit, ctx.L1_in, ctx.L2_in, ctx.W, ctx.rows, ctx.cols, ctx.workspace_buffer, ctx.sender_perm = inputs
         
-    def forward_cpu(self, L1_in, L2_in, weights, L3_out, graph):
-        tp_outputs = np.zeros((graph.nnz, self.L3.dim), dtype=L3_out.dtype)
-        self.reference_tp.forward_cpu(L1_in[graph.cols], L2_in, tp_outputs, weights)
-        np.add.at(L3_out, graph.rows, tp_outputs)
+        def backward(ctx, grad_output):
+            L1_grad, L2_grad, W_grad= backward_op(ctx.jit, ctx.L1_in, ctx.L2_in, ctx.W, grad_output, ctx.rows, ctx.cols, ctx.workspace_buffer, ctx.sender_perm)
+            return None, L1_grad, L2_grad, W_grad, None, None, None, None
 
-    def backward_cpu(
-            self,
-            L1_in : np.ndarray,
-            L1_grad : np.ndarray,
-            L2_in : np.ndarray,
-            L2_grad : np.ndarray,
-            L3_grad : np.ndarray,
-            weights : np.ndarray,
-            weights_grad : np.ndarray,
-            graph):
-        L1_grad_bcast = np.zeros((graph.nnz, self.L1.dim), dtype=L1_grad.dtype)
-        self.reference_tp.backward_cpu(
-                L1_in[graph.cols], L1_grad_bcast, L2_in, L2_grad, L3_grad[graph.rows], weights, weights_grad)
-        np.add.at(L1_grad, graph.cols, L1_grad_bcast)
+        torch.library.register_autograd("torch_tp_jit::jit_conv_forward", backward, setup_context=setup_context)
 
-    @staticmethod
-    def name():
-        return "LoopUnrollConvScatterSum" 
+        def setup_context_double_backward(ctx, inputs, output):
+            ctx.jit, ctx.L1_in, ctx.L2_in, ctx.W, ctx.grad_output, ctx.rows, ctx.cols, ctx.workspace_buffer, ctx.sender_perm = inputs
+            ctx.inputs = inputs
+
+        def double_backward(ctx, E, F, G):
+            jit, A, B, C, D, rows, cols, wspace, sender_perm = ctx.jit, ctx.L1_in, ctx.L2_in, ctx.grad_output, ctx.W, ctx.rows, ctx.cols, ctx.workspace_buffer, ctx.sender_perm
+
+            op1 = backward_op(jit, E, F, D, C, rows, cols, wspace, sender_perm)
+            op2 = backward_op(jit, A, B, G, C, rows, cols, wspace, sender_perm)
+            op3 = forward_op(jit, E, B, D, rows, cols, wspace, sender_perm)
+            op4 = backward_op(jit, E, B, D, C, rows, cols, wspace, sender_perm) # op4 and op5 could be combined with op3 and op6
+            op5 = backward_op(jit, A, F, D, C, rows, cols, wspace, sender_perm)
+            op6 = forward_op(jit, A, F, D, rows, cols, wspace, sender_perm)
+            op7 = forward_op(jit, A, B, G, rows, cols, wspace, sender_perm)
+
+            return None, op1[0] + op2[0], op1[1] + op2[1], op4[2] + op5[2], (op3 + op6 + op7), None, None, None, None
+
+        torch.library.register_autograd("torch_tp_jit::jit_conv_backward", double_backward, setup_context=setup_context_double_backward)
+
+if extlib.TORCH_COMPILE:
+    LoopUnrollConv.register_torch_fakes()
+    LoopUnrollConv.register_autograd()
