@@ -46,29 +46,43 @@ class LoopUnrollTP(TensorProductBase):
                     smem_limit=dp.maxSharedMemPerBlock, 
                     warps_per_block=warps_per_block,
                     warp_size=dp.warpsize,
-                    block_count=dp.multiprocessorCount * 3,
+                    block_count=dp.multiprocessorCount * 4,
                     direction = "backward",
                     irrep_dtype = config.irrep_dtype,
                     weight_dtype = config.weight_dtype,
                     include_scratch=self.is_uvw,
                     stream_weights=self.is_uvw)
 
-        # Latent error: warps per block must be a multiple of 4 or we run into
-        # problems for uvw, float64 backward pass. Need to eventually fix.
-        try:
-            generate_forward_schedule(8)
-        except Exception as e:
-            generate_forward_schedule(4)
+        def generate_double_backward_schedule(warps_per_block):
+            self.double_backward_schedule = ComputationSchedule(self.config, 
+                    smem_limit=dp.maxSharedMemPerBlock, 
+                    warps_per_block=warps_per_block,
+                    warp_size=dp.warpsize,
+                    block_count=dp.multiprocessorCount * 4,
+                    direction = "double_backward",
+                    irrep_dtype = config.irrep_dtype,
+                    weight_dtype = config.weight_dtype,
+                    include_scratch=self.is_uvw,
+                    stream_weights=self.is_uvw,
+                    schedule_type=3)
 
-        try:
-            generate_backward_schedule(8)
-        except Exception as e:
-            generate_backward_schedule(4)
+        scheduler_generators = [generate_forward_schedule, generate_backward_schedule, generate_double_backward_schedule]
 
+        for generate_schedule in scheduler_generators:
+            warp_count = 8
+            while warp_count > 0:
+                try:
+                    generate_schedule(warp_count)
+                    break
+                except Exception as e:
+                    warp_count //= 2
+                    if warp_count == 0:
+                        raise RuntimeError("Tensor product schedule generation failed, shared memory inadequate!")
 
         self.jit_kernel = extlib.postprocess_kernel(template.render(
             forward_schedule=self.forward_schedule,
-            backward_schedule=self.backward_schedule))
+            backward_schedule=self.backward_schedule,
+            double_backward_schedule=self.double_backward_schedule))
 
         internal_cls = None
         if self.torch_op and extlib.TORCH_COMPILE:
@@ -79,14 +93,15 @@ class LoopUnrollTP(TensorProductBase):
         else:
             internal_cls = extlib.JITTPImpl
 
-        logger.info("Starting NVRTC")
+        logger.info("Starting kernel compiler...")
         self.internal = internal_cls(self.jit_kernel,
                 vars(self.forward_schedule.launch_config),
                 vars(self.backward_schedule.launch_config),
+                vars(self.double_backward_schedule.launch_config),
                 {"L3_dim": self.L3.dim})
         logger.info("Kernel compiled!")
 
-        logger.info(f"CUDA Kernel File Size: {len(self.jit_kernel) // 1024} KB")
+        logger.info(f"Kernel File Size: {len(self.jit_kernel) // 1024} KB")
 
         if self.torch_op:
             self.setup_torch_custom_op()
@@ -105,9 +120,10 @@ class LoopUnrollTP(TensorProductBase):
         class TorchJITProduct:
             def __init__(self, kernel_plaintext: str, 
                         fwd_config: dict[str, int], 
-                        bwd_config: dict[str, int], 
+                        bwd_config: dict[str, int],
+                        dbl_bwd_config: dict[str, int],
                         kernel_dims: dict[str, int]) -> None:
-                self.kernel_plaintext, self.fwd_config, self.bwd_config, self.kernel_dims = kernel_plaintext, fwd_config, bwd_config, kernel_dims
+                self.kernel_plaintext, self.fwd_config, self.bwd_config, self.dbl_bwd_config, self.kernel_dims = kernel_plaintext, fwd_config, bwd_config, dbl_bwd_config, kernel_dims
 
             @classmethod
             def __obj_unflatten__(cls, flattened_product):
@@ -117,7 +133,11 @@ class LoopUnrollTP(TensorProductBase):
                 return 0
             
             def __setstate__(self, state):
-                self.kernel_plaintext, self.fwd_config, self.bwd_config, self.kernel_dims = state 
+                self.kernel_plaintext = state["kernel_plaintext"]
+                self.fwd_config = state["fwd_config"]
+                self.bwd_config = state["bwd_config"]
+                self.dbl_bwd_config = state["dbl_bwd_config"]
+                self.kernel_dims = state["kernel_dims"] 
             
             def exec_tensor_product_rawptr(self,
                     batch : int,

@@ -53,16 +53,17 @@ template<typename JIT_IMPL>
 class __attribute__ ((visibility ("default"))) JITTPImpl : public GenericTensorProductImpl {
 public:
     JIT_IMPL jit;
-    KernelLaunchConfig forward_config; 
-    KernelLaunchConfig backward_config; 
+    KernelLaunchConfig forward_config, backward_config, double_backward_config; 
 
     JITTPImpl(
         std::string jit_kernel,
         KernelLaunchConfig forward_config_i,
-        KernelLaunchConfig backward_config_i) :
+        KernelLaunchConfig backward_config_i,
+        KernelLaunchConfig double_backward_config_i) :
             jit(jit_kernel),
             forward_config(forward_config_i),  
-            backward_config(backward_config_i) {
+            backward_config(backward_config_i),
+            double_backward_config(double_backward_config_i) {
         vector<string> kernels = {"forward", "backward", "double_backward_A", "double_backward_B"};
         jit.compile(kernels, {{}, {}, {}, {}}); 
 
@@ -73,7 +74,10 @@ public:
 
         if(backward_config.smem > 0) {
             jit.set_max_smem(1, backward_config.smem);
-            jit.set_max_smem(3, forward_config.smem);
+        
+        }
+        if(double_backward_config.smem > 0) {
+            jit.set_max_smem(3, double_backward_config.smem);
         }
     }
 
@@ -81,6 +85,7 @@ public:
             std::string jit_kernel,
             std::unordered_map<string, int64_t> fwd_dict, 
             std::unordered_map<string, int64_t> bwd_dict,
+            std::unordered_map<string, int64_t> dbl_bwd_dict,
             std::unordered_map<string, int64_t> kernel_dims 
     ) : JITTPImpl(
             jit_kernel,
@@ -93,7 +98,13 @@ public:
                 bwd_dict["num_blocks"],
                 bwd_dict["num_threads"],
                 bwd_dict["smem"]
-            )) { } 
+            ),
+            KernelLaunchConfig(
+                dbl_bwd_dict["num_blocks"],
+                dbl_bwd_dict["num_threads"],
+                dbl_bwd_dict["smem"]
+            ) 
+        ) { } 
 
     void exec_tensor_product(
         uint64_t num_products,
@@ -127,7 +138,7 @@ public:
             &L1_grad, &L2_grad, &W_grad, &L3_dgrad
         };
         jit.execute(2, args, forward_config);
-        jit.execute(3, args, backward_config);
+        jit.execute(3, args, double_backward_config);
     }
 
     ~JITTPImpl() = default; 

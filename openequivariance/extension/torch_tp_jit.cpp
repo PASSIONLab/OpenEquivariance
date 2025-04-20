@@ -52,12 +52,13 @@ inline void* data_ptr(const torch::Tensor &tensor) {
 
 class __attribute__ ((visibility ("default"))) TorchJITProduct : public torch::CustomClassHolder {
 public:
-    Map_t fwd_dict, bwd_dict, kernel_dims;
+    Map_t fwd_dict, bwd_dict, dbl_bwd_dict, kernel_dims;
     JITTPImpl<JITKernel> internal;
     int64_t L3_dim;
-    TorchJITProduct(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t kernel_dims_i) :
+    TorchJITProduct(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t dbl_bwd_dict_i, Map_t kernel_dims_i) :
         fwd_dict(fwd_dict_i.copy()),
         bwd_dict(bwd_dict_i.copy()),
+        dbl_bwd_dict(dbl_bwd_dict_i.copy()),
         kernel_dims(kernel_dims_i.copy()),
         internal(kernel_plaintext, 
             KernelLaunchConfig(
@@ -69,16 +70,23 @@ public:
                 bwd_dict.at("num_blocks"),
                 bwd_dict.at("num_threads"),
                 bwd_dict.at("smem")
+            ),
+            KernelLaunchConfig(
+                dbl_bwd_dict.at("num_blocks"),
+                dbl_bwd_dict.at("num_threads"),
+                dbl_bwd_dict.at("smem")
             )),
         L3_dim(kernel_dims.at("L3_dim")) { }
 
     tuple<  tuple<string, string>, 
             tuple<string, Map_t>, 
             tuple<string, Map_t>, 
+            tuple<string, Map_t>, 
             tuple<string, Map_t>> __obj_flatten__() {
         return tuple(tuple("kernel_plaintext", internal.jit.kernel_plaintext),
             tuple("fwd_config", fwd_dict),
             tuple("bwd_config", bwd_dict),
+            tuple("dbl_bwd_config", dbl_bwd_dict),
             tuple("kernel_dims", kernel_dims));
     }
 
@@ -356,7 +364,7 @@ TORCH_LIBRARY_FRAGMENT(torch_tp_jit, m) {
                 return tuple(self->internal.jit.kernel_plaintext, self->fwd_dict, self->bwd_dict, self->kernel_dims);
             },
             // __setstate__
-            [](tuple<string, Map_t, Map_t, Map_t> state)
+            [](tuple<string, Map_t, Map_t, Map_t, Map_t> state)
                 -> c10::intrusive_ptr<TorchJITProduct> {
                 return c10::make_intrusive<TorchJITProduct>(get<0>(state), get<1>(state), get<2>(state), get<3>(state));
             });
