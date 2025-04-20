@@ -332,7 +332,7 @@ class ComputationSchedule:
             }
 
             if L2_dgrad:
-                smem["L2_dgrad"] = {"size": smem["L2"], "dtype": self.irrep_dtype_cstr} 
+                smem["L2_dgrad"] = {"size": smem["L2"]["size"], "dtype": self.irrep_dtype_cstr} 
 
             weights_smem = 0
             for inst_idx in inst_idxs:
@@ -370,7 +370,6 @@ class ComputationSchedule:
             calculate_smem = calculate_backward_smem
         elif direction == "double_backward":
             calculate_smem = lambda *args, **kwargs: calculate_backward_smem(*args, L2_dgrad=True, **kwargs)
-
 
         schedule2_succeeded = False
         try:

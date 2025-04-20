@@ -97,7 +97,7 @@ class LoopUnrollTP(TensorProductBase):
         self.internal = internal_cls(self.jit_kernel,
                 vars(self.forward_schedule.launch_config),
                 vars(self.backward_schedule.launch_config),
-                vars(self.double_backward_schedule.launch_config),
+                vars(self.backward_schedule.launch_config), # TODO: Change this to double_backward when the kernel is ready 
                 {"L3_dim": self.L3.dim})
         logger.info("Kernel compiled!")
 

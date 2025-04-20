@@ -350,7 +350,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
 
 TORCH_LIBRARY_FRAGMENT(torch_tp_jit, m) { 
     m.class_<TorchJITProduct>("TorchJITProduct")
-        .def(torch::init<string, Map_t, Map_t, Map_t>())
+        .def(torch::init<string, Map_t, Map_t, Map_t, Map_t>())
         .def("__obj_flatten__", &TorchJITProduct::__obj_flatten__)
         .def("exec_tensor_product_rawptr", &TorchJITProduct::exec_tensor_product_device_rawptrs)
         .def("backward_rawptr", &TorchJITProduct::backward_device_rawptrs)
@@ -360,13 +360,13 @@ TORCH_LIBRARY_FRAGMENT(torch_tp_jit, m) {
         .def_pickle(
             // __getstate__
             [](const c10::intrusive_ptr<TorchJITProduct>& self)
-                -> tuple<string, Map_t, Map_t, Map_t> {
-                return tuple(self->internal.jit.kernel_plaintext, self->fwd_dict, self->bwd_dict, self->kernel_dims);
+                -> tuple<string, Map_t, Map_t, Map_t, Map_t> {
+                return tuple(self->internal.jit.kernel_plaintext, self->fwd_dict, self->bwd_dict, self->dbl_bwd_dict, self->kernel_dims);
             },
             // __setstate__
             [](tuple<string, Map_t, Map_t, Map_t, Map_t> state)
                 -> c10::intrusive_ptr<TorchJITProduct> {
-                return c10::make_intrusive<TorchJITProduct>(get<0>(state), get<1>(state), get<2>(state), get<3>(state));
+                return c10::make_intrusive<TorchJITProduct>(get<0>(state), get<1>(state), get<2>(state), get<3>(state), get<4>(state));
             });
 
     m.def("jit_tp_forward(__torch__.torch.classes.torch_tp_jit.TorchJITProduct jit, Tensor L1_in, Tensor L2_in, Tensor W) -> Tensor");
