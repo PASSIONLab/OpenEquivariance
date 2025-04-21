@@ -98,23 +98,30 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 }
 {%- endmacro %}
 
-{%- macro generate_segment_kernel_backward(id, segment, warp_size) %}
+{%- macro generate_segment_kernel_backward(id, segment, warp_size, double_bwd=False) %}
 {%- set L1, L2, L3, interactions, problem = segment.L1, segment.L2, segment.L3, segment.interactions, segment.problem %}
 
 {%- set L1_irrep_lengths = L1 | map(attribute="ir") | map(attribute="dim") | list %}
 {%- set L2_irrep_lengths = L2 | map(attribute="ir") | map(attribute="dim") | list %}
 {%- set L3_irrep_lengths = L3 | map(attribute="ir") | map(attribute="dim") | list %}
 
-{%- for i, inst in enumerate(problem.instructions) %}
-    {%- set u, v, w, _ = interactions[i] %}
-    {%- if inst.connection_mode == "uvw" %}
-        {{generate_matmul("matmul_bwd_A_%d_%d" % (id, i), L1[u].mul, L3[w].ir.dim, L3[w].mul, 4, True, A_CMAJOR=False, accum=False)}}
-        {{generate_matmul("matmul_bwd_B_%d_%d" % (id, i), L3[w].mul, L1[u].mul, L3[w].ir.dim, 4, False, A_CMAJOR=False, accum=False)}}
-    {%- endif %}
-{%- endfor %}
+{%- if not double_bwd %} {# Only the backward pass needs to generate these kernels #} 
+    {%- for i, inst in enumerate(problem.instructions) %}
+        {%- set u, v, w, _ = interactions[i] %}
+        {%- if inst.connection_mode == "uvw" %}
+            {{generate_matmul("matmul_bwd_A_%d_%d" % (id, i), L1[u].mul, L3[w].ir.dim, L3[w].mul, 4, True, A_CMAJOR=False, accum=False)}}
+            {{generate_matmul("matmul_bwd_B_%d_%d" % (id, i), L3[w].mul, L1[u].mul, L3[w].ir.dim, 4, False, A_CMAJOR=False, accum=False)}}
+        {%- endif %}
+    {%- endfor %}
+{%- endif %}
 
-__device__ __forceinline__ void backward_loop_unroll_{{id}}(
-        const IRREP_T* L1_smem,
+
+{%- if not double_bwd %}
+    __device__ __forceinline__ void backward_loop_unroll_{{id}}
+{%- else %}
+    __device__ __forceinline__ void double_backward_loop_unroll_{{id}}
+{%- endif %}
+        (const IRREP_T* L1_smem,
         const IRREP_T* L2_smem,
         WEIGHT_T* weights,
         WEIGHT_T* weights_smem,
