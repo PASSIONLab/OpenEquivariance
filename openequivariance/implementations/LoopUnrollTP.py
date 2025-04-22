@@ -84,6 +84,9 @@ class LoopUnrollTP(TensorProductBase):
             backward_schedule=self.backward_schedule,
             double_backward_schedule=self.double_backward_schedule))
 
+        with open("scratch.txt", "w") as f:
+            f.write(self.jit_kernel)
+
         internal_cls = None
         if self.torch_op and extlib.TORCH_COMPILE:
             global torch
@@ -97,7 +100,7 @@ class LoopUnrollTP(TensorProductBase):
         self.internal = internal_cls(self.jit_kernel,
                 vars(self.forward_schedule.launch_config),
                 vars(self.backward_schedule.launch_config),
-                vars(self.double_backward_schedule.launch_config), # TODO: Change this to double_backward when the kernel is ready 
+                vars(self.double_backward_schedule.launch_config), 
                 {"L3_dim": self.L3.dim})
         logger.info("Kernel compiled!")
 

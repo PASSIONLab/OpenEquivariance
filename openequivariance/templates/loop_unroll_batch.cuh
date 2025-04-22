@@ -244,6 +244,7 @@ __global__ void double_backward_B(
             {{ load_ir_segments(segment.L3Map, "l3_shft", "L3_grad_smem", "j") }}
             {{ load_ir_segments_force(segment.L1Map, "l1_shft", "L1_smem", "j") }}
             {{ load_ir_segments_force(segment.L2Map, "l2_shft", "L2_smem", "j") }}
+            {{ load_ir_segments_force(segment.L2Map, "l2_original", "L2_dgrad_smem", "j") }}
 
             __syncwarp();
             {%- if not segment.L1Map.persist_load %}
@@ -260,19 +261,23 @@ __global__ void double_backward_B(
             {% endif %}
             
             WEIGHT_T* w_buffer = w;
+            IRREP_T* L2_buffer = L2_smem;
+            IRREP_T* L2_dgrad_buffer = L2_dgrad_smem;
+
             for(int n = 0; n < 2; n++) {
                 if(n == 1) {
                     {{ load_ir_segments_force(segment.L1Map, "l1_original", "L1_smem", "j") }}
-                    {{ load_ir_segments_force(segment.L2Map, "l2_original", "L2_smem", "j") }}
 
                     {% if not schedule.stream_weights%}
                         ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = weights_dgrad_shft[{{segment.weight_offset}} + j];)
                     {% endif %}
                     w_buffer = wdgrad;
+                    L2_buffer = L2_dgrad_smem;
+                    L2_dgrad_buffer = L2_smem;
                 }
 
                 __syncwarp();
-                double_backward_loop_unroll_{{i}}(L1_smem, L2_smem, w_buffer, weights_smem, L3_grad_smem,
+                double_backward_loop_unroll_{{i}}(L1_smem, L2_buffer, w_buffer, weights_smem, L3_grad_smem,
                         L1_grad_smem, L2_grad_smem, wgrad, weights_grad_smem, scratch_smem, lane_id);
                 __syncwarp();
             }
