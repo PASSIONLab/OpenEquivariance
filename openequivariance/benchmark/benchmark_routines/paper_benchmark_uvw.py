@@ -4,7 +4,7 @@ import numpy as np
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.implementations.E3NNTensorProduct import E3NNTensorProductCompiledCUDAGraphs
 from openequivariance.implementations.CUETensorProduct import CUETensorProduct
-from openequivariance.implementations.LoopUnrollTP import LoopUnrollTP
+from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance.benchmark.TestBenchmarkSuite import TestBenchmarkSuite, TestDefinition, Direction
 from openequivariance.benchmark.tpp_creation_utils import FullyConnectedTPProblem
 from openequivariance.benchmark.benchmark_configs import e3nn_torch_tetris_polynomial, diffdock_configs
@@ -27,9 +27,9 @@ def run_paper_uvw_benchmark(params) -> pathlib.Path:
     problems += float64_problems
 
     implementations = [
-        E3NNTensorProductCompiledCUDAGraphs,
-        CUETensorProduct,
-        LoopUnrollTP]
+        #E3NNTensorProductCompiledCUDAGraphs,
+        #CUETensorProduct,
+        TensorProduct]
 
     tests = [TestDefinition(implementation, problem, direction, correctness=True, benchmark=True) 
                 for problem, direction, implementation

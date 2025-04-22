@@ -124,19 +124,30 @@ public:
 
 class __attribute__((visibility("default"))) KernelLaunchConfig {
 public:
-   uint32_t num_blocks = 0;
-   uint32_t num_threads = 0;
-   uint32_t warp_size = 64;
-   uint32_t smem = 0;
-   hipStream_t hStream = NULL;
+    uint32_t num_blocks = 0;
+    uint32_t num_threads = 0;
+    uint32_t warp_size = 64;
+    uint32_t smem = 0;
+    hipStream_t hStream = NULL;
 
-   KernelLaunchConfig() = default;
-   ~KernelLaunchConfig() = default;
+    KernelLaunchConfig() = default;
+    ~KernelLaunchConfig() = default;
+
+    KernelLaunchConfig(uint32_t num_blocks, uint32_t num_threads_per_block, uint32_t smem) :
+        num_blocks(num_blocks),
+        num_threads(num_threads_per_block),
+        smem(smem) 
+    { }
+
+    KernelLaunchConfig(int64_t num_blocks_i, int64_t num_threads_i, int64_t smem_i) :
+        KernelLaunchConfig( static_cast<uint32_t>(num_blocks_i),
+                            static_cast<uint32_t>(num_threads_i),
+                            static_cast<uint32_t>(smem_i)) 
+    { }
 };
 
 class __attribute__((visibility("default"))) HIPJITKernel {
 private:
-    string kernel_plaintext;
     hiprtcProgram prog;
 
     bool compiled = false;
@@ -148,6 +159,7 @@ private:
     vector<hipFunction_t> kernels;
 
 public:
+    string kernel_plaintext;
     HIPJITKernel(string plaintext) :
         kernel_plaintext(plaintext) {
 

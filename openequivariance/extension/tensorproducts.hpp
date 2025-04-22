@@ -3,6 +3,8 @@
 #include <stdexcept>
 #include <cstdint>
 #include <string>
+#include <unordered_map>
+#include <iostream>
 
 class __attribute__ ((visibility ("default"))) GenericTensorProductImpl {
 public:
@@ -56,8 +58,8 @@ public:
 
     JITTPImpl(
         std::string jit_kernel,
-        KernelLaunchConfig &forward_config_i,
-        KernelLaunchConfig &backward_config_i) :
+        KernelLaunchConfig forward_config_i,
+        KernelLaunchConfig backward_config_i) :
             jit(jit_kernel),
             forward_config(forward_config_i),  
             backward_config(backward_config_i) {
@@ -72,6 +74,24 @@ public:
             jit.set_max_smem(1, backward_config.smem);
         }
     }
+
+    JITTPImpl(
+            std::string jit_kernel,
+            std::unordered_map<string, int64_t> fwd_dict, 
+            std::unordered_map<string, int64_t> bwd_dict,
+            std::unordered_map<string, int64_t> kernel_dims 
+    ) : JITTPImpl(
+            jit_kernel,
+            KernelLaunchConfig(
+                fwd_dict["num_blocks"],
+                fwd_dict["num_threads"],
+                fwd_dict["smem"]
+            ),
+            KernelLaunchConfig(
+                bwd_dict["num_blocks"],
+                bwd_dict["num_threads"],
+                bwd_dict["smem"]
+            )) { } 
 
     void exec_tensor_product(
         uint64_t num_products,

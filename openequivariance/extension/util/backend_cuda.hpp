@@ -5,6 +5,7 @@
 #include <cuda_runtime.h>
 #include <string>
 #include <iostream>
+#include <vector>
 
 using namespace std;
 
@@ -121,14 +122,27 @@ public:
 
 class __attribute__((visibility("default"))) KernelLaunchConfig {
 public:
-   uint32_t num_blocks = 0;
-   uint32_t num_threads = 0;
-   uint32_t warp_size = 32;
-   uint32_t smem = 0;
-   CUstream hStream = NULL;
+    uint32_t num_blocks = 0;
+    uint32_t num_threads = 0;
+    uint32_t warp_size = 32;
+    uint32_t smem = 0;
+    CUstream hStream = NULL;
 
-   KernelLaunchConfig() = default;
-   ~KernelLaunchConfig() = default;
+    KernelLaunchConfig() = default;
+    ~KernelLaunchConfig() = default;
+
+    KernelLaunchConfig(uint32_t num_blocks, uint32_t num_threads_per_block, uint32_t smem) :
+        num_blocks(num_blocks),
+        num_threads(num_threads_per_block),
+        smem(smem) 
+    { }
+
+
+    KernelLaunchConfig(int64_t num_blocks_i, int64_t num_threads_i, int64_t smem_i) :
+        KernelLaunchConfig( static_cast<uint32_t>(num_blocks_i),
+                            static_cast<uint32_t>(num_threads_i),
+                            static_cast<uint32_t>(smem_i)) 
+    { }
 };
 
 /*
@@ -138,7 +152,6 @@ public:
 
 class __attribute__((visibility("default"))) CUJITKernel {
 private:
-    string kernel_plaintext;
     nvrtcProgram prog;
 
     bool compiled = false;
@@ -151,6 +164,7 @@ private:
     vector<CUkernel> kernels;
 
 public:
+    string kernel_plaintext;
     CUJITKernel(string plaintext) :
         kernel_plaintext(plaintext) {
 

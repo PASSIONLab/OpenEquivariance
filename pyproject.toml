@@ -33,6 +33,7 @@ bench = [
 dev = [
   "pytest",
   "pytest-check",
+  "torch_geometric"
 ]
 
 [tool.setuptools.packages.find]

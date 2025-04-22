@@ -2,6 +2,8 @@ import pickle, pathlib, typing
 from math import prod
 import numpy as np
 import numpy.linalg as la
+
+import openequivariance.extlib as extlib
 from openequivariance.extlib import *
 
 from openequivariance.implementations.e3nn_lite import TPProblem, wigner_3j
@@ -9,7 +11,7 @@ from openequivariance.benchmark.logging_utils import getLogger, bcolors
 logger = getLogger()
 
 class TensorProductBase:
-    next_tp_id = 0 # Used to assign unique IDs to each TP instance 
+    next_tp_id = 0 # Assign unique IDs to each TP instance 
 
     @staticmethod
     def load_cg_tensor(l1, l2, l3):
@@ -46,14 +48,14 @@ class TensorProductBase:
             L3_out: np.uint64,
             weights: np.uint64
             ) -> None:
-        self.internal.exec_tensor_product(batch, L1_in, L2_in, L3_out, weights) 
+        self.internal.exec_tensor_product_rawptr(batch, L1_in, L2_in, L3_out, weights) 
 
     def backward_raw(self, batch_size: np.uint64,
             L1_in: np.uint64, L1_grad: np.uint64, 
             L2_in: np.uint64, L2_grad: np.uint64,
             weights: np.uint64, weights_grad: np.uint64,
             L3_grad: np.uint64):
-        self.internal.backward(
+        self.internal.backward_rawptr(
                 batch_size,
                 L1_in, L1_grad,
                 L2_in, L2_grad,
@@ -80,7 +82,7 @@ class TensorProductBase:
         L2_d = DeviceBuffer(L2_in)
         L3_d = DeviceBuffer(L3_out)
         weights_d = DeviceBuffer(weights_chunked)
-        self.internal.exec_tensor_product(batch, L1_d.data_ptr(), L2_d.data_ptr(), L3_d.data_ptr(), weights_d.data_ptr())
+        self.internal.exec_tensor_product_rawptr(batch, L1_d.data_ptr(), L2_d.data_ptr(), L3_d.data_ptr(), weights_d.data_ptr())
         L3_d.copy_to_host()
 
     def backward_cpu(self, L1_in, L1_grad, L2_in, L2_grad, L3_grad, weights, weights_grad) -> None:
@@ -96,7 +98,7 @@ class TensorProductBase:
         L1_grad_d, L2_grad_d = DeviceBuffer(L1_grad), DeviceBuffer(L2_grad)
         weights_d, weights_grad_d = DeviceBuffer(weights_chunked), DeviceBuffer(weights_grad)
 
-        self.internal.backward(
+        self.internal.backward_rawptr(
                 batch,
                 L1_d.data_ptr(), L1_grad_d.data_ptr(),
                 L2_d.data_ptr(), L2_grad_d.data_ptr(),
@@ -143,25 +145,25 @@ class TensorProductBase:
             weights_d = DeviceBuffer(weights)
 
             for i in range(num_warmup):
-                self.internal.exec_tensor_product(batch, L1_d.data_ptr(), L2_d.data_ptr(), L3_d.data_ptr(), weights_d.data_ptr())
+                self.internal.exec_tensor_product_rawptr(batch, L1_d.data_ptr(), L2_d.data_ptr(), L3_d.data_ptr(), weights_d.data_ptr())
 
             for i in range(num_iter):
                 timer.clear_L2_cache()
                 timer.start()
-                self.internal.exec_tensor_product(batch, L1_d.data_ptr(), L2_d.data_ptr(), L3_d.data_ptr(), weights_d.data_ptr())
+                self.internal.exec_tensor_product_rawptr(batch, L1_d.data_ptr(), L2_d.data_ptr(), L3_d.data_ptr(), weights_d.data_ptr())
                 time_millis[i] = timer.stop_clock_get_elapsed() 
             
         return time_millis
     
     def benchmark_backward(
             self, 
-            num_warmup : int, 
-            num_iter : int, 
-            L1_in : np.ndarray, 
-            L2_in : np.ndarray, 
-            L3_buffer : np.ndarray, 
-            weights : np.ndarray, 
-            L1_grad : np.ndarray, 
+            num_warmup : int,
+            num_iter : int,
+            L1_in : np.ndarray,
+            L2_in : np.ndarray,
+            L3_buffer : np.ndarray,
+            weights : np.ndarray,
+            L1_grad : np.ndarray,
             L2_grad : np.ndarray,
             weights_grad : np.ndarray
             ) -> np.ndarray:
@@ -198,7 +200,7 @@ class TensorProductBase:
             weights_d, weights_grad_d = DeviceBuffer(weights), DeviceBuffer(weights_grad)
 
             for i in range(num_warmup):
-                self.internal.backward(
+                self.internal.backward_rawptr(
                         batch,
                         L1_d.data_ptr(), L1_grad_d.data_ptr(),
                         L2_d.data_ptr(), L2_grad_d.data_ptr(),
@@ -208,7 +210,7 @@ class TensorProductBase:
             for i in range(num_iter):
                 timer.clear_L2_cache()
                 timer.start()
-                self.internal.backward(
+                self.internal.backward_rawptr(
                         batch,
                         L1_d.data_ptr(), L1_grad_d.data_ptr(),
                         L2_d.data_ptr(), L2_grad_d.data_ptr(),
@@ -333,6 +335,10 @@ class TensorProductBase:
 
 
     def setup_torch_custom_op(self):
+        if not extlib.TORCH_COMPILE:
+            self.setup_nocompile_ops()
+
+    def setup_nocompile_ops(self):
         # ----------------- Forward pass -----------------
         @torch.library.custom_op(f"openequivariance::tp_forward{self.tp_id}", mutates_args=(), device_types="cuda")
         def forward(L1_in : torch.Tensor, L2_in : torch.Tensor, weights : torch.Tensor) -> torch.Tensor:

@@ -1,5 +1,4 @@
 import numpy as np
-from openequivariance.extlib import *
 from openequivariance.implementations.e3nn_lite import *
 from itertools import accumulate
 from openequivariance.benchmark.logging_utils import *
@@ -229,11 +228,19 @@ class ProblemSplitter:
 
         self.new_instructions = new_instructions
 
+class LaunchConfig:
+    def __init__(self, num_blocks, num_threads, warp_size, smem):
+        self.num_blocks = num_blocks 
+        self.num_threads = num_threads 
+        self.warp_size = warp_size 
+        self.smem = smem
+
 class ComputationSchedule:
     def __init__(self, 
             config, 
             smem_limit, 
             warps_per_block,
+            warp_size,
             block_count, 
             direction,
             irrep_dtype,
@@ -258,11 +265,9 @@ class ComputationSchedule:
         # Stream weights on the fly before pre-loading 
         self.stream_weights = stream_weights 
 
-        launch_config = KernelLaunchConfig()
-
         # Step 1: Break the irreps and the instructions into chunks of at most 32 x 32 x 32. 
 
-        self.problem_splitter = ProblemSplitter(config, launch_config.warp_size)
+        self.problem_splitter = ProblemSplitter(config, warp_size)
         self.updated_config = self.problem_splitter.output
         self.L1, self.L2, self.L3 = self.updated_config.irreps_in1, self.updated_config.irreps_in2, self.updated_config.irreps_out 
         self.new_instructions = self.updated_config.instructions
@@ -420,11 +425,12 @@ class ComputationSchedule:
         true_max_smem = max([seg.smem["total"] for seg in self.segments])
         self.memory_per_warp = true_max_smem
 
-        launch_config.num_blocks = block_count
-        launch_config.num_threads = warps_per_block * launch_config.warp_size
-        launch_config.smem = self.memory_per_warp * warps_per_block 
-        logger.info(f"{direction.title()} pass needs {launch_config.smem // 1024} KB of shared memory.")
-        self.launch_config = launch_config
+        self.launch_config = LaunchConfig(
+            num_blocks=block_count,
+            num_threads=warps_per_block * warp_size,
+            warp_size=warp_size,
+            smem=self.memory_per_warp * warps_per_block)
+
 
     def reorder_weights(self, weights_in, weights_out, direction, has_batch_dim):
         '''
