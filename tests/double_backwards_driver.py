@@ -21,7 +21,7 @@ implementations = [
     TensorProduct, 
 ]
 
-problems = mace_nequip_problems[:1]
+problems = mace_nequip_problems
 
 directions : list[Direction] = [
     #'forward',
