@@ -36,3 +36,6 @@ openequivariance/extlib/*.so
 
 get_node.sh
 *.egg-info
+
+# pytest
+.pytest_cache/
