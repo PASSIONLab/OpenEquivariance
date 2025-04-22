@@ -278,7 +278,7 @@ __global__ void double_backward_B(
 
                 __syncwarp();
                 double_backward_loop_unroll_{{i}}(L1_smem, L2_buffer, w_buffer, weights_smem, L3_grad_smem,
-                        L1_grad_smem, L2_grad_smem, wgrad, weights_grad_smem, scratch_smem, lane_id);
+                        L1_grad_smem, L2_grad_smem, L2_dgrad_buffer, wgrad, weights_grad_smem, scratch_smem, lane_id);
                 __syncwarp();
             }
 

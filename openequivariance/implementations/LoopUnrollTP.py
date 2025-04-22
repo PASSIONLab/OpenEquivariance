@@ -58,7 +58,7 @@ class LoopUnrollTP(TensorProductBase):
                     smem_limit=dp.maxSharedMemPerBlock, 
                     warps_per_block=warps_per_block,
                     warp_size=dp.warpsize,
-                    block_count=dp.multiprocessorCount * 4,
+                    block_count=dp.multiprocessorCount,
                     direction = "double_backward",
                     irrep_dtype = config.irrep_dtype,
                     weight_dtype = config.weight_dtype,

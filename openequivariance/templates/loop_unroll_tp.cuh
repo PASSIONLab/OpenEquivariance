@@ -129,6 +129,11 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
         IRREP_T* L1_grad_smem,
         IRREP_T* L2_grad_smem,
+
+{%- if double_bwd %}
+        IRREP_T* L2_original,
+{%- endif %}
+
         WEIGHT_T* weights_grad,
         WEIGHT_T* weights_grad_smem,
         WEIGHT_T* scratch,
@@ -139,6 +144,10 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
     IRREP_T l2_vec[{{L2_irrep_lengths  | max}}];
     IRREP_T l2_grad[{{L2_irrep_lengths | max}}]; 
     IRREP_T l3_grad[{{L3_irrep_lengths | max}}];
+
+    {%- if double_bwd %}
+    IRREP_T l2_original[{{L2_irrep_lengths | max}}];
+    {%- endif %}
 
     WEIGHT_T weight, weight_grad;
     int offset;
@@ -173,6 +182,10 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                 for(int j = 0; j < {{L2[v].ir.dim}}; j++) {
                     l2_vec[j] = L2_smem[j + {{L2.slices()[v].start}} + k * {{L2[v].ir.dim}}]; 
                     l2_grad[j] = 0.0; 
+
+                    {%- if double_bwd %}
+                    l2_original[j] = L2_original[j + {{L2.slices()[v].start}} + k * {{L2[v].ir.dim}}]; 
+                    {%- endif %}
                 }
             {%- endif %}
 
@@ -184,8 +197,14 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
                 {%- for i in range(tensor.nnz) %} 
                     {%- set coord1, coord2, coord3, value = tensor.tuples[i] %}
-                    scratch1[{{i % num_scratch_reg}}] = l3_grad[{{coord3}}] * {{value}}; 
+                    scratch1[{{i % num_scratch_reg}}] = l3_grad[{{coord3}}] * {{value}};
+
+                    {%- if double_bwd %}
+                    weight_grad += scratch1[{{i % num_scratch_reg}}] * l2_original[{{coord2}}] * l1_vec[{{coord1}}];
+                    {%- else %}
                     weight_grad += scratch1[{{i % num_scratch_reg}}] * l2_vec[{{coord2}}] * l1_vec[{{coord1}}];
+                    {%- endif %}
+
                     scratch2[{{i % num_scratch_reg}}] = scratch1[{{i % num_scratch_reg}}] * weight;
                     l2_grad[{{coord2}}] += scratch2[{{i % num_scratch_reg}}] * l1_vec[{{coord1}}];
                     l1_grad[{{coord1}}] += scratch2[{{i % num_scratch_reg}}] * l2_vec[{{coord2}}];
@@ -218,7 +237,11 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                     {# Phase 2, computing weight grad. Reusing L3 grad here #}
                     {%- for i in range(tensor.nnz) %}
                         {%- set coord1, coord2, coord3, value = tensor.tuples[i] %}
+                        {% if double_bwd %}
+                        l3_grad[{{coord3}}] += {{value}} * l1_vec[{{coord1}}] * l2_original[{{coord2}}]; 
+                        {%- else %}
                         l3_grad[{{coord3}}] += {{value}} * l1_vec[{{coord1}}] * l2_vec[{{coord2}}]; 
+                        {%- endif %}
                     {%- endfor %}
 
                     {{ reg_store(L1[u].mul, L3[w].ir.dim, "scratch", "0", "l3_grad", "=", 1.0) }}
@@ -231,7 +254,11 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                     {%- if problem.shared_weights %}
                         ROW_OPERATION({{slice_size}}, j, atomicAdd(tmp + j, weights_smem[j + lane_id]);)
                     {%- else %}
+                        {%- if double_bwd %}
+                        ROW_OPERATION({{slice_size}}, j, tmp[j] += weights_smem[j + lane_id];)
+                        {%- else %}
                         ROW_OPERATION({{slice_size}}, j, tmp[j] = weights_smem[j + lane_id];)
+                        {%- endif %}
                     {%- endif %}
                 }
             {%- endif %}
@@ -257,7 +284,11 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
             {%- if problem.instructions[k].connection_mode != "uvw" %}
                 if(lane_id < {{L1[u].mul}}) {
+                    {%- if double_bwd %}
+                    weights_grad_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id] += weight_grad;
+                    {%- else %}
                     weights_grad_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id] = weight_grad;
+                    {%- endif %}
                 }
             {%- endif %}
         }
