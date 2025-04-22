@@ -3,6 +3,7 @@ from pytest_check import check
 
 import numpy as np 
 import openequivariance as oeq
+from e3nn import o3
 from openequivariance.implementations.e3nn_lite import TPProblem
 from openequivariance.implementations.TensorProductBase import TensorProductBase
 from openequivariance.implementations.TensorProduct import TensorProduct
