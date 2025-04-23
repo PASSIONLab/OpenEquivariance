@@ -217,8 +217,8 @@ def correctness_double_backward(
             retain_graph=True, 
             inputs=[out_grad, in1_torch, in2_torch, weights_torch])
 
+        weights_grad = weights_torch.grad.detach().cpu().numpy()
         if tp.reorder_weights_oeq_to_e3nn is not None:
-            weights_grad = weights_torch.grad.detach().cpu().numpy()
             weights_grad_copy = weights_grad.copy()
             tp.reorder_weights_oeq_to_e3nn(weights_grad_copy, weights_grad, not tp.config.shared_weights)
 

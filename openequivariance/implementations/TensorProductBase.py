@@ -29,6 +29,7 @@ class TensorProductBase:
         self.config, self.torch_op = config, torch_op
         self.L1, self.L2, self.L3 = config.irreps_in1, config.irreps_in2, config.irreps_out
         self.irrep_dtype, self.weight_dtype = config.irrep_dtype, config.weight_dtype 
+        self.reorder_weights_e3nn_to_oeq, self.reorder_weights_oeq_to_e3nn = None, None 
 
         self.tp_id = TensorProductBase.next_tp_id
         TensorProductBase.next_tp_id += 1

@@ -12,7 +12,7 @@ from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance.implementations.e3nn_lite import TPProblem
 from openequivariance.benchmark.tpp_creation_utils import FullyConnectedTPProblem, ChannelwiseTPP
 from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance.benchmark.benchmark_configs import mace_nequip_problems
+from openequivariance.benchmark.benchmark_configs import mace_nequip_problems, diffdock_configs
 
 
 implementations = [
@@ -21,7 +21,7 @@ implementations = [
     TensorProduct, 
 ]
 
-problems = mace_nequip_problems
+problems = diffdock_configs # mace_nequip_problems
 
 directions : list[Direction] = [
     #'forward',

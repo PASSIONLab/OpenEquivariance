@@ -189,19 +189,6 @@ class LoopUnrollTP(TensorProductBase):
                                                 E, F, G)
             return None, result[0], result[1], result[2], result[3]
 
-            #jit, A, B, C, D = ctx.jit, ctx.L1_in, ctx.L2_in, ctx.L3_grad, ctx.weights
-            #op1 = backward_op(jit, E, F, D, C)
-            #op2 = backward_op(jit, A, B, G, C)
-            #op3 = forward_op(jit, E, B, D)
-            #op4 = backward_op(jit, E, B, D, C) # op4 and op5 could be combined with op3 and op6 
-            #op5 = backward_op(jit, A, F, D, C) 
-            #op6 = forward_op(jit, A, F, D)
-            #op7 = forward_op(jit, A, B, G)
-
-            #print("TORCH NORM")
-            #print(torch.norm(result[0] - op1[0] - op2[0]))
-            #return None, op1[0] + op2[0], op1[1] + op2[1], (op4[2] + op5[2]), (op3 + op6 + op7)
-
         torch.library.register_autograd("torch_tp_jit::jit_tp_backward", double_backward, setup_context=setup_context_double_backward)
 
 
