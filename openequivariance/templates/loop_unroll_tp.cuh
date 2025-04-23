@@ -105,15 +105,20 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 {%- set L2_irrep_lengths = L2 | map(attribute="ir") | map(attribute="dim") | list %}
 {%- set L3_irrep_lengths = L3 | map(attribute="ir") | map(attribute="dim") | list %}
 
-{%- if not double_bwd %} {# Only the backward pass needs to generate these kernels #} 
-    {%- for i, inst in enumerate(problem.instructions) %}
-        {%- set u, v, w, _ = interactions[i] %}
-        {%- if inst.connection_mode == "uvw" %}
-            {{generate_matmul("matmul_bwd_A_%d_%d" % (id, i), L1[u].mul, L3[w].ir.dim, L3[w].mul, 4, True, A_CMAJOR=False, accum=False)}}
-            {{generate_matmul("matmul_bwd_B_%d_%d" % (id, i), L3[w].mul, L1[u].mul, L3[w].ir.dim, 4, False, A_CMAJOR=False, accum=False)}}
-        {%- endif %}
-    {%- endfor %}
+{%- if double_bwd %}
+    {%- set matmul_basename = "matmul_double_bwd_" %}
+{%- else %}
+    {%- set matmul_basename = "matmul_bwd_" %}
 {%- endif %}
+
+{%- for i, inst in enumerate(problem.instructions) %}
+    {%- set u, v, w, _ = interactions[i] %}
+    {%- if inst.connection_mode == "uvw" %}
+        {{generate_matmul(matmul_basename + "A_%d_%d" % (id, i), L1[u].mul, L3[w].ir.dim, L3[w].mul, 4, True, A_CMAJOR=False, accum=False)}}
+        {{generate_matmul(matmul_basename + "B_%d_%d" % (id, i), L3[w].mul, L1[u].mul, L3[w].ir.dim, 4, False, A_CMAJOR=False, accum=False)}}
+    {%- endif %}
+{%- endfor %}
+
 
 
 {%- if not double_bwd %}
@@ -218,7 +223,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
                     __syncwarp();
                     offset = {{ L3.slices()[w].start}}; 
-                    matmul_bwd_A_{{id}}_{{k}}(weights_smem, L3_grad_smem + offset, scratch);
+                    {{matmul_basename}}A_{{id}}_{{k}}(weights_smem, L3_grad_smem + offset, scratch);
                     __syncwarp();
 
                     {{transpose_load(L1[u].mul, L3[w].ir.dim, 'scratch', '0', 'l3_grad')}}
@@ -238,16 +243,16 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                     {%- for i in range(tensor.nnz) %}
                         {%- set coord1, coord2, coord3, value = tensor.tuples[i] %}
                         {% if double_bwd %}
-                        l3_grad[{{coord3}}] += {{value}} * l1_vec[{{coord1}}] * l2_original[{{coord2}}]; 
+                            l3_grad[{{coord3}}] += {{value}} * l1_vec[{{coord1}}] * l2_original[{{coord2}}]; 
                         {%- else %}
-                        l3_grad[{{coord3}}] += {{value}} * l1_vec[{{coord1}}] * l2_vec[{{coord2}}]; 
+                            l3_grad[{{coord3}}] += {{value}} * l1_vec[{{coord1}}] * l2_vec[{{coord2}}]; 
                         {%- endif %}
                     {%- endfor %}
 
                     {{ reg_store(L1[u].mul, L3[w].ir.dim, "scratch", "0", "l3_grad", "=", 1.0) }}
 
                     __syncwarp(); 
-                    matmul_bwd_B_{{id}}_{{k}}(L3_grad_smem + offset, scratch, weights_smem);
+                    {{matmul_basename}}B_{{id}}_{{k}}(L3_grad_smem + offset, scratch, weights_smem);
                     __syncwarp();
 
                     tmp = weights_grad + {{segment.weight_offset + weight_start}} + k * {{slice_size}} + lane_id;
@@ -255,9 +260,9 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                         ROW_OPERATION({{slice_size}}, j, atomicAdd(tmp + j, weights_smem[j + lane_id]);)
                     {%- else %}
                         {%- if double_bwd %}
-                        ROW_OPERATION({{slice_size}}, j, tmp[j] += weights_smem[j + lane_id];)
+                            ROW_OPERATION({{slice_size}}, j, tmp[j] += weights_smem[j + lane_id];)
                         {%- else %}
-                        ROW_OPERATION({{slice_size}}, j, tmp[j] = weights_smem[j + lane_id];)
+                            ROW_OPERATION({{slice_size}}, j, tmp[j] = weights_smem[j + lane_id];)
                         {%- endif %}
                     {%- endif %}
                 }
@@ -285,9 +290,9 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
             {%- if problem.instructions[k].connection_mode != "uvw" %}
                 if(lane_id < {{L1[u].mul}}) {
                     {%- if double_bwd %}
-                    weights_grad_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id] += weight_grad;
+                        weights_grad_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id] += weight_grad;
                     {%- else %}
-                    weights_grad_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id] = weight_grad;
+                        weights_grad_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id] = weight_grad;
                     {%- endif %}
                 }
             {%- endif %}
