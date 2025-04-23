@@ -7,10 +7,6 @@ from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance.benchmark.correctness_utils import correctness_forward, correctness_backward, correctness_double_backward
 from itertools import chain, product
 
-@pytest.fixture(params=[TensorProduct], ids=['oeq.TensorProduct'])
-def implementation(request):
-    return request.param
-
 @pytest.fixture(params=[np.float32, np.float64], ids=['F32', 'F64'])
 def dtype(request):
     return request.param
@@ -22,10 +18,16 @@ class TPCorrectness:
             thresh = result["thresh"]
             assert result[fieldname]["pass"], f"{fieldname} observed error={error:.2f} >= {thresh}"
 
-    def test_tp_fwd(self, problem, implementation): 
+    @pytest.fixture
+    def tp_and_problem(self, problem):
+        tp = TensorProduct(problem)
+        return tp, problem
+
+    def test_tp_fwd(self, tp_and_problem): 
+        tp, problem = tp_and_problem
         result = correctness_forward(
             problem=problem,
-            test_implementation=implementation,
+            test_implementation=tp,
             reference_implementation=None, 
             batch_size=1000,
             correctness_threshold=1e-5,
@@ -33,10 +35,11 @@ class TPCorrectness:
 
         self.check_result(result, "output")
 
-    def test_tp_bwd(self, problem, implementation): 
+    def test_tp_bwd(self, tp_and_problem): 
+        tp, problem = tp_and_problem
         result = correctness_backward(
             problem=problem,
-            test_implementation=implementation,
+            test_implementation=tp,
             reference_implementation=None, 
             batch_size=1000,
             correctness_threshold=3e-4,
@@ -47,10 +50,11 @@ class TPCorrectness:
         self.check_result(result, "in2_grad")
 
     @pytest.mark.skip(reason="Need to add weight reordering in double-backward")
-    def test_tp_double_bwd(self, problem, implementation):
+    def test_tp_double_bwd(self, tp_and_problem):
+        tp, problem = tp_and_problem
         result = correctness_double_backward(
             problem = problem,
-            test_implementation = implementation,
+            test_implementation=tp,
             reference_implementation = None,
             batch_size = 1000,
             correctness_threshold = 3e-4,

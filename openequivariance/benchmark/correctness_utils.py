@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 from openequivariance.implementations.TensorProductBase import TensorProductBase
 from openequivariance.implementations.CUETensorProduct import CUETensorProduct 
@@ -30,9 +30,20 @@ def check_similiarity(name : str,  to_check : np.ndarray,  ground_truth : np.nda
 
     return result
 
+def instantiate_implementation(implementation : Union[type[TensorProductBase], TensorProductBase], problem : TPProblem):
+    if isinstance(implementation, type):
+        test_tp = implementation(problem)
+    else:
+        test_tp = implementation
+
+    if not isinstance(test_tp, TensorProductBase):
+        raise TypeError(f"test_implementation must be a TensorProductBase or a subclass, got {type(implementation)}")
+
+    return test_tp
+
 def correctness_forward(
         problem : TPProblem,  
-        test_implementation : type[TensorProductBase], 
+        test_implementation : Union[type[TensorProductBase], TensorProductBase],
         reference_implementation : Optional[type[TensorProductBase]], 
         batch_size : int, 
         correctness_threshold : float,
@@ -65,7 +76,7 @@ def correctness_forward(
         weights_copy = weights[np.newaxis, :]
 
     # run test
-    test_tp = test_implementation(problem)
+    test_tp = instantiate_implementation(test_implementation, problem) 
     test_out = out.copy()
     test_tp.forward_cpu(
         L1_in=in1.copy(), 
@@ -82,7 +93,7 @@ def correctness_forward(
 
 def correctness_backward(
         problem : TPProblem,  
-        test_implementation : type[TensorProductBase], 
+        test_implementation : Union[type[TensorProductBase], TensorProductBase], 
         reference_implementation : Optional[type[TensorProductBase]], 
         batch_size : int, 
         correctness_threshold : float,
@@ -132,7 +143,7 @@ def correctness_backward(
         weights_copy = weights[np.newaxis, :]
         test_weights_grad = test_weights_grad[np.newaxis, :] 
 
-    test_tp = test_implementation(problem)
+    test_tp = instantiate_implementation(test_implementation, problem) 
     test_tp.backward_cpu(
         L1_in=in1.copy(),
         L1_grad=test_in1_grad,
@@ -159,7 +170,7 @@ def correctness_backward(
 
 def correctness_double_backward(
         problem : TPProblem,  
-        test_implementation : type[TensorProductBase], 
+        test_implementation : Union[type[TensorProductBase], TensorProductBase], 
         reference_implementation : Optional[type[TensorProductBase]], 
         batch_size : int, 
         correctness_threshold : float,
@@ -187,7 +198,7 @@ def correctness_double_backward(
 
     tensors = []
     for i, impl in enumerate([test_implementation, reference_implementation]):
-        tp = impl(problem, torch_op=True)
+        tp = instantiate_implementation(impl, problem) 
 
         if impl == CUETensorProduct and problem.shared_weights :
             weights = weights[np.newaxis, :]
