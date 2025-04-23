@@ -74,7 +74,7 @@ class TestProductionModels(TPCorrectness):
             e3nn_torch_tetris_polynomial, 
             diffdock_configs))
 
-    @pytest.fixture(params=production_model_tpps, ids = lambda x : x.label)
+    @pytest.fixture(params=production_model_tpps, ids = lambda x : x.label, scope="class")
     def problem(self, request, dtype):
         request.param.irrep_dtype, request.param.weight_dtype = dtype, dtype
         return request.param

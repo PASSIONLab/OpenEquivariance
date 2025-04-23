@@ -185,7 +185,7 @@ def correctness_double_backward(
         prng_seed
     )
     rng = np.random.default_rng(seed=prng_seed * 2)
-    dummy_grad = rng.standard_normal(1) 
+    dummy_grad = rng.standard_normal(1)[0] 
  
     if reference_implementation is None:
         from openequivariance.implementations.E3NNTensorProduct import E3NNTensorProduct
