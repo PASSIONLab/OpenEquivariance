@@ -119,8 +119,6 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
     {%- endif %}
 {%- endfor %}
 
-
-
 {%- if not double_bwd %}
     __device__ __forceinline__ void backward_loop_unroll_{{id}}
 {%- else %}
@@ -137,6 +135,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
 {%- if double_bwd %}
         IRREP_T* L2_original,
+        int n,
 {%- endif %}
 
         WEIGHT_T* weights_grad,
@@ -260,7 +259,12 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                         ROW_OPERATION({{slice_size}}, j, atomicAdd(tmp + j, weights_smem[j + lane_id]);)
                     {%- else %}
                         {%- if double_bwd %}
-                            ROW_OPERATION({{slice_size}}, j, tmp[j] += weights_smem[j + lane_id];)
+                            if(n == 0) {
+                                ROW_OPERATION({{slice_size}}, j, tmp[j] = weights_smem[j + lane_id];)
+                            }
+                            else {
+                                ROW_OPERATION({{slice_size}}, j, tmp[j] += weights_smem[j + lane_id];)
+                            }
                         {%- else %}
                             ROW_OPERATION({{slice_size}}, j, tmp[j] = weights_smem[j + lane_id];)
                         {%- endif %}
