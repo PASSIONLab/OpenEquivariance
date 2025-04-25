@@ -359,7 +359,10 @@ class TensorProductBase:
             L1_grad = torch.empty_like(L1_in)
             L2_grad = torch.empty_like(L2_in)
             weights_grad = torch.empty_like(weights)
-            
+
+            if self.config.shared_weights:
+                weights_grad[:] = 0.0
+
             self.backward_raw( L1_in.shape[0], 
                         L1_in.contiguous().data_ptr(), 
                         L1_grad.data_ptr(),

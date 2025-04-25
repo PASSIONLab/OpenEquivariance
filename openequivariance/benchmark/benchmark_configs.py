@@ -31,15 +31,13 @@ e3nn_torch_tetris = [
     FCTPP("150x0o + 150x0e", "1x0e", "1x0e"), #alpha  
 ]   
 
-
 # jax version can be found here, but doesn't directly translate 
 # https://github.com/e3nn/e3nn-jax/blob/main/examples/tetris_point.py
-
 
 # source: https://github.com/e3nn/e3nn/blob/f95297952303347a8a3cfe971efe449c710c43b2/examples/tetris_polynomial.py#L66-L68
 e3nn_torch_tetris_polynomial = [
     FCTPP("1x0e + 1x1o + 1x2e + 1x3o", "1x0e + 1x1o + 1x2e + 1x3o", "64x0e + 24x1e + 24x1o + 16x2e + 16x2o", label="tetris-poly-1"), #tp1 
-    FCTPP("64x0e + 24x1e + 24x1o + 16x2e + 16x2o", "1x0e + 1x1o + 1x2e + 1x3o", "0o + 6x0e",                 label="tetris-poly-2"), #tp2 
+    FCTPP("64x0e + 24x1e + 24x1o + 16x2e + 16x2o", "1x0e + 1x1o + 1x2e", "0o + 6x0e",                 label="tetris-poly-2"), #tp2 
 ]
 
 # https://github.com/gcorso/DiffDock/blob/b4704d94de74d8cb2acbe7ec84ad234c09e78009/models/tensor_layers.py#L299

@@ -55,6 +55,7 @@ public:
     Map_t fwd_dict, bwd_dict, dbl_bwd_dict, kernel_dims;
     JITTPImpl<JITKernel> internal;
     int64_t L3_dim;
+    int shared_weights;
     TorchJITProduct(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t dbl_bwd_dict_i, Map_t kernel_dims_i) :
         fwd_dict(fwd_dict_i.copy()),
         bwd_dict(bwd_dict_i.copy()),
@@ -76,7 +77,8 @@ public:
                 dbl_bwd_dict.at("num_threads"),
                 dbl_bwd_dict.at("smem")
             )),
-        L3_dim(kernel_dims.at("L3_dim")) { }
+        L3_dim(kernel_dims.at("L3_dim")),
+        shared_weights(kernel_dims.at("shared_weights")) { }
 
     tuple<  tuple<string, string>, 
             tuple<string, Map_t>, 
@@ -141,13 +143,16 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_backward(
         const torch::Tensor &L1_in,
         const torch::Tensor &L2_in,
         const torch::Tensor &W, 
-        const torch::Tensor &L3_grad
-    ) {
+        const torch::Tensor &L3_grad) {
 
     int64_t num_batch = L1_in.sizes()[0];
     torch::Tensor L1_grad = torch::empty(L1_in.sizes(), L1_in.options());
     torch::Tensor L2_grad = torch::empty(L2_in.sizes(), L2_in.options());
     torch::Tensor W_grad = torch::empty(W.sizes(), W.options());
+
+    if(jit_instance->shared_weights == 1) {
+        W_grad.zero_();
+    } 
 
     torch::Tensor L1_in_contig = L1_in.contiguous();
     torch::Tensor L2_in_contig = L2_in.contiguous();
@@ -189,6 +194,10 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_
     torch::Tensor L1_dgrad_contig = L1_dgrad.contiguous();
     torch::Tensor L2_dgrad_contig = L2_dgrad.contiguous();
     torch::Tensor W_dgrad_contig = W_dgrad.contiguous();
+
+    if(jit_instance->shared_weights == 1) {
+        W_grad.zero_();
+    } 
 
     jit_instance->internal.double_backward(
             num_batch,

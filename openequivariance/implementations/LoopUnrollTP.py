@@ -97,11 +97,14 @@ class LoopUnrollTP(TensorProductBase):
             internal_cls = extlib.JITTPImpl
 
         logger.info("Starting kernel compiler...")
+
+
         self.internal = internal_cls(self.jit_kernel,
                 vars(self.forward_schedule.launch_config),
                 vars(self.backward_schedule.launch_config),
                 vars(self.double_backward_schedule.launch_config), 
-                {"L3_dim": self.L3.dim})
+                {"L3_dim": self.L3.dim,
+                 "shared_weights": int(self.config.shared_weights)})
         logger.info("Kernel compiled!")
 
         logger.info(f"Kernel File Size: {len(self.jit_kernel) // 1024} KB")

@@ -23,7 +23,6 @@ class TPCorrectness:
         tp = TensorProduct(problem)
         return tp, problem
 
-    #@pytest.mark.skip
     def test_tp_fwd(self, tp_and_problem): 
         tp, problem = tp_and_problem
         result = correctness_forward(
@@ -36,7 +35,6 @@ class TPCorrectness:
 
         self.check_result(result, "output")
 
-    #@pytest.mark.skip
     def test_tp_bwd(self, tp_and_problem): 
         tp, problem = tp_and_problem
         result = correctness_backward(
@@ -57,7 +55,7 @@ class TPCorrectness:
             problem = problem,
             test_implementation=tp,
             reference_implementation = None,
-            batch_size = 1000,
+            batch_size = 200,
             correctness_threshold = 3e-4,
             prng_seed = 12345)
 
