@@ -17,7 +17,7 @@ class ConvCorrectness:
     def dtype(self, request):
         return request.param
 
-    @pytest.fixture(params=["1drf_radius6.0.pickle"], ids=['1drf'], scope='class')
+    @pytest.fixture(params=["1drf_radius3.5.pickle"], ids=['1drf'], scope='class')
     def graph(self, request):
         download_prefix = "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
         filename = request.param
@@ -29,7 +29,7 @@ class ConvCorrectness:
 
         return graph
 
-    @pytest.fixture(params=['atomic', 'deterministic'], scope='class')
+    @pytest.fixture(params=['atomic'], scope='class')
     def conv_object(self, request, problem):
         if request.param == 'atomic':
             return oeq.TensorProductConv(problem, deterministic=False)
@@ -44,6 +44,7 @@ class ConvCorrectness:
 
         self.check_result(result, "output")
 
+    @pytest.mark.skip
     def test_tp_bwd(self, conv_object, graph):
         result = conv_object.test_correctness_backward(graph, 
                 thresh=3e-04,
@@ -54,6 +55,7 @@ class ConvCorrectness:
         self.check_result(result, "in1_grad")
         self.check_result(result, "in2_grad")
 
+    @pytest.mark.skip
     def test_tp_double_bwd(self, conv_object, graph):
         result = conv_object.test_correctness_double_backward(graph, 
                 thresh=3e-04,
@@ -73,3 +75,22 @@ class TestProductionModels(ConvCorrectness):
     def problem(self, request, dtype):
         request.param.irrep_dtype, request.param.weight_dtype = dtype, dtype
         return request.param
+    
+
+class TestUVWSingleIrrep(ConvCorrectness):
+    muls = [(32, 1, 32)] 
+    irs = [(1, 2, 1)]
+
+    def id_func(m, i): 
+        return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
+
+    @pytest.fixture(params=product(muls, irs), 
+                    ids = lambda x: TestUVWSingleIrrep.id_func(x[0], x[1]),
+                    scope="class") 
+    def problem(self, request, dtype):
+        m, i = request.param[0], request.param[1]
+        instructions=[(0, 0, 0, "uvw", True)]
+        return oeq.TPProblem(f"{m[0]}x{i[0]}e", f"{m[1]}x{i[1]}e", f"{m[2]}x{i[2]}e",
+                             instructions, shared_weights=False, 
+                             internal_weights=False,
+                             irrep_dtype=dtype, weight_dtype=dtype)

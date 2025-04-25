@@ -47,4 +47,27 @@ def calc_weight_offsets(tpp : TPProblem) -> list[int]:
             flatsize = math.prod(ins.path_shape)
             offset += flatsize
     return offsets     
-        
+
+ 
+def filter_and_analyze_problem(problem):
+    '''
+    Centralized function that stops unhandled problem configurations,
+    returns a dictionary of useful information about the problem. 
+    '''
+    for inst in problem.instructions:
+        assert inst.connection_mode == problem.instructions[0].connection_mode, \
+            f"All instructions must have the same connection mode, got {inst.connection_mode} and {problem.instructions[0].connection_mode}"
+
+    assert problem.instructions[0].connection_mode in ["uvu", "uvw"], \
+            f"Connection mode must be 'uvu' or 'uvw', got {problem.instructions[0].connection_mode}"
+
+    assert problem.irrep_dtype == problem.weight_dtype, \
+            f"irrep_dtype and weight_dtype must be the same, got {problem.irrep_dtype} and {problem.weight_dtype}"
+
+    assert len(problem.instructions) > 0, \
+            "Tensor product has no valid instructions!"
+
+    result = {
+        "is_uvw": problem.instructions[0].connection_mode == "uvw", 
+    }
+    return result

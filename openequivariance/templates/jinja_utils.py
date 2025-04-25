@@ -17,4 +17,5 @@ def get_jinja_environment():
     env.globals['raise'] = raise_helper 
     env.globals['divide'] = divide 
     env.globals['sizeof'] = sizeof 
+    env.globals['enumerate'] = enumerate 
     return env

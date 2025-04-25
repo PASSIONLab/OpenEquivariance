@@ -4,6 +4,8 @@ from openequivariance.implementations.TensorProduct import *
 from openequivariance.templates.jinja_utils import *
 from openequivariance.extlib import *
 
+from openequivariance.implementations.utils import filter_and_analyze_problem 
+
 class LoopUnrollConv(ConvolutionBase):
     def __init__(self, config, idx_dtype=np.int64, 
             torch_op=False, deterministic=False):
@@ -15,9 +17,10 @@ class LoopUnrollConv(ConvolutionBase):
 
         env = get_jinja_environment()
         template = env.get_template("loop_unroll_conv_atomic.cuh")
-        env.globals['enumerate'] = enumerate 
-
         dp = DeviceProp(0)
+
+        analysis = filter_and_analyze_problem(config)
+        self.is_uvw = analysis["is_uvw"]
 
         forward_schedule_type = 3
         backward_schedule_type = 2
@@ -32,7 +35,9 @@ class LoopUnrollConv(ConvolutionBase):
                 irrep_dtype = config.irrep_dtype,
                 weight_dtype = config.weight_dtype,
                 schedule_type=forward_schedule_type,
-                warp_size=dp.warpsize)
+                warp_size=dp.warpsize,
+                include_scratch=self.is_uvw,
+                stream_weights=self.is_uvw)
 
         self.backward_schedule = ComputationSchedule(self.config, 
                 smem_limit=dp.maxSharedMemPerBlock, warps_per_block=6,

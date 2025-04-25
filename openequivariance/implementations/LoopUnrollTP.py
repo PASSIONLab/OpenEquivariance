@@ -6,7 +6,7 @@ from openequivariance.implementations.ComputationSchedule import ComputationSche
 
 from openequivariance.implementations.TensorProductBase import TensorProductBase 
 from openequivariance.benchmark.logging_utils import getLogger 
-from openequivariance.benchmark.e3nn_lite_utils import count_cg_non_zero
+from openequivariance.implementations.utils import filter_and_analyze_problem, count_cg_non_zero
 logger = getLogger()
 
 class LoopUnrollTP(TensorProductBase):
@@ -16,18 +16,10 @@ class LoopUnrollTP(TensorProductBase):
 
         env = get_jinja_environment()
         template = env.get_template("loop_unroll_batch.cuh")
-        env.globals['enumerate'] = enumerate 
-
         dp = extlib.DeviceProp(0)
 
-        if len(config.instructions) == 0:
-            raise ValueError("Tensor product problem has no valid intructions!")
-
-        for inst in config.instructions:
-            assert(inst.connection_mode == config.instructions[0].connection_mode)         
-        assert(config.instructions[0].connection_mode in ["uvu", "uvw"]) 
-        assert(config.irrep_dtype == config.weight_dtype)
-        self.is_uvw = (config.instructions[0].connection_mode == "uvw")
+        analysis = filter_and_analyze_problem(config)
+        self.is_uvw = analysis["is_uvw"]
 
         def generate_forward_schedule(warps_per_block):
             self.forward_schedule = ComputationSchedule(self.config, 

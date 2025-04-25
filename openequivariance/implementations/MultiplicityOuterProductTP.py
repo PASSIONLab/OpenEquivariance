@@ -1,7 +1,7 @@
 import numpy as np
 
-from openequivariance.benchmark.e3nn_lite_utils import calc_weight_offsets
-from openequivariance.benchmark.e3nn_lite_utils import Irrep, _MulIr, Irreps, TPProblem, Instruction
+from openequivariance.implementations.utils import calc_weight_offsets
+from openequivariance.implementations.e3nn_lite import Irrep, _MulIr, Irreps, TPProblem, Instruction
 from openequivariance.implementations.TensorProductBase import TensorProductBase 
 from openequivariance.benchmark.logging_utils import getLogger, bcolors 
 from jinja2 import Environment, PackageLoader
