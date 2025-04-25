@@ -75,7 +75,7 @@ __global__ void forward(
             {%- endif %}
 
             __syncwarp();
-            /*forward_loop_unroll_{{i}}(L1_smem, L2_smem, w, weights_smem, L3_smem, scratch_smem, lane_id);*/
+            forward_loop_unroll_{{i}}(L1_smem, L2_smem, w, weights_smem, L3_smem, scratch_smem, lane_id);
             __syncwarp();
 
             {{ store_ir_segments(segment.L3Map, "l3", "L3_smem", "j") }}

@@ -12,9 +12,6 @@ class LoopUnrollConv(ConvolutionBase):
         super().__init__(config, idx_dtype, torch_op, deterministic)
         L1, L2, L3 = self.L1, self.L2, self.L3 
 
-        for (mul, ir) in L2:
-            assert(mul == 1)
-
         env = get_jinja_environment()
         template = env.get_template("loop_unroll_conv_atomic.cuh")
         dp = DeviceProp(0)
