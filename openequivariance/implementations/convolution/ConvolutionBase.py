@@ -502,7 +502,7 @@ class ConvolutionBase:
 
         in1, in2, out_grad, weights, _, _, _ = get_random_buffers_backward_conv(self.config, graph.node_count, graph.nnz, prng_seed)  
         rng = np.random.default_rng(seed=prng_seed * 2)
-        dummy_grad = rng.standard_normal(1) 
+        dummy_grad_value = rng.standard_normal(1)[0]
 
         if reference_implementation is None:
             from openequivariance.implementations.convolution.E3NNConv import E3NNConv 
@@ -534,7 +534,7 @@ class ConvolutionBase:
                 inputs=[in1_torch, in2_torch, weights_torch])
 
             dummy = torch.norm(in1_torch.grad) + torch.norm(in2_torch.grad) + torch.norm(weights_torch.grad)
-            dummy_grad = torch.tensor(float(dummy_grad), device='cuda', requires_grad=True)
+            dummy_grad = torch.tensor(float(dummy_grad_value), device='cuda', requires_grad=True)
             dummy.backward(dummy_grad,
                 retain_graph=True, 
                 inputs=[out_grad_torch, in1_torch, in2_torch, weights_torch])

@@ -6,22 +6,6 @@ import openequivariance as oeq
 from openequivariance.benchmark.ConvBenchmarkSuite import load_graph 
 from itertools import chain, product
 
-@pytest.fixture(params=[np.float32, np.float64], ids=['F32', 'F64'])
-def dtype(request):
-    return request.param
-
-@pytest.fixture(params=["1drf_radius6.0.pickle"], ids=['1drf'])
-def graph(request):
-    download_prefix = "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
-    filename = request.param
-
-    graph = None
-    with tempfile.NamedTemporaryFile() as temp_file:
-        urllib.request.urlretrieve(download_prefix + filename, temp_file.name)
-        graph = load_graph(temp_file.name)
-
-    return graph
-
 class ConvCorrectness:
     def check_result(self, result, fieldname):
         with check:
@@ -29,7 +13,23 @@ class ConvCorrectness:
             thresh = result["thresh"]
             assert result[fieldname]["pass"], f"{fieldname} observed error={error:.2f} >= {thresh}"
 
-    @pytest.fixture(params=['atomic', 'deterministic'])
+    @pytest.fixture(params=[np.float32, np.float64], ids=['F32', 'F64'], scope='class')
+    def dtype(self, request):
+        return request.param
+
+    @pytest.fixture(params=["1drf_radius6.0.pickle"], ids=['1drf'], scope='class')
+    def graph(self, request):
+        download_prefix = "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
+        filename = request.param
+
+        graph = None
+        with tempfile.NamedTemporaryFile() as temp_file:
+            urllib.request.urlretrieve(download_prefix + filename, temp_file.name)
+            graph = load_graph(temp_file.name)
+
+        return graph
+
+    @pytest.fixture(params=['atomic', 'deterministic'], scope='class')
     def conv_object(self, request, problem):
         if request.param == 'atomic':
             return oeq.TensorProductConv(problem, deterministic=False)
@@ -69,7 +69,7 @@ class TestProductionModels(ConvCorrectness):
     from openequivariance.benchmark.benchmark_configs import mace_problems 
     production_model_tpps = mace_problems # Due to e3nn memory constraints, check only MACE for now
 
-    @pytest.fixture(params=production_model_tpps, ids = lambda x : x.label)
+    @pytest.fixture(params=production_model_tpps, ids = lambda x : x.label, scope="class")
     def problem(self, request, dtype):
         request.param.irrep_dtype, request.param.weight_dtype = dtype, dtype
         return request.param
