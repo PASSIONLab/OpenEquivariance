@@ -29,14 +29,13 @@ class ConvCorrectness:
 
         return graph
 
-    @pytest.fixture(params=['deterministic'], scope='class')
+    @pytest.fixture(params=['atomic', 'deterministic'], scope='class')
     def conv_object(self, request, problem):
         if request.param == 'atomic':
             return oeq.TensorProductConv(problem, deterministic=False)
         elif request.param == 'deterministic':
             return oeq.TensorProductConv(problem, deterministic=True)
 
-    @pytest.mark.skip
     def test_tp_fwd(self, conv_object, graph):
         result = conv_object.test_correctness_forward(graph, 
                 thresh=3e-05,
@@ -45,7 +44,6 @@ class ConvCorrectness:
 
         self.check_result(result, "output")
 
-    @pytest.mark.skip
     def test_tp_bwd(self, conv_object, graph):
         result = conv_object.test_correctness_backward(graph, 
                 thresh=3e-04,
