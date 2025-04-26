@@ -216,12 +216,13 @@ def correctness_double_backward(
         out_torch = tp.forward(in1_torch, in2_torch, weights_torch)
         out_grad = out_torch.clone().detach().to(device='cuda').requires_grad_(True)
 
-        out_torch.backward(out_grad, 
-            create_graph=True,
-            retain_graph=True,
-            inputs=[in1_torch, in2_torch, weights_torch])
+        in1_grad, in2_grad, w_grad = torch.autograd.grad(
+            outputs=[out_torch],
+            inputs=[in1_torch, in2_torch, weights_torch],
+            grad_outputs=[out_grad],
+            create_graph=True)
 
-        dummy = torch.norm(in1_torch.grad) + torch.norm(in2_torch.grad) + torch.norm(weights_torch.grad)
+        dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
         dummy_grad = torch.tensor(float(dummy_grad), device='cuda', requires_grad=True)
 
         dummy.backward(dummy_grad,

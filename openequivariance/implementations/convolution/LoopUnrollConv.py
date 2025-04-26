@@ -18,6 +18,7 @@ class LoopUnrollConv(ConvolutionBase):
 
         analysis = filter_and_analyze_problem(config)
         self.is_uvw = analysis["is_uvw"]
+        assert not config.shared_weights, "LoopUnrollConv does not yet support shared weights"
 
         forward_schedule_type = 3
         backward_schedule_type = 2
