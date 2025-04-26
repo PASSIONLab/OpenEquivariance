@@ -68,15 +68,15 @@ class ConvCorrectness:
         self.check_result(result, "weights_grad")
 
 class TestProductionModels(ConvCorrectness):
-    from openequivariance.benchmark.benchmark_configs import mace_problems 
-    production_model_tpps = mace_problems # Due to e3nn memory constraints, check only MACE for now
+    from openequivariance.benchmark.benchmark_configs import mace_problems, diffdock_configs 
+    production_model_tpps = list(chain(mace_problems, diffdock_configs))
 
     @pytest.fixture(params=production_model_tpps, ids = lambda x : x.label, scope="class")
     def problem(self, request, dtype):
         request.param.irrep_dtype, request.param.weight_dtype = dtype, dtype
         return request.param
-    
 
+ 
 class TestUVWSingleIrrep(ConvCorrectness):
     muls = [
         (1, 1, 1), (4, 1, 4), (8, 1, 8), (16, 1, 16), 
