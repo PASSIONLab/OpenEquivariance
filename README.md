@@ -83,8 +83,7 @@ multiplicity 1 for all irreps in the second input). For other configurations
 results up to a well-defined reordering of the weights relative to e3nn. 
 
 If you're executing tensor products as part of a message passing graph
-neural network, we offer fused kernels that save both memory and compute time (only supported
-for "uvu" at the moment, "uvw" support coming soon): 
+neural network, we offer fused kernels that save both memory and compute time: 
 
 ```python
 from torch_geometric import EdgeIndex
@@ -245,7 +244,7 @@ python tests/mace_driver.py carbon.xyz -o outputs/mace_tests -i e3nn cue oeq
 | UVU Batch                | ✅        | ✅    |
 | UVW Batch                | ✅        | 🚧🔨  |
 | UVU Convolution          | ✅        | ✅    |
-| UVW Convolution          | 🚧🔨      | 🚧🔨  |
+| UVW Convolution          | ✅        | 🚧🔨  |
 | Symmetric Tensor Product | ✅ (beta) | 🚧🔨  |
 
 e3nn supports a variety of connection modes for CG tensor products. We support 

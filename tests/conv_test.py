@@ -29,7 +29,7 @@ class ConvCorrectness:
 
         return graph
 
-    @pytest.fixture(params=['atomic'], scope='class')
+    @pytest.fixture(params=['atomic', 'deterministic'], scope='class')
     def conv_object(self, request, problem):
         if request.param == 'atomic':
             return oeq.TensorProductConv(problem, deterministic=False)
@@ -69,7 +69,8 @@ class TestProductionModels(ConvCorrectness):
     from openequivariance.benchmark.benchmark_configs import mace_problems, diffdock_configs 
     production_model_tpps = list(chain(
         mace_problems, 
-        diffdock_configs))
+        diffdock_configs
+        ))
 
     @pytest.fixture(params=production_model_tpps, ids = lambda x : x.label, scope="class")
     def problem(self, request, dtype):
