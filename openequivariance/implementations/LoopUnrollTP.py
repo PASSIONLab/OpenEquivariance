@@ -67,7 +67,7 @@ class LoopUnrollTP(TensorProductBase):
                     generate_schedule(warp_count)
                     break
                 except Exception as e:
-                    warp_count //= 2
+                    warp_count -= 2
                     if warp_count == 0:
                         raise RuntimeError("Tensor product schedule generation failed, shared memory inadequate!")
 

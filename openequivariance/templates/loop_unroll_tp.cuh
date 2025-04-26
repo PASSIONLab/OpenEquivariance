@@ -1,7 +1,7 @@
 {%- from 'macros.jinja' import transpose_load, transpose_store, reg_store with context %}
 {%- from 'wmm.cuh' import generate_matmul %}
 
-{%- macro generate_segment_kernel_forward(id, segment) %}
+{%- macro generate_segment_kernel_forward(id, segment, warp_size) %}
 {%- set L1, L2, L3, interactions, problem = segment.L1, segment.L2, segment.L3, segment.interactions, segment.problem %}
 
 {%- set L1_irrep_lengths = L1 | map(attribute="ir") | map(attribute="dim") | list %}
@@ -11,7 +11,7 @@
 {%- for i, inst in enumerate(problem.instructions) %}
     {%- set u, v, w, _ = interactions[i] %}
     {%- if inst.connection_mode == "uvw" %}
-        {{generate_matmul("matmul_fwd_%d_%d" % (id, i), L3[w].mul, L3[w].ir.dim, L1[u].mul, 4, True)}}
+        {{generate_matmul("matmul_fwd_%d_%d" % (id, i), L3[w].mul, L3[w].ir.dim, L1[u].mul, 4, True, warp_size)}}
     {%- endif %}
 {%- endfor %}
 
@@ -114,8 +114,8 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 {%- for i, inst in enumerate(problem.instructions) %}
     {%- set u, v, w, _ = interactions[i] %}
     {%- if inst.connection_mode == "uvw" %}
-        {{generate_matmul(matmul_basename + "A_%d_%d" % (id, i), L1[u].mul, L3[w].ir.dim, L3[w].mul, 4, True, A_CMAJOR=False, accum=False)}}
-        {{generate_matmul(matmul_basename + "B_%d_%d" % (id, i), L3[w].mul, L1[u].mul, L3[w].ir.dim, 4, False, A_CMAJOR=False, accum=False)}}
+        {{generate_matmul(matmul_basename + "A_%d_%d" % (id, i), L1[u].mul, L3[w].ir.dim, L3[w].mul, 4, True, warp_size, A_CMAJOR=False, accum=False)}}
+        {{generate_matmul(matmul_basename + "B_%d_%d" % (id, i), L3[w].mul, L1[u].mul, L3[w].ir.dim, 4, False, warp_size, A_CMAJOR=False, accum=False)}}
     {%- endif %}
 {%- endfor %}
 

@@ -1,11 +1,11 @@
-{%- macro generate_matmul(name, M, N, K, TILES_PER_ROW, OUTPUT_RMAJOR, A_CMAJOR=True, B_RMAJOR=True, accum=True) %}
+{%- macro generate_matmul(name, M, N, K, TILES_PER_ROW, OUTPUT_RMAJOR, warp_size, A_CMAJOR=True, B_RMAJOR=True, accum=True) %}
 
-{%-set TILES_PER_COL = 32 // TILES_PER_ROW %}
+{%-set TILES_PER_COL = warp_size // TILES_PER_ROW %}
 
 template<typename T> 
 __device__ __forceinline__ void {{name}}(const T* __restrict__ A, const T* __restrict__ B, T* C) {    
     int t_idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int lane_id = t_idx % 32;
+    int lane_id = t_idx % {{warp_size}};
 
     int const rpt = {{(M + TILES_PER_COL - 1) // TILES_PER_COL}};
     int const cpt = {{(N + TILES_PER_ROW - 1) // TILES_PER_ROW}};

@@ -18,7 +18,7 @@ using IRREP_T  = {{ forward_schedule.irrep_dtype_cstr }};
 using WEIGHT_T = {{ forward_schedule.weight_dtype_cstr }};
 
 {%- for i, segment in enumerate(forward_schedule.segments) %}
-{{ generate_segment_kernel_forward(i, segment) }}
+{{ generate_segment_kernel_forward(i, segment, forward_schedule.launch_config.warp_size) }}
 {%- endfor %}
 
 __global__ void forward(

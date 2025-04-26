@@ -5,8 +5,6 @@ from openequivariance.benchmark.logging_utils import *
 from openequivariance.implementations.TensorProductBase import *
 logger = getLogger()
 
-# This class assumes a warp size of 32
-
 class IrrepMapping:
     '''
     Maps irreps from a source to a destination set.
@@ -265,9 +263,13 @@ class ComputationSchedule:
         # Stream weights on the fly before pre-loading 
         self.stream_weights = stream_weights 
 
-        # Step 1: Break the irreps and the instructions into chunks of at most 32 x 32 x 32. 
+        # Step 1: Break the irreps and the instructions into chunks 
 
-        self.problem_splitter = ProblemSplitter(config, warp_size)
+        chunk_size = warp_size
+        if include_scratch: # There is at least one UVW computation if this flag is set. Cap the chunk size to 32. 
+            chunk_size = 32
+
+        self.problem_splitter = ProblemSplitter(config, chunk_size)
         self.updated_config = self.problem_splitter.output
         self.L1, self.L2, self.L3 = self.updated_config.irreps_in1, self.updated_config.irreps_in2, self.updated_config.irreps_out 
         self.new_instructions = self.updated_config.instructions

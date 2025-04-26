@@ -26,27 +26,44 @@ class LoopUnrollConv(ConvolutionBase):
             backward_schedule_type = 3
             template = env.get_template("loop_unroll_conv_det.cuh")
 
-        self.forward_schedule = ComputationSchedule(self.config, 
-                smem_limit=dp.maxSharedMemPerBlock // 4 * 3, warps_per_block=6,
-                block_count=dp.multiprocessorCount,
-                direction = "forward",
-                irrep_dtype = config.irrep_dtype,
-                weight_dtype = config.weight_dtype,
-                schedule_type=forward_schedule_type,
-                warp_size=dp.warpsize,
-                include_scratch=self.is_uvw,
-                stream_weights=self.is_uvw)
 
-        self.backward_schedule = ComputationSchedule(self.config, 
-                smem_limit=dp.maxSharedMemPerBlock, warps_per_block=6,
-                block_count=dp.multiprocessorCount * 2,
-                direction = "backward",
-                irrep_dtype = config.irrep_dtype,
-                weight_dtype = config.weight_dtype,
-                schedule_type=backward_schedule_type,
-                warp_size=dp.warpsize,
-                include_scratch=self.is_uvw,
-                stream_weights=self.is_uvw)
+        def generate_forward_schedule(warps_per_block):
+            self.forward_schedule = ComputationSchedule(self.config, 
+                    smem_limit=dp.maxSharedMemPerBlock // 4 * 3, warps_per_block=warps_per_block,
+                    block_count=dp.multiprocessorCount,
+                    direction = "forward",
+                    irrep_dtype = config.irrep_dtype,
+                    weight_dtype = config.weight_dtype,
+                    schedule_type=forward_schedule_type,
+                    warp_size=dp.warpsize,
+                    include_scratch=self.is_uvw,
+                    stream_weights=self.is_uvw)
+
+        def generate_backward_schedule(warps_per_block):
+            self.backward_schedule = ComputationSchedule(self.config, 
+                    smem_limit=dp.maxSharedMemPerBlock, warps_per_block=warps_per_block,
+                    block_count=dp.multiprocessorCount * 2,
+                    direction = "backward",
+                    irrep_dtype = config.irrep_dtype,
+                    weight_dtype = config.weight_dtype,
+                    schedule_type=backward_schedule_type,
+                    warp_size=dp.warpsize,
+                    include_scratch=self.is_uvw,
+                    stream_weights=self.is_uvw)
+
+        scheduler_generators = [generate_forward_schedule, generate_backward_schedule]
+
+        for generate_schedule in scheduler_generators:
+            warp_count = 6
+            while warp_count > 0:
+                try:
+                    generate_schedule(warp_count)
+                    break
+                except Exception as e:
+                    warp_count -= 2
+                    if warp_count == 0:
+                        raise RuntimeError("Tensor product schedule generation failed, shared memory inadequate!")
+
 
         if not deterministic:
             for segment in self.forward_schedule.segments:
