@@ -29,7 +29,7 @@ class ConvCorrectness:
 
         return graph
 
-    @pytest.fixture(params=['atomic'], scope='class')
+    @pytest.fixture(params=['atomic', 'deterministic'], scope='class')
     def conv_object(self, request, problem):
         if request.param == 'atomic':
             return oeq.TensorProductConv(problem, deterministic=False)
