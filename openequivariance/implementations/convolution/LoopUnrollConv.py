@@ -43,7 +43,9 @@ class LoopUnrollConv(ConvolutionBase):
                 irrep_dtype = config.irrep_dtype,
                 weight_dtype = config.weight_dtype,
                 schedule_type=backward_schedule_type,
-                warp_size=dp.warpsize)
+                warp_size=dp.warpsize,
+                include_scratch=self.is_uvw,
+                stream_weights=self.is_uvw)
 
         if not deterministic:
             for segment in self.forward_schedule.segments:

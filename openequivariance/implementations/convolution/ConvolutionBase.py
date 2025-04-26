@@ -142,9 +142,15 @@ class ConvolutionBase:
         assert(graph.rows.dtype == self.idx_dtype)
         assert(graph.cols.dtype == self.idx_dtype)
 
+        weights_chunked = np.zeros_like(weights)        
+        if self.reorder_weights_e3nn_to_oeq is not None:
+            self.reorder_weights_e3nn_to_oeq(weights, weights_chunked, not self.config.shared_weights)
+        else:
+            weights_chunked = weights
+
         L1_d = DeviceBuffer(L1_in)
         L2_d = DeviceBuffer(L2_in)
-        weights_d = DeviceBuffer(weights)
+        weights_d = DeviceBuffer(weights_chunked)
         L3_d = DeviceBuffer(L3_grad)
         rows_d = DeviceBuffer(graph.rows)
         cols_d = DeviceBuffer(graph.cols)
@@ -172,6 +178,10 @@ class ConvolutionBase:
         L1_grad_d.copy_to_host()
         L2_grad_d.copy_to_host()
         weights_grad_d.copy_to_host()
+
+        if self.reorder_weights_oeq_to_e3nn is not None:
+            weights_grad_copy = weights_grad.copy()
+            self.reorder_weights_oeq_to_e3nn(weights_grad_copy, weights_grad, not self.config.shared_weights)
 
         return L1_grad, L2_grad, weights_grad
 
