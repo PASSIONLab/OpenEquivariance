@@ -110,7 +110,13 @@ class ConvolutionBase:
         assert(graph.rows.dtype == self.idx_dtype)
         assert(graph.cols.dtype == self.idx_dtype)
 
-        L1_d, L2_d, weights_d = DeviceBuffer(L1_in), DeviceBuffer(L2_in), DeviceBuffer(weights)
+        weights_chunked = np.zeros_like(weights)        
+        if self.reorder_weights_e3nn_to_oeq is not None:
+            self.reorder_weights_e3nn_to_oeq(weights, weights_chunked, not self.config.shared_weights)
+        else:
+            weights_chunked = weights
+
+        L1_d, L2_d, weights_d = DeviceBuffer(L1_in), DeviceBuffer(L2_in), DeviceBuffer(weights_chunked)
         L3_d = DeviceBuffer(L3_out)
 
         rows_d = DeviceBuffer(graph.rows)

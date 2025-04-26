@@ -89,8 +89,6 @@ class LoopUnrollTP(TensorProductBase):
             internal_cls = extlib.JITTPImpl
 
         logger.info("Starting kernel compiler...")
-
-
         self.internal = internal_cls(self.jit_kernel,
                 vars(self.forward_schedule.launch_config),
                 vars(self.backward_schedule.launch_config),

@@ -93,12 +93,17 @@ class LoopUnrollConv(ConvolutionBase):
         else:
             internal_cls = JITConvImpl 
 
-        logger.info("Starting NVRTC")
+        logger.info("Starting kernel compiler...")
         self.internal = internal_cls(self.jit_kernel,
                 vars(self.forward_schedule.launch_config), 
                 vars(self.backward_schedule.launch_config),
                 {"L3_dim": self.L3.dim})
         logger.info("Kernel compiled!")
+
+        self.reorder_weights_e3nn_to_oeq = lambda input, output, has_batch_dim: \
+                self.forward_schedule.reorder_weights(input, output, "forward", has_batch_dim) 
+        self.reorder_weights_oeq_to_e3nn = lambda input, output, has_batch_dim: \
+                self.forward_schedule.reorder_weights(input, output, "backward", has_batch_dim) 
 
     @staticmethod
     def name():
