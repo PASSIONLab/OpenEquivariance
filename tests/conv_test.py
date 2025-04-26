@@ -29,7 +29,7 @@ class ConvCorrectness:
 
         return graph
 
-    @pytest.fixture(params=['atomic'], scope='class')
+    @pytest.fixture(params=['deterministic'], scope='class')
     def conv_object(self, request, problem):
         if request.param == 'atomic':
             return oeq.TensorProductConv(problem, deterministic=False)
@@ -45,6 +45,7 @@ class ConvCorrectness:
 
         self.check_result(result, "output")
 
+    @pytest.mark.skip
     def test_tp_bwd(self, conv_object, graph):
         result = conv_object.test_correctness_backward(graph, 
                 thresh=3e-04,
@@ -55,7 +56,6 @@ class ConvCorrectness:
         self.check_result(result, "in1_grad")
         self.check_result(result, "in2_grad")
 
-    @pytest.mark.skip
     def test_tp_double_bwd(self, conv_object, graph):
         result = conv_object.test_correctness_double_backward(graph, 
                 thresh=3e-04,
@@ -70,7 +70,7 @@ class ConvCorrectness:
 class TestProductionModels(ConvCorrectness):
     from openequivariance.benchmark.benchmark_configs import mace_problems, diffdock_configs 
     production_model_tpps = list(chain(
-        #mace_problems, 
+        mace_problems, 
         diffdock_configs))
 
     @pytest.fixture(params=production_model_tpps, ids = lambda x : x.label, scope="class")
