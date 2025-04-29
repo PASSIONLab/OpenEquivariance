@@ -97,16 +97,19 @@ public:
     JIT_IMPL jit;
     KernelLaunchConfig forward_config; 
     KernelLaunchConfig backward_config;
+    KernelLaunchConfig double_backward_config;
     bool is_uvw; 
 
     JITConvImpl(
         std::string jit_kernel,
         KernelLaunchConfig forward_config_i,
         KernelLaunchConfig backward_config_i,
+        KernelLaunchConfig double_backward_config_i,
         bool is_uvw_i) :
             jit(jit_kernel),
             forward_config(forward_config_i),  
             backward_config(backward_config_i),
+            double_backward_config(double_backward_config_i),
             is_uvw(is_uvw_i) {
 
         vector<string> kernels = {"forward", "backward", "fixup_forward", "fixup_backward", "double_backward_A", "double_backward_B"};
@@ -121,10 +124,15 @@ public:
 
         if(forward_config.smem > 0) {
             jit.set_max_smem(0, forward_config.smem);
+            jit.set_max_smem(4, forward_config.smem);
         }
 
         if(backward_config.smem > 0) {
             jit.set_max_smem(1, backward_config.smem);
+        }
+
+        if(double_backward_config.smem > 0) {
+            jit.set_max_smem(5, double_backward_config.smem);
         }
     }
 
@@ -218,7 +226,7 @@ public:
 
         // Execute forward fixup kernel here 
 
-        jit.execute(5, args, backward_config);
+        jit.execute(5, args, double_backward_config);
 
         // Execute backward fixup kernel here
     }

@@ -156,3 +156,24 @@ __global__ void backward(
         } {%- endfor %}
     }
 }
+
+
+__global__ void double_backward_A(
+        IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
+        IRREP_T* L1_dgrad, IRREP_T* L2_dgrad, IRREP_T* W_dgrad,
+        IRREP_T* L1_grad, IRREP_T* L2_grad, WEIGHT_T* W_grad, IRREP_T* L3_dgrad
+        ConvData c, void* workspace, unsigned {{idx_type}}* transpose_perm) {
+
+    printf("Hello world!");
+}
+
+
+__global__ void double_backward_B(
+        IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
+        IRREP_T* L1_dgrad, IRREP_T* L2_dgrad, IRREP_T* W_dgrad,
+        IRREP_T* L1_grad, IRREP_T* L2_grad, WEIGHT_T* W_grad, IRREP_T* L3_dgrad
+        ConvData c, void* workspace, unsigned {{idx_type}}* transpose_perm) {
+
+    printf("Hello world!");
+}
+

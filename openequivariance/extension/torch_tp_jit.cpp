@@ -383,7 +383,6 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
     torch::Tensor transpose_perm_contig = transpose_perm.contiguous();
 
     jit_instance->internal.double_backward(
-            num_batch,
             data_ptr(L1_in_contig), data_ptr(L2_in_contig),
             data_ptr(W_contig), data_ptr(L3_grad_contig),
             data_ptr(L1_dgrad_contig), data_ptr(L2_dgrad_contig),
@@ -448,6 +447,7 @@ TORCH_LIBRARY_FRAGMENT(torch_tp_jit, m) {
 
     m.def("jit_conv_forward(__torch__.torch.classes.torch_tp_jit.TorchJITConv jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> Tensor");
     m.def("jit_conv_backward(__torch__.torch.classes.torch_tp_jit.TorchJITConv jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor)");
+    m.def("jit_conv_double_backward(__torch__.torch.classes.torch_tp_jit.TorchJITConv jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor, Tensor, Tensor)");
 };
 
 
@@ -458,6 +458,7 @@ TORCH_LIBRARY_IMPL(torch_tp_jit, CUDA, m) {
 
     m.impl("jit_conv_forward", &jit_conv_forward);
     m.impl("jit_conv_backward", &jit_conv_backward);
+    m.impl("jit_conv_double_backward", &jit_conv_double_backward);
 };
 
 PYBIND11_MODULE(torch_tp_jit, m) {}
