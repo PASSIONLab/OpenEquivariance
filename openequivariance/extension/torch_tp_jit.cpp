@@ -347,6 +347,57 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
     return tuple(L1_grad, L2_grad, W_grad);
 }
 
+
+tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_backward(
+        const c10::intrusive_ptr<TorchJITConv> &jit_instance,
+        const torch::Tensor &L1_in, 
+        const torch::Tensor &L2_in, 
+        const torch::Tensor &W, 
+        const torch::Tensor &L3_grad, 
+        const torch::Tensor &L1_dgrad, 
+        const torch::Tensor &L2_dgrad, 
+        const torch::Tensor &W_dgrad, 
+        const torch::Tensor &rows,
+        const torch::Tensor &cols,
+        const torch::Tensor &workspace,
+        const torch::Tensor &transpose_perm) {
+
+    int64_t nnz = rows.sizes()[0];
+    int64_t node_count = L1_in.sizes()[0];
+    torch::Tensor L1_grad = torch::zeros(L1_in.sizes(), L1_in.options());
+    torch::Tensor L2_grad = torch::empty(L2_in.sizes(), L2_in.options());
+    torch::Tensor W_grad = torch::empty(W.sizes(), W.options());
+    torch::Tensor L3_dgrad = torch::zeros(L3_grad.sizes(), L3_grad.options());
+
+    torch::Tensor L1_in_contig = L1_in.contiguous();
+    torch::Tensor L2_in_contig = L2_in.contiguous();
+    torch::Tensor W_contig = W.contiguous();
+    torch::Tensor L3_grad_contig = L3_grad.contiguous();
+    torch::Tensor L1_dgrad_contig = L1_dgrad.contiguous();
+    torch::Tensor L2_dgrad_contig = L2_dgrad.contiguous();
+    torch::Tensor W_dgrad_contig = W_dgrad.contiguous();
+
+    torch::Tensor rows_contig = rows.contiguous();
+    torch::Tensor cols_contig = cols.contiguous();
+    torch::Tensor workspace_contig = workspace.contiguous();
+    torch::Tensor transpose_perm_contig = transpose_perm.contiguous();
+
+    jit_instance->internal.double_backward(
+            num_batch,
+            data_ptr(L1_in_contig), data_ptr(L2_in_contig),
+            data_ptr(W_contig), data_ptr(L3_grad_contig),
+            data_ptr(L1_dgrad_contig), data_ptr(L2_dgrad_contig),
+            data_ptr(W_dgrad_contig),
+            data_ptr(L1_grad), data_ptr(L2_grad),
+            data_ptr(W_grad), data_ptr(L3_dgrad),
+            data_ptr(rows_contig), data_ptr(cols_contig),
+            nnz, node_count,
+            data_ptr(workspace_contig), data_ptr(transpose_perm_contig)
+    );
+
+    return tuple(L1_grad, L2_grad, W_grad, L3_dgrad);
+}
+
 // =========================================================== 
 
 TORCH_LIBRARY_FRAGMENT(torch_tp_jit, m) { 

@@ -109,7 +109,7 @@ public:
             backward_config(backward_config_i),
             is_uvw(is_uvw_i) {
 
-        vector<string> kernels = {"forward", "backward", "fixup_forward", "fixup_backward"};
+        vector<string> kernels = {"forward", "backward", "fixup_forward", "fixup_backward", "double_backward_A", "double_backward_B"};
 
         int opt_level = 3;
         #ifdef HIP_BACKEND
@@ -117,7 +117,7 @@ public:
             opt_level = 1;
         }
         #endif 
-        jit.compile(kernels, {{}, {}, {}, {}}, opt_level); 
+        jit.compile(kernels, {{}, {}, {}, {}, {}, {}}, opt_level); 
 
         if(forward_config.smem > 0) {
             jit.set_max_smem(0, forward_config.smem);
@@ -199,6 +199,28 @@ public:
 
             jit.execute(3, fixup_args, fixup_config);
         }
+    }
+
+    void double_backward(
+        void* L1_in, void* L2_in, void* W, void* L3_grad, 
+        void* L1_dgrad, void* L2_dgrad, void* w_dgrad, 
+        void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad, 
+        void* rows_contig, void* cols_contig,
+        uint64_t nnz, uint64_t node_count,
+        void* wspace, void* transpose_perm) {
+
+        ConvData conv_data = {rows, cols, nnz, node_count};
+        void* args[] = { 
+            &L1_in, &L2_in, &W, &L3_grad, &L1_dgrad, &L2_dgrad, &w_dgrad, 
+            &L1_grad, &L2_grad, &W_grad, &L3_dgrad, &conv_data, &wspace, &transpose_perm
+        };
+        jit.execute(4, args, forward_config);
+
+        // Execute forward fixup kernel here 
+
+        jit.execute(5, args, backward_config);
+
+        // Execute backward fixup kernel here
     }
 
     ~JITConvImpl() = default; 
