@@ -23,8 +23,8 @@ which has a closed-source kernel package. We also offer fused
 equivariant graph convolutions that can reduce 
 computation and memory consumption significantly. 
 
-We currently support NVIDIA GPUs and have just added beta support on AMD GPUs for
-UVU tensor products! See [the coverage table](#tensor-products-we-accelerate) for more 
+We currently support NVIDIA GPUs and just added beta support on AMD GPUs for
+all tensor products! See [the coverage table](#tensor-products-we-accelerate) for more 
 details.
 
 **Warning**: This is an early release, bug reports are welcome.
@@ -242,9 +242,9 @@ python tests/mace_driver.py carbon.xyz -o outputs/mace_tests -i e3nn cue oeq
 | Operation                | CUDA     | HIP |
 |--------------------------|----------|-----|
 | UVU Batch                | ✅        | ✅    |
-| UVW Batch                | ✅        | 🚧🔨  |
+| UVW Batch                | ✅        | ✅    |
 | UVU Convolution          | ✅        | ✅    |
-| UVW Convolution          | ✅        | 🚧🔨  |
+| UVW Convolution          | ✅        | ✅    |
 | Symmetric Tensor Product | ✅ (beta) | 🚧🔨  |
 
 e3nn supports a variety of connection modes for CG tensor products. We support 

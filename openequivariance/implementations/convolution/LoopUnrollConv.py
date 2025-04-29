@@ -26,7 +26,6 @@ class LoopUnrollConv(ConvolutionBase):
             backward_schedule_type = 3
             template = env.get_template("loop_unroll_conv_det.cuh")
 
-
         def generate_forward_schedule(warps_per_block):
             self.forward_schedule = ComputationSchedule(self.config, 
                     smem_limit=dp.maxSharedMemPerBlock // 4 * 3, warps_per_block=warps_per_block,
@@ -60,10 +59,9 @@ class LoopUnrollConv(ConvolutionBase):
                     generate_schedule(warp_count)
                     break
                 except Exception as e:
-                    warp_count -= 2
+                    warp_count -= 1
                     if warp_count == 0:
                         raise RuntimeError("Tensor product schedule generation failed, shared memory inadequate!")
-
 
         if not deterministic:
             for segment in self.forward_schedule.segments:
@@ -117,7 +115,8 @@ class LoopUnrollConv(ConvolutionBase):
         self.internal = internal_cls(self.jit_kernel,
                 vars(self.forward_schedule.launch_config), 
                 vars(self.backward_schedule.launch_config),
-                {"L3_dim": self.L3.dim})
+                {"L3_dim": self.L3.dim,
+                 "is_uvw": int(self.is_uvw)})
         logger.info("Kernel compiled!")
 
         self.reorder_weights_e3nn_to_oeq = lambda input, output, has_batch_dim: \

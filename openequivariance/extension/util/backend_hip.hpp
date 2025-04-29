@@ -173,13 +173,13 @@ public:
                             NULL));                    // includeNames
     }
 
-    void compile(string kernel_name, const vector<int> template_params) {
+    void compile(string kernel_name, const vector<int> template_params, int opt_level=3) {
         vector<string> kernel_names = {kernel_name};
         vector<vector<int>> template_param_list = {template_params};
-        compile(kernel_names, template_param_list);
+        compile(kernel_names, template_param_list, opt_level);
     }
 
-    void compile(vector<string> kernel_names_i, vector<vector<int>> template_param_list) {
+    void compile(vector<string> kernel_names_i, vector<vector<int>> template_param_list, int opt_level=3) {
         if(compiled) {
             throw std::logic_error("JIT object has already been compiled!");
         }
@@ -214,9 +214,11 @@ public:
         int device = 0;
         HIP_ERRCHK(hipGetDeviceProperties(&props, device));
         std::string sarg = std::string("--gpu-architecture=") + props.gcnArchName;  
+        std::string opt_arg = "-O" + std::to_string(opt_level);
 
         std::vector<const char*> opts = {
             "--std=c++17",
+            opt_arg.c_str(),
             sarg.c_str()
         }; 
 

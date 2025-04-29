@@ -37,6 +37,14 @@ namespace py=pybind11;
 
 using Map_t=torch::Dict<string, int64_t>;
 
+std::unordered_map<string, int64_t> to_map(const Map_t &map) {
+    std::unordered_map<string, int64_t> result;
+    for(auto it = map.begin(); it != map.end(); ++it) {
+        result[it->key()] = it->value();
+    }
+    return result;
+}
+
 inline void* data_ptr(const torch::Tensor &tensor) {
     if(tensor.dtype() == torch::kFloat)
         return reinterpret_cast<void*>(tensor.data_ptr<float>());
@@ -62,21 +70,11 @@ public:
         dbl_bwd_dict(dbl_bwd_dict_i.copy()),
         kernel_dims(kernel_dims_i.copy()),
         internal(kernel_plaintext, 
-            KernelLaunchConfig(
-                fwd_dict.at("num_blocks"),
-                fwd_dict.at("num_threads"),
-                fwd_dict.at("smem")
+                to_map(fwd_dict_i),
+                to_map(bwd_dict_i),
+                to_map(dbl_bwd_dict_i),
+                to_map(kernel_dims_i)
             ),
-            KernelLaunchConfig(
-                bwd_dict.at("num_blocks"),
-                bwd_dict.at("num_threads"),
-                bwd_dict.at("smem")
-            ),
-            KernelLaunchConfig(
-                dbl_bwd_dict.at("num_blocks"),
-                dbl_bwd_dict.at("num_threads"),
-                dbl_bwd_dict.at("smem")
-            )),
         L3_dim(kernel_dims.at("L3_dim")),
         shared_weights(kernel_dims.at("shared_weights")) { }
 
@@ -225,17 +223,11 @@ public:
         fwd_dict(fwd_dict_i.copy()),
         bwd_dict(bwd_dict_i.copy()),
         kernel_dims(kernel_dims_i.copy()),
-        internal(kernel_plaintext, 
-            KernelLaunchConfig(
-                fwd_dict.at("num_blocks"),
-                fwd_dict.at("num_threads"),
-                fwd_dict.at("smem")
+        internal(kernel_plaintext,
+                to_map(fwd_dict_i),
+                to_map(bwd_dict_i),
+                to_map(kernel_dims_i)
             ),
-            KernelLaunchConfig(
-                bwd_dict.at("num_blocks"),
-                bwd_dict.at("num_threads"),
-                bwd_dict.at("smem")
-            )),
         L3_dim(kernel_dims.at("L3_dim")) { }
 
     tuple<tuple<string, string>, tuple<string, Map_t>, tuple<string, Map_t>, tuple<string, Map_t>> __obj_flatten__() {
