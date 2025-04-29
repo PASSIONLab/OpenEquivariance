@@ -51,6 +51,7 @@ PYBIND11_MODULE(generic_module, m) {
         .def(py::init<  std::string, 
                         std::unordered_map<string, int64_t>, 
                         std::unordered_map<string, int64_t>, 
+                        std::unordered_map<string, int64_t>, 
                         std::unordered_map<string, int64_t>>());
 
     py::class_<GroupMM<float>>(m, "GroupMM_F32")

@@ -140,6 +140,7 @@ public:
             std::string jit_kernel,
             std::unordered_map<string, int64_t> fwd_dict, 
             std::unordered_map<string, int64_t> bwd_dict,
+            std::unordered_map<string, int64_t> dbl_bwd_dict,
             std::unordered_map<string, int64_t> kernel_dims 
     ) : JITConvImpl(
             jit_kernel,
@@ -152,6 +153,11 @@ public:
                 bwd_dict["num_blocks"],
                 bwd_dict["num_threads"],
                 bwd_dict["smem"]
+            ),
+            KernelLaunchConfig(
+                dbl_bwd_dict["num_blocks"],
+                dbl_bwd_dict["num_threads"],
+                dbl_bwd_dict["smem"]
             ),
             kernel_dims["is_uvw"] == 1) { }
 
@@ -213,7 +219,7 @@ public:
         void* L1_in, void* L2_in, void* W, void* L3_grad, 
         void* L1_dgrad, void* L2_dgrad, void* w_dgrad, 
         void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad, 
-        void* rows_contig, void* cols_contig,
+        void* rows, void* cols,
         uint64_t nnz, uint64_t node_count,
         void* wspace, void* transpose_perm) {
 
@@ -224,11 +230,11 @@ public:
         };
         jit.execute(4, args, forward_config);
 
-        // Execute forward fixup kernel here 
+        // TODO: Execute forward fixup kernel here 
 
         jit.execute(5, args, double_backward_config);
 
-        // Execute backward fixup kernel here
+        // TODO: Execute backward fixup kernel here
     }
 
     ~JITConvImpl() = default; 
