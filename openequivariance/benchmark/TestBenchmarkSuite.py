@@ -10,7 +10,7 @@ import openequivariance as oeq
 from openequivariance.extlib import DeviceProp
 from openequivariance.implementations.TensorProductBase import TensorProductBase
 
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.benchmark.logging_utils import getLogger, bcolors
 from openequivariance.extlib import *
 from openequivariance.implementations.e3nn_lite import TPProblem
 from openequivariance.benchmark.correctness_utils import (
@@ -139,7 +139,7 @@ class TestBenchmarkSuite:
             logger.info(f'Irrep dtype: {tpp.irrep_dtype.__name__}')
             logger.info(f'Weight dtype: {tpp.weight_dtype.__name__}')
             if(tpp.label):
-                logger.info(f'Label: {tpp.label}')
+                logger.info(f'{bcolors.OKCYAN}{tpp.label}{bcolors.ENDC}')
             logger.info(f'Implementation Name: {impl.name()}')
             logger.info(f'Test Direction: {test.direction}')
             logger.info(f"Torch Overhead Included: {self.torch_op}")

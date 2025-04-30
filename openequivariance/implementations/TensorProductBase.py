@@ -29,6 +29,7 @@ class TensorProductBase:
         self.config, self.torch_op = config, torch_op
         self.L1, self.L2, self.L3 = config.irreps_in1, config.irreps_in2, config.irreps_out
         self.irrep_dtype, self.weight_dtype = config.irrep_dtype, config.weight_dtype 
+        self.reorder_weights_e3nn_to_oeq, self.reorder_weights_oeq_to_e3nn = None, None 
 
         self.tp_id = TensorProductBase.next_tp_id
         TensorProductBase.next_tp_id += 1
@@ -72,7 +73,6 @@ class TensorProductBase:
         
         weights_chunked = np.zeros_like(weights)        
         if self.reorder_weights_e3nn_to_oeq is not None:
-            weights_chunked = np.zeros_like(weights)
             self.reorder_weights_e3nn_to_oeq(weights, weights_chunked, not self.config.shared_weights)
         else:
             weights_chunked = weights
@@ -88,7 +88,6 @@ class TensorProductBase:
     def backward_cpu(self, L1_in, L1_grad, L2_in, L2_grad, L3_grad, weights, weights_grad) -> None:
         weights_chunked = np.zeros_like(weights)        
         if self.reorder_weights_e3nn_to_oeq is not None:
-            weights_chunked = np.zeros_like(weights)
             self.reorder_weights_e3nn_to_oeq(weights, weights_chunked, not self.config.shared_weights)
         else:
             weights_chunked = weights
@@ -360,7 +359,10 @@ class TensorProductBase:
             L1_grad = torch.empty_like(L1_in)
             L2_grad = torch.empty_like(L2_in)
             weights_grad = torch.empty_like(weights)
-            
+
+            if self.config.shared_weights:
+                weights_grad[:] = 0.0
+
             self.backward_raw( L1_in.shape[0], 
                         L1_in.contiguous().data_ptr(), 
                         L1_grad.data_ptr(),

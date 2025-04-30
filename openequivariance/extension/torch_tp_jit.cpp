@@ -1,4 +1,5 @@
-#include <pybind11/pybind11.h> #include <pybind11/numpy.h>
+#include <pybind11/pybind11.h> 
+#include <pybind11/numpy.h>
 #include <iostream>
 #include <unordered_map>
 #include <stdexcept>
@@ -36,6 +37,14 @@ namespace py=pybind11;
 
 using Map_t=torch::Dict<string, int64_t>;
 
+std::unordered_map<string, int64_t> to_map(const Map_t &map) {
+    std::unordered_map<string, int64_t> result;
+    for(auto it = map.begin(); it != map.end(); ++it) {
+        result[it->key()] = it->value();
+    }
+    return result;
+}
+
 inline void* data_ptr(const torch::Tensor &tensor) {
     if(tensor.dtype() == torch::kFloat)
         return reinterpret_cast<void*>(tensor.data_ptr<float>());
@@ -51,33 +60,33 @@ inline void* data_ptr(const torch::Tensor &tensor) {
 
 class __attribute__ ((visibility ("default"))) TorchJITProduct : public torch::CustomClassHolder {
 public:
-    Map_t fwd_dict, bwd_dict, kernel_dims;
+    Map_t fwd_dict, bwd_dict, dbl_bwd_dict, kernel_dims;
     JITTPImpl<JITKernel> internal;
     int64_t L3_dim;
-    TorchJITProduct(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t kernel_dims_i) :
+    int shared_weights;
+    TorchJITProduct(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t dbl_bwd_dict_i, Map_t kernel_dims_i) :
         fwd_dict(fwd_dict_i.copy()),
         bwd_dict(bwd_dict_i.copy()),
+        dbl_bwd_dict(dbl_bwd_dict_i.copy()),
         kernel_dims(kernel_dims_i.copy()),
         internal(kernel_plaintext, 
-            KernelLaunchConfig(
-                fwd_dict.at("num_blocks"),
-                fwd_dict.at("num_threads"),
-                fwd_dict.at("smem")
+                to_map(fwd_dict_i),
+                to_map(bwd_dict_i),
+                to_map(dbl_bwd_dict_i),
+                to_map(kernel_dims_i)
             ),
-            KernelLaunchConfig(
-                bwd_dict.at("num_blocks"),
-                bwd_dict.at("num_threads"),
-                bwd_dict.at("smem")
-            )),
-        L3_dim(kernel_dims.at("L3_dim")) { }
+        L3_dim(kernel_dims.at("L3_dim")),
+        shared_weights(kernel_dims.at("shared_weights")) { }
 
     tuple<  tuple<string, string>, 
+            tuple<string, Map_t>, 
             tuple<string, Map_t>, 
             tuple<string, Map_t>, 
             tuple<string, Map_t>> __obj_flatten__() {
         return tuple(tuple("kernel_plaintext", internal.jit.kernel_plaintext),
             tuple("fwd_config", fwd_dict),
             tuple("bwd_config", bwd_dict),
+            tuple("dbl_bwd_config", dbl_bwd_dict),
             tuple("kernel_dims", kernel_dims));
     }
 
@@ -132,13 +141,16 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_backward(
         const torch::Tensor &L1_in,
         const torch::Tensor &L2_in,
         const torch::Tensor &W, 
-        const torch::Tensor &L3_grad
-    ) {
+        const torch::Tensor &L3_grad) {
 
     int64_t num_batch = L1_in.sizes()[0];
     torch::Tensor L1_grad = torch::empty(L1_in.sizes(), L1_in.options());
     torch::Tensor L2_grad = torch::empty(L2_in.sizes(), L2_in.options());
     torch::Tensor W_grad = torch::empty(W.sizes(), W.options());
+
+    if(jit_instance->shared_weights == 1) {
+        W_grad.zero_();
+    } 
 
     torch::Tensor L1_in_contig = L1_in.contiguous();
     torch::Tensor L2_in_contig = L2_in.contiguous();
@@ -156,6 +168,49 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_backward(
     return tuple(L1_grad, L2_grad, W_grad);
 }
 
+tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_backward(
+        const c10::intrusive_ptr<TorchJITProduct> &jit_instance,
+        const torch::Tensor &L1_in, 
+        const torch::Tensor &L2_in, 
+        const torch::Tensor &W, 
+        const torch::Tensor &L3_grad, 
+        const torch::Tensor &L1_dgrad, 
+        const torch::Tensor &L2_dgrad, 
+        const torch::Tensor &W_dgrad) {
+
+    int64_t num_batch = L1_in.sizes()[0]; // Declaring outputs
+    torch::Tensor L1_grad = torch::empty(L1_in.sizes(), L1_in.options());
+    torch::Tensor L2_grad = torch::empty(L2_in.sizes(), L2_in.options());
+    torch::Tensor W_grad = torch::empty(W.sizes(), W.options());
+    torch::Tensor L3_dgrad = torch::empty(L3_grad.sizes(), L3_grad.options());
+
+    torch::Tensor L1_in_contig = L1_in.contiguous();
+    torch::Tensor L2_in_contig = L2_in.contiguous();
+    torch::Tensor W_contig = W.contiguous();
+    torch::Tensor L3_grad_contig = L3_grad.contiguous();
+
+    torch::Tensor L1_dgrad_contig = L1_dgrad.contiguous();
+    torch::Tensor L2_dgrad_contig = L2_dgrad.contiguous();
+    torch::Tensor W_dgrad_contig = W_dgrad.contiguous();
+
+    if(jit_instance->shared_weights == 1) {
+        W_grad.zero_();
+    } 
+
+    jit_instance->internal.double_backward(
+            num_batch,
+            data_ptr(L1_in_contig), data_ptr(L2_in_contig),
+            data_ptr(W_contig), data_ptr(L3_grad_contig),
+            data_ptr(L1_dgrad_contig), data_ptr(L2_dgrad_contig),
+            data_ptr(W_dgrad_contig),
+            data_ptr(L1_grad), data_ptr(L2_grad),
+            data_ptr(W_grad), data_ptr(L3_dgrad)
+    );
+
+    return tuple(L1_grad, L2_grad, W_grad, L3_dgrad); 
+}
+
+
 // =========================================================== 
 
 class TorchJITConv : public torch::CustomClassHolder {
@@ -168,17 +223,11 @@ public:
         fwd_dict(fwd_dict_i.copy()),
         bwd_dict(bwd_dict_i.copy()),
         kernel_dims(kernel_dims_i.copy()),
-        internal(kernel_plaintext, 
-            KernelLaunchConfig(
-                fwd_dict.at("num_blocks"),
-                fwd_dict.at("num_threads"),
-                fwd_dict.at("smem")
+        internal(kernel_plaintext,
+                to_map(fwd_dict_i),
+                to_map(bwd_dict_i),
+                to_map(kernel_dims_i)
             ),
-            KernelLaunchConfig(
-                bwd_dict.at("num_blocks"),
-                bwd_dict.at("num_threads"),
-                bwd_dict.at("smem")
-            )),
         L3_dim(kernel_dims.at("L3_dim")) { }
 
     tuple<tuple<string, string>, tuple<string, Map_t>, tuple<string, Map_t>, tuple<string, Map_t>> __obj_flatten__() {
@@ -280,6 +329,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
     torch::Tensor L2_in_contig = L2_in.contiguous();
     torch::Tensor W_contig = W.contiguous();
     torch::Tensor L3_grad_contig = L3_grad.contiguous();
+
     torch::Tensor rows_contig = rows.contiguous();
     torch::Tensor cols_contig = cols.contiguous();
     torch::Tensor workspace_contig = workspace.contiguous();
@@ -301,7 +351,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
 
 TORCH_LIBRARY_FRAGMENT(torch_tp_jit, m) { 
     m.class_<TorchJITProduct>("TorchJITProduct")
-        .def(torch::init<string, Map_t, Map_t, Map_t>())
+        .def(torch::init<string, Map_t, Map_t, Map_t, Map_t>())
         .def("__obj_flatten__", &TorchJITProduct::__obj_flatten__)
         .def("exec_tensor_product_rawptr", &TorchJITProduct::exec_tensor_product_device_rawptrs)
         .def("backward_rawptr", &TorchJITProduct::backward_device_rawptrs)
@@ -311,17 +361,18 @@ TORCH_LIBRARY_FRAGMENT(torch_tp_jit, m) {
         .def_pickle(
             // __getstate__
             [](const c10::intrusive_ptr<TorchJITProduct>& self)
-                -> tuple<string, Map_t, Map_t, Map_t> {
-                return tuple(self->internal.jit.kernel_plaintext, self->fwd_dict, self->bwd_dict, self->kernel_dims);
+                -> tuple<string, Map_t, Map_t, Map_t, Map_t> {
+                return tuple(self->internal.jit.kernel_plaintext, self->fwd_dict, self->bwd_dict, self->dbl_bwd_dict, self->kernel_dims);
             },
             // __setstate__
-            [](tuple<string, Map_t, Map_t, Map_t> state)
+            [](tuple<string, Map_t, Map_t, Map_t, Map_t> state)
                 -> c10::intrusive_ptr<TorchJITProduct> {
-                return c10::make_intrusive<TorchJITProduct>(get<0>(state), get<1>(state), get<2>(state), get<3>(state));
+                return c10::make_intrusive<TorchJITProduct>(get<0>(state), get<1>(state), get<2>(state), get<3>(state), get<4>(state));
             });
 
     m.def("jit_tp_forward(__torch__.torch.classes.torch_tp_jit.TorchJITProduct jit, Tensor L1_in, Tensor L2_in, Tensor W) -> Tensor");
     m.def("jit_tp_backward(__torch__.torch.classes.torch_tp_jit.TorchJITProduct jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad) -> (Tensor, Tensor, Tensor)");
+    m.def("jit_tp_double_backward(__torch__.torch.classes.torch_tp_jit.TorchJITProduct jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad) -> (Tensor, Tensor, Tensor, Tensor)");
 
 
     m.class_<TorchJITConv>("TorchJITConv")
@@ -352,6 +403,7 @@ TORCH_LIBRARY_FRAGMENT(torch_tp_jit, m) {
 TORCH_LIBRARY_IMPL(torch_tp_jit, CUDA, m) { 
     m.impl("jit_tp_forward", &jit_tp_forward);
     m.impl("jit_tp_backward", &jit_tp_backward);
+    m.impl("jit_tp_double_backward", &jit_tp_double_backward);
 
     m.impl("jit_conv_forward", &jit_conv_forward);
     m.impl("jit_conv_backward", &jit_conv_backward);

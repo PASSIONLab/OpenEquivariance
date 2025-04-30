@@ -6,7 +6,7 @@ from openequivariance.implementations.e3nn_lite import *
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.benchmark.tpp_creation_utils import *
 from openequivariance.extlib import *
-from openequivariance.benchmark.e3nn_lite_utils import count_cg_non_zero
+from openequivariance.implementations.utils import count_cg_non_zero
 
 os.environ["CUEQUIVARIANCE_OPS_USE_JIT"] = "1"
 

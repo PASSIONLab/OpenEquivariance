@@ -178,13 +178,13 @@ public:
                             NULL));                    // includeNames
     }
 
-    void compile(string kernel_name, const vector<int> template_params) {
+    void compile(string kernel_name, const vector<int> template_params, int opt_level=3) {
         vector<string> kernel_names = {kernel_name};
         vector<vector<int>> template_param_list = {template_params};
         compile(kernel_names, template_param_list);
     }
 
-    void compile(vector<string> kernel_names_i, vector<vector<int>> template_param_list) {
+    void compile(vector<string> kernel_names_i, vector<vector<int>> template_param_list, int opt_level=3) {
         if(compiled) {
             throw std::logic_error("JIT object has already been compiled!");
         }

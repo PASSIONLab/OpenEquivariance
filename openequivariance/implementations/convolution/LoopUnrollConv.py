@@ -4,20 +4,21 @@ from openequivariance.implementations.TensorProduct import *
 from openequivariance.templates.jinja_utils import *
 from openequivariance.extlib import *
 
+from openequivariance.implementations.utils import filter_and_analyze_problem 
+
 class LoopUnrollConv(ConvolutionBase):
     def __init__(self, config, idx_dtype=np.int64, 
             torch_op=False, deterministic=False):
         super().__init__(config, idx_dtype, torch_op, deterministic)
         L1, L2, L3 = self.L1, self.L2, self.L3 
 
-        for (mul, ir) in L2:
-            assert(mul == 1)
-
         env = get_jinja_environment()
         template = env.get_template("loop_unroll_conv_atomic.cuh")
-        env.globals['enumerate'] = enumerate 
-
         dp = DeviceProp(0)
+
+        analysis = filter_and_analyze_problem(config)
+        self.is_uvw = analysis["is_uvw"]
+        assert not config.shared_weights, "LoopUnrollConv does not yet support shared weights"
 
         forward_schedule_type = 3
         backward_schedule_type = 2
@@ -25,23 +26,42 @@ class LoopUnrollConv(ConvolutionBase):
             backward_schedule_type = 3
             template = env.get_template("loop_unroll_conv_det.cuh")
 
-        self.forward_schedule = ComputationSchedule(self.config, 
-                smem_limit=dp.maxSharedMemPerBlock // 4 * 3, warps_per_block=6,
-                block_count=dp.multiprocessorCount,
-                direction = "forward",
-                irrep_dtype = config.irrep_dtype,
-                weight_dtype = config.weight_dtype,
-                schedule_type=forward_schedule_type,
-                warp_size=dp.warpsize)
+        def generate_forward_schedule(warps_per_block):
+            self.forward_schedule = ComputationSchedule(self.config, 
+                    smem_limit=dp.maxSharedMemPerBlock // 4 * 3, warps_per_block=warps_per_block,
+                    block_count=dp.multiprocessorCount,
+                    direction = "forward",
+                    irrep_dtype = config.irrep_dtype,
+                    weight_dtype = config.weight_dtype,
+                    schedule_type=forward_schedule_type,
+                    warp_size=dp.warpsize,
+                    include_scratch=self.is_uvw,
+                    stream_weights=self.is_uvw)
 
-        self.backward_schedule = ComputationSchedule(self.config, 
-                smem_limit=dp.maxSharedMemPerBlock, warps_per_block=6,
-                block_count=dp.multiprocessorCount * 2,
-                direction = "backward",
-                irrep_dtype = config.irrep_dtype,
-                weight_dtype = config.weight_dtype,
-                schedule_type=backward_schedule_type,
-                warp_size=dp.warpsize)
+        def generate_backward_schedule(warps_per_block):
+            self.backward_schedule = ComputationSchedule(self.config, 
+                    smem_limit=dp.maxSharedMemPerBlock, warps_per_block=warps_per_block,
+                    block_count=dp.multiprocessorCount * 2,
+                    direction = "backward",
+                    irrep_dtype = config.irrep_dtype,
+                    weight_dtype = config.weight_dtype,
+                    schedule_type=backward_schedule_type,
+                    warp_size=dp.warpsize,
+                    include_scratch=self.is_uvw,
+                    stream_weights=self.is_uvw)
+
+        scheduler_generators = [generate_forward_schedule, generate_backward_schedule]
+
+        for generate_schedule in scheduler_generators:
+            warp_count = 6
+            while warp_count > 0:
+                try:
+                    generate_schedule(warp_count)
+                    break
+                except Exception as e:
+                    warp_count -= 1
+                    if warp_count == 0:
+                        raise RuntimeError("Tensor product schedule generation failed, shared memory inadequate!")
 
         if not deterministic:
             for segment in self.forward_schedule.segments:
@@ -91,12 +111,18 @@ class LoopUnrollConv(ConvolutionBase):
         else:
             internal_cls = JITConvImpl 
 
-        logger.info("Starting NVRTC")
+        logger.info("Starting kernel compiler...")
         self.internal = internal_cls(self.jit_kernel,
                 vars(self.forward_schedule.launch_config), 
                 vars(self.backward_schedule.launch_config),
-                {"L3_dim": self.L3.dim})
+                {"L3_dim": self.L3.dim,
+                 "is_uvw": int(self.is_uvw)})
         logger.info("Kernel compiled!")
+
+        self.reorder_weights_e3nn_to_oeq = lambda input, output, has_batch_dim: \
+                self.forward_schedule.reorder_weights(input, output, "forward", has_batch_dim) 
+        self.reorder_weights_oeq_to_e3nn = lambda input, output, has_batch_dim: \
+                self.forward_schedule.reorder_weights(input, output, "backward", has_batch_dim) 
 
     @staticmethod
     def name():

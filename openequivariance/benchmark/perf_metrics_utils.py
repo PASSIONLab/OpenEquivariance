@@ -1,6 +1,6 @@
 import math
 
-from openequivariance.benchmark.e3nn_lite_utils import count_cg_non_zero, sparse_outer_product_work
+from openequivariance.implementations.utils import count_cg_non_zero, sparse_outer_product_work
 from openequivariance.implementations.TensorProductBase import TensorProductBase
 from openequivariance.implementations.e3nn_lite import TPProblem
 from openequivariance.benchmark.logging_utils import getLogger

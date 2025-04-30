@@ -96,18 +96,28 @@ class __attribute__ ((visibility ("default"))) JITConvImpl : public ConvolutionI
 public:
     JIT_IMPL jit;
     KernelLaunchConfig forward_config; 
-    KernelLaunchConfig backward_config; 
+    KernelLaunchConfig backward_config;
+    bool is_uvw; 
 
     JITConvImpl(
         std::string jit_kernel,
         KernelLaunchConfig forward_config_i,
-        KernelLaunchConfig backward_config_i) :
+        KernelLaunchConfig backward_config_i,
+        bool is_uvw_i) :
             jit(jit_kernel),
             forward_config(forward_config_i),  
-            backward_config(backward_config_i) {
+            backward_config(backward_config_i),
+            is_uvw(is_uvw_i) {
 
         vector<string> kernels = {"forward", "backward", "fixup_forward", "fixup_backward"};
-        jit.compile(kernels, {{}, {}, {}, {}}); 
+
+        int opt_level = 3;
+        #ifdef HIP_BACKEND
+        if(is_uvw) {
+            opt_level = 1;
+        }
+        #endif 
+        jit.compile(kernels, {{}, {}, {}, {}}, opt_level); 
 
         if(forward_config.smem > 0) {
             jit.set_max_smem(0, forward_config.smem);
@@ -134,7 +144,8 @@ public:
                 bwd_dict["num_blocks"],
                 bwd_dict["num_threads"],
                 bwd_dict["smem"]
-            )) { } 
+            ),
+            kernel_dims["is_uvw"] == 1) { }
 
     void exec_conv(
             void* L1_in,

@@ -7,7 +7,7 @@ from torch_geometric import EdgeIndex
 from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance.benchmark.correctness_utils import correctness_forward, correctness_backward, correctness_double_backward
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def problem_and_irreps():
     X_ir, Y_ir, Z_ir = oeq.Irreps("32x5e"), oeq.Irreps("1x3e"), oeq.Irreps("32x5e")
     problem = oeq.TPProblem(X_ir, Y_ir, Z_ir,
@@ -20,7 +20,7 @@ def problem_and_irreps():
 
     return problem, X_ir, Y_ir, Z_ir, 
 
-@pytest.fixture(params=['batch', 'conv_det', 'conv_atomic'])
+@pytest.fixture(params=['batch', 'conv_det', 'conv_atomic'], scope='session')
 def tp_and_inputs(request, problem_and_irreps):
     problem, X_ir, Y_ir, _ = problem_and_irreps
     gen = torch.Generator(device='cuda')

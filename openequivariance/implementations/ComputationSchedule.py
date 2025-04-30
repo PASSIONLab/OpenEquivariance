@@ -5,8 +5,6 @@ from openequivariance.benchmark.logging_utils import *
 from openequivariance.implementations.TensorProductBase import *
 logger = getLogger()
 
-# This class assumes a warp size of 32
-
 class IrrepMapping:
     '''
     Maps irreps from a source to a destination set.
@@ -265,13 +263,18 @@ class ComputationSchedule:
         # Stream weights on the fly before pre-loading 
         self.stream_weights = stream_weights 
 
-        # Step 1: Break the irreps and the instructions into chunks of at most 32 x 32 x 32. 
+        # Step 1: Break the irreps and the instructions into chunks 
 
-        self.problem_splitter = ProblemSplitter(config, warp_size)
+        chunk_size = warp_size
+        if include_scratch: # There is at least one UVW computation if this flag is set. Cap the chunk size to 32. 
+            chunk_size = 32
+
+        self.problem_splitter = ProblemSplitter(config, chunk_size)
         self.updated_config = self.problem_splitter.output
         self.L1, self.L2, self.L3 = self.updated_config.irreps_in1, self.updated_config.irreps_in2, self.updated_config.irreps_out 
         self.new_instructions = self.updated_config.instructions
 
+        smem_limit -= 1
         self.memory_per_warp = smem_limit // warps_per_block
         self.memory_per_warp -= self.memory_per_warp % 4
 
@@ -314,7 +317,9 @@ class ComputationSchedule:
             return smem
 
 
-        def calculate_backward_smem(L1_set, L2_set, L3_set, inst_idxs): 
+        def calculate_backward_smem(L1_set, L2_set, L3_set, inst_idxs, 
+                                    L2_dgrad=False # Used for double-backward pass 
+                                    ):
             irrep_itemsize = np.dtype(irrep_dtype).itemsize
             weight_itemsize = np.dtype(weight_dtype).itemsize
             smem = {
@@ -327,6 +332,9 @@ class ComputationSchedule:
                 "weights_grad": {"size": 0, "dtype": self.weight_dtype_cstr},
                 "scratch": {"size": 0, "dtype": self.weight_dtype_cstr}
             }
+
+            if L2_dgrad:
+                smem["L2_dgrad"] = {"size": smem["L2"]["size"], "dtype": self.irrep_dtype_cstr} 
 
             weights_smem = 0
             for inst_idx in inst_idxs:
@@ -362,6 +370,8 @@ class ComputationSchedule:
             calculate_smem = calculate_forward_smem
         elif direction == "backward":
             calculate_smem = calculate_backward_smem
+        elif direction == "double_backward":
+            calculate_smem = lambda *args, **kwargs: calculate_backward_smem(*args, L2_dgrad=True, **kwargs)
 
         schedule2_succeeded = False
         try:

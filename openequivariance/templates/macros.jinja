@@ -32,7 +32,7 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
 {%- endmacro %}
 
 {# smem contains a mul_ir stored in row-major order as mul * rep, where mul
-   is at most 32. reg is at least a |rep|-sized register array on each thread.
+   is at most |warp_size|. reg is at least a |rep|-sized register array on each thread.
        Assumes: each thread has the lane_id. #}
 {%- macro transpose_load(mul, dim, smem, offset, reg) %}
     if(lane_id < {{mul}}) {
@@ -66,6 +66,13 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
             ROW_OPERATION({{range_len}}, {{loop_var}}, {{smem_ptr}}[{{loop_var}} + {{dst_rng.start}} + lane_id] = {{glb_ptr_shft}}[{{loop_var}} + {{src_rng.start}}];)
         {%- endfor %} 
     {%- endif %}
+{%- endmacro %}
+
+{%- macro load_ir_segments_force(map, glb_ptr_shft, smem_ptr, loop_var) %}
+    {%- for (src_rng, dst_rng) in map.copy_ranges %}
+        {%- set range_len = src_rng.stop - src_rng.start %}
+        ROW_OPERATION({{range_len}}, {{loop_var}}, {{smem_ptr}}[{{loop_var}} + {{dst_rng.start}} + lane_id] = {{glb_ptr_shft}}[{{loop_var}} + {{src_rng.start}}];)
+    {%- endfor %} 
 {%- endmacro %}
 
 {%- macro store_ir_segments(map, glb_ptr_shft, smem_ptr, loop_var) %}

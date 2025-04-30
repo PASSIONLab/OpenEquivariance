@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 from openequivariance.implementations.TensorProductBase import TensorProductBase
 from openequivariance.implementations.CUETensorProduct import CUETensorProduct 
@@ -30,9 +30,20 @@ def check_similiarity(name : str,  to_check : np.ndarray,  ground_truth : np.nda
 
     return result
 
+def instantiate_implementation(implementation : Union[type[TensorProductBase], TensorProductBase], problem : TPProblem):
+    if isinstance(implementation, type):
+        test_tp = implementation(problem)
+    else:
+        test_tp = implementation
+
+    if not isinstance(test_tp, TensorProductBase):
+        raise TypeError(f"test_implementation must be a TensorProductBase or a subclass, got {type(implementation)}")
+
+    return test_tp
+
 def correctness_forward(
         problem : TPProblem,  
-        test_implementation : type[TensorProductBase], 
+        test_implementation : Union[type[TensorProductBase], TensorProductBase],
         reference_implementation : Optional[type[TensorProductBase]], 
         batch_size : int, 
         correctness_threshold : float,
@@ -65,7 +76,7 @@ def correctness_forward(
         weights_copy = weights[np.newaxis, :]
 
     # run test
-    test_tp = test_implementation(problem)
+    test_tp = instantiate_implementation(test_implementation, problem) 
     test_out = out.copy()
     test_tp.forward_cpu(
         L1_in=in1.copy(), 
@@ -82,7 +93,7 @@ def correctness_forward(
 
 def correctness_backward(
         problem : TPProblem,  
-        test_implementation : type[TensorProductBase], 
+        test_implementation : Union[type[TensorProductBase], TensorProductBase], 
         reference_implementation : Optional[type[TensorProductBase]], 
         batch_size : int, 
         correctness_threshold : float,
@@ -132,7 +143,7 @@ def correctness_backward(
         weights_copy = weights[np.newaxis, :]
         test_weights_grad = test_weights_grad[np.newaxis, :] 
 
-    test_tp = test_implementation(problem)
+    test_tp = instantiate_implementation(test_implementation, problem) 
     test_tp.backward_cpu(
         L1_in=in1.copy(),
         L1_grad=test_in1_grad,
@@ -159,7 +170,7 @@ def correctness_backward(
 
 def correctness_double_backward(
         problem : TPProblem,  
-        test_implementation : type[TensorProductBase], 
+        test_implementation : Union[type[TensorProductBase], TensorProductBase], 
         reference_implementation : Optional[type[TensorProductBase]], 
         batch_size : int, 
         correctness_threshold : float,
@@ -174,7 +185,7 @@ def correctness_double_backward(
         prng_seed
     )
     rng = np.random.default_rng(seed=prng_seed * 2)
-    dummy_grad = rng.standard_normal(1) 
+    dummy_grad = rng.standard_normal(1)[0] 
  
     if reference_implementation is None:
         from openequivariance.implementations.E3NNTensorProduct import E3NNTensorProduct
@@ -186,35 +197,48 @@ def correctness_double_backward(
     }
 
     tensors = []
-    for impl in [test_implementation, reference_implementation]:
-        tp = impl(problem, torch_op=True)
+    for i, impl in enumerate([test_implementation, reference_implementation]):
+        tp = instantiate_implementation(impl, problem) 
 
         if impl == CUETensorProduct and problem.shared_weights :
-            weights = weights[np.newaxis, :] 
+            weights = weights[np.newaxis, :]
+
+        weights_reordered = np.zeros_like(weights)        
+        if tp.reorder_weights_e3nn_to_oeq is not None:
+            tp.reorder_weights_e3nn_to_oeq(weights, weights_reordered, not tp.config.shared_weights)
+        else:
+            weights_reordered = weights
             
         in1_torch = torch.tensor(in1, device='cuda', requires_grad=True)
         in2_torch = torch.tensor(in2, device='cuda', requires_grad=True)
-        weights_torch = torch.tensor(weights, device='cuda', requires_grad=True)
+        weights_torch = torch.tensor(weights_reordered, device='cuda', requires_grad=True)
 
         out_torch = tp.forward(in1_torch, in2_torch, weights_torch)
         out_grad = out_torch.clone().detach().to(device='cuda').requires_grad_(True)
 
-        out_torch.backward(out_grad, 
-            create_graph=True,
-            retain_graph=True,
-            inputs=[in1_torch, in2_torch, weights_torch])
+        in1_grad, in2_grad, w_grad = torch.autograd.grad(
+            outputs=[out_torch],
+            inputs=[in1_torch, in2_torch, weights_torch],
+            grad_outputs=[out_grad],
+            create_graph=True)
 
-        dummy = torch.norm(in1_torch.grad) + torch.norm(in2_torch.grad) + torch.norm(weights_torch.grad)
+        dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
         dummy_grad = torch.tensor(float(dummy_grad), device='cuda', requires_grad=True)
+
         dummy.backward(dummy_grad,
             retain_graph=True, 
             inputs=[out_grad, in1_torch, in2_torch, weights_torch])
+
+        weights_grad = weights_torch.grad.detach().cpu().numpy()
+        if tp.reorder_weights_oeq_to_e3nn is not None:
+            weights_grad_copy = weights_grad.copy()
+            tp.reorder_weights_oeq_to_e3nn(weights_grad_copy, weights_grad, not tp.config.shared_weights)
 
         tensors.append((
             out_grad.grad.detach().cpu().numpy(),
             in1_torch.grad.detach().cpu().numpy(),
             in2_torch.grad.detach().cpu().numpy(),
-            weights_torch.grad.detach().cpu().numpy()
+            weights_grad
         ))
 
         

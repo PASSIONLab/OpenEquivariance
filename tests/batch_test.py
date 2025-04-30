@@ -7,25 +7,27 @@ from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance.benchmark.correctness_utils import correctness_forward, correctness_backward, correctness_double_backward
 from itertools import chain, product
 
-@pytest.fixture(params=[TensorProduct], ids=['oeq.TensorProduct'])
-def implementation(request):
-    return request.param
-
-@pytest.fixture(params=[np.float32, np.float64], ids=['F32', 'F64'])
-def dtype(request):
-    return request.param
-
 class TPCorrectness:
     def check_result(self, result, fieldname):
         with check:
             error = result[fieldname]["diff_Linf_norm"]
             thresh = result["thresh"]
-            assert result[fieldname]["pass"], f"{fieldname} observed error={error:.2f} >= {thresh}"
+            assert result[fieldname]["pass"], f"{fieldname} observed error={error:.5f} >= {thresh}"
 
-    def test_tp_fwd(self, problem, implementation): 
+    @pytest.fixture(params=[np.float32, np.float64], ids=['F32', 'F64'], scope="class")
+    def dtype(self, request):
+        return request.param
+
+    @pytest.fixture(scope="class")
+    def tp_and_problem(self, problem):
+        tp = TensorProduct(problem)
+        return tp, problem
+
+    def test_tp_fwd(self, tp_and_problem): 
+        tp, problem = tp_and_problem
         result = correctness_forward(
             problem=problem,
-            test_implementation=implementation,
+            test_implementation=tp,
             reference_implementation=None, 
             batch_size=1000,
             correctness_threshold=1e-5,
@@ -33,10 +35,11 @@ class TPCorrectness:
 
         self.check_result(result, "output")
 
-    def test_tp_bwd(self, problem, implementation): 
+    def test_tp_bwd(self, tp_and_problem): 
+        tp, problem = tp_and_problem
         result = correctness_backward(
             problem=problem,
-            test_implementation=implementation,
+            test_implementation=tp,
             reference_implementation=None, 
             batch_size=1000,
             correctness_threshold=3e-4,
@@ -46,13 +49,13 @@ class TPCorrectness:
         self.check_result(result, "in1_grad")
         self.check_result(result, "in2_grad")
 
-    @pytest.mark.skip(reason="Need to add weight reordering in double-backward")
-    def test_tp_double_bwd(self, problem, implementation):
+    def test_tp_double_bwd(self, tp_and_problem):
+        tp, problem = tp_and_problem
         result = correctness_double_backward(
             problem = problem,
-            test_implementation = implementation,
+            test_implementation=tp,
             reference_implementation = None,
-            batch_size = 1000,
+            batch_size = 200,
             correctness_threshold = 3e-4,
             prng_seed = 12345)
 
@@ -69,7 +72,7 @@ class TestProductionModels(TPCorrectness):
             e3nn_torch_tetris_polynomial, 
             diffdock_configs))
 
-    @pytest.fixture(params=production_model_tpps, ids = lambda x : x.label)
+    @pytest.fixture(params=production_model_tpps, ids = lambda x : x.label, scope="class")
     def problem(self, request, dtype):
         request.param.irrep_dtype, request.param.weight_dtype = dtype, dtype
         return request.param
@@ -91,7 +94,8 @@ class TestUVUSingleIrrep(TPCorrectness):
         return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
 
     @pytest.fixture(params=product(muls, irs), 
-                    ids = lambda x: TestUVUSingleIrrep.id_func(x[0], x[1])) 
+                    ids = lambda x: TestUVUSingleIrrep.id_func(x[0], x[1]),
+                    scope="class") 
     def problem(self, request, dtype):
         m, i = request.param[0], request.param[1]
         instructions=[(0, 0, 0, "uvu", True)]
@@ -117,7 +121,8 @@ class TestUVWSingleIrrep(TPCorrectness):
         return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
 
     @pytest.fixture(params=product(muls, irs), 
-                    ids = lambda x: TestUVWSingleIrrep.id_func(x[0], x[1])) 
+                    ids = lambda x: TestUVWSingleIrrep.id_func(x[0], x[1]),
+                    scope="class")
     def problem(self, request, dtype):
         m, i = request.param[0], request.param[1]
         instructions=[(0, 0, 0, "uvw", True)]

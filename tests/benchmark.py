@@ -89,7 +89,6 @@ def benchmark_uvu(params):
                 or ('benzene' not in test.problem.label and test.problem.irrep_dtype != np.float64)]
 
     bench_suite = TestBenchmarkSuite(
-        correctness_threshold = 5e-5,
         num_warmup=100,
         num_iter=100,
         bench_batch_size=params.batch_size,
@@ -110,7 +109,6 @@ def benchmark_roofline(params):
              in itertools.product(implementations, roofline_configs, directions)]
 
     bench_suite = TestBenchmarkSuite(
-        correctness_threshold = 5e-5,
         num_warmup=100,
         num_iter=100,
         bench_batch_size=200000,

@@ -53,25 +53,41 @@ template<typename JIT_IMPL>
 class __attribute__ ((visibility ("default"))) JITTPImpl : public GenericTensorProductImpl {
 public:
     JIT_IMPL jit;
-    KernelLaunchConfig forward_config; 
-    KernelLaunchConfig backward_config; 
+    KernelLaunchConfig forward_config, backward_config, double_backward_config; 
+    bool is_uvw;
 
     JITTPImpl(
         std::string jit_kernel,
         KernelLaunchConfig forward_config_i,
-        KernelLaunchConfig backward_config_i) :
+        KernelLaunchConfig backward_config_i,
+        KernelLaunchConfig double_backward_config_i,
+        bool is_uvw_i) :
             jit(jit_kernel),
             forward_config(forward_config_i),  
-            backward_config(backward_config_i) {
-        vector<string> kernels = {"forward", "backward"};
-        jit.compile(kernels, {{}, {}}); 
+            backward_config(backward_config_i),
+            double_backward_config(double_backward_config_i),
+            is_uvw(is_uvw_i) {
+        vector<string> kernels = {"forward", "backward", "double_backward_A", "double_backward_B"};
+
+        int opt_level = 3;
+        #ifdef HIP_BACKEND
+        if(is_uvw) {
+            opt_level = 1;
+        }
+        #endif 
+        jit.compile(kernels, {{}, {}, {}, {}}, opt_level); 
 
         if(forward_config.smem > 0) {
             jit.set_max_smem(0, forward_config.smem);
+            jit.set_max_smem(2, forward_config.smem);
         }
 
         if(backward_config.smem > 0) {
             jit.set_max_smem(1, backward_config.smem);
+        
+        }
+        if(double_backward_config.smem > 0) {
+            jit.set_max_smem(3, double_backward_config.smem);
         }
     }
 
@@ -79,6 +95,7 @@ public:
             std::string jit_kernel,
             std::unordered_map<string, int64_t> fwd_dict, 
             std::unordered_map<string, int64_t> bwd_dict,
+            std::unordered_map<string, int64_t> dbl_bwd_dict,
             std::unordered_map<string, int64_t> kernel_dims 
     ) : JITTPImpl(
             jit_kernel,
@@ -91,7 +108,14 @@ public:
                 bwd_dict["num_blocks"],
                 bwd_dict["num_threads"],
                 bwd_dict["smem"]
-            )) { } 
+            ),
+            KernelLaunchConfig(
+                dbl_bwd_dict["num_blocks"],
+                dbl_bwd_dict["num_threads"],
+                dbl_bwd_dict["smem"]
+            ),
+            kernel_dims["is_uvw"] == 1 
+        ) { } 
 
     void exec_tensor_product(
         uint64_t num_products,
@@ -112,6 +136,20 @@ public:
             void* L3_grad) {
         void *args[] = { &num_products, &L1_in, &L1_grad, &L2_in, &L2_grad, &weight, &weight_grad, &L3_grad};
         jit.execute(1, args, backward_config);
+    }
+
+    void double_backward(
+        size_t num_products,
+        void* L1_in, void* L2_in, void* W, void* L3_grad, // Inputs of backward op 
+        void* L1_dgrad, void* L2_dgrad, void* w_dgrad, // Gradients w.r.t outputs of backward op
+        void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad) {
+
+        void* args[] = { 
+            &num_products, &L1_in, &L2_in, &W, &L3_grad, &L1_dgrad, &L2_dgrad, &w_dgrad, 
+            &L1_grad, &L2_grad, &W_grad, &L3_dgrad
+        };
+        jit.execute(2, args, forward_config);
+        jit.execute(3, args, double_backward_config);
     }
 
     ~JITTPImpl() = default; 

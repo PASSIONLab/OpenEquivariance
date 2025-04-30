@@ -110,7 +110,13 @@ class ConvolutionBase:
         assert(graph.rows.dtype == self.idx_dtype)
         assert(graph.cols.dtype == self.idx_dtype)
 
-        L1_d, L2_d, weights_d = DeviceBuffer(L1_in), DeviceBuffer(L2_in), DeviceBuffer(weights)
+        weights_chunked = np.zeros_like(weights)        
+        if self.reorder_weights_e3nn_to_oeq is not None:
+            self.reorder_weights_e3nn_to_oeq(weights, weights_chunked, not self.config.shared_weights)
+        else:
+            weights_chunked = weights
+
+        L1_d, L2_d, weights_d = DeviceBuffer(L1_in), DeviceBuffer(L2_in), DeviceBuffer(weights_chunked)
         L3_d = DeviceBuffer(L3_out)
 
         rows_d = DeviceBuffer(graph.rows)
@@ -136,9 +142,15 @@ class ConvolutionBase:
         assert(graph.rows.dtype == self.idx_dtype)
         assert(graph.cols.dtype == self.idx_dtype)
 
+        weights_chunked = np.zeros_like(weights)        
+        if self.reorder_weights_e3nn_to_oeq is not None:
+            self.reorder_weights_e3nn_to_oeq(weights, weights_chunked, not self.config.shared_weights)
+        else:
+            weights_chunked = weights
+
         L1_d = DeviceBuffer(L1_in)
         L2_d = DeviceBuffer(L2_in)
-        weights_d = DeviceBuffer(weights)
+        weights_d = DeviceBuffer(weights_chunked)
         L3_d = DeviceBuffer(L3_grad)
         rows_d = DeviceBuffer(graph.rows)
         cols_d = DeviceBuffer(graph.cols)
@@ -166,6 +178,10 @@ class ConvolutionBase:
         L1_grad_d.copy_to_host()
         L2_grad_d.copy_to_host()
         weights_grad_d.copy_to_host()
+
+        if self.reorder_weights_oeq_to_e3nn is not None:
+            weights_grad_copy = weights_grad.copy()
+            self.reorder_weights_oeq_to_e3nn(weights_grad_copy, weights_grad, not self.config.shared_weights)
 
         return L1_grad, L2_grad, weights_grad
 
@@ -502,7 +518,7 @@ class ConvolutionBase:
 
         in1, in2, out_grad, weights, _, _, _ = get_random_buffers_backward_conv(self.config, graph.node_count, graph.nnz, prng_seed)  
         rng = np.random.default_rng(seed=prng_seed * 2)
-        dummy_grad = rng.standard_normal(1) 
+        dummy_grad_value = rng.standard_normal(1)[0]
 
         if reference_implementation is None:
             from openequivariance.implementations.convolution.E3NNConv import E3NNConv 
@@ -515,7 +531,13 @@ class ConvolutionBase:
         for i, tp in enumerate([self, reference_tp]):
             in1_torch = torch.tensor(in1, device='cuda', requires_grad=True)
             in2_torch = torch.tensor(in2, device='cuda', requires_grad=True)
-            weights_torch = torch.tensor(weights, device='cuda', requires_grad=True)
+
+            weights_reordered = np.zeros_like(weights)        
+            if i == 0 and self.reorder_weights_e3nn_to_oeq is not None:
+                self.reorder_weights_e3nn_to_oeq(weights, weights_reordered, not self.config.shared_weights)
+            else:
+                weights_reordered[:] = weights
+            weights_torch = torch.tensor(weights_reordered, device='cuda', requires_grad=True)
 
             torch_rows = torch.tensor(graph.rows, device='cuda')
             torch_cols = torch.tensor(graph.cols, device='cuda')
@@ -528,22 +550,26 @@ class ConvolutionBase:
             out_torch = tp.forward(*fwd_args)
             out_grad_torch = torch.tensor(out_grad, device='cuda', requires_grad=True)
 
-            out_torch.backward(out_grad_torch, 
-                create_graph=True,
-                retain_graph=True,
-                inputs=[in1_torch, in2_torch, weights_torch])
+            in1_grad, in2_grad, w_grad = torch.autograd.grad(
+                outputs=[out_torch],
+                inputs=[in1_torch, in2_torch, weights_torch],
+                grad_outputs=[out_grad_torch],
+                create_graph=True)
 
-            dummy = torch.norm(in1_torch.grad) + torch.norm(in2_torch.grad) + torch.norm(weights_torch.grad)
-            dummy_grad = torch.tensor(float(dummy_grad), device='cuda', requires_grad=True)
-            dummy.backward(dummy_grad,
-                retain_graph=True, 
-                inputs=[out_grad_torch, in1_torch, in2_torch, weights_torch])
+            dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
+            dummy_grad = torch.tensor(float(dummy_grad_value), device='cuda', requires_grad=True)
+            dummy.backward(dummy_grad, inputs=[out_grad_torch, in1_torch, in2_torch, weights_torch])
+            
+            weights_grad = weights_torch.grad.detach().cpu().numpy()
+            if i == 0 and self.reorder_weights_oeq_to_e3nn is not None:
+                weights_grad_copy = weights_grad.copy()
+                self.reorder_weights_oeq_to_e3nn(weights_grad_copy, weights_grad, not self.config.shared_weights)
 
             tensors.append((
                 out_grad_torch.grad.detach().cpu().numpy(),
                 in1_torch.grad.detach().cpu().numpy(),
                 in2_torch.grad.detach().cpu().numpy(),
-                weights_torch.grad.detach().cpu().numpy()
+                weights_grad 
             ))
 
         for name, to_check, ground_truth in [
