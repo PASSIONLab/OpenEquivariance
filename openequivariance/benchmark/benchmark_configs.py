@@ -65,8 +65,42 @@ nequip_conv = [
             'nequip-water'),
 ]
 
+nequip_asprin_conv = [
+    ("64x0e", 
+     "1x0e+1x1o+1x2e+1x3o", 
+     "64x0e+64x1o+64x2e+64x3o", 
+     "nequip-revmd17-aspirin-layer-1"
+     ),
+    (
+    "64x0e+64x1o+64x2e+64x3o",
+    "1x0e+1x1o+1x2e+1x3o",
+    "64x0e+64x0e+64x0e+64x0e+64x1o+64x1o+64x1o+64x1o+64x1o+64x1o+64x1e+64x1e+64x1e+64x2o+64x2o+64x2o+64x2o+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3e+64x3e+64x3e+64x3e",
+    "nequip-revmd17-aspirin-layer-2",
+    ),
+    (
+    "64x0e+64x1o+64x1e+64x2o+64x2e+64x3o+64x3e",
+    "1x0e+1x1o+1x2e+1x3o",
+    "64x0o+64x0o+64x0o+64x0e+64x0e+64x0e+64x0e+64x1o+64x1o+64x1o+64x1o+64x1o+64x1o+64x1o+64x1o+64x1o+64x1e+64x1e+64x1e+64x1e+64x1e+64x1e+64x1e+64x1e+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e",
+    "nequip-revmd17-aspirin-layer-3",
+    ),
+    (
+    "64x0o+64x0e+64x1o+64x1e+64x2o+64x2e+64x3o+64x3e",
+    "1x0e+1x1o+1x2e+1x3o",
+    "64x0o+64x0o+64x0o+64x0o+64x0e+64x0e+64x0e+64x0e+64x1o+64x1o+64x1o+64x1o+64x1o+64x1o+64x1o+64x1o+64x1o+64x1e+64x1e+64x1e+64x1e+64x1e+64x1e+64x1e+64x1e+64x1e+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e",
+    "nequip-revmd17-aspirin-layer-4",
+    ),
+    (
+    "64x0o+64x0e+64x1o+64x1e+64x2o+64x2e+64x3o+64x3e",
+    "1x0e+1x1o+1x2e+1x3o",
+    "64x0o+64x0o+64x0o+64x0o+64x0e+64x0e+64x0e+64x0e+64x1o+64x1o+64x1o+64x1o+64x1o+64x1o+64x1o+64x1o+64x1o+64x1e+64x1e+64x1e+64x1e+64x1e+64x1e+64x1e+64x1e+64x1e+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2o+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x2e+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3o+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e+64x3e",
+    "nequip-revmd17-aspirin-layer-5",
+    ),
+]
+
 mace_problems = [CTPP(*config) for config in mace_conv]
 
 mace_nequip_problems = []
 for config in mace_conv + nequip_conv:
     mace_nequip_problems.append(CTPP(*config))
+
+nequip_asprin_problems = [CTPP(*config) for config in nequip_asprin_conv]
