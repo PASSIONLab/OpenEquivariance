@@ -67,10 +67,11 @@ class ConvCorrectness:
         self.check_result(result, "weights_grad")
 
 class TestProductionModels(ConvCorrectness):
-    from openequivariance.benchmark.benchmark_configs import mace_problems, diffdock_configs 
+    from openequivariance.benchmark.benchmark_configs import mace_problems, diffdock_configs, nequip_asprin_problems
     production_model_tpps = list(chain(
         mace_problems, 
-        diffdock_configs
+        diffdock_configs,
+        nequip_asprin_problems,
         ))
 
     @pytest.fixture(params=production_model_tpps, ids = lambda x : x.label, scope="class")
