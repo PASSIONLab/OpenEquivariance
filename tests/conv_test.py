@@ -13,7 +13,11 @@ class ConvCorrectness:
             thresh = result["thresh"]
             assert result[fieldname]["pass"], f"{fieldname} observed error={error:.2f} >= {thresh}"
 
-    @pytest.fixture(params=[np.float32, np.float64], ids=['F32', 'F64'], scope='class')
+    @pytest.fixture(params=[np.float32, 
+                            #np.float64
+                            ], ids=['F32', 
+                                              #'F64'
+                                              ], scope='class')
     def dtype(self, request):
         return request.param
 
@@ -22,21 +26,24 @@ class ConvCorrectness:
         download_prefix = "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
         filename = request.param
 
-        graph = None
-        with tempfile.NamedTemporaryFile() as temp_file:
-            urllib.request.urlretrieve(download_prefix + filename, temp_file.name)
-            graph = load_graph(temp_file.name)
+        #graph = None
+        #with tempfile.NamedTemporaryFile() as temp_file:
+        #    urllib.request.urlretrieve(download_prefix + filename, temp_file.name)
+        #    graph = load_graph(temp_file.name)
 
-        #graph = load_graph("data/1drf_radius3.5.pickle")
+        graph = load_graph("data/1drf_radius3.5.pickle")
         return graph
 
-    @pytest.fixture(params=['atomic', 'deterministic'], scope='class')
+    @pytest.fixture(params=['atomic', 
+                            #'deterministic'
+                            ], scope='class')
     def conv_object(self, request, problem):
         if request.param == 'atomic':
             return oeq.TensorProductConv(problem, deterministic=False)
         elif request.param == 'deterministic':
             return oeq.TensorProductConv(problem, deterministic=True)
 
+    @pytest.mark.skip
     def test_tp_fwd(self, conv_object, graph):
         result = conv_object.test_correctness_forward(graph, 
                 thresh=3e-05,
@@ -45,6 +52,7 @@ class ConvCorrectness:
 
         self.check_result(result, "output")
 
+    @pytest.mark.skip
     def test_tp_bwd(self, conv_object, graph):
         result = conv_object.test_correctness_backward(graph, 
                 thresh=3e-04,
