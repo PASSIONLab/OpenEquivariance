@@ -103,13 +103,17 @@ class LoopUnrollConv(ConvolutionBase):
             destination_index_bytes = 32 # Add extra to account for padding
             workspace_size = max(
                 (self.forward_schedule.L3.dim * np.dtype(config.irrep_dtype).itemsize + destination_index_bytes) * self.forward_schedule.total_warps,
-                (self.backward_schedule.L1.dim * np.dtype(config.irrep_dtype).itemsize + destination_index_bytes) * self.backward_schedule.total_warps)
+                (self.backward_schedule.L1.dim * np.dtype(config.irrep_dtype).itemsize + destination_index_bytes) * self.backward_schedule.total_warps,
+                (self.double_backward_schedule.L1.dim * np.dtype(config.irrep_dtype).itemsize + destination_index_bytes) * self.double_backward_schedule.total_warps
+            )
 
             self.forward_workspace_offset = self.forward_schedule.L3.dim * np.dtype(config.irrep_dtype).itemsize * self.forward_schedule.total_warps
             self.backward_workspace_offset = self.backward_schedule.L1.dim * np.dtype(config.irrep_dtype).itemsize * self.backward_schedule.total_warps
+            self.double_backwardB_offset = self.double_backward_schedule.L1.dim * np.dtype(config.irrep_dtype).itemsize * self.double_backward_schedule.total_warps
 
             self.forward_workspace_offset = (self.forward_workspace_offset + 7) // 8 * 8
             self.backward_workspace_offset = (self.backward_workspace_offset + 7) // 8 * 8
+            self.double_backwardB_offset = (self.double_backwardB_offset + 7) // 8 * 8
 
         self.allocate_workspace(workspace_size)
 
@@ -119,7 +123,8 @@ class LoopUnrollConv(ConvolutionBase):
             double_backward_schedule=self.double_backward_schedule,
             idx_type=idx_type_map[idx_dtype],
             forward_workspace_offset=self.forward_workspace_offset,
-            backward_workspace_offset=self.backward_workspace_offset)
+            backward_workspace_offset=self.backward_workspace_offset,
+            double_backwardB_offset=self.double_backwardB_offset)
         self.jit_kernel = postprocess_kernel(self.jit_kernel)
 
         if self.torch_op and extlib.TORCH_COMPILE:

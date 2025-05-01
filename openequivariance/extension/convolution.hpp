@@ -112,7 +112,7 @@ public:
             double_backward_config(double_backward_config_i),
             is_uvw(is_uvw_i) {
 
-        vector<string> kernels = {"forward", "backward", "fixup_forward", "fixup_backward", "double_backward_A", "double_backward_B"};
+        vector<string> kernels = {"forward", "backward", "fixup_forward", "fixup_backward", "double_backward_A", "double_backward_B", "fixup_double_backwardB"};
 
         int opt_level = 3;
         #ifdef HIP_BACKEND
@@ -120,7 +120,7 @@ public:
             opt_level = 1;
         }
         #endif 
-        jit.compile(kernels, {{}, {}, {}, {}, {}, {}}, opt_level); 
+        jit.compile(kernels, {{}, {}, {}, {}, {}, {}, {}}, opt_level); 
 
         if(forward_config.smem > 0) {
             jit.set_max_smem(0, forward_config.smem);
@@ -240,7 +240,15 @@ public:
         }
 
         jit.execute(5, args, double_backward_config);
-        // TODO: Execute backward fixup kernel here
+
+        if(reinterpret_cast<uint64_t>(wspace) != 0) {
+            void *fixup_args[] = {&wspace, &L1_grad};
+            KernelLaunchConfig fixup_config;
+            fixup_config.num_blocks = double_backward_config.num_blocks;
+            fixup_config.num_threads = double_backward_config.num_threads;
+            fixup_config.smem = 0;
+            jit.execute(6, fixup_args, fixup_config);
+        }
     }
 
     ~JITConvImpl() = default; 
