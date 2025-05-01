@@ -244,12 +244,14 @@ __global__ void double_backward_A(
         IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
         IRREP_T* L1_dgrad, IRREP_T* L2_dgrad, IRREP_T* W_dgrad,
         IRREP_T* L1_grad, IRREP_T* L2_grad, WEIGHT_T* W_grad, IRREP_T* L3_dgrad,
-        ConvData c, void* workspace, unsigned {{idx_type}}* transpose_perm) {
+        ConvData c, void* workspace_raw, unsigned {{idx_type}}* transpose_perm) {
 
     extern __shared__ char s[];
     size_t num_products = c.nnz;
     unsigned {{idx_type}}* rows = (unsigned {{idx_type}}*) c.rows;
     unsigned {{idx_type}}* cols = (unsigned {{idx_type}}*) c.cols;
+
+    {{ set_launch_bound_variables(forward_schedule.launch_config) }}
 
     IRREP_T* workspace = (IRREP_T*) workspace_raw;
     {{idx_type}}* dst_idxs = ({{idx_type}}*) ((char*) workspace + {{forward_workspace_offset}}); 
@@ -263,7 +265,6 @@ __global__ void double_backward_A(
         }
     }
 
-    {{ set_launch_bound_variables(forward_schedule.launch_config) }}
     {%- set tpp = forward_schedule.updated_config %}
     char* smem = s + {{forward_schedule.memory_per_warp}} * warp_loc; 
 
@@ -336,7 +337,6 @@ __global__ void double_backward_A(
         } 
     } {%- endfor %}
 }
-
 
 __global__ void double_backward_B(
         IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,

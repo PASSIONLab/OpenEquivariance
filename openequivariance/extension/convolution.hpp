@@ -228,12 +228,18 @@ public:
             &L1_in, &L2_in, &W, &L3_grad, &L1_dgrad, &L2_dgrad, &w_dgrad, 
             &L1_grad, &L2_grad, &W_grad, &L3_dgrad, &conv_data, &wspace, &transpose_perm
         };
-        jit.execute(4, args, forward_config);
 
-        // TODO: Execute forward fixup kernel here 
+        jit.execute(4, args, forward_config);
+        if(reinterpret_cast<uint64_t>(wspace) != 0) {
+            void *fixup_args[] = {&wspace, &L3_dgrad};    
+            KernelLaunchConfig fixup_config;
+            fixup_config.num_blocks = forward_config.num_blocks;
+            fixup_config.num_threads = forward_config.num_threads;
+            fixup_config.smem = 0;
+            jit.execute(2, fixup_args, fixup_config);
+        }
 
         jit.execute(5, args, double_backward_config);
-
         // TODO: Execute backward fixup kernel here
     }
 
