@@ -10,7 +10,8 @@ It implements some of the tensor products
 that [e3nn](https://e3nn.org/) supports that are
 commonly found in graph neural networks 
 (e.g. [Nequip](https://github.com/mir-group/nequip) or
-[MACE](https://github.com/ACEsuit/mace)). To get started, install our package via
+[MACE](https://github.com/ACEsuit/mace)). To get started, make sure you have GCC 7.5+ active and 
+install our package via
 
 ```bash
 pip install git+https://github.com/PASSIONLab/OpenEquivariance
@@ -124,21 +125,21 @@ print(torch.norm(Z))
 arbitrary order. 
 
 ## Installation 
-We currently support Linux systems only. We recommend that you use
-`conda` or `mamba` to set up a Python environment for installation.
+We currently support Linux systems only. 
+Before installation and the first library import, 
+ensure that the command 
+`c++ --version` returns GCC 7.5+; if not, set the
+`CC` and `CXX` environment variables to a valid 
+compiler.
 
 After activating an environment of your choice, run
 ```bash
 pip install git+https://github.com/PASSIONLab/OpenEquivariance
 ```
 After installation, the very first library
-import will trigger a build of a C++ extension we use.
+import will trigger a build of a C++ extension we use,
+which takes longer than usual.
 All subsequent imports will not retrigger compilation.
-
-If you encounter problems with installation, let us
-know by filing a bug and try a development build (see
-below). After installation, you should be able 
-to run the example above.
 
 ## Replicating our benchmarks 
 To run our benchmark suite, you'll also need the following packages: 
