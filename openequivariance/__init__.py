@@ -5,6 +5,7 @@ from importlib.metadata import version
 from openequivariance.implementations.e3nn_lite import TPProblem, Irreps
 from openequivariance.implementations.TensorProduct import TensorProduct 
 from openequivariance.implementations.convolution.TensorProductConv import TensorProductConv 
+from openequivariance.implementations.utils import torch_to_oeq_dtype
 
 __version__ = version("openequivariance")
 

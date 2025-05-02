@@ -16,6 +16,9 @@ from mace.calculators import mace_mp
 from torch.profiler import profile, record_function, ProfilerActivity
 from mace.tools import compile as mace_compile
 
+
+from mace.modules.wrapper_ops import OEQConfig
+
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -57,7 +60,7 @@ def analyze_trace(trace_file):
     }
 
 def create_model(hidden_irreps, max_ell, device, cueq_config=None):
-    table = tools.AtomicNumberTable([6, 82, 53, 55, 5, 8, 7, 4, 2])
+    table = tools.AtomicNumberTable([6, 82, 53, 55])
     model_config = {
         "r_max": 6.0,
         "num_bessel": 8,
@@ -115,7 +118,7 @@ def benchmark_model(model, batch, num_iterations=100, warmup=100, label=None, ou
             "cuda_time_profile": analyze_trace(trace_file)
         }, f, indent=4) 
 
-    #print(run_inference())
+    print(run_inference())
 
     return measurement
 
@@ -123,7 +126,10 @@ def create_model_oeq(hidden_irreps, max_ell, device, cueq_config=None):
     source_model = create_model(hidden_irreps, max_ell, device, cueq_config)
     from mace.tools.scripts_utils import extract_config_mace_model
     config = extract_config_mace_model(source_model)
-    config["oeq_config"] = {"enabled": True, "conv_fusion": "deterministic"}
+    config["oeq_config"] = OEQConfig(
+        enabled=True,
+        optimize_all=True,
+        conv_fusion=None)
     target_model = source_model.__class__(**config).to(device)
 
     source_dict = source_model.state_dict()
@@ -172,7 +178,7 @@ def main():
         # Create dataset
         atoms_list = ase.io.read(args.xyz_file, index=":")
         #table = tools.AtomicNumberTable(list(set(np.concatenate([atoms.numbers for atoms in atoms_list]))))
-        table = tools.AtomicNumberTable([6, 82, 53, 55, 5, 8, 7, 4, 2])
+        table = tools.AtomicNumberTable([6, 82, 53, 55])
         data_loader = torch_geometric.dataloader.DataLoader(
             dataset=[data.AtomicData.from_config(
                 data.config_from_atoms(atoms),

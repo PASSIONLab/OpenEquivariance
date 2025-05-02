@@ -71,3 +71,17 @@ def filter_and_analyze_problem(problem):
         "is_uvw": problem.instructions[0].connection_mode == "uvw", 
     }
     return result
+
+def torch_to_oeq_dtype(torch_dtype):
+    global torch
+    import torch
+
+    """
+    Converts torch dtype to oeq dtype
+    """
+    if torch_dtype == torch.float32:
+        return np.float32
+    elif torch_dtype == torch.float64:
+        return np.float64
+    else:
+        raise ValueError("Unsupported torch dtype!")

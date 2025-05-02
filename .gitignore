@@ -25,6 +25,7 @@ nvidia-mathdx*
 .vscode/*
 *.ncu-rep
 mace_dev
+mace_oeq_integration
 valid_indices*
 
 *.xyz
