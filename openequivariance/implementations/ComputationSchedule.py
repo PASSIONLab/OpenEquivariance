@@ -276,7 +276,7 @@ class ComputationSchedule:
 
         smem_limit -= 1
         self.memory_per_warp = smem_limit // warps_per_block
-        self.memory_per_warp -= self.memory_per_warp % 4
+        self.memory_per_warp -= self.memory_per_warp % 8
 
         # =====================================================================
         # Shared memory partitioning functions 
