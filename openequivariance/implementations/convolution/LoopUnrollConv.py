@@ -97,6 +97,7 @@ class LoopUnrollConv(ConvolutionBase):
 
         self.forward_workspace_offset = None
         self.backward_workspace_offset = None
+        self.double_backwardB_offset = None
 
         workspace_size = 1
         if deterministic:
@@ -162,9 +163,10 @@ class LoopUnrollConv(ConvolutionBase):
         class TorchJITConv:
             def __init__(self, kernel_plaintext: str, 
                         fwd_config: dict[str, int], 
-                        bwd_config: dict[str, int], 
+                        bwd_config: dict[str, int],
+                        dbl_bwd_config: dict[str, int], 
                         kernel_dims: dict[str, int]) -> None:
-                self.kernel_plaintext, self.fwd_config, self.bwd_config, self.kernel_dims = kernel_plaintext, fwd_config, bwd_config, kernel_dims
+                self.kernel_plaintext, self.fwd_config, self.bwd_config, self.dbl_bwd_config, self.kernel_dims = kernel_plaintext, fwd_config, bwd_config, dbl_bwd_config, kernel_dims
 
             @classmethod
             def __obj_unflatten__(cls, flattened_product):
@@ -174,7 +176,7 @@ class LoopUnrollConv(ConvolutionBase):
                 return 0
             
             def __setstate__(self, state):
-                self.kernel_plaintext, self.fwd_config, self.bwd_config, self.kernel_dims = state 
+                self.kernel_plaintext, self.fwd_config, self.bwd_config, self.dbl_bwd_config, self.kernel_dims = state 
             
         @torch.library.register_fake("torch_tp_jit::jit_conv_forward")
         def fake_forward(jit, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm):
@@ -205,19 +207,6 @@ class LoopUnrollConv(ConvolutionBase):
 
         def double_backward(ctx, E, F, G):
             result = double_backward_op(ctx.jit, ctx.L1_in, ctx.L2_in, ctx.W, ctx.grad_output, E, F, G, ctx.rows, ctx.cols, ctx.workspace_buffer, ctx.sender_perm)
-
-            #jit, A, B, C, D, rows, cols, wspace, sender_perm = ctx.jit, ctx.L1_in, ctx.L2_in, ctx.grad_output, ctx.W, ctx.rows, ctx.cols, ctx.workspace_buffer, ctx.sender_perm
-            #op1 = backward_op(jit, E, F, D, C, rows, cols, wspace, sender_perm)
-            #op2 = backward_op(jit, A, B, G, C, rows, cols, wspace, sender_perm)
-            #op3 = forward_op(jit, E, B, D, rows, cols, wspace, sender_perm)
-            #op4 = backward_op(jit, E, B, D, C, rows, cols, wspace, sender_perm) # op4 and op5 could be combined with op3 and op6
-            #op5 = backward_op(jit, A, F, D, C, rows, cols, wspace, sender_perm)
-            #op6 = forward_op(jit, A, F, D, rows, cols, wspace, sender_perm)
-            #op7 = forward_op(jit, A, B, G, rows, cols, wspace, sender_perm)
-
-            #return None, op1[0] + op2[0], op1[1] + op2[1], op4[2] + op5[2], (op3 + op6 + op7), None, None, None, None
-            #print(torch.norm(op7 - result[3]))
-
             return None, result[0], result[1], result[2], result[3], None, None, None, None
 
         torch.library.register_autograd("torch_tp_jit::jit_conv_backward", double_backward, setup_context=setup_context_double_backward)

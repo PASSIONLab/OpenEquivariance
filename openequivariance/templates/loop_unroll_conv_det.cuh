@@ -297,7 +297,7 @@ __global__ void double_backward_A(
             {{ load_ir_segments(segment.L2Map, "l2", "L2_smem", "j") }}
              
             {%- if not forward_schedule.stream_weights %}
-                ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = w[{{segment.weight_offset}} + j + lane_id];)
+                ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = w_dgrad[{{segment.weight_offset}} + j + lane_id];)
             {%- endif %}
 
             w_buffer = w_dgrad;
@@ -336,7 +336,7 @@ __global__ void double_backward_A(
     } {%- endfor %}
 }
 
-{{ generate_fixup_kernel("fixup_double_backwardB", double_backward_schedule.launch_config.warp_size, backward_schedule.L1.dim, double_backwardB_offset) }}
+{{ generate_fixup_kernel("fixup_double_backwardB", double_backward_schedule.launch_config.warp_size, double_backward_schedule.L1.dim, double_backwardB_offset) }}
 
 {%- for i, segment in enumerate(double_backward_schedule.segments) %}
 {{ generate_segment_kernel_backward(i, segment, double_backward_schedule.launch_config.warp_size, double_bwd=True) }}
@@ -351,8 +351,9 @@ __global__ void double_backward_B(
         ConvData c, void* workspace_raw, unsigned {{idx_type}}* transpose_perm) {
 
     size_t num_products = c.nnz;
-    unsigned {{idx_type}}* rows = (unsigned {{idx_type}}*) c.rows;
-    unsigned {{idx_type}}* cols = (unsigned {{idx_type}}*) c.cols;
+    {{idx_type}}* rows = ({{idx_type}}*) c.cols;
+    {{idx_type}}* cols = ({{idx_type}}*) c.rows;
+    {{idx_type}}* tperm = ({{idx_type}}*) transpose_perm;
 
     extern __shared__ char s[];
     {{ set_launch_bound_variables(schedule.launch_config) }}
@@ -363,7 +364,7 @@ __global__ void double_backward_B(
 
     if(lane_id == 0) {
         if(start < end) {
-            dst_idxs[warp_id] = rows[start];
+            dst_idxs[warp_id] = cols[start];
         }
         else {
             dst_idxs[warp_id] = -1; 
@@ -380,18 +381,19 @@ __global__ void double_backward_B(
 
         for(size_t i = start; i < end; i++) {
             unsigned {{idx_type}} row = rows[i]; unsigned {{idx_type}} col = cols[i];
+            {{idx_type}} tperm_idx = tperm[i];
 
             IRREP_T* l1_shft = L1_dgrad + col * {{schedule.L1.dim}} + lane_id;
-            IRREP_T* l2_shft = L2_dgrad + i * {{schedule.L2.dim}} + lane_id; 
+            IRREP_T* l2_shft = L2_dgrad + tperm_idx * {{schedule.L2.dim}} + lane_id; 
             IRREP_T* l3_shft = L3_grad + row * {{schedule.L3.dim}} + lane_id;
 
             IRREP_T* l1_original = L1_in + col * {{schedule.L1.dim}} + lane_id;
-            IRREP_T* l2_original = L2_in + i * {{schedule.L2.dim}} + lane_id; 
+            IRREP_T* l2_original = L2_in + tperm_idx * {{schedule.L2.dim}} + lane_id; 
 
             {%- if not tpp.shared_weights %} 
-                WEIGHT_T* w = W + i * {{tpp.weight_numel}}; 
-                WEIGHT_T* wgrad = W_grad + i * {{tpp.weight_numel}}; 
-                WEIGHT_T* wdgrad = W_dgrad + i * {{tpp.weight_numel}}; 
+                WEIGHT_T* w = W + tperm_idx * {{tpp.weight_numel}}; 
+                WEIGHT_T* wgrad = W_grad + tperm_idx * {{tpp.weight_numel}}; 
+                WEIGHT_T* wdgrad = W_dgrad + tperm_idx * {{tpp.weight_numel}}; 
             {%- else %}
                 WEIGHT_T* w = W; 
                 WEIGHT_T* wgrad = W_grad; 
@@ -440,10 +442,10 @@ __global__ void double_backward_B(
             }
 
             IRREP_T* l1_grad_shft = L1_grad + col * {{schedule.L1.dim}} + lane_id;
-            IRREP_T* l2_grad_shft = L2_grad + i * {{schedule.L2.dim}} + lane_id;
+            IRREP_T* l2_grad_shft = L2_grad + tperm_idx * {{schedule.L2.dim}} + lane_id;
 
             {%- if not tpp.shared_weights %}
-                WEIGHT_T* weights_grad_shft = W_grad + i * {{schedule.updated_config.weight_numel}} + lane_id;
+                WEIGHT_T* weights_grad_shft = W_grad + tperm_idx * {{schedule.updated_config.weight_numel}} + lane_id;
             {%- else %}
                 WEIGHT_T* weights_grad_shft = W_grad + lane_id;
             {%- endif %}
@@ -452,7 +454,7 @@ __global__ void double_backward_B(
             if(changeRow || i == end - 1) {
                 IRREP_T* dst = l1_grad_shft;
                 if(firstSegment) {
-                    dst = workspace + {{backward_schedule.L1.dim}} * warp_id + lane_id;
+                    dst = workspace + {{schedule.L1.dim}} * warp_id + lane_id;
                     firstSegment = false;
                 }
                 {{ store_ir_segments(segment.L1Map, "dst", "L1_grad_smem", "j") }}

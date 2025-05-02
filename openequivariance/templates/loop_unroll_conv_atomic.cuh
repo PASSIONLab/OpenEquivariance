@@ -4,7 +4,8 @@
 
 {%- from 'macros.jinja' import
         transpose_load, transpose_store, 
-        load_ir_segments, store_ir_segments, 
+        load_ir_segments, load_ir_segments_force,
+        store_ir_segments, 
         declare_smem_variables,
         set_launch_bound_variables with context %}
 
@@ -34,6 +35,10 @@ __global__ void fixup_forward(void* workspace, IRREP_T* dst_ptr) {
 }
 
 __global__ void fixup_backward(void* workspace, IRREP_T* dst_ptr) {
+    // Empty, no fixup
+}
+
+__global__ void fixup_double_backwardB(void* workspace, IRREP_T* dst_ptr) {
     // Empty, no fixup
 }
 
@@ -198,9 +203,9 @@ __global__ void double_backward_A(
             {{ load_ir_segments(segment.L1Map, "l1", "L1_smem", "j") }}
             {{ load_ir_segments(segment.L2Map, "l2", "L2_smem", "j") }}
             ROW_OPERATION({{segment.L3.dim}}, j, L3_smem[j + lane_id] = 0.0f;)
-             
+                
             {%- if not forward_schedule.stream_weights %}
-                ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = w[{{segment.weight_offset}} + j + lane_id];)
+                ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = w_dgrad[{{segment.weight_offset}} + j + lane_id];)
             {%- endif %}
 
             w_buffer = w_dgrad;
@@ -225,7 +230,7 @@ __global__ void double_backward_A(
 
             {{ store_ir_segments(segment.L3Map, "l3", "L3_smem", "j") }}
         } 
-    } {%- endfor %}
+    } {%- endfor %} 
 }
 
 {%- for i, segment in enumerate(double_backward_schedule.segments) %}

@@ -216,12 +216,12 @@ public:
     }
 
     void double_backward(
-        void* L1_in, void* L2_in, void* W, void* L3_grad, 
-        void* L1_dgrad, void* L2_dgrad, void* w_dgrad, 
-        void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad, 
-        void* rows, void* cols,
-        uint64_t nnz, uint64_t node_count,
-        void* wspace, void* transpose_perm) {
+            void* L1_in, void* L2_in, void* W, void* L3_grad, 
+            void* L1_dgrad, void* L2_dgrad, void* w_dgrad, 
+            void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad, 
+            void* rows, void* cols,
+            uint64_t nnz, uint64_t node_count,
+            void* wspace, void* transpose_perm) {
 
         ConvData conv_data = {rows, cols, nnz, node_count};
         void* args[] = { 
@@ -240,7 +240,6 @@ public:
         }
 
         jit.execute(5, args, double_backward_config);
-
         if(reinterpret_cast<uint64_t>(wspace) != 0) {
             void *fixup_args[] = {&wspace, &L1_grad};
             KernelLaunchConfig fixup_config;
