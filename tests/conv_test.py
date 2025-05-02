@@ -22,12 +22,12 @@ class ConvCorrectness:
         download_prefix = "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
         filename = request.param
 
-        #graph = None
-        #with tempfile.NamedTemporaryFile() as temp_file:
-        #    urllib.request.urlretrieve(download_prefix + filename, temp_file.name)
-        #    graph = load_graph(temp_file.name)
+        graph = None
+        with tempfile.NamedTemporaryFile() as temp_file:
+            urllib.request.urlretrieve(download_prefix + filename, temp_file.name)
+            graph = load_graph(temp_file.name)
 
-        graph = load_graph("data/1drf_radius3.5.pickle")
+        #graph = load_graph("data/1drf_radius3.5.pickle")
         return graph
 
     @pytest.fixture(params=['atomic', 'deterministic'], scope='class')
