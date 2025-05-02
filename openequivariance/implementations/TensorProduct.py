@@ -10,7 +10,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
     def __init__(self, problem, torch_op=True):
         torch.nn.Module.__init__(self)
         LoopUnrollTP.__init__(self, problem, torch_op)
-        self.weight_numel = self.problem.weight_numel
+        self.weight_numel = problem.weight_numel
 
     @staticmethod
     def name():
