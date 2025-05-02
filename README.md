@@ -129,10 +129,12 @@ We currently support Linux systems only.
 Before installation and the first library import, 
 ensure that the command 
 `c++ --version` returns GCC 7.5+; if not, set the
-`CC` and `CXX` environment variables to a valid 
-compiler.
+`CC` and `CXX` environment variables to point to
+valid compilers. On NERSC Perlmutter,
+`module load gcc` will set up your environment
+correctly. 
 
-After activating an environment of your choice, run
+To install, run
 ```bash
 pip install git+https://github.com/PASSIONLab/OpenEquivariance
 ```
