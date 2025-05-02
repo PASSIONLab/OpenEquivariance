@@ -15,6 +15,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 
         self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device='cuda')
         self.forward = self.forward_deterministic if deterministic else self.forward_atomic
+        self.weight_numel = self.config.weight_numel
 
     @staticmethod
     def name():
