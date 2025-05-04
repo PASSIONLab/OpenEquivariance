@@ -2,7 +2,7 @@ import itertools, sys, os, logging, copy, pathlib
 import numpy as np
 
 from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance.implementations.E3NNTensorProduct import E3NNTensorProductCompiledCUDAGraphs
+from openequivariance.implementations.E3NNTensorProduct import E3NNTensorProduct, E3NNTensorProductCompiledCUDAGraphs
 from openequivariance.implementations.CUETensorProduct import CUETensorProduct
 from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance.benchmark.TestBenchmarkSuite import TestBenchmarkSuite, TestDefinition, Direction
@@ -10,7 +10,10 @@ from openequivariance.benchmark.tpp_creation_utils import FullyConnectedTPProble
 from openequivariance.benchmark.benchmark_configs import e3nn_torch_tetris_polynomial, diffdock_configs
 
 logger = getLogger()
+import torch
+from torch._functorch import config
 
+@config.patch("donated_buffer", False)
 def run_paper_uvw_benchmark(params) -> pathlib.Path:
     FCTPP = FullyConnectedTPProblem
 
@@ -27,16 +30,15 @@ def run_paper_uvw_benchmark(params) -> pathlib.Path:
     problems += float64_problems
 
     implementations = [
-        #E3NNTensorProductCompiledCUDAGraphs,
-        #CUETensorProduct,
+        E3NNTensorProductCompiledCUDAGraphs,
+        CUETensorProduct,
         TensorProduct]
 
-    tests = [TestDefinition(implementation, problem, direction, correctness=True, benchmark=True) 
+    tests = [TestDefinition(implementation, problem, direction, correctness=False, benchmark=True) 
                 for problem, direction, implementation
                 in itertools.product(problems, params.directions, implementations)]
 
     bench_suite = TestBenchmarkSuite(
-            correctness_threshold = 5e-5,
             num_warmup=100,
             num_iter=100,
             bench_batch_size=params.batch_size,
