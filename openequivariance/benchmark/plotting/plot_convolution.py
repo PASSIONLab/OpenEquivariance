@@ -8,6 +8,7 @@ def plot_convolution(data_folder):
     benchmarks, metadata = load_benchmarks(data_folder)
 
     implementations =  ["CUEConvolution", 
+                        "CUEConvolutionFused",
                         "LoopUnrollConvScatterSum",
                         "LoopUnrollConvAtomic",
                         "LoopUnrollConvDeterministic"

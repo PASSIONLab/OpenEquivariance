@@ -160,6 +160,7 @@ def benchmark_convolution(params):
 
         implementations = [ TensorProductConvScatterSum, 
                             CUEConv,
+                            CUEConvFused,
                             TensorProductConvDeterministic, 
                             TensorProductConvAtomic]
 

@@ -296,7 +296,9 @@ plt.rcParams.update({'font.size': 11})
 
 labelmap = {"E3NNTensorProduct": "e3nn", "CUETensorProduct": "cuE", "LoopUnrollTP": "ours",
             "E3NNTensorProductCompiledCUDAGraphs": "e3nn",
-            "LoopUnrollConvScatterSum": "fast-scattersum", "CUEConvolution": "cuE-scattersum", 
+            "LoopUnrollConvScatterSum": "fast-scattersum", 
+            "CUEConvolution": "cuE-scattersum", 
+            "CUEConvolutionFused": "cuE-fused", 
             "LoopUnrollConvDeterministic": "fast-fused-det", "LoopUnrollConvAtomic": "fast-fused-atomic"
            }
 colormap = {"e3nn": "lightblue", "cuE": "orange", "ours": "g"}
@@ -305,7 +307,8 @@ for key in ["fast-scattersum", "fast-fused-det", "fast-fused-atomic"]:
     colormap[key] = colormap["ours"]
     
 colormap["cuE-scattersum"] = colormap["cuE"]
-hatchmap = {"fast-fused-det": "oo", "fast-fused-atomic": "//"}
+colormap["cuE-fused"] = colormap["cuE"]
+hatchmap = {"fast-fused-det": "oo", "fast-fused-atomic": "//", "cuE-fused": "//"}
 
 directions = ["forward", "backward"]
 dtypes = ["<class 'numpy.float32'>", "<class 'numpy.float64'>"]
