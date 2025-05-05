@@ -55,8 +55,8 @@ def plot_double_backward(data_folder):
         set_grid(axs[i])
         set_grid(axs[i])
 
-    axs[0].set_xlabel("FP32")
-    axs[1].set_xlabel("FP64")
+    axs[0].set_xlabel("float32")
+    axs[1].set_xlabel("float64")
 
     handles, labels = axs[0].get_legend_handles_labels()
     unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
@@ -66,10 +66,6 @@ def plot_double_backward(data_folder):
         ax.label_outer()
 
     fig.supylabel("2nd Deriv. Throughput (# tensor products / s)", y=0.5)
-
-    fig.show()
-    fig.tight_layout()
-    fig.savefig("throughput_comparison.pdf")        
 
     speedup_table = []
     for direction in ['double_backward']:
