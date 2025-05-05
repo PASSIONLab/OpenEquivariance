@@ -288,7 +288,7 @@ if __name__=='__main__':
     parser_uvw.add_argument("--plot", action="store_true", help="Plot the results.")
     parser_uvw.set_defaults(func=run_paper_uvw_benchmark)
 
-    parser_higher_deriv = subparsers.add_parser('higher_deriv', help='Run the higher derivative kernel benchmark')
+    parser_higher_deriv = subparsers.add_parser('double_backward', help='Run the higher derivative kernel benchmark')
     parser_higher_deriv.add_argument("--batch_size", "-b", type=int, default=50000, help="Batch size for benchmark")
     parser_higher_deriv.set_defaults(func=run_paper_hderiv_benchmark)
 

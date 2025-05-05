@@ -43,26 +43,33 @@ def plot_double_backward(data_folder):
                     print(impl)
 
                 dataf64[direction][desc][labelmap[impl]] = calculate_tp_per_sec(exp)
-        
-    fig = plt.figure(figsize=(7, 7))
-    gs = fig.add_gridspec(2, 1)
-    axs = gs.subplots(sharex=True)
 
-    grouped_barchart(dataf32["double_backward"], axs[0], bar_height_fontsize=0, xticklabel=False, colormap=colormap, group_spacing=6.0)
+    fig = plt.figure(figsize=(7, 5))
+    gs = fig.add_gridspec(1, 2, hspace=0, wspace=0)
+    axs = gs.subplots(sharex='col', sharey='row')
+
+    grouped_barchart(dataf32["double_backward"], axs[0], bar_height_fontsize=0, colormap=colormap, group_spacing=6.0)
     grouped_barchart(dataf64["double_backward"], axs[1], bar_height_fontsize=0, colormap=colormap, group_spacing=6.0)
 
     for i in range(2):
         set_grid(axs[i])
         set_grid(axs[i])
 
-    axs[0].set_ylabel("FP32")
-    axs[1].set_ylabel("FP64")
+    axs[0].set_xlabel("FP32")
+    axs[1].set_xlabel("FP64")
 
     handles, labels = axs[0].get_legend_handles_labels()
     unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
     axs[0].legend(*zip(*unique))
 
-    fig.supylabel("Double Backward Throughput (# tensor products / s)", y=0.6)
+    for ax in fig.get_axes():
+        ax.label_outer()
+
+    fig.supylabel("2nd Deriv. Throughput (# tensor products / s)", y=0.5)
+
+    fig.show()
+    fig.tight_layout()
+    fig.savefig("throughput_comparison.pdf")        
 
     speedup_table = []
     for direction in ['double_backward']:
