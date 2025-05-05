@@ -186,7 +186,37 @@ def benchmark_convolution(params):
             plot({"data_folder": output_folder})
         else:
             logger.critical("Cannot plot convolution speedups over cuE with --limited-memory flag enabled.")
- 
+
+def run_paper_hderiv_benchmark(params):
+    from openequivariance.benchmark.benchmark_configs import mace_nequip_problems, diffdock_configs
+
+    implementations = [
+        E3NNTensorProduct,
+        CUETensorProduct,
+        TensorProduct, 
+    ]
+
+    problems = diffdock_configs + mace_nequip_problems
+    float64_problems = copy.deepcopy(problems)
+
+    for problem in float64_problems: 
+        problem.irrep_dtype = np.float64
+        problem.weight_dtype = np.float64 
+
+    directions : list[Direction] = ['double_backward']
+    tests = [TestDefinition(implementation, problem, direction, correctness=False, benchmark=True) 
+                for  problem, direction, implementation in itertools.product(problems + float64_problems, directions, implementations)]
+
+    logger = getLogger()
+    logger.setLevel(logging.INFO)
+    test_suite = TestBenchmarkSuite(bench_batch_size=20000, test_name="double_backward")
+    test_suite.run(tests)
+
+    data_folder = test_suite.run(tests, params.output_folder)
+    if params.plot:
+        plot({"data_folder": data_folder})
+
+
 def plot(params):
     import openequivariance.benchmark.plotting as plotting
     data_folder, test_name = None, None
@@ -207,6 +237,10 @@ def plot(params):
         plotting.plot_roofline(data_folder)
     elif test_name == "convolution":
         plotting.plot_convolution(data_folder)
+    elif test_name == "double_backward":
+        plotting.plot_double_backward(data_folder)
+    else:
+        raise ValueError(f"Unknown test name: {test_name}. Cannot plot results.")
 
 if __name__=='__main__':
     logger.setLevel(logging.INFO)
@@ -253,6 +287,10 @@ if __name__=='__main__':
             choices=['forward', 'backward'])
     parser_uvw.add_argument("--plot", action="store_true", help="Plot the results.")
     parser_uvw.set_defaults(func=run_paper_uvw_benchmark)
+
+    parser_higher_deriv = subparsers.add_parser('higher_deriv', help='Run the higher derivative kernel benchmark')
+    parser_higher_deriv.add_argument("--batch_size", "-b", type=int, default=50000, help="Batch size for benchmark")
+    parser_higher_deriv.set_defaults(func=run_paper_hderiv_benchmark)
 
     parser_plot = subparsers.add_parser('plot', help="Generate a plot for a folder of benchmarks.")
     parser_plot.add_argument("data_folder", type=str)

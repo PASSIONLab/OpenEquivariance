@@ -16,16 +16,14 @@ from openequivariance.benchmark.benchmark_configs import mace_nequip_problems, d
 
 
 implementations = [
-    # E3NNTensorProduct,
-    #CUETensorProduct,
+    E3NNTensorProduct,
+    CUETensorProduct,
     TensorProduct, 
 ]
 
 problems = diffdock_configs # mace_nequip_problems
 
 directions : list[Direction] = [
-    #'forward',
-    #'backward',
     'double_backward',
 ]
 
