@@ -29,7 +29,9 @@ We currently support NVIDIA GPUs and just added beta support on AMD GPUs for
 all tensor products! See [the coverage table](#tensor-products-we-accelerate) for more 
 details.
 
-**Warning**: This is an early release, bug reports are welcome.
+📣 📣 OpenEquivariance was accepted to the 2025 SIAM Conference on Applied and 
+Computational Discrete Algorithms! Catch the talk in Montréal and check out the 
+[camera-ready copy on Arxiv](https://arxiv.org/abs/2501.13986) today.
 
 ## Show me some examples
 Here's a CG tensor product implemented by e3nn: 
@@ -279,14 +281,12 @@ If you have a use case for any of the unsupported features above, let us know.
 If you find this code useful, please cite our paper:
 
 ```bibtex
-@misc{openequivariance,
-      title={An Efficient Sparse Kernel Generator for O(3)-Equivariant Deep Networks}, 
-      author={Vivek Bharadwaj and Austin Glover and Aydin Buluc and James Demmel},
-      year={2025},
-      eprint={2501.13986},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2501.13986}, 
+@inbook{openequivariance,
+author={Vivek Bharadwaj and Austin Glover and Aydin Buluc and James Demmel},
+title={An Efficient Sparse Kernel Generator for O(3)-Equivariant Deep Networks}, 
+booktitle = {SIAM Conference on Applied and Computational Discrete Algorithms (ACDA25)},
+chapter = {},
+url={https://arxiv.org/abs/2501.13986}
 }
 ```
 
