@@ -171,7 +171,9 @@ class CUETensorProduct(TensorProductBase):
                 event_time_ms = event["dur"] / 1000
                 total += event_time_ms 
 
-                if "TensorProductUniform1dKernel" in event["name"]:
+                if "TensorProductUniform1dKernel" in event["name"] \
+                        or "channelwise_kernel_fwd" in event["name"] \
+                        or "channelwise_kernel_bwd" in event["name"]:
                     tp_time += event_time_ms 
 
         return tp_time 
@@ -210,7 +212,7 @@ class CUETensorProduct(TensorProductBase):
                     with record_function("cue_forward"):
                         torch_L3_out = self.forward(torch_L1_in, torch_L2_in, torch_weights) 
 
-                prof.export_chrome_trace(trace_file)
+                prof.export_chrome_trace(trace_file) 
                 time_millis[i] = self.analyze_trace(trace_file)
 
             return time_millis
