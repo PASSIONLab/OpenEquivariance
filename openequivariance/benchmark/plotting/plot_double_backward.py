@@ -44,8 +44,8 @@ def plot_double_backward(data_folder):
 
                 dataf64[direction][desc][labelmap[impl]] = calculate_tp_per_sec(exp)
 
-    fig = plt.figure(figsize=(7, 5))
-    gs = fig.add_gridspec(1, 2, hspace=0, wspace=0)
+    fig = plt.figure(figsize=(7, 3))
+    gs = fig.add_gridspec(1, 2, hspace=0, wspace=0.1)
     axs = gs.subplots(sharex='col', sharey='row')
 
     grouped_barchart(dataf32["double_backward"], axs[0], bar_height_fontsize=0, colormap=colormap, group_spacing=6.0)
@@ -65,7 +65,7 @@ def plot_double_backward(data_folder):
     for ax in fig.get_axes():
         ax.label_outer()
 
-    fig.supylabel("2nd Deriv. Throughput (# tensor products / s)", y=0.5)
+    fig.supylabel("2nd Deriv. Throughput\n(# tensor products / s)", y=0.5)
 
     speedup_table = []
     for direction in ['double_backward']:
