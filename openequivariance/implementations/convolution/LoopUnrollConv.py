@@ -145,6 +145,9 @@ class LoopUnrollConv(ConvolutionBase):
                  "is_uvw": int(self.is_uvw)})
         logger.info("Kernel compiled!")
 
+        #with open("scratch.txt", "w") as f:
+        #    f.write(self.jit_kernel)
+
         self.reorder_weights_e3nn_to_oeq = lambda input, output, has_batch_dim: \
                 self.forward_schedule.reorder_weights(input, output, "forward", has_batch_dim) 
         self.reorder_weights_oeq_to_e3nn = lambda input, output, has_batch_dim: \

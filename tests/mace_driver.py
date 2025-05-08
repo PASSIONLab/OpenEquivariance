@@ -44,7 +44,7 @@ def analyze_trace(trace_file):
 
             if "forward" in event["name"] \
                     or "backward" in event["name"] \
-                    or "TensorProductUniform1dKernel" in event["name"] \
+                    or "TensorProductUniform1d" in event["name"] \
                     or "channelwise_kernel_fwd" in event["name"] \
                     or "channelwise_kernel_bwd" in event["name"]:
                 cgtp_fwd_bwd += event["dur"]
@@ -62,7 +62,7 @@ def analyze_trace(trace_file):
     }
 
 def create_model(hidden_irreps, max_ell, device, cueq_config=None, oeq_config=None):
-    table = tools.AtomicNumberTable([6, 82, 53, 55, 5, 8, 7, 4, 2])
+    table = tools.AtomicNumberTable([6, 7, 8, 1, 11, 13, 15, 18])
     model_config = {
         "r_max": 6.0,
         "num_bessel": 8,
@@ -131,8 +131,9 @@ def create_model_oeq(hidden_irreps, max_ell, device, cueq_config=None):
     config = extract_config_mace_model(source_model)
     config["oeq_config"] = OEQConfig(
         enabled=True,
-        optimize_all=True,
-        conv_fusion=None)
+        optimize_channelwise=True,
+        optimize_symmetric=True,
+        conv_fusion="deterministic")
 
     target_model = source_model.__class__(**config).to(device)
 
@@ -184,15 +185,15 @@ def main():
     print("WARNING: You need a modified version of MACE to run this driver.")
     parser = argparse.ArgumentParser()
     parser.add_argument("xyz_file", type=str, help="Path to xyz file")
-    parser.add_argument("--device", type=str, default="cuda", choices=["cpu", "cuda"])
+    parser.add_argument("--device", type=str, default="cuda", choices=["cuda"])
     parser.add_argument("--num_iters", type=int, default=100)
     parser.add_argument("--max_ell", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--hidden_irreps", type=str, default="128x0e + 128x1o + 128x2e")
     parser.add_argument("--output_folder", '-o', type=str, default=None)
-    parser.add_argument("--implementations", "-i", type=str, nargs='+', 
-            default=['e3nn', 'cue', 'oeq'], help="Implementations to benchmark",
-            choices=['e3nn', 'cue', 'oeq'])
+    parser.add_argument("--implementations", "-i", type=str, nargs='+',
+            default=['e3nn', 'cue', 'oeq', 'hybrid'], help="Implementations to benchmark",
+            choices=['e3nn', 'cue', 'oeq', 'hybrid'])
 
     args = parser.parse_args()
 
@@ -209,7 +210,7 @@ def main():
         # Create dataset
         atoms_list = ase.io.read(args.xyz_file, index=":")
         #table = tools.AtomicNumberTable(list(set(np.concatenate([atoms.numbers for atoms in atoms_list]))))
-        table = tools.AtomicNumberTable([6, 82, 53, 55, 5, 8, 7, 4, 2])
+        table = tools.AtomicNumberTable([6, 7, 8, 1, 11, 13, 15, 18])
         data_loader = torch_geometric.dataloader.DataLoader(
             dataset=[data.AtomicData.from_config(
                 data.config_from_atoms(atoms),
@@ -243,10 +244,15 @@ def main():
             print(f"E3NN Measurement:\n{measurement_e3nn}")
 
         if 'oeq' in args.implementations:
-            model_oeq = create_model_hybrid(hidden_irreps, args.max_ell, device)
+            model_oeq = create_model_oeq(hidden_irreps, args.max_ell, device)
             measurement_oeq = benchmark_model(model_oeq, batch_dict, args.num_iters, label=f"ours_{dtype_str}", output_folder=output_folder)
             print(f"\nOpenEquivariance Measurement:\n{measurement_oeq}")
             #print(f"\nSpeedup: {measurement_e3nn.mean / measurement_oeq.mean:.2f}x")
+
+        if 'hybrid' in args.implementations:
+            model_hybrid = create_model_hybrid(hidden_irreps, args.max_ell, device)
+            measurement_hybrid = benchmark_model(model_hybrid, batch_dict, args.num_iters, label=f"hybrid_{dtype_str}", output_folder=output_folder)
+            print(f"\nHybrid Measurement:\n{measurement_hybrid}")
 
         if 'cue' in args.implementations:
             model_cueq = create_model_cueq(hidden_irreps, args.max_ell, device)
