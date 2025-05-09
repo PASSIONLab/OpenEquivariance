@@ -42,6 +42,7 @@ else:
         def postprocess(kernel):
             kernel = kernel.replace("__syncwarp();", "__threadfence_block();")
             kernel = kernel.replace("__shfl_down_sync(FULL_MASK,", "__shfl_down(")
+            kernel = kernel.replace("atomicAdd", "unsafeAtomicAdd")
             return kernel 
         postprocess_kernel = postprocess
 
