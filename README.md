@@ -30,8 +30,8 @@ all tensor products! See [the coverage table](#tensor-products-we-accelerate) fo
 details.
 
 📣 📣 OpenEquivariance was accepted to the 2025 SIAM Conference on Applied and 
-Computational Discrete Algorithms! Catch the talk in Montréal and check out the 
-[camera-ready copy on Arxiv](https://arxiv.org/abs/2501.13986) today.
+Computational Discrete Algorithms (Proceedings Track)! Catch the talk in 
+Montréal and check out the [camera-ready copy on Arxiv](https://arxiv.org/abs/2501.13986) (available May 12, 2025).
 
 ## Show me some examples
 Here's a CG tensor product implemented by e3nn: 
