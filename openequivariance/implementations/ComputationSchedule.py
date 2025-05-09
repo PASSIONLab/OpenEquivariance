@@ -245,10 +245,15 @@ class ComputationSchedule:
             weight_dtype,
             include_scratch=False,
             stream_weights=False, 
-            schedule_type=2):
+            schedule_type=2,
+            kahan=False):
         '''
         smem_limit: size of available shared memory in bytes 
         '''
+        self.kahan = kahan
+        if kahan:
+            assert irrep_dtype == weight_dtype == np.float32
+
         # Note: does not work with variances for irreps; easy to add that in 
         self.total_warps = warps_per_block * block_count
 
@@ -288,9 +293,15 @@ class ComputationSchedule:
                 "L1": {"size": sum([self.L1[el].dim for el in L1_set]) * irrep_itemsize, "dtype": self.irrep_dtype_cstr},
                 "L2": {"size": sum([self.L2[el].dim for el in L2_set]) * irrep_itemsize, "dtype": self.irrep_dtype_cstr},
                 "L3": {"size": sum([self.L3[el].dim for el in L3_set]) * irrep_itemsize, "dtype": self.irrep_dtype_cstr},
+                "L3_kahan": {"size": 0, "dtype": self.irrep_dtype_cstr},
                 "weights": {"size": 0, "dtype": self.weight_dtype_cstr},
                 "scratch": {"size": 0, "dtype": self.weight_dtype_cstr}
             }
+
+            if kahan:
+                smem["L3_kahan"]["size"] = smem["L3"]["size"] 
+            else:
+                smem.pop("L3_kahan")
 
             weights_smem = 0
             for inst_idx in inst_idxs:
@@ -325,6 +336,7 @@ class ComputationSchedule:
             smem = {
                 "L1": {"size": sum([self.L1[el].dim for el in L1_set]) * irrep_itemsize, "dtype": self.irrep_dtype_cstr},
                 "L1_grad": {"size": sum([self.L1[el].dim for el in L1_set]) * irrep_itemsize, "dtype": self.irrep_dtype_cstr},
+                "L1_kahan": {"size": 0, "dtype": self.irrep_dtype_cstr},
                 "L2": {"size": sum([self.L2[el].dim for el in L2_set]) * irrep_itemsize, "dtype": self.irrep_dtype_cstr},
                 "L2_grad": {"size": sum([self.L2[el].dim for el in L2_set]) * irrep_itemsize, "dtype": self.irrep_dtype_cstr},
                 "L3_grad": {"size": sum([self.L3[el].dim for el in L3_set]) * irrep_itemsize, "dtype": self.irrep_dtype_cstr},
@@ -332,6 +344,11 @@ class ComputationSchedule:
                 "weights_grad": {"size": 0, "dtype": self.weight_dtype_cstr},
                 "scratch": {"size": 0, "dtype": self.weight_dtype_cstr}
             }
+
+            if kahan:
+                smem["L1_kahan"]["size"] = smem["L1"]["size"] 
+            else:
+                smem.pop("L1_kahan")
 
             if L2_dgrad:
                 smem["L2_dgrad"] = {"size": smem["L2"]["size"], "dtype": self.irrep_dtype_cstr} 

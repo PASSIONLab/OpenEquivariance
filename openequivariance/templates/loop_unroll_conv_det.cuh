@@ -63,6 +63,31 @@ __global__ void {{name}}(void* workspace, IRREP_T* dst_ptr) {
 
 {{ generate_fixup_kernel("fixup_forward", forward_schedule.launch_config.warp_size, forward_schedule.L3.dim, forward_workspace_offset) }}
 
+template<int ROW_LEN>
+__device__ __forceinline__ void kahanAdd(IRREP_T* c, IRREP_T* sum) {
+    c += lane_id;
+    sum += lane_id;
+    #pragma unroll 
+    for(int j = 0; j < ROW_LEN; j += THREADS_PER_WARP) {
+        if(j >= ROW_LEN - THREADS_PER_WARP) {
+            if(lane_id < ROW_LEN - j) {
+                IRREP_T y = c[j];
+                IRREP_T sum = sum[j];
+                IRREP_T t = sum + y;
+                c[j] = y - (t - sum);
+                sum[j] = t;
+            }
+        }
+        else {
+            IRREP_T y = c[j];
+            IRREP_T sum = sum[j];
+            IRREP_T t = sum + y;
+            c[j] = y - (t - sum);
+            sum[j] = t;
+        }
+    }
+}
+
 __global__ void forward(
         IRREP_T* L1_in,
         IRREP_T* L2_in,
@@ -99,6 +124,12 @@ __global__ void forward(
         bool firstSegment = true;
         ROW_OPERATION({{segment.L3.dim}}, j, L3_smem[j + lane_id] = 0.0f;)
 
+        {%- set ns = namespace(L3_accum="L3_smem") %}
+        {%- if forward_schedule.kahan %}
+            ROW_OPERATION({{segment.L3.dim}}, j, L3_kahan[j + lane_id] = 0.0f;)
+            {%- set ns.L3_accum="L3_kahan" %}
+        {%- endif %}
+
         for(size_t i = start; i < end; i++) {
             {{idx_type}} row = rows[i]; {{idx_type}} col = cols[i];
 
@@ -115,8 +146,12 @@ __global__ void forward(
             {%- endif %}
 
             __syncwarp();
-            forward_loop_unroll_{{i}}(L1_smem, L2_smem, w, weights_smem, L3_smem, scratch_smem, lane_id);
+            forward_loop_unroll_{{i}}(L1_smem, L2_smem, w, weights_smem, {{ns.L3_accum}}, scratch_smem, lane_id);
             __syncwarp();
+
+            {%- if forward_schedule.kahan %}
+                kahanAdd<{{segment.L3.dim}}>(L3_kahan, L3_smem);
+            {%- endif %}
 
             bool changeRow = (i < end - 1) && (row != rows[i+1]);
 

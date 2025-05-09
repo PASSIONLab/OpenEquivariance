@@ -100,3 +100,31 @@ class TestUVWSingleIrrep(ConvCorrectness):
                              instructions, shared_weights=False, 
                              internal_weights=False,
                              irrep_dtype=dtype, weight_dtype=dtype)
+    
+class TestUVUSingleIrrep(ConvCorrectness):
+    muls = [ (32, 1, 32) ] 
+    irs = [(5, 3, 5)]
+
+    def id_func(m, i): 
+        return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
+
+    @pytest.fixture(params=product(muls, irs), 
+                    ids = lambda x: TestUVUSingleIrrep.id_func(x[0], x[1]),
+                    scope="class") 
+    def problem(self, request, dtype):
+        m, i = request.param[0], request.param[1]
+        instructions=[(0, 0, 0, "uvu", True)]
+        return oeq.TPProblem(f"{m[0]}x{i[0]}e", f"{m[1]}x{i[1]}e", f"{m[2]}x{i[2]}e",
+                             instructions, shared_weights=False, 
+                             internal_weights=False,
+                             irrep_dtype=dtype, weight_dtype=dtype)
+    
+
+    @pytest.fixture(params=['kahan'], scope='class')
+    def conv_object(self, request, problem):
+        if request.param == 'atomic':
+            return oeq.TensorProductConv(problem, deterministic=False)
+        elif request.param == 'deterministic':
+            return oeq.TensorProductConv(problem, deterministic=True)
+        elif request.param == 'kahan':
+            return oeq.TensorProductConv(problem, deterministic=True, kahan=True)

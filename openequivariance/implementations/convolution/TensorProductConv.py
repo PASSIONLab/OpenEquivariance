@@ -38,6 +38,17 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 # ==================================================================
 # Reference implementations for benchmarking
 
+class TensorProductConvKahan(TensorProductConv):
+    def __init__(self, config, 
+            idx_dtype=np.int64, 
+            torch_op=True):
+        super().__init__(config, idx_dtype, torch_op, deterministic=True, kahan=True)
+
+    @staticmethod
+    def name():
+        return "LoopUnrollConvKahan"
+
+
 class TensorProductConvDeterministic(TensorProductConv):
     def __init__(self, config, 
             idx_dtype=np.int64, 

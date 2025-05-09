@@ -54,9 +54,12 @@ def filter_and_analyze_problem(problem):
     Centralized function that stops unhandled problem configurations,
     returns a dictionary of useful information about the problem. 
     '''
-    for inst in problem.instructions:
+    for i, inst in enumerate(problem.instructions):
         assert inst.connection_mode == problem.instructions[0].connection_mode, \
             f"All instructions must have the same connection mode, got {inst.connection_mode} and {problem.instructions[0].connection_mode}"
+
+        assert inst.has_weight, \
+            f"All instructions must have trainable weights, got {inst.has_weight} at index {i}"
 
     assert problem.instructions[0].connection_mode in ["uvu", "uvw"], \
             f"Connection mode must be 'uvu' or 'uvw', got {problem.instructions[0].connection_mode}"
