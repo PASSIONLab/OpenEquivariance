@@ -105,6 +105,10 @@ class TestUVUSingleIrrep(ConvCorrectness):
     muls = [ (32, 1, 32) ] 
     irs = [(5, 3, 5)]
 
+    @pytest.fixture(params=[np.float32], ids=['F32'], scope='class')
+    def dtype(self, request):
+        return request.param
+
     def id_func(m, i): 
         return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
 

@@ -64,26 +64,26 @@ __global__ void {{name}}(void* workspace, IRREP_T* dst_ptr) {
 {{ generate_fixup_kernel("fixup_forward", forward_schedule.launch_config.warp_size, forward_schedule.L3.dim, forward_workspace_offset) }}
 
 template<int ROW_LEN>
-__device__ __forceinline__ void kahanAdd(IRREP_T* c, IRREP_T* sum) {
-    c += lane_id;
-    sum += lane_id;
+__device__ __forceinline__ void kahanAdd(IRREP_T* c_arr, IRREP_T* sum_arr, int lane_id) {
+    c_arr += lane_id;
+    sum_arr += lane_id;
     #pragma unroll 
     for(int j = 0; j < ROW_LEN; j += THREADS_PER_WARP) {
         if(j >= ROW_LEN - THREADS_PER_WARP) {
             if(lane_id < ROW_LEN - j) {
-                IRREP_T y = c[j];
-                IRREP_T sum = sum[j];
+                IRREP_T y = c_arr[j];
+                IRREP_T sum = sum_arr[j];
                 IRREP_T t = sum + y;
-                c[j] = y - (t - sum);
-                sum[j] = t;
+                c_arr[j] = y - (t - sum);
+                sum_arr[j] = t;
             }
         }
         else {
-            IRREP_T y = c[j];
-            IRREP_T sum = sum[j];
+            IRREP_T y = c_arr[j];
+            IRREP_T sum = sum_arr[j];
             IRREP_T t = sum + y;
-            c[j] = y - (t - sum);
-            sum[j] = t;
+            c_arr[j] = y - (t - sum);
+            sum_arr[j] = t;
         }
     }
 }
@@ -126,8 +126,8 @@ __global__ void forward(
 
         {%- set ns = namespace(L3_accum="L3_smem") %}
         {%- if forward_schedule.kahan %}
-            ROW_OPERATION({{segment.L3.dim}}, j, L3_kahan[j + lane_id] = 0.0f;)
-            {%- set ns.L3_accum="L3_kahan" %}
+            ROW_OPERATION({{segment.L3.dim}}, j, L3_kahan_smem[j + lane_id] = 0.0f;)
+            {%- set ns.L3_accum="L3_kahan_smem" %}
         {%- endif %}
 
         for(size_t i = start; i < end; i++) {
@@ -150,7 +150,7 @@ __global__ void forward(
             __syncwarp();
 
             {%- if forward_schedule.kahan %}
-                kahanAdd<{{segment.L3.dim}}>(L3_kahan, L3_smem);
+                kahanAdd<{{segment.L3.dim}}>(L3_kahan_smem, L3_smem, lane_id);
             {%- endif %}
 
             bool changeRow = (i < end - 1) && (row != rows[i+1]);
