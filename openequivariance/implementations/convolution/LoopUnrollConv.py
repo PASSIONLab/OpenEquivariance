@@ -1,5 +1,5 @@
 from openequivariance.implementations.convolution.ConvolutionBase import *
-from openequivariance.implementations.ComputationSchedule import ComputationSchedule
+from openequivariance.implementations.ComputationSchedule import ComputationSchedule, SMEMCapacityException
 from openequivariance.implementations.TensorProduct import *
 from openequivariance.templates.jinja_utils import *
 from openequivariance.extlib import *
@@ -77,10 +77,10 @@ class LoopUnrollConv(ConvolutionBase):
                 try:
                     generate_schedule(warp_count)
                     break
-                except Exception as e:
+                except SMEMCapacityException as e:
                     warp_count -= 1
                     if warp_count == 0:
-                        raise RuntimeError("Tensor product schedule generation failed, shared memory inadequate!")
+                        raise SMEMCapacityException("Tensor product schedule generation failed, shared memory inadequate!")
 
         if not deterministic:
             for segment in self.forward_schedule.segments:

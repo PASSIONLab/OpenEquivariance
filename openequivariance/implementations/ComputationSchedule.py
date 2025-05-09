@@ -5,6 +5,11 @@ from openequivariance.benchmark.logging_utils import *
 from openequivariance.implementations.TensorProductBase import *
 logger = getLogger()
 
+class SMEMCapacityException(Exception):
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
+
 class IrrepMapping:
     '''
     Maps irreps from a source to a destination set.
@@ -104,7 +109,7 @@ def create_schedule_case2(instructions, memory_per_warp, calculate_smem, directi
                 segments.append((cL1, cL2, cL3, cinst))
                 cL3, cinst = set(), []
             else:
-                raise Exception(f"{direction.title()} scheduling failed, memory allocation too small to accomodate segment!")
+                raise SMEMCapacityException(f"{direction.title()} scheduling failed, memory allocation too small to accomodate segment!")
         else:
             cL3.add(w)
             cinst.append(inst_idx)
@@ -130,7 +135,7 @@ def create_schedule_case3(instructions, memory_per_warp, calculate_smem, directi
                 segments.append((cL1, cL2, cL3, cinst))
                 cL1, cL2, cL3, cinst = set(), set(), set(), []
             else:
-                raise Exception(f"{direction.title()} scheduling failed, memory allocation too small to accomodate segment!")
+                raise SMEMCapacityException(f"{direction.title()} scheduling failed, memory allocation too small to accomodate segment!")
         else:
             cL1.add(u)
             cL2.add(v)
@@ -393,11 +398,11 @@ class ComputationSchedule:
         schedule2_succeeded = False
         try:
             if schedule_type != 2:
-                raise Exception("Asked for schedule case 3.")
+                raise SMEMCapacityException("Asked for schedule case 3.")
             self.segments = create_schedule_case2(self.new_instructions, self.memory_per_warp, calculate_smem, direction)
             logger.info(f"{direction.title()} case 2 scheduling succeeded with {len(self.segments)} segments.") 
             schedule2_succeeded = True
-        except Exception as e:
+        except SMEMCapacityException as e:
             self.segments = create_schedule_case3(self.new_instructions, self.memory_per_warp, calculate_smem, direction) 
             logger.info(f"{direction.title()} case 3 scheduling succeeded with {len(self.segments)} segments.")
 

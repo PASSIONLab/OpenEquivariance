@@ -9,10 +9,10 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
     '''
     PyTorch-specialized dispatcher class.
     '''
-    def __init__(self, config, idx_dtype=np.int64, torch_op=True, deterministic=False):
+    def __init__(self, config, idx_dtype=np.int64, torch_op=True, deterministic=False, kahan=False):
         torch.nn.Module.__init__(self)
         LoopUnrollConv.__init__(self, config, idx_dtype=np.int64,
-                torch_op=torch_op, deterministic=deterministic)
+                torch_op=torch_op, deterministic=deterministic, kahan=kahan)
 
         self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device='cuda')
         self.weight_numel = self.config.weight_numel
