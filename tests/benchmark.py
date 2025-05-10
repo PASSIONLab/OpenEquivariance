@@ -223,7 +223,7 @@ def benchmark_kahan_accuracy(params):
     implementations = [TensorProductConvAtomic, TensorProductConvKahan]
     problems = [mace_problems[0]]
 
-    bench = ConvBenchmarkSuite(problems, test_name="convolution", correctness_threshold=1e-4) 
+    bench = ConvBenchmarkSuite(problems, test_name="kahan_convolution_accuracy", correctness_threshold=1e-4) 
     directions = ['forward', 'backward']
     if params.double_backward:
         directions.append('double_backward')
