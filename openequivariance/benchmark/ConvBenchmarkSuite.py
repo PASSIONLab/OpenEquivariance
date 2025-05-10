@@ -24,7 +24,6 @@ class ConvBenchmarkSuite:
             num_warmup = 10,
             num_iter = 30,
             reference_impl=None,
-            torch_op=True,
             test_name=None,
             prng_seed = 12345):
         self.configs = configs
@@ -33,7 +32,6 @@ class ConvBenchmarkSuite:
         self.reference_impl = reference_impl
         self.prng_seed = 12345
         self.correctness_threshold = 1e-5
-        self.torch_op = torch_op
         self.exp_count = 0
         self.test_name = test_name 
 
@@ -65,7 +63,7 @@ class ConvBenchmarkSuite:
             for impl in implementations:
                 tc_name = f"{config}, {impl.name()}"
                 logger.info(f'Starting {tc_name}, graph {graph.name}, {direction}')
-                conv = impl(config, torch_op=self.torch_op)
+                conv = impl(config) 
 
                 if double_backward_correctness:
                     double_backward_correctness = conv.test_correctness_double_backward(self.graph, 
@@ -100,7 +98,7 @@ class ConvBenchmarkSuite:
                     "config": str(config),
                     "irrep_dtype": str(config.irrep_dtype),
                     "weight_dtype": str(config.weight_dtype),
-                    "torch_overhead_included": self.torch_op,
+                    "torch_overhead_included": conv.torch_op,
                     "direction": direction,
                     "graph": graph.name,
                     "name": impl.name(),

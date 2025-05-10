@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 import numpy.linalg as la
 from openequivariance.extlib import *
@@ -11,7 +12,6 @@ logger = getLogger()
 def flops_data_per_tp(config, direction):
     '''
     Assumes all interactions are "uvu" for now
-
     Returns (flops_per_tp, data_per_tp, nnz)
     '''
     bytes_per_word = np.dtype(config.irrep_dtype).itemsize 
@@ -187,48 +187,41 @@ class ConvolutionBase:
 
     def test_correctness_forward(self, 
             graph, thresh, prng_seed, reference_implementation=None,
-            check_reproducible=True, torch_op=False):
-        L1, L2, L3 = self.L1, self.L2, self.L3
+            check_reproducible=True, high_precision_ref=False):
 
         if reference_implementation is None:
             from openequivariance.implementations.convolution.E3NNConv import E3NNConv
             reference_implementation = E3NNConv
 
-        result = {
-            "thresh": thresh 
-        }
+        result = {"thresh": thresh}
 
         in1, in2, weights, out = get_random_buffers_forward_conv(self.config, 
                 graph.node_count, graph.nnz, prng_seed)
+        ref_in1, ref_in2, ref_weights, ref_out = [buf.copy() for buf in [in1, in2, weights, out]] 
 
-        ref_tp = reference_implementation(self.config)
-        ref_out = out.copy()
+        reference_config = self.config 
+        if high_precision_ref:
+            reference_config = copy.deepcopy(self.config)
+            reference_config.irrep_dtype = np.float64
+            reference_config.weight_dtype = np.float64 
+            reference_buffers = [np.array(el, dtype=np.float64) for el in reference_buffers]
 
-        if ref_tp.torch_op:
-            ref_out_torch = None
-            if not ref_tp.deterministic:
-                ref_out_torch = ref_tp.forward(
-                    L1_in=torch.tensor(in1, device='cuda'),
-                    L2_in=torch.tensor(in2, device='cuda'),
-                    weights=torch.tensor(weights, device='cuda'),
-                    rows = torch.tensor(graph.rows, device='cuda'),
-                    cols = torch.tensor(graph.cols, device='cuda'))
-            else:
-                ref_out_torch = ref_tp.forward(
-                    torch.tensor(in1, device='cuda'),
-                    torch.tensor(in2, device='cuda'),
-                    torch.tensor(weights, device='cuda'),
-                    torch.tensor(graph.rows, device='cuda'),
-                    torch.tensor(graph.cols, device='cuda'),
-                    torch.tensor(graph.transpose_perm, device='cuda'))
-            ref_out[:] = ref_out_torch.cpu().numpy()
-        else:
-            ref_tp.forward_cpu(
-                L1_in=in1.copy(), 
-                L2_in=in2.copy(), 
-                weights=weights.copy(),
-                L3_out=ref_out,
-                graph=graph)
+        args = {
+            "L1_in": ref_in1,
+            "L2_in": ref_in2,
+            "weights": ref_weights,
+            "rows": graph.rows,
+            "cols": graph.cols
+        }
+
+        ref_tp = reference_implementation(reference_config)
+        if ref_tp.deterministic:
+            args["transpose_perm"] = graph.transpose_perm
+
+        for key in args:
+            args[key] = torch.tensor(args[key], device='cuda')
+
+        ref_out[:] = ref_tp.forward(**args).cpu().numpy()
 
         test_out = out.copy()
         self.forward_cpu(

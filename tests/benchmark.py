@@ -121,12 +121,12 @@ def benchmark_roofline(params):
     if params.plot:
         plot({"data_folder": data_folder})
 
+def download_graphs(params):
+    download_prefix = "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
 
-def benchmark_convolution(params):
     filenames = [   "covid_spike_radius3.0.pickle", 
                     "1drf_radius6.0.pickle", 
                     "carbon_lattice_radius6.0.pickle"]
-    download_prefix = "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
 
     if not Path(params.data).exists():
         os.makedirs(params.data, exist_ok=True)
@@ -140,9 +140,14 @@ def benchmark_convolution(params):
                 exit(1)
             else:
                 logging.info(f"Downloading {download_prefix + filename}...")
-                urllib.request.urlretrieve(download_prefix + filename, target_path)
-        
+                urllib.request.urlretrieve(download_prefix + filename, target_path) 
+
         graphs.append(load_graph(str(target_path)))
+
+    return graphs
+
+def benchmark_convolution(params): 
+    graphs = download_graphs(params)
 
     if not params.disable_bench:
         configs = [ ChannelwiseTPP("128x0e+128x1o+128x2e", 
@@ -156,7 +161,7 @@ def benchmark_convolution(params):
         configs[1].irrep_dtype = np.float64
         configs[1].weight_dtype = np.float64
 
-        bench = ConvBenchmarkSuite(configs, torch_op=True, test_name="convolution") 
+        bench = ConvBenchmarkSuite(configs, test_name="convolution") 
 
         implementations = [ TensorProductConvScatterSum, 
                             CUEConv,
@@ -187,15 +192,10 @@ def benchmark_convolution(params):
         else:
             logger.critical("Cannot plot convolution speedups over cuE with --limited-memory flag enabled.")
 
-def run_paper_hderiv_benchmark(params):
+def benchmark_double_backward(params):
     from openequivariance.benchmark.benchmark_configs import mace_nequip_problems, diffdock_configs
 
-    implementations = [
-        E3NNTensorProduct,
-        CUETensorProduct,
-        TensorProduct, 
-    ]
-
+    implementations = [E3NNTensorProduct, CUETensorProduct, TensorProduct]
     problems = diffdock_configs + mace_nequip_problems
     float64_problems = copy.deepcopy(problems)
 
@@ -216,6 +216,19 @@ def run_paper_hderiv_benchmark(params):
     if params.plot:
         plot({"data_folder": data_folder})
 
+def benchmark_kahan_accuracy(params):
+    from openequivariance.benchmark.benchmark_configs import mace_problems
+    graphs = download_graphs(params)[0]
+    implementations = [TensorProductConvKahan]
+    problem = mace_problems[0]
+
+    output_folder = None
+    for graph in graphs: 
+        for direction in ["forward", "backward"]:
+            conv_tp = TensorProductConvKahan(problem) 
+            result = conv_tp.test_correctness_forward(graph, 1e-7, check_reproducible=False, high_precision_ref=True)           
+            
+            print(result) 
 
 def plot(params):
     import openequivariance.benchmark.plotting as plotting
@@ -290,7 +303,7 @@ if __name__=='__main__':
 
     parser_higher_deriv = subparsers.add_parser('double_backward', help='Run the higher derivative kernel benchmark')
     parser_higher_deriv.add_argument("--batch_size", "-b", type=int, default=50000, help="Batch size for benchmark")
-    parser_higher_deriv.set_defaults(func=run_paper_hderiv_benchmark)
+    parser_higher_deriv.set_defaults(func=benchmark_double_backward)
 
     parser_plot = subparsers.add_parser('plot', help="Generate a plot for a folder of benchmarks.")
     parser_plot.add_argument("data_folder", type=str)
