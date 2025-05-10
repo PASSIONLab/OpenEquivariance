@@ -319,6 +319,12 @@ __global__ void double_backward_A(
         bool firstSegment = true;
         ROW_OPERATION({{segment.L3.dim}}, j, L3_smem[j + lane_id] = 0.0f;)
 
+        {%- set ns = namespace(L3_accum="L3_smem") %}
+        {%- if forward_schedule.kahan %}
+            ROW_OPERATION({{segment.L3.dim}}, j, L3_kahan_smem[j + lane_id] = 0.0f;)
+            {%- set ns.L3_accum="L3_kahan_smem" %}
+        {%- endif %}
+
         for(size_t i = start; i < end; i++) {
             unsigned {{idx_type}} row = rows[i]; unsigned {{idx_type}} col = cols[i];
 
@@ -361,9 +367,13 @@ __global__ void double_backward_A(
                 }
 
                 __syncwarp();
-                forward_loop_unroll_{{i}}(L1_smem, L2_smem, w_buffer, weights_smem, L3_smem, scratch_smem, lane_id);
+                forward_loop_unroll_{{i}}(L1_smem, L2_smem, w_buffer, weights_smem, {{ns.L3_accum}}, scratch_smem, lane_id);
                 __syncwarp();
             }
+
+            {%- if forward_schedule.kahan %}
+                kahanAdd<{{segment.L3.dim}}>(L3_kahan_smem, L3_smem, lane_id);
+            {%- endif %}
 
             bool changeRow = (i < end - 1) && (row != rows[i+1]);
             if(changeRow || i == end - 1) {
