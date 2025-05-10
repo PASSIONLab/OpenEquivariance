@@ -30,14 +30,23 @@ class ConvCorrectness:
         #graph = load_graph("data/1drf_radius3.5.pickle")
         return graph
 
-    @pytest.fixture(params=['atomic', 'deterministic'], scope='class')
+    @pytest.fixture(params=['atomic', 'deterministic', 'kahan'], scope='class')
     def conv_object(self, request, problem):
         if request.param == 'atomic':
             return oeq.TensorProductConv(problem, deterministic=False)
         elif request.param == 'deterministic':
             return oeq.TensorProductConv(problem, deterministic=True)
+        elif request.param == 'kahan':
+            if problem.irrep_dtype == np.float32:
+                return oeq.TensorProductConv(problem, deterministic=True, kahan=True)
+            else:
+                return None
 
     def test_tp_fwd(self, conv_object, graph):
+        if conv_object is None:
+            assert True
+            return
+
         result = conv_object.test_correctness_forward(graph, 
                 thresh=3e-05,
                 prng_seed=12345,
@@ -46,6 +55,10 @@ class ConvCorrectness:
         self.check_result(result, "output")
 
     def test_tp_bwd(self, conv_object, graph):
+        if conv_object is None:
+            assert True
+            return
+
         result = conv_object.test_correctness_backward(graph, 
                 thresh=3e-04,
                 prng_seed=12345,
@@ -56,6 +69,10 @@ class ConvCorrectness:
         self.check_result(result, "in2_grad")
 
     def test_tp_double_bwd(self, conv_object, graph):
+        if conv_object is None:
+            assert True
+            return
+
         result = conv_object.test_correctness_double_backward(graph, 
                 thresh=3e-04,
                 prng_seed=12345,
@@ -78,6 +95,30 @@ class TestProductionModels(ConvCorrectness):
         request.param.irrep_dtype, request.param.weight_dtype = dtype, dtype
         return request.param
 
+
+class TestUVUSingleIrrep(ConvCorrectness):
+    muls = [
+        (1, 1, 1), (8, 1, 8), (16, 1, 16), 
+        (32, 1, 32), (5, 1, 5), (13, 1, 13), (19, 1, 19),
+        (33, 1, 33), (49, 1, 49), (128, 1, 128), (1, 2, 1), (1, 16, 1), (1, 32, 1), (16, 3, 16) 
+    ]
+    
+    irs = [ (0, 0, 0), (1, 1, 1), (1, 0, 1), (1, 2, 1), (2, 0, 2), (5, 3, 5), (7, 2, 5) ]
+
+    def id_func(m, i): 
+        return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
+
+    @pytest.fixture(params=product(muls, irs), 
+                    ids = lambda x: TestUVUSingleIrrep.id_func(x[0], x[1]),
+                    scope="class") 
+    def problem(self, request, dtype):
+        m, i = request.param[0], request.param[1]
+        instructions=[(0, 0, 0, "uvu", True)]
+        return oeq.TPProblem(f"{m[0]}x{i[0]}e", f"{m[1]}x{i[1]}e", f"{m[2]}x{i[2]}e",
+                             instructions, shared_weights=False, 
+                             internal_weights=False,
+                             irrep_dtype=dtype, weight_dtype=dtype)
+
  
 class TestUVWSingleIrrep(ConvCorrectness):
     muls = [
@@ -99,36 +140,4 @@ class TestUVWSingleIrrep(ConvCorrectness):
         return oeq.TPProblem(f"{m[0]}x{i[0]}e", f"{m[1]}x{i[1]}e", f"{m[2]}x{i[2]}e",
                              instructions, shared_weights=False, 
                              internal_weights=False,
-                             irrep_dtype=dtype, weight_dtype=dtype)
-    
-class TestUVUSingleIrrep(ConvCorrectness):
-    muls = [ (32, 1, 32) ] 
-    irs = [(5, 3, 5)]
-
-    @pytest.fixture(params=[np.float32], ids=['F32'], scope='class')
-    def dtype(self, request):
-        return request.param
-
-    def id_func(m, i): 
-        return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
-
-    @pytest.fixture(params=product(muls, irs), 
-                    ids = lambda x: TestUVUSingleIrrep.id_func(x[0], x[1]),
-                    scope="class") 
-    def problem(self, request, dtype):
-        m, i = request.param[0], request.param[1]
-        instructions=[(0, 0, 0, "uvu", True)]
-        return oeq.TPProblem(f"{m[0]}x{i[0]}e", f"{m[1]}x{i[1]}e", f"{m[2]}x{i[2]}e",
-                             instructions, shared_weights=False, 
-                             internal_weights=False,
-                             irrep_dtype=dtype, weight_dtype=dtype)
-    
-
-    @pytest.fixture(params=['kahan'], scope='class')
-    def conv_object(self, request, problem):
-        if request.param == 'atomic':
-            return oeq.TensorProductConv(problem, deterministic=False)
-        elif request.param == 'deterministic':
-            return oeq.TensorProductConv(problem, deterministic=True)
-        elif request.param == 'kahan':
-            return oeq.TensorProductConv(problem, deterministic=True, kahan=True)
+                             irrep_dtype=dtype, weight_dtype=dtype) 
