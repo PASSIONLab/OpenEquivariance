@@ -207,13 +207,8 @@ class ConvolutionBase:
             ref_in1, ref_in2, ref_weights, ref_out = [np.array(el, dtype=np.float64) 
                                                       for el in [ref_in1, ref_in2, ref_weights, ref_out]]
 
-        args = {
-            "L1_in": ref_in1,
-            "L2_in": ref_in2,
-            "weights": ref_weights,
-            "rows": graph.rows,
-            "cols": graph.cols
-        }
+        args = {"L1_in": ref_in1, "L2_in": ref_in2, "weights": ref_weights, 
+                "rows": graph.rows, "cols": graph.cols}
 
         ref_tp = reference_implementation(reference_config)
         if ref_tp.deterministic:
@@ -452,32 +447,36 @@ class ConvolutionBase:
         logger.info(f"{bcolors.OKCYAN}Avg. Bandwidth: {bcolors.ENDC} {bcolors.OKGREEN}{np.mean(bandwidth_gbps):.2f} ± {np.std(bandwidth_gbps):.2f} GBPs{bcolors.ENDC}")
         return result
 
-    def test_correctness_backward(self, graph, thresh, prng_seed, reference_implementation=None):
+    def test_correctness_backward(self, graph, thresh, prng_seed, reference_implementation=None, high_precision_ref=False):
         L1, L2, L3 = self.L1, self.L2, self.L3
 
         if reference_implementation is None:
             from openequivariance.implementations.convolution.E3NNConv import E3NNConv
             reference_implementation = E3NNConv
 
-        result = {
-            "thresh": thresh 
-        }
+        result = {"thresh": thresh}
 
-        in1, in2, out_grad, weights, weights_grad, in1_grad, in2_grad = get_random_buffers_backward_conv(self.config, graph.node_count, graph.nnz, prng_seed) 
+        buffers = get_random_buffers_backward_conv(self.config, graph.node_count, graph.nnz, prng_seed) 
+        reference_buffers = [buf.copy() for buf in buffers]
+        reference_problem = self.config
 
-        ref_tp = reference_implementation(self.config)
+        if high_precision_ref:
+            reference_problem = copy.deepcopy(self.config)
+            reference_problem.irrep_dtype = np.float64
+            reference_problem.weight_dtype = np.float64 
+            reference_buffers = [np.array(el, dtype=np.float64) for el in reference_buffers]
 
-        ref_weights_grad = weights_grad.copy()
-        ref_in1_grad = in1_grad.copy()
-        ref_in2_grad = in2_grad.copy()
+        ref_tp = reference_implementation(reference_problem)
+        in1, in2, out_grad, weights, weights_grad, in1_grad, in2_grad = buffers
+        ref_in1, ref_in2, ref_out_grad, ref_weights, ref_weights_grad, ref_in1_grad, ref_in2_grad = reference_buffers 
 
         ref_tp.backward_cpu(
-            L1_in=in1.copy(),
+            L1_in=ref_in1,
             L1_grad=ref_in1_grad,
-            L2_in=in2.copy(), 
+            L2_in=ref_in2,
             L2_grad=ref_in2_grad, 
-            L3_grad=out_grad.copy(), 
-            weights=weights.copy(), 
+            L3_grad=ref_out_grad,
+            weights=ref_weights,
             weights_grad=ref_weights_grad,
             graph=graph) 
 
@@ -491,8 +490,8 @@ class ConvolutionBase:
             L1_grad=test_in1_grad,
             L2_in=in2.copy(), 
             L2_grad=test_in2_grad, 
-            L3_grad=out_grad.copy(), 
-            weights=weights.copy(), 
+            L3_grad=out_grad.copy(),
+            weights=weights.copy(),
             weights_grad=test_weights_grad,
             graph=graph)
 
@@ -504,13 +503,13 @@ class ConvolutionBase:
 
         return result
 
-    def test_correctness_double_backward(self, graph, thresh, prng_seed, reference_implementation=None):
+    def test_correctness_double_backward(self, graph, thresh, prng_seed, reference_implementation=None, high_precision_ref=False):
         global torch
         import torch
 
         assert(self.torch_op)
+        buffers = get_random_buffers_backward_conv(self.config, graph.node_count, graph.nnz, prng_seed)
 
-        in1, in2, out_grad, weights, _, _, _ = get_random_buffers_backward_conv(self.config, graph.node_count, graph.nnz, prng_seed)  
         rng = np.random.default_rng(seed=prng_seed * 2)
         dummy_grad_value = rng.standard_normal(1)[0]
 
@@ -518,11 +517,22 @@ class ConvolutionBase:
             from openequivariance.implementations.convolution.E3NNConv import E3NNConv 
             reference_implementation = E3NNConv 
 
-        reference_tp = reference_implementation(self.config, torch_op=True)
+        reference_problem = self.config
+        if high_precision_ref:
+            reference_problem = copy.deepcopy(self.config)
+            reference_problem.irrep_dtype = np.float64
+            reference_problem.weight_dtype = np.float64
+
+        reference_tp = reference_implementation(reference_problem, torch_op=True)
 
         result = {"thresh": thresh}
         tensors = []
         for i, tp in enumerate([self, reference_tp]):
+            in1, in2, out_grad, weights, _, _, _ = [buf.copy() for buf in buffers]
+
+            if i == 1 and high_precision_ref:
+                in1, in2, out_grad, weights, _, _, _ = [np.array(el, dtype=np.float64) for el in buffers] 
+                
             in1_torch = torch.tensor(in1, device='cuda', requires_grad=True)
             in2_torch = torch.tensor(in2, device='cuda', requires_grad=True)
 
@@ -552,6 +562,12 @@ class ConvolutionBase:
 
             dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
             dummy_grad = torch.tensor(float(dummy_grad_value), device='cuda', requires_grad=True)
+
+            #torch.autograd.grad(
+            #    outputs=[dummy],
+            #    inputs=[out_torch, in1_torch, in2_torch, weights_torch],
+            #    grad_outputs=[dummy_grad],
+            #)
             dummy.backward(dummy_grad, inputs=[out_grad_torch, in1_torch, in2_torch, weights_torch])
             
             weights_grad = weights_torch.grad.detach().cpu().numpy()

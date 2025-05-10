@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.linalg as la
 
-import itertools, logging, argparse, os, copy
+import itertools, logging, argparse, os, copy, gc
 from pathlib import Path
 import urllib.request
 
@@ -218,19 +218,31 @@ def benchmark_double_backward(params):
 
 def benchmark_kahan_accuracy(params):
     from openequivariance.benchmark.benchmark_configs import mace_problems
-    graphs = download_graphs(params) 
+    graphs = download_graphs(params)[-1:] 
     implementations = [TensorProductConvAtomic, TensorProductConvKahan]
     problem = mace_problems[0]
+
+    from torch.utils.viz._cycles import warn_tensor_cycles
+    warn_tensor_cycles() 
 
     for graph in graphs: 
         for impl in implementations:
             conv_tp = impl(problem) 
-            result = conv_tp.test_correctness_forward(  graph, 1e-4, 
-                                                        check_reproducible=False, 
+            #result_fwd = conv_tp.test_correctness_forward(  graph, 1e-4, 
+            #                                            check_reproducible=False, 
+            #                                            high_precision_ref=True, 
+            #                                            prng_seed=12345) 
+
+            #result_bwd = conv_tp.test_correctness_backward(graph, 1e-4,
+            #                                            high_precision_ref=True, 
+            #                                            prng_seed=12345)
+
+            result_double_bwd = conv_tp.test_correctness_double_backward(graph, 1e-4,
                                                         high_precision_ref=True, 
                                                         prng_seed=12345) 
-            
-            print(result) 
+            #gc.collect()
+
+            print(result_double_bwd)
 
 def plot(params):
     import openequivariance.benchmark.plotting as plotting
