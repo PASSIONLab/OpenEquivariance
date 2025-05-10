@@ -434,6 +434,12 @@ __global__ void double_backward_B(
         bool firstSegment = true;
         ROW_OPERATION({{segment.L1.dim}}, j, L1_grad_smem[j + lane_id] = 0.0f;)
 
+        {%- set ns = namespace(L1_accum="L1_grad_smem") %}
+        {%- if backward_schedule.kahan %}
+            ROW_OPERATION({{segment.L1.dim}}, j, L1_kahan_smem[j + lane_id] = 0.0f;)
+            {%- set ns.L1_accum="L1_kahan_smem" %}
+        {%- endif %}
+
         for(size_t i = start; i < end; i++) {
             unsigned {{idx_type}} row = rows[i]; unsigned {{idx_type}} col = cols[i];
             {{idx_type}} tperm_idx = tperm[i];
@@ -492,9 +498,13 @@ __global__ void double_backward_B(
 
                 __syncwarp();
                 double_backward_loop_unroll_{{i}}(L1_smem, L2_buffer, w_buffer, weights_smem, L3_grad_smem,
-                        L1_grad_smem, L2_grad_smem, L2_dgrad_buffer, n, wgrad, weights_grad_smem, scratch_smem, lane_id);
+                        {{ns.L1_accum}}, L2_grad_smem, L2_dgrad_buffer, n, wgrad, weights_grad_smem, scratch_smem, lane_id);
                 __syncwarp();
             }
+
+            {%- if backward_schedule.kahan %}
+                kahanAdd<{{segment.L1.dim}}>(L1_kahan_smem, L1_grad_smem, lane_id);
+            {%- endif %}
 
             IRREP_T* l1_grad_shft = L1_grad + col * {{schedule.L1.dim}} + lane_id;
             IRREP_T* l2_grad_shft = L2_grad + tperm_idx * {{schedule.L2.dim}} + lane_id;
