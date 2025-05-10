@@ -218,15 +218,17 @@ def benchmark_double_backward(params):
 
 def benchmark_kahan_accuracy(params):
     from openequivariance.benchmark.benchmark_configs import mace_problems
-    graphs = download_graphs(params)[0]
-    implementations = [TensorProductConvKahan]
+    graphs = download_graphs(params) 
+    implementations = [TensorProductConvAtomic, TensorProductConvKahan]
     problem = mace_problems[0]
 
-    output_folder = None
     for graph in graphs: 
-        for direction in ["forward", "backward"]:
-            conv_tp = TensorProductConvKahan(problem) 
-            result = conv_tp.test_correctness_forward(graph, 1e-7, check_reproducible=False, high_precision_ref=True)           
+        for impl in implementations:
+            conv_tp = impl(problem) 
+            result = conv_tp.test_correctness_forward(  graph, 1e-4, 
+                                                        check_reproducible=False, 
+                                                        high_precision_ref=True, 
+                                                        prng_seed=12345) 
             
             print(result) 
 
@@ -301,9 +303,14 @@ if __name__=='__main__':
     parser_uvw.add_argument("--plot", action="store_true", help="Plot the results.")
     parser_uvw.set_defaults(func=run_paper_uvw_benchmark)
 
-    parser_higher_deriv = subparsers.add_parser('double_backward', help='Run the higher derivative kernel benchmark')
-    parser_higher_deriv.add_argument("--batch_size", "-b", type=int, default=50000, help="Batch size for benchmark")
-    parser_higher_deriv.set_defaults(func=benchmark_double_backward)
+    parser_double_bwd = subparsers.add_parser('double_backward', help='Run the higher derivative kernel benchmark')
+    parser_double_bwd.add_argument("--batch_size", "-b", type=int, default=50000, help="Batch size for benchmark")
+    parser_double_bwd.set_defaults(func=benchmark_double_backward)
+
+    parser_kahan = subparsers.add_parser('kahan_conv', help='Run the Kahan convolution accuracy benchmark')
+    parser_kahan.add_argument("--data", type=str, help="Folder to download graph data to (or already containing graphs)", required=True)
+    parser_kahan.add_argument("--disable_download", action='store_true', help="Disable downloading data files if they do not exist")    
+    parser_kahan.set_defaults(func=benchmark_kahan_accuracy)
 
     parser_plot = subparsers.add_parser('plot', help="Generate a plot for a folder of benchmarks.")
     parser_plot.add_argument("data_folder", type=str)

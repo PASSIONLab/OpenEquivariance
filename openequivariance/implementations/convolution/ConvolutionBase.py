@@ -97,7 +97,7 @@ class ConvolutionBase:
         else:
             self.workspace_buffer = DeviceBuffer(size_bytes)
         self.workspace_ptr = self.workspace_buffer.data_ptr()
-        logger.info(f"Deterministic Convolution requires {size_bytes // 1000000}MB of workspace.")
+        logger.info(f"Convolution requires {size_bytes // 1000000}MB of workspace.")
 
     @staticmethod
     def name():
@@ -204,7 +204,8 @@ class ConvolutionBase:
             reference_config = copy.deepcopy(self.config)
             reference_config.irrep_dtype = np.float64
             reference_config.weight_dtype = np.float64 
-            reference_buffers = [np.array(el, dtype=np.float64) for el in reference_buffers]
+            ref_in1, ref_in2, ref_weights, ref_out = [np.array(el, dtype=np.float64) 
+                                                      for el in [ref_in1, ref_in2, ref_weights, ref_out]]
 
         args = {
             "L1_in": ref_in1,
