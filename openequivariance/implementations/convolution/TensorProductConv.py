@@ -4,6 +4,7 @@ from openequivariance.implementations.TensorProduct import TensorProduct
 import numpy as np
 
 from typing import Optional
+import types
 
 class TensorProductConv(torch.nn.Module, LoopUnrollConv):
     '''
@@ -17,23 +18,21 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
         self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device='cuda')
         self.weight_numel = self.config.weight_numel
 
-        if extlib.TORCH_COMPILE:
-            self.forward = self.forward_deterministic if deterministic else self.forward_atomic
+        if not extlib.TORCH_COMPILE:
+            self.forward = types.MethodType(LoopUnrollConv.forward, self) 
+
+    def forward(self,   L1_in: torch.Tensor, L2_in: 
+                        torch.Tensor, W: torch.Tensor, 
+                        rows: torch.Tensor, cols: torch.Tensor, sender_perm: Optional[torch.Tensor]=None) -> torch.Tensor:
+        if sender_perm is None:
+            return torch.ops.torch_tp_jit.jit_conv_forward(self.internal, L1_in, L2_in, W, rows, cols, self.workspace_buffer, self.dummy_transpose_perm)
+        else:
+            return torch.ops.torch_tp_jit.jit_conv_forward(self.internal, L1_in, L2_in, W, rows, cols, self.workspace_buffer, sender_perm) 
 
     @staticmethod
     def name():
         return LoopUnrollConv.name()
-
-    def forward_deterministic(self,   L1_in: torch.Tensor, L2_in: 
-                        torch.Tensor, W: torch.Tensor, 
-                        rows: torch.Tensor, cols: torch.Tensor, sender_perm: torch.Tensor) -> torch.Tensor:
-        return torch.ops.torch_tp_jit.jit_conv_forward(self.internal, L1_in, L2_in, W, rows, cols, self.workspace_buffer, sender_perm) 
-
-    def forward_atomic(self, L1_in: torch.Tensor, L2_in:
-                        torch.Tensor, W: torch.Tensor, 
-                        rows: torch.Tensor, cols: torch.Tensor) -> torch.Tensor:
-        return torch.ops.torch_tp_jit.jit_conv_forward(self.internal, L1_in, L2_in, W, rows, cols, self.workspace_buffer, self.dummy_transpose_perm)
-    
+ 
 
 # ==================================================================
 # Reference implementations for benchmarking

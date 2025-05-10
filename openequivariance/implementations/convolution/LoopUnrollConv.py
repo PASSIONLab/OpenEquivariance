@@ -154,10 +154,11 @@ class LoopUnrollConv(ConvolutionBase):
         #with open("scratch.txt", "w") as f:
         #    f.write(self.jit_kernel)
 
-        self.reorder_weights_e3nn_to_oeq = lambda input, output, has_batch_dim: \
-                self.forward_schedule.reorder_weights(input, output, "forward", has_batch_dim) 
-        self.reorder_weights_oeq_to_e3nn = lambda input, output, has_batch_dim: \
-                self.forward_schedule.reorder_weights(input, output, "backward", has_batch_dim) 
+    def reorder_weights_e3nn_to_oeq(self, input, output, has_batch_dim):
+        return self.forward_schedule.reorder_weights(input, output, "forward", has_batch_dim)
+    
+    def reorder_weights_oeq_to_e3nn(self, input, output, has_batch_dim):
+        return self.forward_schedule.reorder_weights(input, output, "backward", has_batch_dim)
 
     @staticmethod
     def name():
