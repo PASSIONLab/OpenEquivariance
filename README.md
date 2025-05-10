@@ -125,7 +125,17 @@ print(torch.norm(Z))
 ```
 **Note**: you don't need Pytorch geometric to use our kernels. When
 `deterministic=False`, the `sender` and `receiver` indices can have
-arbitrary order. 
+arbitrary order.
+
+**New:** If you're working in FP32 precision and want
+higher accuracy during graph convolution, we offer a Kahan 
+summation variant of our deterministic algorithm:
+
+```python
+tp_conv_kahan = oeq.TensorProductConv(problem, torch_op=True, deterministic=True, kahan=True) 
+Z = tp_conv_kahan.forward(X, Y[receiver_perm], W[receiver_perm], edge_index[0], edge_index[1], sender_perm) 
+print(torch.norm(Z))
+```
 
 ## Installation 
 We currently support Linux systems only. 
@@ -172,6 +182,7 @@ python tests/benchmark.py -o outputs/uvu uvu --plot
 python tests/benchmark.py -o outputs/uvw uvw --plot
 python tests/benchmark.py -o outputs/roofline roofline --plot
 python tests/benchmark.py -o outputs/conv conv --plot --data data/molecular_structures
+python tests/benchmark.py -o outputs/kahan_conv kahan_conv --data data/molecular_structures/
 ```
 
 If your GPU has limited memory, you might want to try

@@ -562,12 +562,6 @@ class ConvolutionBase:
 
             dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
             dummy_grad = torch.tensor(float(dummy_grad_value), device='cuda', requires_grad=True)
-
-            #torch.autograd.grad(
-            #    outputs=[dummy],
-            #    inputs=[out_torch, in1_torch, in2_torch, weights_torch],
-            #    grad_outputs=[dummy_grad],
-            #)
             dummy.backward(dummy_grad, inputs=[out_grad_torch, in1_torch, in2_torch, weights_torch])
             
             weights_grad = weights_torch.grad.detach().cpu().numpy()
@@ -576,10 +570,10 @@ class ConvolutionBase:
                 self.reorder_weights_oeq_to_e3nn(weights_grad_copy, weights_grad, not self.config.shared_weights)
 
             tensors.append((
-                out_grad_torch.grad.detach().cpu().numpy(),
-                in1_torch.grad.detach().cpu().numpy(),
-                in2_torch.grad.detach().cpu().numpy(),
-                weights_grad 
+                out_grad_torch.grad.detach().cpu().numpy().copy(),
+                in1_torch.grad.detach().cpu().numpy().copy(),
+                in2_torch.grad.detach().cpu().numpy().copy(),
+                weights_grad.copy() 
             ))
 
         for name, to_check, ground_truth in [

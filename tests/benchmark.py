@@ -121,12 +121,8 @@ def benchmark_roofline(params):
     if params.plot:
         plot({"data_folder": data_folder})
 
-def download_graphs(params):
+def download_graphs(params, filenames):
     download_prefix = "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
-
-    filenames = [   "covid_spike_radius3.0.pickle", 
-                    "1drf_radius6.0.pickle", 
-                    "carbon_lattice_radius6.0.pickle"]
 
     if not Path(params.data).exists():
         os.makedirs(params.data, exist_ok=True)
@@ -146,8 +142,12 @@ def download_graphs(params):
 
     return graphs
 
-def benchmark_convolution(params): 
-    graphs = download_graphs(params)
+def benchmark_convolution(params):
+    filenames = [   "covid_spike_radius3.0.pickle", 
+                    "1drf_radius6.0.pickle", 
+                    "carbon_lattice_radius6.0.pickle"]
+
+    graphs = download_graphs(params, filenames)
 
     if not params.disable_bench:
         configs = [ ChannelwiseTPP("128x0e+128x1o+128x2e", 
@@ -182,7 +182,6 @@ def benchmark_convolution(params):
                         graph = graph,
                         direction=direction, 
                         correctness=False,
-                        double_backward_correctness=False,
                         benchmark=True,
                         output_folder=params.output_folder)
 
@@ -218,31 +217,28 @@ def benchmark_double_backward(params):
 
 def benchmark_kahan_accuracy(params):
     from openequivariance.benchmark.benchmark_configs import mace_problems
-    graphs = download_graphs(params)[-1:] 
-    implementations = [TensorProductConvAtomic, TensorProductConvKahan]
-    problem = mace_problems[0]
 
-    from torch.utils.viz._cycles import warn_tensor_cycles
-    warn_tensor_cycles() 
+    filenames = ["carbon_lattice_radius6.0.pickle"]
+    graphs = download_graphs(params, filenames)
+    implementations = [TensorProductConvAtomic, TensorProductConvKahan]
+    problems = [mace_problems[0]]
+
+    bench = ConvBenchmarkSuite(problems, test_name="convolution", correctness_threshold=1e-4) 
+    directions = ['forward', 'backward']
+    if params.double_backward:
+        directions.append('double_backward')
 
     for graph in graphs: 
-        for impl in implementations:
-            conv_tp = impl(problem) 
-            #result_fwd = conv_tp.test_correctness_forward(  graph, 1e-4, 
-            #                                            check_reproducible=False, 
-            #                                            high_precision_ref=True, 
-            #                                            prng_seed=12345) 
-
-            #result_bwd = conv_tp.test_correctness_backward(graph, 1e-4,
-            #                                            high_precision_ref=True, 
-            #                                            prng_seed=12345)
-
-            result_double_bwd = conv_tp.test_correctness_double_backward(graph, 1e-4,
-                                                        high_precision_ref=True, 
-                                                        prng_seed=12345) 
-            #gc.collect()
-
-            print(result_double_bwd)
+        for direction in directions: 
+            output_folder = bench.run(
+                    implementations = implementations,
+                    graph = graph,
+                    direction=direction, 
+                    correctness=True,
+                    benchmark=False,
+                    output_folder=params.output_folder,
+                    high_precision_ref=True)
+    
 
 def plot(params):
     import openequivariance.benchmark.plotting as plotting
@@ -321,7 +317,8 @@ if __name__=='__main__':
 
     parser_kahan = subparsers.add_parser('kahan_conv', help='Run the Kahan convolution accuracy benchmark')
     parser_kahan.add_argument("--data", type=str, help="Folder to download graph data to (or already containing graphs)", required=True)
-    parser_kahan.add_argument("--disable_download", action='store_true', help="Disable downloading data files if they do not exist")    
+    parser_kahan.add_argument("--disable_download", action='store_true', help="Disable downloading data files if they do not exist")
+    parser_kahan.add_argument("--double_backward", action='store_true', help="Run double backward test (high memory usage)")
     parser_kahan.set_defaults(func=benchmark_kahan_accuracy)
 
     parser_plot = subparsers.add_parser('plot', help="Generate a plot for a folder of benchmarks.")
