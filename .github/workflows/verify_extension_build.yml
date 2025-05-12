@@ -24,6 +24,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        sudo apt-get update
         sudo apt install nvidia-cuda-toolkit
         pip install -r .github/workflows/requirements_cuda_ci.txt
         pip install -e .
