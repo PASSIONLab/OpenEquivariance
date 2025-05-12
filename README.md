@@ -1,4 +1,6 @@
 # OpenEquivariance
+[![OEQ CUDA C++ Extension Build Verification](https://github.com/PASSIONLab/OpenEquivariance/actions/workflows/verify_extension_build.yml/badge.svg?event=push)](https://github.com/PASSIONLab/OpenEquivariance/actions/workflows/verify_extension_build.yml)
+[![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 [[Examples]](#show-me-some-examples) [[Installation]](#installation)
 [[Supported Tensor Products]](#tensor-products-we-accelerate)

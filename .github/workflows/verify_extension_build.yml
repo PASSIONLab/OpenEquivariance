@@ -5,12 +5,14 @@ on:
     branches: [ "main" ] 
   pull_request:
     branches: [ "main" ]
+    types: [ labeled ]
 
 permissions:
   contents: read
 
 jobs:
   verify_cuda_extension:
+    if: ${{ github.event.label.name == 'ci-ready' || github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
 
     steps:
