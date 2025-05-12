@@ -24,7 +24,7 @@ else:
     torch_sources = ['torch_tp_jit.cpp']
 
     include_dirs, extra_link_args = ['util'], None 
-    if torch.cuda.is_available() and torch.version.cuda:
+    if torch.version.cuda:
         extra_link_args = ['-Wl,--no-as-needed', '-lcuda', '-lcudart', '-lnvrtc']
 
         try:
@@ -36,7 +36,7 @@ else:
             getLogger().info(str(e))
 
         extra_cflags.append("-DCUDA_BACKEND")
-    elif torch.cuda.is_available() and torch.version.hip:
+    elif torch.version.hip:
         extra_link_args = [ '-Wl,--no-as-needed', '-lhiprtc']
 
         def postprocess(kernel):
