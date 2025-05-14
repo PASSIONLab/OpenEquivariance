@@ -21,7 +21,9 @@ class LoopUnrollConv(ConvolutionBase):
 
         analysis = filter_and_analyze_problem(config)
         self.is_uvw = analysis["is_uvw"]
-        assert not config.shared_weights, "LoopUnrollConv does not yet support shared weights"
+
+        if config.shared_weights:
+            assert not deterministic, "Deterministic convolution does not support shared weights"
 
         forward_schedule_type = 3
         backward_schedule_type = 2
@@ -148,7 +150,8 @@ class LoopUnrollConv(ConvolutionBase):
                 vars(self.backward_schedule.launch_config),
                 vars(self.double_backward_schedule.launch_config),
                 {"L3_dim": self.L3.dim,
-                 "is_uvw": int(self.is_uvw)})
+                 "is_uvw": int(self.is_uvw),
+                 "shared_weights": int(config.shared_weights)})
         logger.info("Kernel compiled!")
 
         #with open("scratch.txt", "w") as f:

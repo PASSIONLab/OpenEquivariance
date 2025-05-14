@@ -218,6 +218,7 @@ public:
     Map_t fwd_dict, bwd_dict, dbl_bwd_dict, kernel_dims;
     JITConvImpl<JITKernel> internal;
     int64_t L3_dim;
+    int shared_weights;
 
     TorchJITConv(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t dbl_bwd_dict_i, Map_t kernel_dims_i) :
         fwd_dict(fwd_dict_i.copy()),
@@ -230,7 +231,8 @@ public:
                 to_map(dbl_bwd_dict_i),
                 to_map(kernel_dims_i)
             ),
-        L3_dim(kernel_dims.at("L3_dim")) { }
+        L3_dim(kernel_dims.at("L3_dim")),    
+        shared_weights(kernel_dims.at("shared_weights")) { }
 
     tuple<tuple<string, string>, 
         tuple<string, Map_t>, 
@@ -341,6 +343,11 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
     torch::Tensor cols_contig = cols.contiguous();
     torch::Tensor workspace_contig = workspace.contiguous();
     torch::Tensor transpose_perm_contig = transpose_perm.contiguous();
+
+    if(jit_instance->shared_weights == 1) {
+        W_grad.zero_();
+    }
+
     jit_instance->internal.backward(
             data_ptr(L1_in_contig), data_ptr(L1_grad),
             data_ptr(L2_in_contig), data_ptr(L2_grad),
@@ -387,6 +394,10 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_doubl
     torch::Tensor cols_contig = cols.contiguous();
     torch::Tensor workspace_contig = workspace.contiguous();
     torch::Tensor transpose_perm_contig = transpose_perm.contiguous();
+
+    if(jit_instance->shared_weights == 1) {
+        W_grad.zero_();
+    }
 
     jit_instance->internal.double_backward(
             data_ptr(L1_in_contig), data_ptr(L2_in_contig),

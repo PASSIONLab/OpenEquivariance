@@ -68,7 +68,11 @@ __global__ void forward(
             IRREP_T* l1 = L1_in + col * {{forward_schedule.L1.dim}} + lane_id;
             IRREP_T* l2 = L2_in + i * {{forward_schedule.L2.dim}} + lane_id; 
             IRREP_T* l3 = L3_out + row * {{forward_schedule.L3.dim}} + lane_id;
-            WEIGHT_T* w = weights + i * {{tpp.weight_numel}};
+            {%- if not tpp.shared_weights %} 
+                WEIGHT_T* w = weights + i * {{tpp.weight_numel}}; 
+            {%- else %}
+                WEIGHT_T* w = weights; 
+            {%- endif %}
 
             __syncwarp();
             {{ load_ir_segments(segment.L1Map, "l1", "L1_smem", "j") }}
@@ -115,11 +119,11 @@ __global__ void backward(
         IRREP_T* l3_shft = L3_grad + row * {{backward_schedule.L3.dim}} + lane_id;
 
         {%- if not tpp.shared_weights %} 
-        WEIGHT_T* w = weights + i * {{tpp.weight_numel}}; 
-        WEIGHT_T* wgrad = weights_grad + i * {{tpp.weight_numel}}; 
+            WEIGHT_T* w = weights + i * {{tpp.weight_numel}}; 
+            WEIGHT_T* wgrad = weights_grad + i * {{tpp.weight_numel}}; 
         {%- else %}
-        WEIGHT_T* w = weights; 
-        WEIGHT_T* wgrad = weights_grad; 
+            WEIGHT_T* w = weights; 
+            WEIGHT_T* wgrad = weights_grad; 
         {%- endif %}
         WEIGHT_T* weights_shft = w + lane_id;
 
@@ -155,7 +159,7 @@ __global__ void backward(
             {{ store_ir_segments(segment.L1Map, "l1_grad_shft", "L1_grad_smem", "j") }}
             {{ store_ir_segments(segment.L2Map, "l2_grad_shft", "L2_grad_smem", "j") }}
 
-            {%- if not backward_schedule.stream_weights%}
+            {%- if not backward_schedule.stream_weights and not tpp.shared_weights %}
                 ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_grad_shft[{{segment.weight_offset}} + j] = weights_grad_smem[j + lane_id];)
             {%- endif %}
         } {%- endfor %}
@@ -332,7 +336,7 @@ __global__ void double_backward_B(
             {{ store_ir_segments(segment.L1Map, "l1_grad_shft", "L1_grad_smem", "j") }}
             {{ store_ir_segments(segment.L2Map, "l2_grad_shft", "L2_grad_smem", "j") }}
 
-            {% if not schedule.stream_weights%}
+            {% if not schedule.stream_weights and not tpp.shared_weights %}
                 ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_grad_shft[{{segment.weight_offset}} + j] = weights_grad_smem[j + lane_id];)
             {% endif %}
         }

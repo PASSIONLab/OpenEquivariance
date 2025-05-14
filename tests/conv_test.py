@@ -11,7 +11,7 @@ class ConvCorrectness:
         with check:
             error = result[fieldname]["diff_Linf_norm"]
             thresh = result["thresh"]
-            assert result[fieldname]["pass"], f"{fieldname} observed error={error:.2f} >= {thresh}"
+            assert result[fieldname]["pass"], f"{fieldname} observed error={error:.5f} >= {thresh}"
 
     @pytest.fixture(params=[np.float32, np.float64], ids=['F32', 'F64'], scope='class')
     def dtype(self, request):
@@ -141,3 +141,17 @@ class TestUVWSingleIrrep(ConvCorrectness):
                              instructions, shared_weights=False, 
                              internal_weights=False,
                              irrep_dtype=dtype, weight_dtype=dtype) 
+    
+
+class TestAtomicSharedWeights(ConvCorrectness):
+    @pytest.fixture(scope="class")
+    def problem(self, dtype):
+        from openequivariance.benchmark.benchmark_configs import mace_problems, diffdock_configs
+        problem = diffdock_configs[0]
+        problem.irrep_dtype, problem.weight_dtype = dtype, dtype
+        problem.shared_weights = True
+        return problem 
+    
+    @pytest.fixture(scope='class')
+    def conv_object(self, request, problem):
+        return oeq.TensorProductConv(problem, deterministic=False)
