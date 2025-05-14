@@ -128,7 +128,11 @@ __global__ void backward(
             {{ store_ir_segments(segment.L2Map, "l2_grad_shft", "L2_grad_smem", "j") }}
 
             {%- if not backward_schedule.stream_weights%}
-                ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_grad_shft[{{segment.weight_offset}} + j] = weights_grad_smem[j + lane_id];)
+                {%- if not tpp.shared_weights %}
+                    ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_grad_shft[{{segment.weight_offset}} + j] = weights_grad_smem[j + lane_id];)
+                {%- else %}  
+                    ROW_OPERATION({{segment.problem.weight_numel}}, j, atomicAdd(weights_grad_shft + {{segment.weight_offset}} + j, weights_grad_smem[j + lane_id]);)
+                {%- endif %}
             {%- endif %}
         } {%- endfor %}
     }
@@ -295,7 +299,11 @@ __global__ void double_backward_B(
             {{ store_ir_segments(segment.L2Map, "l2_grad_shft", "L2_grad_smem", "j") }}
 
             {% if not schedule.stream_weights%}
-                ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_grad_shft[{{segment.weight_offset}} + j] = weights_grad_smem[j + lane_id];)
+                {%- if not tpp.shared_weights %}
+                    ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_grad_shft[{{segment.weight_offset}} + j] = weights_grad_smem[j + lane_id];)
+                {%- else %}  
+                    ROW_OPERATION({{segment.problem.weight_numel}}, j, atomicAdd(weights_grad_shft + {{segment.weight_offset}} + j, weights_grad_smem[j + lane_id]);)
+                {%- endif %}
             {% endif %}
         }
     } {%- endfor %}

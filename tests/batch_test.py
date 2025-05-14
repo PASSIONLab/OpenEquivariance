@@ -8,6 +8,13 @@ from openequivariance.benchmark.correctness_utils import correctness_forward, co
 from itertools import chain, product
 
 class TPCorrectness:
+    def thresh(self, direction):
+        return {
+            "fwd": 1e-5,
+            "bwd": 3e-4,  
+            "double_bwd": 3e-4
+        }[direction]
+
     def check_result(self, result, fieldname):
         with check:
             error = result[fieldname]["diff_Linf_norm"]
@@ -30,7 +37,7 @@ class TPCorrectness:
             test_implementation=tp,
             reference_implementation=None, 
             batch_size=1000,
-            correctness_threshold=1e-5,
+            correctness_threshold=self.thresh("fwd"),
             prng_seed=12345)
 
         self.check_result(result, "output")
@@ -42,7 +49,7 @@ class TPCorrectness:
             test_implementation=tp,
             reference_implementation=None, 
             batch_size=1000,
-            correctness_threshold=3e-4,
+            correctness_threshold=self.thresh("bwd"),
             prng_seed=12345)
 
         self.check_result(result, "weight_grad")
@@ -56,7 +63,7 @@ class TPCorrectness:
             test_implementation=tp,
             reference_implementation = None,
             batch_size = 200,
-            correctness_threshold = 3e-4,
+            correctness_threshold=self.thresh("double_bwd"), 
             prng_seed = 12345)
 
         self.check_result(result, "output_double_grad")
@@ -130,3 +137,22 @@ class TestUVWSingleIrrep(TPCorrectness):
                              instructions, shared_weights=False, 
                              internal_weights=False,
                              irrep_dtype=dtype, weight_dtype=dtype)
+    
+
+class TestSharedWeights(TPCorrectness):
+    from openequivariance.benchmark.benchmark_configs import mace_problems, diffdock_configs
+    problems = [mace_problems[0], diffdock_configs[0]] 
+
+    def thresh(self, direction):
+        return {
+            "fwd": 1e-5,
+            "bwd": 5e-4,  # Expect higher errors for shared weights 
+            "double_bwd": 5e-4
+        }[direction]
+
+    @pytest.fixture(params=problems, ids = lambda x : x.label, scope="class")
+    def problem(self, request, dtype):
+        problem = request.param
+        problem.irrep_dtype, problem.weight_dtype = dtype, dtype
+        problem.shared_weights = True
+        return problem 
