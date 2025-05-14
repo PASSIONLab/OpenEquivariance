@@ -7,12 +7,20 @@ from openequivariance.benchmark.ConvBenchmarkSuite import load_graph
 from itertools import chain, product
 
 class ConvCorrectness:
+    def thresh(self, direction):
+        return {
+            "fwd": 1e-5,
+            "bwd": 3e-4,
+            "double_bwd": 3e-4
+        }[direction]
+    
+
     def check_result(self, result, fieldname):
         with check:
             error = result[fieldname]["diff_Linf_norm"]
             thresh = result["thresh"]
-            assert result[fieldname]["pass"], f"{fieldname} observed error={error:.5f} >= {thresh}"
-
+            assert result[fieldname]["pass"], f"{fieldname} observed error={error:.5f} >= {thresh}" 
+           
     @pytest.fixture(params=[np.float32, np.float64], ids=['F32', 'F64'], scope='class')
     def dtype(self, request):
         return request.param
@@ -48,7 +56,7 @@ class ConvCorrectness:
             return
 
         result = conv_object.test_correctness_forward(graph, 
-                thresh=3e-05,
+                thresh=self.thresh("fwd"),
                 prng_seed=12345,
                 reference_implementation=None)
 
@@ -60,7 +68,7 @@ class ConvCorrectness:
             return
 
         result = conv_object.test_correctness_backward(graph, 
-                thresh=3e-04,
+                thresh=self.thresh("bwd"),
                 prng_seed=12345,
                 reference_implementation=None)
 
@@ -74,7 +82,7 @@ class ConvCorrectness:
             return
 
         result = conv_object.test_correctness_double_backward(graph, 
-                thresh=3e-04,
+                thresh=self.thresh("double_bwd"),
                 prng_seed=12345,
                 reference_implementation=None)
 
@@ -144,10 +152,19 @@ class TestUVWSingleIrrep(ConvCorrectness):
     
 
 class TestAtomicSharedWeights(ConvCorrectness):
-    @pytest.fixture(scope="class")
-    def problem(self, dtype):
-        from openequivariance.benchmark.benchmark_configs import mace_problems, diffdock_configs
-        problem = diffdock_configs[0]
+    from openequivariance.benchmark.benchmark_configs import mace_problems, diffdock_configs
+    problems = [mace_problems[0], diffdock_configs[0]] 
+
+    def thresh(self, direction):
+        return {
+            "fwd": 1e-5,
+            "bwd": 5e-2,  # Expect higher errors for shared weights 
+            "double_bwd": 5e-2
+        }[direction]
+
+    @pytest.fixture(params=problems, ids = lambda x : x.label, scope="class")
+    def problem(self, request, dtype):
+        problem = request.param
         problem.irrep_dtype, problem.weight_dtype = dtype, dtype
         problem.shared_weights = True
         return problem 

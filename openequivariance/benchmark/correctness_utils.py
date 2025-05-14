@@ -21,7 +21,7 @@ def check_similiarity(name : str,  to_check : np.ndarray,  ground_truth : np.nda
         result["shape_match"] = True 
         diff_Linf_norm = float(la.norm((ground_truth - to_check).flatten(), ord=np.inf))
         result["diff_Linf_norm"] = diff_Linf_norm 
-        result["pass"] = bool(diff_Linf_norm < correctness_threshold) 
+        result["pass"] = bool(diff_Linf_norm < correctness_threshold)
 
         if result["pass"]:
             logger.info(f" {bcolors.OKGREEN}{name} correctness check pass. {diff_Linf_norm=:.3e}, {correctness_threshold=} {bcolors.ENDC}")
