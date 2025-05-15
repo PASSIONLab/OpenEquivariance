@@ -697,6 +697,9 @@ class ConvolutionBase:
                 L2_grad = torch.empty_like(L2_in)
                 weights_grad = torch.empty_like(weights)
 
+                if self.config.shared_weights:
+                    weights_grad[:] = 0.0 
+
                 self.internal.backward_rawptrs(
                         L1_in.contiguous().data_ptr(), L1_grad.data_ptr(),
                         L2_in.contiguous().data_ptr(), L2_grad.data_ptr(),
