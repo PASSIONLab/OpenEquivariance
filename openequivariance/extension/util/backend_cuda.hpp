@@ -137,7 +137,6 @@ public:
         smem(smem) 
     { }
 
-
     KernelLaunchConfig(int64_t num_blocks_i, int64_t num_threads_i, int64_t smem_i) :
         KernelLaunchConfig( static_cast<uint32_t>(num_blocks_i),
                             static_cast<uint32_t>(num_threads_i),
@@ -157,7 +156,6 @@ private:
     bool compiled = false;
     char* code = nullptr;
 
-    CUdevice dev;
     CUlibrary library;
 
     vector<string> kernel_names;
@@ -268,19 +266,24 @@ public:
             kernels.emplace_back();
             CUDA_SAFE_CALL(cuLibraryGetKernel(&(kernels[i]), library, name));
         }
-
-        CUDA_SAFE_CALL(cuDeviceGet(&dev, 0));
     }
 
     void set_max_smem(int kernel_id, uint32_t max_smem_bytes) {
         if(kernel_id >= kernels.size())
             throw std::logic_error("Kernel index out of range!");
 
-        CUDA_SAFE_CALL(cuKernelSetAttribute(
-                CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
-                max_smem_bytes,
-                kernels[kernel_id],
-                dev));
+        int device_count;
+        CUDA_SAFE_CALL(cuDeviceGetCount(&device_count));
+
+        for(int i = 0; i < device_count; i++) {
+            CUdevice dev;
+            CUDA_SAFE_CALL(cuDeviceGet(&dev, i));
+            CUDA_SAFE_CALL(cuKernelSetAttribute(
+                    CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+                    max_smem_bytes,
+                    kernels[kernel_id],
+                    dev));
+        }
     }
 
     void execute(int kernel_id, void* args[], KernelLaunchConfig config) {
@@ -291,6 +294,10 @@ public:
         CUDA_SAFE_CALL(cuCtxGetCurrent(&pctx));
 
         if(pctx == NULL) {
+            int device_id;
+            CUdevice dev;
+            CUDA_ERRCHK(cudaGetDevice(&device_id));
+            CUDA_SAFE_CALL(cuDeviceGet(&dev, device_id));
             CUDA_SAFE_CALL(cuDevicePrimaryCtxRetain(&pctx, dev));
             CUDA_SAFE_CALL(cuCtxSetCurrent(pctx));
         }

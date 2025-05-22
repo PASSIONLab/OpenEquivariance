@@ -274,7 +274,7 @@ public:
         if(kernel_id >= kernels.size())
             throw std::logic_error("Kernel index out of range!");
 
-	// Ignore for AMD GPUs 
+        // Ignore for AMD GPUs 
     }
 
     void execute(int kernel_id, void* args[], KernelLaunchConfig config) {

@@ -4,8 +4,6 @@ import pytest, tempfile
 import numpy as np
 import openequivariance as oeq
 from torch_geometric import EdgeIndex
-from openequivariance.implementations.TensorProduct import TensorProduct
-from openequivariance.benchmark.correctness_utils import correctness_forward, correctness_backward, correctness_double_backward
 
 @pytest.fixture(scope='session')
 def problem_and_irreps():
@@ -14,9 +12,6 @@ def problem_and_irreps():
                             [(0, 0, 0, "uvu", True)], 
                             shared_weights=False, internal_weights=False,
                             irrep_dtype=np.float32, weight_dtype=np.float32)
-
-    gen = torch.Generator(device='cuda')
-    gen.manual_seed(0)
 
     return problem, X_ir, Y_ir, Z_ir, 
 
