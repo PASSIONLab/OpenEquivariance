@@ -31,6 +31,8 @@ bench = [
 ]
 
 dev = [
+  "pre-commit",
+  "ruff",
   "pytest",
   "pytest-check",
   "torch_geometric"
