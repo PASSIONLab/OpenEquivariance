@@ -1,4 +1,5 @@
-'''
+# ruff: noqa: E741, E743
+"""
 This file contains lightly modified code from E3NN. The code has been modified to remove
 all dependency on Pytorch.
 
@@ -12,14 +13,14 @@ https://github.com/e3nn/e3nn/blob/main/e3nn/o3/_wigner.py
 MIT License for e3nn:
 Euclidean neural networks (e3nn) Copyright (c) 2020, The Regents of the
 University of California, through Lawrence Berkeley National Laboratory
-(subject to receipt of any required approvals from the U.S. Dept. of Energy), 
-Ecole Polytechnique Federale de Lausanne (EPFL), Free University of Berlin 
+(subject to receipt of any required approvals from the U.S. Dept. of Energy),
+Ecole Polytechnique Federale de Lausanne (EPFL), Free University of Berlin
 and Kostiantyn Lapchevskyi. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy 
-of this software and associated documentation files (the "Software"), to deal 
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights to use,
-copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the 
+copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
 Software, and to permit persons to whom the Software is furnished to do so,
 subject to the following conditions:
 
@@ -31,24 +32,25 @@ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-'''
+"""
 
 import itertools
 from typing import Tuple, NamedTuple, Union, List, Any, Optional
 from math import sqrt, prod
 import collections
-import sys 
 import numpy as np
 import numpy.linalg as la
-import functools, math
+import functools
+
 
 def perm_inverse(p):
     r"""
     compute the inverse permutation
     """
     return tuple(p.index(i) for i in range(len(p)))
+
 
 class Irrep(tuple):
     def __new__(cls, l: Union[int, "Irrep", str, tuple], p=None):
@@ -153,6 +155,7 @@ class Irrep(tuple):
 
     def __len__(self):
         raise NotImplementedError
+
 
 class _MulIr(tuple):
     def __new__(cls, mul, ir=None):
@@ -295,7 +298,9 @@ class Irreps(tuple):
         6x1e
         """
         if isinstance(other, Irreps):
-            raise NotImplementedError("Use o3.TensorProduct for this, see the documentation")
+            raise NotImplementedError(
+                "Use o3.TensorProduct for this, see the documentation"
+            )
         return Irreps(super().__mul__(other))
 
     def __rmul__(self, other) -> "Irreps":
@@ -362,12 +367,12 @@ class Instruction(NamedTuple):
     path_shape: tuple
 
 
-class TPProblem: 
+class TPProblem:
     instructions: List[Any]
     shared_weights: bool
     internal_weights: bool
     weight_numel: int
-    label : str
+    label: str
     _profiling_str: str
     _in1_dim: int
     _in2_dim: int
@@ -378,17 +383,17 @@ class TPProblem:
         irreps_in2: Irreps,
         irreps_out: Irreps,
         instructions: List[tuple],
-        in1_var: Optional[List[float]] = None, 
-        in2_var: Optional[List[float]] = None, 
-        out_var: Optional[List[float]] = None, 
+        in1_var: Optional[List[float]] = None,
+        in2_var: Optional[List[float]] = None,
+        out_var: Optional[List[float]] = None,
         irrep_normalization: str = "component",
         path_normalization: str = "element",
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
-        label: Optional[str] = None, 
-        irrep_dtype : type[np.generic] = np.float32,
-        weight_dtype : type[np.generic] = np.float32) -> None:
-
+        label: Optional[str] = None,
+        irrep_dtype: type[np.generic] = np.float32,
+        weight_dtype: type[np.generic] = np.float32,
+    ) -> None:
         # === Setup ===
         super().__init__()
 
@@ -396,7 +401,7 @@ class TPProblem:
         assert path_normalization in ["element", "path", "none"]
         assert issubclass(irrep_dtype, np.generic)
         assert issubclass(weight_dtype, np.generic)
-        
+
         self.irreps_in1 = Irreps(irreps_in1)
         self.irreps_in2 = Irreps(irreps_in2)
         self.irreps_out = Irreps(irreps_out)
@@ -420,14 +425,27 @@ class TPProblem:
                 has_weight=has_weight,
                 path_weight=path_weight,
                 path_shape={
-                    "uvw": (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul, self.irreps_out[i_out].mul),
+                    "uvw": (
+                        self.irreps_in1[i_in1].mul,
+                        self.irreps_in2[i_in2].mul,
+                        self.irreps_out[i_out].mul,
+                    ),
                     "uvu": (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
                     "uvv": (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
                     "uuw": (self.irreps_in1[i_in1].mul, self.irreps_out[i_out].mul),
                     "uuu": (self.irreps_in1[i_in1].mul,),
                     "uvuv": (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
-                    "uvu<v": (self.irreps_in1[i_in1].mul * (self.irreps_in2[i_in2].mul - 1) // 2,),
-                    "u<vw": (self.irreps_in1[i_in1].mul * (self.irreps_in2[i_in2].mul - 1) // 2, self.irreps_out[i_out].mul),
+                    "uvu<v": (
+                        self.irreps_in1[i_in1].mul
+                        * (self.irreps_in2[i_in2].mul - 1)
+                        // 2,
+                    ),
+                    "u<vw": (
+                        self.irreps_in1[i_in1].mul
+                        * (self.irreps_in2[i_in2].mul - 1)
+                        // 2,
+                        self.irreps_out[i_out].mul,
+                    ),
                 }[connection_mode],
             )
             for i_in1, i_in2, i_out, connection_mode, has_weight, path_weight in instructions
@@ -437,30 +455,40 @@ class TPProblem:
             in1_var = [1.0 for _ in range(len(self.irreps_in1))]
         else:
             in1_var = [float(var) for var in in1_var]
-            assert len(in1_var) == len(self.irreps_in1), "Len of ir1_var must be equal to len(irreps_in1)"
+            assert len(in1_var) == len(self.irreps_in1), (
+                "Len of ir1_var must be equal to len(irreps_in1)"
+            )
 
         if in2_var is None:
             in2_var = [1.0 for _ in range(len(self.irreps_in2))]
         else:
             in2_var = [float(var) for var in in2_var]
-            assert len(in2_var) == len(self.irreps_in2), "Len of ir2_var must be equal to len(irreps_in2)"
+            assert len(in2_var) == len(self.irreps_in2), (
+                "Len of ir2_var must be equal to len(irreps_in2)"
+            )
 
         if out_var is None:
             out_var = [1.0 for _ in range(len(self.irreps_out))]
         else:
             out_var = [float(var) for var in out_var]
-            assert len(out_var) == len(self.irreps_out), "Len of out_var must be equal to len(irreps_out)"
+            assert len(out_var) == len(self.irreps_out), (
+                "Len of out_var must be equal to len(irreps_out)"
+            )
 
         def num_elements(ins):
             return {
-                "uvw": (self.irreps_in1[ins.i_in1].mul * self.irreps_in2[ins.i_in2].mul),
+                "uvw": (
+                    self.irreps_in1[ins.i_in1].mul * self.irreps_in2[ins.i_in2].mul
+                ),
                 "uvu": self.irreps_in2[ins.i_in2].mul,
                 "uvv": self.irreps_in1[ins.i_in1].mul,
                 "uuw": self.irreps_in1[ins.i_in1].mul,
                 "uuu": 1,
                 "uvuv": 1,
                 "uvu<v": 1,
-                "u<vw": self.irreps_in1[ins.i_in1].mul * (self.irreps_in2[ins.i_in2].mul - 1) // 2,
+                "u<vw": self.irreps_in1[ins.i_in1].mul
+                * (self.irreps_in2[ins.i_in2].mul - 1)
+                // 2,
             }[ins.connection_mode]
 
         normalization_coefficients = []
@@ -469,8 +497,21 @@ class TPProblem:
             mul_ir_in2 = self.irreps_in2[ins.i_in2]
             mul_ir_out = self.irreps_out[ins.i_out]
             assert mul_ir_in1.ir.p * mul_ir_in2.ir.p == mul_ir_out.ir.p
-            assert abs(mul_ir_in1.ir.l - mul_ir_in2.ir.l) <= mul_ir_out.ir.l <= mul_ir_in1.ir.l + mul_ir_in2.ir.l
-            assert ins.connection_mode in ["uvw", "uvu", "uvv", "uuw", "uuu", "uvuv", "uvu<v", "u<vw"]
+            assert (
+                abs(mul_ir_in1.ir.l - mul_ir_in2.ir.l)
+                <= mul_ir_out.ir.l
+                <= mul_ir_in1.ir.l + mul_ir_in2.ir.l
+            )
+            assert ins.connection_mode in [
+                "uvw",
+                "uvu",
+                "uvv",
+                "uuw",
+                "uuu",
+                "uvuv",
+                "uvu<v",
+                "u<vw",
+            ]
 
             if irrep_normalization == "component":
                 alpha = mul_ir_out.ir.dim
@@ -480,7 +521,11 @@ class TPProblem:
                 alpha = 1
 
             if path_normalization == "element":
-                x = sum(in1_var[i.i_in1] * in2_var[i.i_in2] * num_elements(i) for i in instructions if i.i_out == ins.i_out)
+                x = sum(
+                    in1_var[i.i_in1] * in2_var[i.i_in2] * num_elements(i)
+                    for i in instructions
+                    if i.i_out == ins.i_out
+                )
             if path_normalization == "path":
                 x = in1_var[ins.i_in1] * in2_var[ins.i_in2] * num_elements(ins)
                 x *= len([i for i in instructions if i.i_out == ins.i_out])
@@ -496,7 +541,15 @@ class TPProblem:
             normalization_coefficients += [sqrt(alpha)]
 
         self.instructions = [
-            Instruction(ins.i_in1, ins.i_in2, ins.i_out, ins.connection_mode, ins.has_weight, alpha, ins.path_shape)
+            Instruction(
+                ins.i_in1,
+                ins.i_in2,
+                ins.i_out,
+                ins.connection_mode,
+                ins.has_weight,
+                alpha,
+                ins.path_shape,
+            )
             for ins, alpha in zip(instructions, normalization_coefficients)
         ]
 
@@ -510,14 +563,18 @@ class TPProblem:
             shared_weights = True
 
         if internal_weights is None:
-            internal_weights = shared_weights and any(i.has_weight for i in self.instructions)
+            internal_weights = shared_weights and any(
+                i.has_weight for i in self.instructions
+            )
 
         assert shared_weights or not internal_weights
         self.internal_weights = internal_weights
         self.shared_weights = shared_weights
 
         # === Determine weights ===
-        self.weight_numel = sum(prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
+        self.weight_numel = sum(
+            prod(ins.path_shape) for ins in self.instructions if ins.has_weight
+        )
         self.output_mask = None
 
         self.irrep_dtype = irrep_dtype
@@ -543,9 +600,9 @@ class TPProblem:
         result += f"{self.in2_var = }\n"
         result += f"{self.out_var = }\n"
         result += f"num weights {self.weight_numel} \n"
-        result += f"|      index      |       l         |        m        | mode  |    weights   | \n"
-        result += f"| in1 | in2 | out | in1 | in2 | out | in1 | in2 | out |       | exist | path | \n"
-        for ins in self.instructions: # type : Instruction
+        result += "|      index      |       l         |        m        | mode  |    weights   | \n"
+        result += "| in1 | in2 | out | in1 | in2 | out | in1 | in2 | out |       | exist | path | \n"
+        for ins in self.instructions:  # type : Instruction
             mul_irrep_in1 = self.irreps_in1[ins.i_in1]
             mul_irrep_in2 = self.irreps_in2[ins.i_in2]
             mul_irrep_out = self.irreps_out[ins.i_out]
@@ -561,15 +618,18 @@ class TPProblem:
             result += f" {str(ins.has_weight):<5} |"
             result += f" {ins.path_weight:<4.2f} | "
             result += "\n"
-        result = result.replace("self.","")
-        return result 
-    
-    def weight_range_and_shape_for_instruction(self, instruction: int) -> Tuple[int, int, tuple]: 
+        result = result.replace("self.", "")
+        return result
+
+    def weight_range_and_shape_for_instruction(
+        self, instruction: int
+    ) -> Tuple[int, int, tuple]:
         if not self.instructions[instruction].has_weight:
             raise ValueError(f"Instruction {instruction} has no weights.")
         offset = sum(prod(ins.path_shape) for ins in self.instructions[:instruction])
         ins = self.instructions[instruction]
         return offset, offset + prod(ins.path_shape), ins.path_shape
+
 
 def change_basis_real_to_complex(l: int, dtype=None) -> np.ndarray:
     # https://en.wikipedia.org/wiki/Spherical_harmonics#Real_form
@@ -581,15 +641,16 @@ def change_basis_real_to_complex(l: int, dtype=None) -> np.ndarray:
     for m in range(1, l + 1):
         q[l + m, l + abs(m)] = (-1) ** m / 2**0.5
         q[l + m, l - abs(m)] = 1j * (-1) ** m / 2**0.5
-    q = (-1j) ** l * q  # Added factor of 1j**l to make the Clebsch-Gordan coefficients real
+    q = (
+        -1j
+    ) ** l * q  # Added factor of 1j**l to make the Clebsch-Gordan coefficients real
 
-    dtype = {
-        np.float32: np.complex64,
-        np.float64: np.complex128,
-        None: np.complex128
-    }[dtype]
+    dtype = {np.float32: np.complex64, np.float64: np.complex128, None: np.complex128}[
+        dtype
+    ]
 
     return q.astype(dtype)
+
 
 def wigner_3j(l1: int, l2: int, l3: int, dtype=np.float64) -> np.ndarray:
     r"""Wigner 3j symbols :math:`C_{lmn}`.
@@ -618,7 +679,7 @@ def wigner_3j(l1: int, l2: int, l3: int, dtype=np.float64) -> np.ndarray:
         :math:`l_3`
 
     dtype : np.dtype or None
-        ``dtype`` of the returned tensor. Default is np.float64 
+        ``dtype`` of the returned tensor. Default is np.float64
 
     Returns
     -------
@@ -630,11 +691,11 @@ def wigner_3j(l1: int, l2: int, l3: int, dtype=np.float64) -> np.ndarray:
     C = _so3_clebsch_gordan(l1, l2, l3)
 
     # make sure we always get a copy so mutation doesn't ruin the stored tensors
-    return C.copy().astype(dtype) 
+    return C.copy().astype(dtype)
 
 
 @functools.lru_cache(maxsize=None)
-def _so3_clebsch_gordan(l1: int, l2: int, l3: int) -> np.ndarray: 
+def _so3_clebsch_gordan(l1: int, l2: int, l3: int) -> np.ndarray:
     Q1 = change_basis_real_to_complex(l1, dtype=np.float64)
     Q2 = change_basis_real_to_complex(l2, dtype=np.float64)
     Q3 = change_basis_real_to_complex(l3, dtype=np.float64)
@@ -687,7 +748,9 @@ def _so3_clebsch_gordan(l1: int, l2: int, l3: int) -> np.ndarray:
 
 
 @functools.lru_cache(maxsize=None)
-def _su2_clebsch_gordan(j1: Union[int, float], j2: Union[int, float], j3: Union[int, float]) -> np.ndarray: 
+def _su2_clebsch_gordan(
+    j1: Union[int, float], j2: Union[int, float], j3: Union[int, float]
+) -> np.ndarray:
     """Calculates the Clebsch-Gordon matrix
     for SU(2) coupling j1 and j2 to give j3.
     Parameters
@@ -706,13 +769,15 @@ def _su2_clebsch_gordan(j1: Union[int, float], j2: Union[int, float], j3: Union[
     assert isinstance(j1, (int, float))
     assert isinstance(j2, (int, float))
     assert isinstance(j3, (int, float))
-    mat = np.zeros((int(2 * j1 + 1), int(2 * j2 + 1), int(2 * j3 + 1)), dtype=np.float64)
+    mat = np.zeros(
+        (int(2 * j1 + 1), int(2 * j2 + 1), int(2 * j3 + 1)), dtype=np.float64
+    )
     if int(2 * j3) in range(int(2 * abs(j1 - j2)), int(2 * (j1 + j2)) + 1, 2):
         for m1 in (x / 2 for x in range(-int(2 * j1), int(2 * j1) + 1, 2)):
             for m2 in (x / 2 for x in range(-int(2 * j2), int(2 * j2) + 1, 2)):
                 if abs(m1 + m2) <= j3:
-                    mat[int(j1 + m1), int(j2 + m2), int(j3 + m1 + m2)] = _su2_clebsch_gordan_coeff(
-                        (j1, m1), (j2, m2), (j3, m1 + m2)
+                    mat[int(j1 + m1), int(j2 + m2), int(j3 + m1 + m2)] = (
+                        _su2_clebsch_gordan_coeff((j1, m1), (j2, m2), (j3, m1 + m2))
                     )
     return mat
 
@@ -758,7 +823,11 @@ def _su2_clebsch_gordan_coeff(idx1, idx2, idx3):
     C = (
         (2.0 * j3 + 1.0)
         * Fraction(
-            f(j3 + j1 - j2) * f(j3 - j1 + j2) * f(j1 + j2 - j3) * f(j3 + m3) * f(j3 - m3),
+            f(j3 + j1 - j2)
+            * f(j3 - j1 + j2)
+            * f(j1 + j2 - j3)
+            * f(j3 + m3)
+            * f(j3 - m3),
             f(j1 + j2 + j3 + 1) * f(j1 - m1) * f(j1 + m1) * f(j2 - m2) * f(j2 + m2),
         )
     ) ** 0.5
@@ -766,7 +835,8 @@ def _su2_clebsch_gordan_coeff(idx1, idx2, idx3):
     S = 0
     for v in range(vmin, vmax + 1):
         S += (-1) ** int(v + j2 + m2) * Fraction(
-            f(j2 + j3 + m1 - v) * f(j1 - m1 + v), f(v) * f(j3 - j1 + j2 - v) * f(j3 + m3 - v) * f(v + j1 - j2 - m3)
+            f(j2 + j3 + m1 - v) * f(j1 - m1 + v),
+            f(v) * f(j3 - j1 + j2 - v) * f(j3 + m3 - v) * f(v + j1 - j2 - m3),
         )
     C = C * S
     return C

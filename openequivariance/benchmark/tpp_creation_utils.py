@@ -13,9 +13,7 @@ And adopted to create TPP's to avoid torch dependence
 
 
 class FullyConnectedTPProblem(TPProblem):
-    def __init__(
-        self, irreps_in1, irreps_in2, irreps_out, **kwargs
-    ) -> None:
+    def __init__(self, irreps_in1, irreps_in2, irreps_out, **kwargs) -> None:
         irreps_in1 = Irreps(irreps_in1)
         irreps_in2 = Irreps(irreps_in2)
         irreps_out = Irreps(irreps_out)
@@ -35,6 +33,7 @@ class FullyConnectedTPProblem(TPProblem):
             **kwargs,
         )
 
+
 class ElementwiseTPProblem(TPProblem):
     def __init__(self, irreps_in1, irreps_in2, filter_ir_out=None, **kwargs) -> None:
         irreps_in1 = Irreps(irreps_in1).simplify()
@@ -43,7 +42,9 @@ class ElementwiseTPProblem(TPProblem):
             try:
                 filter_ir_out = [Irrep(ir) for ir in filter_ir_out]
             except ValueError:
-                raise ValueError(f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep")
+                raise ValueError(
+                    f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep"
+                )
 
         assert irreps_in1.num_irreps == irreps_in2.num_irreps
 
@@ -93,7 +94,9 @@ class FullTPProblem(TPProblem):
             try:
                 filter_ir_out = [Irrep(ir) for ir in filter_ir_out]
             except ValueError:
-                raise ValueError(f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep")
+                raise ValueError(
+                    f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep"
+                )
 
         out = []
         instr = []
@@ -110,15 +113,18 @@ class FullTPProblem(TPProblem):
         out = Irreps(out)
         out, p, _ = out.sort()
 
-        instr = [(i_1, i_2, p[i_out], mode, train) for i_1, i_2, i_out, mode, train in instr]
+        instr = [
+            (i_1, i_2, p[i_out], mode, train) for i_1, i_2, i_out, mode, train in instr
+        ]
 
         super().__init__(irreps_in1, irreps_in2, out, instr, **kwargs)
 
 
 class ChannelwiseTPP(TPProblem):
-    '''
+    """
     Modified from mace/mace/modules/irreps_tools.py.
-    '''
+    """
+
     def __init__(
         self,
         irreps_in1: Irreps,
@@ -126,8 +132,8 @@ class ChannelwiseTPP(TPProblem):
         irreps_out: Irreps,
         label: Optional[str] = None,
         irrep_dtype=np.float32,
-        weight_dtype=np.float32):
-
+        weight_dtype=np.float32,
+    ):
         trainable = True
         irreps1 = Irreps(irreps_in1)
         irreps2 = Irreps(irreps_in2)
@@ -153,12 +159,18 @@ class ChannelwiseTPP(TPProblem):
         ]
 
         instructions = sorted(instructions, key=lambda x: x[2])
-        super().__init__(irreps1, irreps2, irreps_out, instructions,
+        super().__init__(
+            irreps1,
+            irreps2,
+            irreps_out,
+            instructions,
             internal_weights=False,
             shared_weights=False,
             label=label,
             irrep_dtype=irrep_dtype,
-            weight_dtype=weight_dtype)
+            weight_dtype=weight_dtype,
+        )
+
 
 class SingleInstruction(TPProblem):
     def __init__(
@@ -167,15 +179,20 @@ class SingleInstruction(TPProblem):
         irreps_in2: Irreps,
         irreps_in3: Irreps,
         mode: str,
-        label: Optional[str] = None):
-
+        label: Optional[str] = None,
+    ):
         trainable = True
         irreps1 = Irreps(irreps_in1)
         irreps2 = Irreps(irreps_in2)
         irreps3 = Irreps(irreps_in3)
         instructions = [(0, 0, 0, mode, trainable)]
 
-        super().__init__(irreps1, irreps2, irreps3, instructions,
+        super().__init__(
+            irreps1,
+            irreps2,
+            irreps3,
+            instructions,
             internal_weights=False,
             shared_weights=False,
-            label=label)
+            label=label,
+        )

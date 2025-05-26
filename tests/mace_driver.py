@@ -1,32 +1,29 @@
-import sys, json, time, pathlib
-
+import json
+import pathlib
 import argparse
-import logging
-from pathlib import Path
 
 import ase.io
-import numpy as np
 import torch
 from e3nn import o3
 from mace import data, modules, tools
-from mace.cli.convert_e3nn_cueq import run as run_e3nn_to_cueq
 from mace.tools import torch_geometric
 from torch.utils.benchmark import Timer
-from mace.calculators import mace_mp
 from torch.profiler import profile, record_function, ProfilerActivity
-from mace.tools import compile as mace_compile
 
 from mace.modules.wrapper_ops import OEQConfig, CuEquivarianceConfig
 
 import warnings
+
 warnings.filterwarnings("ignore")
 
 try:
-    import cuequivariance as cue  # pylint: disable=unused-import
+    import cuequivariance as cue  # noqa F401
+
     CUET_AVAILABLE = True
 
 except ImportError:
     CUET_AVAILABLE = False
+
 
 def analyze_trace(trace_file):
     trace = None
@@ -42,11 +39,13 @@ def analyze_trace(trace_file):
         if "args" in event and "stream" in event["args"]:
             total += event["dur"]
 
-            if "forward" in event["name"] \
-                    or "backward" in event["name"] \
-                    or "TensorProductUniform1d" in event["name"] \
-                    or "channelwise_kernel_fwd" in event["name"] \
-                    or "channelwise_kernel_bwd" in event["name"]:
+            if (
+                "forward" in event["name"]
+                or "backward" in event["name"]
+                or "TensorProductUniform1d" in event["name"]
+                or "channelwise_kernel_fwd" in event["name"]
+                or "channelwise_kernel_bwd" in event["name"]
+            ):
                 cgtp_fwd_bwd += event["dur"]
 
             elif "_scatter_gather_elementwise_kernel" in event["name"]:
@@ -54,12 +53,13 @@ def analyze_trace(trace_file):
             else:
                 other_kernels += event["dur"]
 
-    return { 
-        "total_cuda_ms": total / 1000.,
-        "cgtp_fwd_bwd_ms": cgtp_fwd_bwd / 1000.,
-        "reduce_by_key_ms": reduce_by_key / 1000.,
-        "other_kernels_ms": other_kernels / 1000.
+    return {
+        "total_cuda_ms": total / 1000.0,
+        "cgtp_fwd_bwd_ms": cgtp_fwd_bwd / 1000.0,
+        "reduce_by_key_ms": reduce_by_key / 1000.0,
+        "other_kernels_ms": other_kernels / 1000.0,
     }
+
 
 def create_model(hidden_irreps, max_ell, device, cueq_config=None, oeq_config=None):
     table = tools.AtomicNumberTable([6, 7, 8, 1, 11, 13, 15, 18])
@@ -68,8 +68,12 @@ def create_model(hidden_irreps, max_ell, device, cueq_config=None, oeq_config=No
         "num_bessel": 8,
         "num_polynomial_cutoff": 6,
         "max_ell": max_ell,
-        "interaction_cls": modules.interaction_classes["RealAgnosticResidualInteractionBlock"],
-        "interaction_cls_first": modules.interaction_classes["RealAgnosticResidualInteractionBlock"],
+        "interaction_cls": modules.interaction_classes[
+            "RealAgnosticResidualInteractionBlock"
+        ],
+        "interaction_cls_first": modules.interaction_classes[
+            "RealAgnosticResidualInteractionBlock"
+        ],
         "num_interactions": 2,
         "num_elements": len(table),
         "hidden_irreps": o3.Irreps(hidden_irreps),
@@ -87,9 +91,12 @@ def create_model(hidden_irreps, max_ell, device, cueq_config=None, oeq_config=No
     }
     return modules.ScaleShiftMACE(**model_config).to(device)
 
-def benchmark_model(model, batch, num_iterations=100, warmup=100, label=None, output_folder=None):
+
+def benchmark_model(
+    model, batch, num_iterations=100, warmup=100, label=None, output_folder=None
+):
     def run_inference():
-        out = model(batch,training=True)
+        out = model(batch, training=True)
         torch.cuda.synchronize()
         return out
 
@@ -104,36 +111,43 @@ def benchmark_model(model, batch, num_iterations=100, warmup=100, label=None, ou
             "run_inference": run_inference,
         },
     )
-    warm_up_measurement = timer.timeit(num_iterations)
+    timer.timeit(num_iterations)  # warmup
     measurement = timer.timeit(num_iterations)
 
     with profile(activities=[ProfilerActivity.CUDA], record_shapes=True) as prof:
         with record_function("model_inference"):
-            run_inference() 
+            run_inference()
 
     trace_file = str(output_folder / f"traces/{label}_trace.json")
     prof.export_chrome_trace(trace_file)
 
     with open(output_folder / f"{label}.json", "w") as f:
-        json.dump({
-            "time_ms_mean": measurement.mean * 1000, 
-            "label": label,
-            "cuda_time_profile": analyze_trace(trace_file)
-        }, f, indent=4) 
+        json.dump(
+            {
+                "time_ms_mean": measurement.mean * 1000,
+                "label": label,
+                "cuda_time_profile": analyze_trace(trace_file),
+            },
+            f,
+            indent=4,
+        )
 
-    #print(run_inference())
+    # print(run_inference())
 
     return measurement
+
 
 def create_model_oeq(hidden_irreps, max_ell, device, cueq_config=None):
     source_model = create_model(hidden_irreps, max_ell, device, cueq_config)
     from mace.tools.scripts_utils import extract_config_mace_model
+
     config = extract_config_mace_model(source_model)
     config["oeq_config"] = OEQConfig(
         enabled=True,
         optimize_channelwise=True,
         optimize_symmetric=True,
-        conv_fusion="deterministic")
+        conv_fusion="deterministic",
+    )
 
     target_model = source_model.__class__(**config).to(device)
 
@@ -148,22 +162,23 @@ def create_model_oeq(hidden_irreps, max_ell, device, cueq_config=None):
     target_model.load_state_dict(target_dict)
     return target_model.to(device)
 
+
 def create_model_hybrid(hidden_irreps, max_ell, device, cueq_config=None):
     cueq_config = CuEquivarianceConfig(
-            enabled=True,
-            layout="mul_ir",
-            group="O3_e3nn",
-            optimize_all=False,
-            optimize_linear=True,
-            optimize_channelwise=False,
-            optimize_symmetric=True, 
-            optimize_fctp=True,
-            fuse_convolution=True)
-    
+        enabled=True,
+        layout="mul_ir",
+        group="O3_e3nn",
+        optimize_all=False,
+        optimize_linear=True,
+        optimize_channelwise=False,
+        optimize_symmetric=True,
+        optimize_fctp=True,
+        fuse_convolution=True,
+    )
+
     oeq_config = OEQConfig(
-            enabled=True,
-            optimize_channelwise=True,
-            conv_fusion="deterministic")
+        enabled=True, optimize_channelwise=True, conv_fusion="deterministic"
+    )
 
     model = create_model(hidden_irreps, max_ell, device, cueq_config, oeq_config)
     return model.to(device)
@@ -171,11 +186,12 @@ def create_model_hybrid(hidden_irreps, max_ell, device, cueq_config=None):
 
 def create_model_cueq(hidden_irreps, max_ell, device, cueq_config=None):
     cueq_config = CuEquivarianceConfig(
-            enabled=True,
-            layout="ir_mul",
-            group="O3_e3nn",
-            optimize_all=True,
-            fuse_convolution=True)
+        enabled=True,
+        layout="ir_mul",
+        group="O3_e3nn",
+        optimize_all=True,
+        fuse_convolution=True,
+    )
 
     model_cueq = create_model(hidden_irreps, max_ell, device, cueq_config)
     return model_cueq.to(device)
@@ -190,33 +206,38 @@ def main():
     parser.add_argument("--max_ell", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--hidden_irreps", type=str, default="128x0e + 128x1o + 128x2e")
-    parser.add_argument("--output_folder", '-o', type=str, default=None)
-    parser.add_argument("--implementations", "-i", type=str, nargs='+',
-            default=['e3nn', 'cue', 'oeq', 'hybrid'], help="Implementations to benchmark",
-            choices=['e3nn', 'cue', 'oeq', 'hybrid'])
+    parser.add_argument("--output_folder", "-o", type=str, default=None)
+    parser.add_argument(
+        "--implementations",
+        "-i",
+        type=str,
+        nargs="+",
+        default=["e3nn", "cue", "oeq", "hybrid"],
+        help="Implementations to benchmark",
+        choices=["e3nn", "cue", "oeq", "hybrid"],
+    )
 
     args = parser.parse_args()
 
     output_folder = args.output_folder
     output_folder = pathlib.Path(output_folder)
 
-    for dtype_str, dtype in [   ("f32", torch.float32),
-                                ("f64", torch.float64)
-                            ]:
+    for dtype_str, dtype in [("f32", torch.float32), ("f64", torch.float64)]:
         torch.set_default_dtype(dtype)
         device = torch.device(args.device)
         hidden_irreps = o3.Irreps(args.hidden_irreps)
 
         # Create dataset
         atoms_list = ase.io.read(args.xyz_file, index=":")
-        #table = tools.AtomicNumberTable(list(set(np.concatenate([atoms.numbers for atoms in atoms_list]))))
+        # table = tools.AtomicNumberTable(list(set(np.concatenate([atoms.numbers for atoms in atoms_list]))))
         table = tools.AtomicNumberTable([6, 7, 8, 1, 11, 13, 15, 18])
         data_loader = torch_geometric.dataloader.DataLoader(
-            dataset=[data.AtomicData.from_config(
-                data.config_from_atoms(atoms),
-                z_table=table,
-                cutoff=6.0
-            ) for atoms in atoms_list],
+            dataset=[
+                data.AtomicData.from_config(
+                    data.config_from_atoms(atoms), z_table=table, cutoff=6.0
+                )
+                for atoms in atoms_list
+            ],
             batch_size=min(len(atoms_list), args.batch_size),
             shuffle=False,
             drop_last=False,
@@ -227,7 +248,7 @@ def main():
         output_folder.mkdir(parents=True, exist_ok=True)
 
         traces_folder = output_folder / "traces"
-        traces_folder.mkdir(parents=True, exist_ok=True) 
+        traces_folder.mkdir(parents=True, exist_ok=True)
 
         # Compile is still not working for MACE and cueq; turned off for now
         print("\nBenchmarking Configuration:")
@@ -238,27 +259,51 @@ def main():
         print(f"Hidden irreps: {hidden_irreps}")
         print(f"Number of iterations: {args.num_iters}\n")
 
-        if 'e3nn' in args.implementations:
+        if "e3nn" in args.implementations:
             model_e3nn = create_model(hidden_irreps, args.max_ell, device)
-            measurement_e3nn = benchmark_model(model_e3nn, batch_dict, args.num_iters, label=f"e3nn_{dtype_str}", output_folder=output_folder)
+            measurement_e3nn = benchmark_model(
+                model_e3nn,
+                batch_dict,
+                args.num_iters,
+                label=f"e3nn_{dtype_str}",
+                output_folder=output_folder,
+            )
             print(f"E3NN Measurement:\n{measurement_e3nn}")
 
-        if 'oeq' in args.implementations:
+        if "oeq" in args.implementations:
             model_oeq = create_model_oeq(hidden_irreps, args.max_ell, device)
-            measurement_oeq = benchmark_model(model_oeq, batch_dict, args.num_iters, label=f"ours_{dtype_str}", output_folder=output_folder)
+            measurement_oeq = benchmark_model(
+                model_oeq,
+                batch_dict,
+                args.num_iters,
+                label=f"ours_{dtype_str}",
+                output_folder=output_folder,
+            )
             print(f"\nOpenEquivariance Measurement:\n{measurement_oeq}")
-            #print(f"\nSpeedup: {measurement_e3nn.mean / measurement_oeq.mean:.2f}x")
+            # print(f"\nSpeedup: {measurement_e3nn.mean / measurement_oeq.mean:.2f}x")
 
-        if 'hybrid' in args.implementations:
+        if "hybrid" in args.implementations:
             model_hybrid = create_model_hybrid(hidden_irreps, args.max_ell, device)
-            measurement_hybrid = benchmark_model(model_hybrid, batch_dict, args.num_iters, label=f"hybrid_{dtype_str}", output_folder=output_folder)
+            measurement_hybrid = benchmark_model(
+                model_hybrid,
+                batch_dict,
+                args.num_iters,
+                label=f"hybrid_{dtype_str}",
+                output_folder=output_folder,
+            )
             print(f"\nHybrid Measurement:\n{measurement_hybrid}")
 
-        if 'cue' in args.implementations:
+        if "cue" in args.implementations:
             model_cueq = create_model_cueq(hidden_irreps, args.max_ell, device)
-            measurement_cueq = benchmark_model(model_cueq, batch_dict, args.num_iters, label=f"cuE_{dtype_str}", output_folder=output_folder)
+            measurement_cueq = benchmark_model(
+                model_cueq,
+                batch_dict,
+                args.num_iters,
+                label=f"cuE_{dtype_str}",
+                output_folder=output_folder,
+            )
             print(f"\nCUET Measurement:\n{measurement_cueq}")
-            #print(f"\nSpeedup: {measurement_e3nn.mean / measurement_cueq.mean:.2f}x")
+            # print(f"\nSpeedup: {measurement_e3nn.mean / measurement_cueq.mean:.2f}x")
 
 
 if __name__ == "__main__":

@@ -1,13 +1,15 @@
 import torch
-from typing import Optional 
+from typing import Optional
 
-'''
+"""
 Scatter sum operator from MACE.
 
 basic scatter_sum operations from torch_scatter from
 https://github.com/mir-group/pytorch_runstats/blob/main/torch_runstats/scatter_sum.py
 Using code from https://github.com/rusty1s/pytorch_scatter, but cut down to avoid a dependency.
-'''
+"""
+
+
 def _broadcast(src: torch.Tensor, other: torch.Tensor, dim: int):
     if dim < 0:
         dim = other.dim() + dim
@@ -18,6 +20,7 @@ def _broadcast(src: torch.Tensor, other: torch.Tensor, dim: int):
         src = src.unsqueeze(-1)
     src = src.expand_as(other)
     return src
+
 
 def scatter_sum(
     src: torch.Tensor,

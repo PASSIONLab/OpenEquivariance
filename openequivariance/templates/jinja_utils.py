@@ -1,10 +1,13 @@
-from jinja2 import Environment, PackageLoader 
+from jinja2 import Environment, PackageLoader
+
 
 def raise_helper(msg):
     raise Exception(msg)
 
+
 def divide(numerator, denominator):
-    return numerator // denominator 
+    return numerator // denominator
+
 
 def sizeof(dtype):
     if dtype in ["float", "int", "unsigned int"]:
@@ -12,10 +15,13 @@ def sizeof(dtype):
     else:
         raise Exception("Provided undefined datatype to sizeof!")
 
+
 def get_jinja_environment():
-    env = Environment(loader=PackageLoader("openequivariance"), extensions=['jinja2.ext.do'])
-    env.globals['raise'] = raise_helper 
-    env.globals['divide'] = divide 
-    env.globals['sizeof'] = sizeof 
-    env.globals['enumerate'] = enumerate 
+    env = Environment(
+        loader=PackageLoader("openequivariance"), extensions=["jinja2.ext.do"]
+    )
+    env.globals["raise"] = raise_helper
+    env.globals["divide"] = divide
+    env.globals["sizeof"] = sizeof
+    env.globals["enumerate"] = enumerate
     return env
