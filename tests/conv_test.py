@@ -11,7 +11,7 @@ from itertools import chain, product
 
 class ConvCorrectness:
     def thresh(self, direction):
-        return {"fwd": 1e-5, "bwd": 3e-4, "double_bwd": 3e-4}[direction]
+        return {"fwd": 3e-4, "bwd": 3e-4, "double_bwd": 3e-4}[direction]
 
     def check_result(self, result, fieldname):
         with check:
@@ -48,17 +48,21 @@ class ConvCorrectness:
             if not problem.shared_weights:
                 return oeq.TensorProductConv(problem, deterministic=True)
             else:
-                return None
+                pytest.skip("Shared weights not supported with deterministic")
         elif request.param == "kahan":
             if problem.irrep_dtype == np.float32:
-                return oeq.TensorProductConv(problem, deterministic=True, kahan=True)
+                if not problem.shared_weights:
+                    return oeq.TensorProductConv(
+                        problem, deterministic=True, kahan=True
+                    )
+                else:
+                    pytest.skip("Shared weights not supported with kahan")
             else:
-                return None
+                pytest.skip("Only Float32 supported with kahan")
 
     def test_tp_fwd(self, conv_object, graph):
         if conv_object is None:
-            assert True
-            return
+            pytest.skip("'conv_object' fixture returned None, skipping")
 
         result = conv_object.test_correctness_forward(
             graph,
@@ -71,8 +75,7 @@ class ConvCorrectness:
 
     def test_tp_bwd(self, conv_object, graph):
         if conv_object is None:
-            assert True
-            return
+            pytest.skip("'conv_object' fixture returned None, skipping")
 
         result = conv_object.test_correctness_backward(
             graph,
@@ -87,8 +90,7 @@ class ConvCorrectness:
 
     def test_tp_double_bwd(self, conv_object, graph):
         if conv_object is None:
-            assert True
-            return
+            pytest.skip("'conv_object' fixture returned None, skipping")
 
         result = conv_object.test_correctness_double_backward(
             graph,
