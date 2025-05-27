@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Optional, Union
 
 from openequivariance.implementations.TensorProductBase import TensorProductBase
@@ -34,11 +33,6 @@ def check_similiarity(
         diff_Linf_norm = float(la.norm((ground_truth - to_check).flatten(), ord=np.inf))
         result["diff_Linf_norm"] = diff_Linf_norm
         result["pass"] = bool(diff_Linf_norm < correctness_threshold)
-        path = Path("testing_failures")
-        path.mkdir(exist_ok=True)
-        np.save(path / "to_check", to_check)
-        np.save(path / "ground_truth", ground_truth)
-        logger.debug(print(correctness_threshold))
         if result["pass"]:
             logger.info(
                 f" {bcolors.OKGREEN}{name} correctness check pass. {diff_Linf_norm=:.3e}, {correctness_threshold=} {bcolors.ENDC}"
