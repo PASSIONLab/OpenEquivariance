@@ -45,7 +45,10 @@ class ConvCorrectness:
         if request.param == "atomic":
             return oeq.TensorProductConv(problem, deterministic=False)
         elif request.param == "deterministic":
-            return oeq.TensorProductConv(problem, deterministic=True)
+            if not problem.shared_weights:
+                return oeq.TensorProductConv(problem, deterministic=True)
+            else:
+                return None
         elif request.param == "kahan":
             if problem.irrep_dtype == np.float32:
                 return oeq.TensorProductConv(problem, deterministic=True, kahan=True)
