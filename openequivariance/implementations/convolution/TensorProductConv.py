@@ -41,13 +41,13 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 
     def forward(
         self,
-        L1_in: torch.tensor,
-        L2_in: torch.tensor,
-        W: torch.tensor,
-        rows: torch.tensor,
-        cols: torch.tensor,
-        sender_perm: Optional[torch.tensor] = None,
-    ) -> torch.tensor:
+        L1_in: torch.Tensor,
+        L2_in: torch.Tensor,
+        W: torch.Tensor,
+        rows: torch.Tensor,
+        cols: torch.Tensor,
+        sender_perm: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         if sender_perm is None:
             return torch.ops.torch_tp_jit.jit_conv_forward(
                 self.internal,
