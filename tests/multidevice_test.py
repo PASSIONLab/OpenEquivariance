@@ -1,37 +1,49 @@
-import textwrap, torch, subprocess, os
-import numpy as np
+import textwrap
+import torch
+import subprocess
+import os
+
 
 def test_multidevice():
-    result = subprocess.run([
-        "python", "-m", "torch.distributed.run",
-        "--standalone", "--nnodes=1", "--nproc-per-node=gpu",
-        __file__], 
+    result = subprocess.run(
+        [
+            "python",
+            "-m",
+            "torch.distributed.run",
+            "--standalone",
+            "--nnodes=1",
+            "--nproc-per-node=gpu",
+            __file__,
+        ],
         capture_output=True,
-        check=False)
-    
+        check=False,
+    )
+
     if result.returncode != 0:
-        error_string = f'''
-        Invocation: {' '.join(result.args)}
+        error_string = f"""
+        Invocation: {" ".join(result.args)}
         Test failed with return code {result.returncode}.
         \nOutput:\n\n{result.stdout.decode()}
         \nError:\n\n{result.stderr.decode()}
-        '''
-        assert False, textwrap.dedent(error_string) 
+        """
+        assert False, textwrap.dedent(error_string)
 
     assert True
+
 
 if __name__ == "__main__":
     import openequivariance as oeq
 
-    # Use MACE-large to test >64KB shared memory allocation 
-    from openequivariance.benchmark.benchmark_configs import mace_problems 
-    problem = mace_problems[0] 
+    # Use MACE-large to test >64KB shared memory allocation
+    from openequivariance.benchmark.benchmark_configs import mace_problems
+
+    problem = mace_problems[0]
 
     local_rank = int(os.environ["LOCAL_RANK"])
-    device = f'cuda:{local_rank}'
+    device = f"cuda:{local_rank}"
     torch.set_default_device(device)
 
-    X_ir, Y_ir, Z_ir = problem.irreps_in1, problem.irreps_in2, problem.irreps_out 
+    X_ir, Y_ir, Z_ir = problem.irreps_in1, problem.irreps_in2, problem.irreps_out
     tp = oeq.TensorProduct(problem)
 
     batch_size = 1000
