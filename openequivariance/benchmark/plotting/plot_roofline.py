@@ -1,4 +1,3 @@
-# ruff: noqa: E741
 import numpy as np
 import pathlib
 from openequivariance.benchmark.plotting.plotting_utils import (

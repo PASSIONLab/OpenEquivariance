@@ -1,4 +1,4 @@
-# ruff: noqa: E741, E743
+# ruff: noqa: E743
 """
 This file contains lightly modified code from E3NN. The code has been modified to remove
 all dependency on Pytorch.

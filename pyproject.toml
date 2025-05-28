@@ -45,3 +45,6 @@ include = ["openequivariance*"]
 addopts = [
     "--import-mode=importlib",
 ]
+
+[tool.ruff]
+lint.ignore = ["E741"]

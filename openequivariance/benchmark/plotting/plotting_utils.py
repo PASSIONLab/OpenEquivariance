@@ -1,4 +1,3 @@
-# ruff: noqa: E741
 import json
 import os
 import pathlib
