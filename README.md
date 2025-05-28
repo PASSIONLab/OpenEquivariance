@@ -290,6 +290,18 @@ We do not (yet) support:
 
 If you have a use case for any of the unsupported features above, let us know.
 
+## Multidevice / Stream Support
+To use OpenEquivariance on multiple GPUs of a single
+compute node, we currently require that all GPUs 
+share the same compute capability. This is because
+our kernels are compiled based on the shared memory
+capacity of the numerically first visible GPU card. 
+On heterogeneous systems, you can still 
+use OpenEquivariance on all GPUs that match the
+compute capability of the first visible device.
+
+We are working on support for CUDA streams!
+
 ## Citation and Acknowledgements
 If you find this code useful, please cite our paper:
 

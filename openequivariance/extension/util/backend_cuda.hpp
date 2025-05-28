@@ -137,7 +137,6 @@ public:
         smem(smem) 
     { }
 
-
     KernelLaunchConfig(int64_t num_blocks_i, int64_t num_threads_i, int64_t smem_i) :
         KernelLaunchConfig( static_cast<uint32_t>(num_blocks_i),
                             static_cast<uint32_t>(num_threads_i),
@@ -156,8 +155,8 @@ private:
 
     bool compiled = false;
     char* code = nullptr;
+    int cu_major, cu_minor;
 
-    CUdevice dev;
     CUlibrary library;
 
     vector<string> kernel_names;
@@ -185,6 +184,10 @@ public:
     }
 
     void compile(vector<string> kernel_names_i, vector<vector<int>> template_param_list, int opt_level=3) {
+        DeviceProp dp(0); // We only query the first device on the system at the moment
+        cu_major = dp.major;
+        cu_minor = dp.minor;
+
         if(compiled) {
             throw std::logic_error("JIT object has already been compiled!");
         }
@@ -215,8 +218,7 @@ public:
 
         }
         
-        DeviceProp dp(0); // TODO: We only query the first device at the moment
-        std::string sm = "-arch=sm_" + std::to_string(dp.major) + std::to_string(dp.minor);
+        std::string sm = "-arch=sm_" + std::to_string(cu_major) + std::to_string(cu_minor);
 
         std::vector<const char*> opts = {
             "--std=c++17",
@@ -268,19 +270,29 @@ public:
             kernels.emplace_back();
             CUDA_SAFE_CALL(cuLibraryGetKernel(&(kernels[i]), library, name));
         }
-
-        CUDA_SAFE_CALL(cuDeviceGet(&dev, 0));
     }
 
     void set_max_smem(int kernel_id, uint32_t max_smem_bytes) {
+        if(!compiled)
+            throw std::logic_error("JIT object has not been compiled!");
         if(kernel_id >= kernels.size())
             throw std::logic_error("Kernel index out of range!");
 
-        CUDA_SAFE_CALL(cuKernelSetAttribute(
-                CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
-                max_smem_bytes,
-                kernels[kernel_id],
-                dev));
+        int device_count;
+        CUDA_SAFE_CALL(cuDeviceGetCount(&device_count));
+
+        for(int i = 0; i < device_count; i++) {
+            DeviceProp dp(i);
+            if(dp.major == cu_major && dp.minor == cu_minor) {
+                CUdevice dev;
+                CUDA_SAFE_CALL(cuDeviceGet(&dev, i));
+                CUDA_SAFE_CALL(cuKernelSetAttribute(
+                        CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+                        max_smem_bytes,
+                        kernels[kernel_id],
+                        dev));
+            }
+        }
     }
 
     void execute(int kernel_id, void* args[], KernelLaunchConfig config) {
@@ -291,6 +303,10 @@ public:
         CUDA_SAFE_CALL(cuCtxGetCurrent(&pctx));
 
         if(pctx == NULL) {
+            int device_id;
+            CUdevice dev;
+            CUDA_ERRCHK(cudaGetDevice(&device_id));
+            CUDA_SAFE_CALL(cuDeviceGet(&dev, device_id));
             CUDA_SAFE_CALL(cuDevicePrimaryCtxRetain(&pctx, dev));
             CUDA_SAFE_CALL(cuCtxSetCurrent(pctx));
         }

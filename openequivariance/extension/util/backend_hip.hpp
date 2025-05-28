@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <memory>
 
 using namespace std;
 
@@ -146,20 +147,54 @@ public:
     { }
 };
 
-class __attribute__((visibility("default"))) HIPJITKernel {
-private:
-    hiprtcProgram prog;
-
-    bool compiled = false;
-    char* code = nullptr;
-
-    hipModule_t library; 
-
-    vector<string> kernel_names;
+class __attribute__((visibility("default"))) KernelLibrary {
+    hipModule_t library;
     vector<hipFunction_t> kernels;
 
 public:
+    int device;
+    KernelLibrary(hiprtcProgram &prog, vector<char> &kernel_binary, vector<string> &kernel_names) {
+        hipGetDevice(&device);
+        HIP_ERRCHK(hipModuleLoadData(&library, kernel_binary.data()));
+
+        for (size_t i = 0; i < kernel_names.size(); i++) {
+            const char *name;
+
+            HIPRTC_SAFE_CALL(hiprtcGetLoweredName(
+                    prog,
+                    kernel_names[i].c_str(), // name expression
+                    &name                    // lowered name
+                    ));
+
+            kernels.emplace_back();
+            HIP_ERRCHK(hipModuleGetFunction(&(kernels[i]), library, name));
+        }
+    }
+
+    hipFunction_t operator[](int kernel_id) {
+        if(kernel_id >= kernels.size())
+            throw std::logic_error("Kernel index out of range!");
+
+        return kernels[kernel_id];
+    }
+
+    ~KernelLibrary() { 
+        HIP_ERRCHK(hipModuleUnload(library)); 
+    }
+}; 
+
+class __attribute__((visibility("default"))) HIPJITKernel {
+private:
+    hiprtcProgram prog;
+    bool compiled = false;
+
+    vector<string> kernel_names;
+    unique_ptr<KernelLibrary> kernels;
+
+public:
     string kernel_plaintext;
+    vector<char> kernel_binary;
+
     HIPJITKernel(string plaintext) :
         kernel_plaintext(plaintext) {
 
@@ -247,42 +282,24 @@ public:
 
         size_t codeSize;
         HIPRTC_SAFE_CALL(hiprtcGetCodeSize(prog, &codeSize));
-        code = new char[codeSize];
-        HIPRTC_SAFE_CALL(hiprtcGetCode(prog, code));
-
-	vector<char> kernel_binary(codeSize);
-	hiprtcGetCode(prog, kernel_binary.data());
-
-        //HIP_SAFE_CALL(cuInit(0));
-        HIP_ERRCHK(hipModuleLoadData(&library, kernel_binary.data()));
-
-        for (size_t i = 0; i < kernel_names.size(); i++) {
-            const char *name;
-
-            HIPRTC_SAFE_CALL(hiprtcGetLoweredName(
-                    prog,
-                    kernel_names[i].c_str(), // name expression
-                    &name                    // lowered name
-                    ));
-
-            kernels.emplace_back();
-            HIP_ERRCHK(hipModuleGetFunction(&(kernels[i]), library, name));
-        }
+        kernel_binary.resize(codeSize);
+        hiprtcGetCode(prog, kernel_binary.data());
+        kernels.reset(new KernelLibrary(prog, kernel_binary, kernel_names));
     }
 
     void set_max_smem(int kernel_id, uint32_t max_smem_bytes) {
-        if(kernel_id >= kernels.size())
-            throw std::logic_error("Kernel index out of range!");
-
-	// Ignore for AMD GPUs 
+        // Ignore for AMD GPUs 
     }
 
     void execute(int kernel_id, void* args[], KernelLaunchConfig config) {
-        if(kernel_id >= kernels.size())
-            throw std::logic_error("Kernel index out of range!");
+        int device_id; HIP_ERRCHK(hipGetDevice(&device_id));
+        if(device_id != kernels->device) {
+            kernels.reset();
+            kernels.reset(new KernelLibrary(prog, kernel_binary, kernel_names)); 
+        }
 
         HIP_ERRCHK(
-            hipModuleLaunchKernel( (kernels[kernel_id]),
+            hipModuleLaunchKernel( ((*kernels)[kernel_id]),
                             config.num_blocks, 1, 1,    // grid dim
                             config.num_threads, 1, 1,   // block dim
                             config.smem, config.hStream,       // shared mem and stream
@@ -291,10 +308,6 @@ public:
     }
 
     ~HIPJITKernel() {
-        if(compiled) {
-            HIP_ERRCHK(hipModuleUnload(library));
-            delete[] code;
-        }
         HIPRTC_SAFE_CALL(hiprtcDestroyProgram(&prog));
     }
 };
