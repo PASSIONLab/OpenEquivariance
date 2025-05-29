@@ -16,18 +16,11 @@ jobs:
     runs-on: ubuntu-24.04
     
     container: 
-      image: nvcr.io/nvidia/cuda:12.9.0-devel-ubuntu24.04 # Pre installed CUDA toolkit
+      image: nvcr.io/nvidia/pytorch:25.04-py3 # Pre installed CUDA toolkit
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
-        cache: 'pip'
-        cache-dependency-path: '**/requirements_cuda_ci.txt'
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
         pip install -r .github/workflows/requirements_cuda_ci.txt
         pip install -e .
 
