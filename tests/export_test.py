@@ -126,3 +126,6 @@ def test_aoti(tp_and_inputs):
 
     aoti_result = aoti_model(*inputs)
     assert torch.allclose(uncompiled_result, aoti_result, atol=1e-5)
+
+def test_jitscript_cpp_interface():
+    pass
