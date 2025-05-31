@@ -14,6 +14,7 @@ from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.extlib import DeviceProp
 from openequivariance.implementations.E3NNTensorProduct import (
     E3NNTensorProduct,
+    E3NNTensorProductCompiledCUDAGraphs,
     E3NNTensorProductCompiledMaxAutotuneCUDAGraphs,
 )
 from openequivariance.implementations.TensorProduct import TensorProduct
@@ -28,9 +29,6 @@ from openequivariance.benchmark.tpp_creation_utils import (
     FullyConnectedTPProblem,
     SingleInstruction,
 )
-from openequivariance.benchmark.benchmark_routines.paper_benchmark_uvw import (
-    run_paper_uvw_benchmark,
-)
 
 from openequivariance.implementations.convolution.TensorProductConv import (
     TensorProductConvAtomic,
@@ -41,6 +39,15 @@ from openequivariance.implementations.convolution.TensorProductConv import (
 
 from openequivariance.implementations.convolution.CUEConv import CUEConv, CUEConvFused
 from openequivariance.benchmark.ConvBenchmarkSuite import ConvBenchmarkSuite, load_graph
+
+from openequivariance.benchmark.problems import (
+    e3nn_torch_tetris_poly_problems,
+    diffdock_problems,
+    mace_problems,
+    nequip_problems
+)
+
+from torch._functorch import config
 
 logger = getLogger()
 
@@ -74,8 +81,6 @@ roofline_configs = [
 
 
 def benchmark_uvu(params):
-    from openequivariance.benchmark.benchmark_problems import mace_problems, nequip_problems 
-
     float64_problems = mace_problems() + nequip_problems() 
     for problem in float64_problems:
         problem.irrep_dtype = np.float64
@@ -155,6 +160,51 @@ def benchmark_uvu(params):
 
     if params.plot:
         plot({"data_folder": data_folder})
+
+@config.patch("donated_buffer", False)
+def benchmark_uvw(params) -> pathlib.Path:
+    problems = list(itertools.chain(e3nn_torch_tetris_poly_problems(), diffdock_problems()))
+
+    float64_problems = copy.deepcopy(problems)
+    for problem in float64_problems:
+        problem.irrep_dtype = np.float64
+        problem.weight_dtype = np.float64
+
+    problems += float64_problems
+
+    implementations = [
+        E3NNTensorProductCompiledCUDAGraphs,
+        CUETensorProduct,
+        TensorProduct,
+    ]
+
+    tests = [
+        TestDefinition(
+            implementation, problem, direction, correctness=False, benchmark=True
+        )
+        for problem, direction, implementation in itertools.product(
+            problems, params.directions, implementations
+        )
+    ]
+
+    bench_suite = TestBenchmarkSuite(
+        num_warmup=100,
+        num_iter=100,
+        bench_batch_size=params.batch_size,
+        prng_seed=11111,
+        torch_op=True,
+        test_name="uvw",
+    )
+
+    logger.setLevel(logging.INFO)
+    data_folder = bench_suite.run(tests, output_folder=params.output_folder)
+
+    if params.plot:
+        import openequivariance.benchmark.plotting as plotting
+
+        plotting.plot_uvw(data_folder)
+
+    return data_folder
 
 
 def benchmark_roofline(params):
@@ -272,12 +322,6 @@ def benchmark_convolution(params):
 
 
 def benchmark_double_backward(params):
-    from openequivariance.benchmark.benchmark_problems import (
-        mace_problems,
-        nequip_problems,
-        diffdock_problems,
-    )
-
     implementations = [E3NNTensorProduct, CUETensorProduct, TensorProduct]
     problems = diffdock_problems() + mace_problems() + nequip_problems() 
     float64_problems = copy.deepcopy(problems)
@@ -307,8 +351,6 @@ def benchmark_double_backward(params):
 
 
 def benchmark_kahan_accuracy(params):
-    from openequivariance.benchmark.benchmark_problems import mace_problems
-
     filenames = ["carbon_lattice_radius6.0.pickle"]
     graphs = download_graphs(params, filenames)
     implementations = [TensorProductConvAtomic, TensorProductConvKahan]
@@ -469,7 +511,7 @@ if __name__ == "__main__":
         choices=["forward", "backward"],
     )
     parser_uvw.add_argument("--plot", action="store_true", help="Plot the results.")
-    parser_uvw.set_defaults(func=run_paper_uvw_benchmark)
+    parser_uvw.set_defaults(func=benchmark_uvw)
 
     parser_double_bwd = subparsers.add_parser(
         "double_backward", help="Run the higher derivative kernel benchmark"

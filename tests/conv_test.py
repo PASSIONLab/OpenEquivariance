@@ -106,7 +106,7 @@ class ConvCorrectness:
 
 
 class TestProductionModels(ConvCorrectness):
-    from openequivariance.benchmark.benchmark_problems import (
+    from openequivariance.benchmark.problems import (
         mace_problems,
         diffdock_problems,
     )
@@ -207,7 +207,7 @@ class TestUVWSingleIrrep(ConvCorrectness):
 
 
 class TestAtomicSharedWeights(ConvCorrectness):
-    from openequivariance.benchmark.benchmark_problems import (
+    from openequivariance.benchmark.problems import (
         mace_problems,
         diffdock_problems,
     )

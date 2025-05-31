@@ -79,7 +79,7 @@ class TPCorrectness:
 
 
 class TestProductionModels(TPCorrectness):
-    from openequivariance.benchmark.benchmark_problems import (
+    from openequivariance.benchmark.problems import (
         e3nn_torch_tetris_poly_problems,
         diffdock_problems,
         mace_problems,
@@ -218,7 +218,7 @@ class TestUVWSingleIrrep(TPCorrectness):
 
 
 class TestSharedWeights(TPCorrectness):
-    from openequivariance.benchmark.benchmark_problems import (
+    from openequivariance.benchmark.problems import (
         mace_problems,
         diffdock_problems,
     )
