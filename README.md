@@ -295,6 +295,19 @@ We do not (yet) support:
 
 If you have a use case for any of the unsupported features above, let us know.
 
+We have recently added beta support for symmetric
+contraction acceleration. Because this is a kernel 
+specific to MACE, we require e3nn as dependency
+to run it, and there is currently no support for
+compile / export (coming soon!), we 
+do not expose it in the package
+toplevel. You can test out our implementation by
+running 
+
+```python
+from openequivariance.implementations.symmetric_contraction import SymmetricContraction as OEQSymmetricContraction
+```
+
 ## Multidevice / Stream Support
 To use OpenEquivariance on multiple GPUs of a single
 compute node, we currently require that all GPUs 
