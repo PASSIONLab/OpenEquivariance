@@ -17,9 +17,9 @@ from openequivariance.benchmark.TestBenchmarkSuite import (
     TestBenchmarkSuite,
     TestDefinition,
 )
-from openequivariance.benchmark.benchmark_configs import (
-    e3nn_torch_tetris_polynomial,
-    diffdock_configs,
+from openequivariance.benchmark.benchmark_problems import (
+    e3nn_torch_tetris_poly_problems,
+    diffdock_problems,
 )
 
 logger = getLogger()
@@ -27,7 +27,7 @@ logger = getLogger()
 
 @config.patch("donated_buffer", False)
 def run_paper_uvw_benchmark(params) -> pathlib.Path:
-    problems = list(itertools.chain(e3nn_torch_tetris_polynomial, diffdock_configs))
+    problems = list(itertools.chain(e3nn_torch_tetris_poly_problems(), diffdock_problems()))
 
     float64_problems = copy.deepcopy(problems)
     for problem in float64_problems:

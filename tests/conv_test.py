@@ -106,12 +106,12 @@ class ConvCorrectness:
 
 
 class TestProductionModels(ConvCorrectness):
-    from openequivariance.benchmark.benchmark_configs import (
+    from openequivariance.benchmark.benchmark_problems import (
         mace_problems,
-        diffdock_configs,
+        diffdock_problems,
     )
 
-    production_model_tpps = list(chain(mace_problems, diffdock_configs))
+    production_model_tpps = mace_problems() + diffdock_problems() 
 
     @pytest.fixture(params=production_model_tpps, ids=lambda x: x.label, scope="class")
     def problem(self, request, dtype):
@@ -207,12 +207,12 @@ class TestUVWSingleIrrep(ConvCorrectness):
 
 
 class TestAtomicSharedWeights(ConvCorrectness):
-    from openequivariance.benchmark.benchmark_configs import (
+    from openequivariance.benchmark.benchmark_problems import (
         mace_problems,
-        diffdock_configs,
+        diffdock_problems,
     )
 
-    problems = [mace_problems[0], diffdock_configs[0]]
+    problems = [mace_problems()[0], diffdock_problems()[0]]
 
     def thresh(self, direction):
         return {

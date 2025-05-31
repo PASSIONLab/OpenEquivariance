@@ -74,13 +74,13 @@ roofline_configs = [
 
 
 def benchmark_uvu(params):
-    from openequivariance.benchmark.benchmark_configs import mace_nequip_problems
+    from openequivariance.benchmark.benchmark_problems import mace_problems, nequip_problems 
 
-    float64_problems = copy.deepcopy(mace_nequip_problems)
+    float64_problems = mace_problems() + nequip_problems() 
     for problem in float64_problems:
         problem.irrep_dtype = np.float64
         problem.weight_dtype = np.float64
-    problems = mace_nequip_problems + float64_problems
+    problems = mace_problems() + nequip_problems() + float64_problems
 
     implementations = [implementation_map[impl] for impl in params.implementations]
     directions = params.directions
@@ -272,13 +272,14 @@ def benchmark_convolution(params):
 
 
 def benchmark_double_backward(params):
-    from openequivariance.benchmark.benchmark_configs import (
-        mace_nequip_problems,
-        diffdock_configs,
+    from openequivariance.benchmark.benchmark_problems import (
+        mace_problems,
+        nequip_problems,
+        diffdock_problems,
     )
 
     implementations = [E3NNTensorProduct, CUETensorProduct, TensorProduct]
-    problems = diffdock_configs + mace_nequip_problems
+    problems = diffdock_problems() + mace_problems() + nequip_problems() 
     float64_problems = copy.deepcopy(problems)
 
     for problem in float64_problems:
@@ -306,12 +307,12 @@ def benchmark_double_backward(params):
 
 
 def benchmark_kahan_accuracy(params):
-    from openequivariance.benchmark.benchmark_configs import mace_problems
+    from openequivariance.benchmark.benchmark_problems import mace_problems
 
     filenames = ["carbon_lattice_radius6.0.pickle"]
     graphs = download_graphs(params, filenames)
     implementations = [TensorProductConvAtomic, TensorProductConvKahan]
-    problems = [mace_problems[0]]
+    problems = [mace_problems()[0]]
 
     bench = ConvBenchmarkSuite(
         problems, test_name="kahan_convolution_accuracy", correctness_threshold=1e-4
