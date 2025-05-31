@@ -231,8 +231,8 @@ TorchBind in earlier versions.
 ## Running MACE
 **NOTE**: If you're revisiting this page, the repo containing
 our up-to-date MACE integration has changed! See the instructions
-below; our new repo is a fork of MACE to facilitate a PR into the
-main codebase.
+below; we use a branch off a fork of MACE to facilitate
+PRs into the main codebase.
 
 We have modified MACE to use our accelerated kernels instead
 of the standard e3nn backend. Here are the steps to replicate
@@ -242,7 +242,7 @@ our MACE benchmark:
 ```bash
 pip uninstall mace-torch
 pip install git+https://github.com/PASSIONLab/OpenEquivariance
-pip install git+https://github.com/vbharadwaj-bk/mace_oeq_integration/tree/oeq_experimental
+pip install git+https://github.com/vbharadwaj-bk/mace_oeq_integration.git@oeq_experimental
 ```
 
 2. Download the `carbon.xyz` data file, available at <https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/>. 
