@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rocblas.h" 
+#include "rocblas/rocblas.h" 
 #include <hip/hip_runtime.h>
 #include <stdexcept>
 #include <iostream>
@@ -57,8 +57,8 @@ public:
                 C = C_base + (m * batch_size * ragged_offset); 
                 ldc = M * batch_size; strideC = M; 
                
-                transa = CUBLAS_OP_T;
-                transb = CUBLAS_OP_N;
+                transa = rocblas_operation_transpose;
+                transb = rocblas_operation_none;
             }
             else {
                 M = k;
@@ -74,8 +74,8 @@ public:
                 C = C_base + (m * k * batch_size * i);
                 ldc = k; strideC = M * N;
 
-                transa = CUBLAS_OP_N;
-                transb = CUBLAS_OP_T;
+                transa = rocblas_operation_none;
+                transb = rocblas_operation_transpose;
             }
             ragged_offset += ragged_counts[i];
             
@@ -124,6 +124,6 @@ public:
     }
 
     ~GroupMMHIP() {
-        rocblas_destroy_handle(handle)
+        rocblas_destroy_handle(handle);
     }
 };
