@@ -103,7 +103,7 @@ public:
                         batch_size);
                 }
                 else {
-                    throw std::logic_error("Double precision support in progress.");
+                    throw std::logic_error("Unsupported datatype for grouped GEMM!");
                 }
                 if (stat != rocblas_status_success) {
                     throw std::logic_error("Grouped GEMM failed!");
