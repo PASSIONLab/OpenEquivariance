@@ -3,6 +3,7 @@ import torch
 
 from openequivariance.extlib import GroupMM_F32, GroupMM_F64
 
+
 class GroupMM:
     next_id = 0
 
@@ -120,6 +121,7 @@ from e3nn.util.jit import compile_mode
 _TP = collections.namedtuple("_TP", "op, args")
 _INPUT = collections.namedtuple("_INPUT", "tensor, start, stop")
 
+
 def _wigner_nj(
     irrepss: List[o3.Irreps],
     normalization: str = "component",
@@ -198,7 +200,7 @@ def U_matrix_real(
     correlation: int,
     normalization: str = "component",
     filter_ir_mid=None,
-    dtype=None
+    dtype=None,
 ):
     irreps_out = o3.Irreps(irreps_out)
     irrepss = [o3.Irreps(irreps_in)] * correlation
@@ -206,16 +208,7 @@ def U_matrix_real(
     if correlation == 4:
         filter_ir_mid = [(i, 1 if i % 2 == 0 else -1) for i in range(12)]
 
-    try:
-        wigners = _wigner_nj(irrepss, normalization, filter_ir_mid, dtype)
-    except NotImplementedError as e:
-        if CUET_AVAILABLE:
-            return compute_U_cueq(
-                irreps_in, irreps_out=irreps_out, correlation=correlation
-            )
-        raise NotImplementedError(
-            "The requested Clebsch-Gordan coefficients are not implemented, please install cuequivariance; pip install cuequivariance"
-        ) from e
+    wigners = _wigner_nj(irrepss, normalization, filter_ir_mid, dtype)
 
     current_ir = wigners[0][0]
     out = []
@@ -234,6 +227,7 @@ def U_matrix_real(
             current_ir = ir
     out += [last_ir, stack]
     return out
+
 
 @compile_mode("script")
 class Contraction(torch.nn.Module):
