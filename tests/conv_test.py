@@ -6,7 +6,7 @@ from pytest_check import check
 import numpy as np
 import openequivariance as oeq
 from openequivariance.benchmark.ConvBenchmarkSuite import load_graph
-from itertools import chain, product
+from itertools import product
 
 
 class ConvCorrectness:
@@ -111,7 +111,7 @@ class TestProductionModels(ConvCorrectness):
         diffdock_problems,
     )
 
-    production_model_tpps = mace_problems() + diffdock_problems() 
+    production_model_tpps = mace_problems() + diffdock_problems()
 
     @pytest.fixture(params=production_model_tpps, ids=lambda x: x.label, scope="class")
     def problem(self, request, dtype):

@@ -9,7 +9,7 @@ from openequivariance.benchmark.correctness_utils import (
     correctness_backward,
     correctness_double_backward,
 )
-from itertools import chain, product
+from itertools import product
 
 
 class TPCorrectness:
@@ -83,10 +83,15 @@ class TestProductionModels(TPCorrectness):
         e3nn_torch_tetris_poly_problems,
         diffdock_problems,
         mace_problems,
-        nequip_problems
+        nequip_problems,
     )
 
-    production_model_tpps = mace_problems() + nequip_problems() + e3nn_torch_tetris_poly_problems() + diffdock_problems()
+    production_model_tpps = (
+        mace_problems()
+        + nequip_problems()
+        + e3nn_torch_tetris_poly_problems()
+        + diffdock_problems()
+    )
 
     @pytest.fixture(params=production_model_tpps, ids=lambda x: x.label, scope="class")
     def problem(self, request, dtype):

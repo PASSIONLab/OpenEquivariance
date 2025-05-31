@@ -44,7 +44,7 @@ from openequivariance.benchmark.problems import (
     e3nn_torch_tetris_poly_problems,
     diffdock_problems,
     mace_problems,
-    nequip_problems
+    nequip_problems,
 )
 
 from torch._functorch import config
@@ -81,7 +81,7 @@ roofline_configs = [
 
 
 def benchmark_uvu(params):
-    float64_problems = mace_problems() + nequip_problems() 
+    float64_problems = mace_problems() + nequip_problems()
     for problem in float64_problems:
         problem.irrep_dtype = np.float64
         problem.weight_dtype = np.float64
@@ -161,9 +161,12 @@ def benchmark_uvu(params):
     if params.plot:
         plot({"data_folder": data_folder})
 
+
 @config.patch("donated_buffer", False)
 def benchmark_uvw(params) -> pathlib.Path:
-    problems = list(itertools.chain(e3nn_torch_tetris_poly_problems(), diffdock_problems()))
+    problems = list(
+        itertools.chain(e3nn_torch_tetris_poly_problems(), diffdock_problems())
+    )
 
     float64_problems = copy.deepcopy(problems)
     for problem in float64_problems:
@@ -323,7 +326,7 @@ def benchmark_convolution(params):
 
 def benchmark_double_backward(params):
     implementations = [E3NNTensorProduct, CUETensorProduct, TensorProduct]
-    problems = diffdock_problems() + mace_problems() + nequip_problems() 
+    problems = diffdock_problems() + mace_problems() + nequip_problems()
     float64_problems = copy.deepcopy(problems)
 
     for problem in float64_problems:

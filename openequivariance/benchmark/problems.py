@@ -53,6 +53,7 @@ _e3nn_torch_tetris = [
     FCTPP("150x0o + 150x0e", "1x0e", "1x0e"),  # alpha
 ]
 
+
 def e3nn_torch_tetris_poly_problems():
     # source: https://github.com/e3nn/e3nn/blob/f95297952303347a8a3cfe971efe449c710c43b2/examples/tetris_polynomial.py#L66-L68
     return [
@@ -69,6 +70,7 @@ def e3nn_torch_tetris_poly_problems():
             label="tetris-poly-2",
         ),  # tp2
     ]
+
 
 # https://github.com/gcorso/DiffDock/blob/b4704d94de74d8cb2acbe7ec84ad234c09e78009/models/tensor_layers.py#L299
 # specific irreps come from Vivek's communication with DiffDock team
@@ -90,50 +92,60 @@ def diffdock_problems():
         ),
     ]
 
+
 def mace_problems():
-        return [CTPP(*config) for config in 
-        [
-        (
-            "128x0e+128x1o+128x2e",
-            "1x0e+1x1o+1x2e+1x3o",
-            "128x0e+128x1o+128x2e+128x3o",
-            "mace-large",
-        ),
-        ("128x0e+128x1o", "1x0e+1x1o+1x2e+1x3o", "128x0e+128x1o+128x2e", "mace-medium"),
-    ]]
+    return [
+        CTPP(*config)
+        for config in [
+            (
+                "128x0e+128x1o+128x2e",
+                "1x0e+1x1o+1x2e+1x3o",
+                "128x0e+128x1o+128x2e+128x3o",
+                "mace-large",
+            ),
+            (
+                "128x0e+128x1o",
+                "1x0e+1x1o+1x2e+1x3o",
+                "128x0e+128x1o+128x2e",
+                "mace-medium",
+            ),
+        ]
+    ]
+
 
 def nequip_problems():
-    return [CTPP(*config) for config in
-        [
-        (
-            "32x0o + 32x0e + 32x1o + 32x1e + 32x2o + 32x2e",
-            "0e + 1o + 2e",
-            "32x0o + 32x0e + 32x1o + 32x1e + 32x2o + 32x2e",
-            "nequip-lips",
-        ),
-        (
-            "64x0o + 64x0e + 64x1o + 64x1e",
-            "0e + 1o",
-            "64x0o + 64x0e + 64x1o + 64x1e",
-            "nequip-revmd17-aspirin",
-        ),
-        (
-            "64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e",
-            "0e + 1o + 2e",
-            "64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e",
-            "nequip-revmd17-toluene",
-        ),
-        (
-            "64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e + 64x3o + 64x3e",
-            "0e + 1o + 2e + 3o",
-            "64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e + 64x3o + 64x3e",
-            "nequip-revmd17-benzene",
-        ),
-        (
-            "32x0o + 32x0e + 32x1o + 32x1e",
-            "0e + 1o",
-            "32x0o + 32x0e + 32x1o + 32x1e",
-            "nequip-water",
-        ),
-    ]
+    return [
+        CTPP(*config)
+        for config in [
+            (
+                "32x0o + 32x0e + 32x1o + 32x1e + 32x2o + 32x2e",
+                "0e + 1o + 2e",
+                "32x0o + 32x0e + 32x1o + 32x1e + 32x2o + 32x2e",
+                "nequip-lips",
+            ),
+            (
+                "64x0o + 64x0e + 64x1o + 64x1e",
+                "0e + 1o",
+                "64x0o + 64x0e + 64x1o + 64x1e",
+                "nequip-revmd17-aspirin",
+            ),
+            (
+                "64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e",
+                "0e + 1o + 2e",
+                "64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e",
+                "nequip-revmd17-toluene",
+            ),
+            (
+                "64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e + 64x3o + 64x3e",
+                "0e + 1o + 2e + 3o",
+                "64x0o + 64x0e + 64x1o + 64x1e + 64x2o + 64x2e + 64x3o + 64x3e",
+                "nequip-revmd17-benzene",
+            ),
+            (
+                "32x0o + 32x0e + 32x1o + 32x1e",
+                "0e + 1o",
+                "32x0o + 32x0e + 32x1o + 32x1e",
+                "nequip-water",
+            ),
+        ]
     ]
