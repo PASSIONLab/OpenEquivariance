@@ -260,11 +260,11 @@ python tests/mace_driver.py carbon.xyz -o outputs/mace_tests -i e3nn cue oeq
 
 | Operation                | CUDA     | HIP |
 |--------------------------|----------|-----|
-| UVU Batch                | ✅        | ✅    |
-| UVW Batch                | ✅        | ✅    |
-| UVU Convolution          | ✅        | ✅    |
-| UVW Convolution          | ✅        | ✅    |
-| Symmetric Tensor Product | ✅ (beta) | 🚧🔨  |
+| UVU                      | ✅        | ✅    |
+| UVW                      | ✅        | ✅    |
+| UVU + Convolution        | ✅        | ✅    |
+| UVW + Convolution        | ✅        | ✅    |
+| Symmetric Tensor Product | ✅ (beta) | ✅ (beta)  |
 
 e3nn supports a variety of connection modes for CG tensor products. We support 
 two that are commonly used in equivariant graph neural networks:

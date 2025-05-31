@@ -9,7 +9,6 @@ using namespace std;
 
 template<typename T>
 class GroupMMCUDA {
-    cudaError_t cudaStat;
     cublasStatus_t stat;
     cublasHandle_t handle;
 
@@ -117,7 +116,7 @@ public:
                         batch_size);
                 }
                 else {
-                    throw std::logic_error("Double precision support in progress.");
+                    throw std::logic_error("Unsupported datatype for grouped GEMM!");
                 }
                 if (stat != CUBLAS_STATUS_SUCCESS) {
                     throw std::logic_error("Grouped GEMM failed!");
