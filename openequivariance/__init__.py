@@ -9,6 +9,7 @@ from openequivariance.implementations.convolution.TensorProductConv import (
     TensorProductConv,
 )
 from openequivariance.implementations.utils import torch_to_oeq_dtype
+from openequivariance.implementations.symmetric_contraction.STPOpt import SymmetricContraction
 
 __all__ = [
     "TPProblem",
@@ -16,6 +17,7 @@ __all__ = [
     "TensorProduct",
     "TensorProductConv",
     "torch_to_oeq_dtype",
+    "SymmetricContraction"
 ]
 
 __version__ = version("openequivariance")
