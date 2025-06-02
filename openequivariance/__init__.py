@@ -26,7 +26,6 @@ _editable_install_output_path = Path(__file__).parent.parent / "outputs"
 def torch_ext_so_path():
     return openequivariance.extlib.torch_module.__file__
 
-
 __all__ = [
     "TPProblem",
     "Irreps",
