@@ -59,7 +59,7 @@ def tp_and_inputs(request, problem_and_irreps):
         )
 
         _, sender_perm = edge_index.sort_by("col")
-        edge_index, receiver_perm = edge_index.sort_by("row")
+        edge_index, _ = edge_index.sort_by("row")
         edge_index = [edge_index[0].detach(), edge_index[1].detach()]
 
         X = torch.rand(node_ct, X_ir.dim, device="cuda", generator=gen)
@@ -133,16 +133,18 @@ def test_aoti(tp_and_inputs):
     aoti_result = aoti_model(*inputs)
     assert torch.allclose(uncompiled_result, aoti_result, atol=1e-5)
 
-def test_jitscript_cpp_interface(tp_and_inputs):
+def test_jitscript_cpp_interface(problem_and_irreps):
+    problem, X_ir, Y_ir, Z_ir = problem_and_irreps
     cmake_prefix_path = torch.utils.cmake_prefix_path
     torch_ext_so_path = oeq.torch_ext_so_path()
 
-    tp, _ = tp_and_inputs
+    tp = oeq.TensorProduct(problem).to("cuda")
     scripted_tp = torch.jit.script(tp)
+    batch_size = 1000
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        with tempfile.NamedTemporaryFile(suffix=".pt") as tmp_file:
-            scripted_tp.save(tmp_file.name)
+        with tempfile.NamedTemporaryFile(suffix=".pt") as oeq_file:
+            scripted_tp.save(oeq_file.name)
 
             test_path = importlib.resources.files("openequivariance") / "extension" / "test" 
 
@@ -172,7 +174,14 @@ def test_jitscript_cpp_interface(tp_and_inputs):
                         stderr=subprocess.PIPE)
 
                 result = subprocess.run(
-                    ["./load_jitscript", tmp_file.name],
+                    ["./load_jitscript", 
+                     oeq_file.name, 
+                     oeq_file.name,
+                     str(X_ir.dim),
+                     str(Y_ir.dim),
+                     str(problem.weight_numel),
+                     str(batch_size)
+                     ],
                     cwd=build_dir,
                     check=True,
                     stdout=subprocess.PIPE,
