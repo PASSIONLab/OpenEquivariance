@@ -35,7 +35,8 @@ dev = [
   "ruff",
   "pytest",
   "pytest-check",
-  "torch_geometric"
+  "torch_geometric",
+  "cmake"
 ]
 
 [tool.setuptools.packages.find]
