@@ -4,6 +4,7 @@ import warnings
 from pathlib import Path
 
 from openequivariance.benchmark.logging_utils import getLogger
+from distutils import sysconfig
 
 oeq_root = str(Path(__file__).parent.parent)
 
@@ -11,6 +12,7 @@ build_ext = True
 TORCH_COMPILE = True
 torch_module, generic_module = None, None
 postprocess_kernel = lambda kernel: kernel  # noqa : E731
+python_lib_dir = sysconfig.get_config_var("LIBDIR")
 
 if not build_ext:
     from openequivariance.extlib.generic_module import (
@@ -32,11 +34,11 @@ else:
 
     extra_cflags = ["-O3"]
     generic_sources = ["generic_module.cpp"]
-    torch_sources = ["torch_tp_jit.cpp"]
+    torch_sources = ["libtorch_tp_jit.cpp"]
 
-    include_dirs, extra_link_args = ["util"], None
+    include_dirs, extra_link_args = ["util"], ["-Wl,--no-as-needed", f"-L{python_lib_dir}", "-lpython3"] 
     if torch.version.cuda:
-        extra_link_args = ["-Wl,--no-as-needed", "-lcuda", "-lcudart", "-lnvrtc"]
+        extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc"])
 
         try:
             cuda_libs = library_paths("cuda")[1]
@@ -48,7 +50,7 @@ else:
 
         extra_cflags.append("-DCUDA_BACKEND")
     elif torch.version.hip:
-        extra_link_args = ["-Wl,--no-as-needed", "-lhiprtc"]
+        extra_link_args.extend(["-lhiprtc"])
 
         def postprocess(kernel):
             kernel = kernel.replace("__syncwarp();", "__threadfence_block();")
@@ -72,7 +74,7 @@ else:
 
         try:
             torch_module = torch.utils.cpp_extension.load(
-                "torch_tp_jit",
+                "libtorch_tp_jit",
                 torch_sources,
                 extra_cflags=extra_cflags,
                 extra_include_paths=include_dirs,

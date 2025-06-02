@@ -467,7 +467,7 @@ TORCH_LIBRARY_FRAGMENT(torch_tp_jit, m) {
     m.def("jit_conv_double_backward(__torch__.torch.classes.torch_tp_jit.TorchJITConv jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor, Tensor)");
 };
 
-TORCH_LIBRARY_IMPL(torch_tp_jit, CUDA, m) { 
+TORCH_LIBRARY_IMPL(libtorch_tp_jit, CUDA, m) { 
     m.impl("jit_tp_forward", &jit_tp_forward);
     m.impl("jit_tp_backward", &jit_tp_backward);
     m.impl("jit_tp_double_backward", &jit_tp_double_backward);
@@ -477,4 +477,4 @@ TORCH_LIBRARY_IMPL(torch_tp_jit, CUDA, m) {
     m.impl("jit_conv_double_backward", &jit_conv_double_backward);
 };
 
-PYBIND11_MODULE(torch_tp_jit, m) {}
+PYBIND11_MODULE(libtorch_tp_jit, m) {}

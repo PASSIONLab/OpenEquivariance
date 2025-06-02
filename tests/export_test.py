@@ -181,7 +181,4 @@ def test_jitscript_cpp_interface(tp_and_inputs):
             except subprocess.CalledProcessError as e:
                 print(e.stdout.decode(), file=sys.stderr)
                 print(e.stderr.decode(), file=sys.stderr)
-                print(torch_ext_so_path, file=sys.stderr)
                 assert False
-
-            exit(1)
