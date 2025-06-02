@@ -136,7 +136,6 @@ def test_aoti(tp_and_inputs):
 def test_jitscript_cpp_interface(tp_and_inputs):
     cmake_prefix_path = torch.utils.cmake_prefix_path
     torch_ext_so_path = oeq.torch_ext_so_path()
-    print(torch_ext_so_path)
 
     tp, _ = tp_and_inputs
     scripted_tp = torch.jit.script(tp)
@@ -180,9 +179,9 @@ def test_jitscript_cpp_interface(tp_and_inputs):
                     stderr=subprocess.PIPE,
                 )
             except subprocess.CalledProcessError as e:
-                # print stdout and stderr
                 print(e.stdout.decode(), file=sys.stderr)
                 print(e.stderr.decode(), file=sys.stderr)
+                print(torch_ext_so_path, file=sys.stderr)
                 assert False
 
             exit(1)
