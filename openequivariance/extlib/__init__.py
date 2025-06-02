@@ -13,7 +13,9 @@ TORCH_COMPILE = True
 torch_module, generic_module = None, None
 postprocess_kernel = lambda kernel: kernel  # noqa : E731
 python_lib_dir = sysconfig.get_config_var("LIBDIR")
-python_lib_name = sysconfig.get_config_var("LINK_PYTHON_DEPS").replace("lib", "").replace(".a", "")
+python_lib_name = (
+    sysconfig.get_config_var("LINK_PYTHON_DEPS").replace("lib", "").replace(".a", "")
+)
 
 if not build_ext:
     from openequivariance.extlib.generic_module import (
@@ -37,7 +39,10 @@ else:
     generic_sources = ["generic_module.cpp"]
     torch_sources = ["libtorch_tp_jit.cpp"]
 
-    include_dirs, extra_link_args = ["util"], ["-Wl,--no-as-needed", f"-L{python_lib_dir}", f"-l{python_lib_name}"] 
+    include_dirs, extra_link_args = (
+        ["util"],
+        ["-Wl,--no-as-needed", f"-L{python_lib_dir}", f"-l{python_lib_name}"],
+    )
     if torch.version.cuda:
         extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc"])
 
