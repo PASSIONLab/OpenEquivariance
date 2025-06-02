@@ -23,7 +23,7 @@ int main(int argc, const char* argv[]) {
         module = torch::jit::load(argv[1]);
     }
     catch (const c10::Error& e) {
-        std::cerr << "error loading the model\n";
+        std::cerr << "error loading the model" << std::endl;
         return -1;
     }
 

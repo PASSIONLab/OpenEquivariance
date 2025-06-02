@@ -4,6 +4,7 @@ import pytest
 import tempfile
 import subprocess
 import os
+import sys
 
 import numpy as np
 import openequivariance as oeq
@@ -133,58 +134,55 @@ def test_aoti(tp_and_inputs):
     assert torch.allclose(uncompiled_result, aoti_result, atol=1e-5)
 
 def test_jitscript_cpp_interface(tp_and_inputs):
+    cmake_prefix_path = torch.utils.cmake_prefix_path
+    torch_ext_so_path = oeq.torch_ext_so_path()
+    print(torch_ext_so_path)
+
     tp, _ = tp_and_inputs
     scripted_tp = torch.jit.script(tp)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        test_path = importlib.resources.files("openequivariance") / "extension" / "test" 
-        cmake_prefix_path = torch.utils.cmake_prefix_path
-
-        build_dir = os.path.join(tmpdir, "build")
-        os.makedirs(build_dir, exist_ok=True)
-
-        for item in test_path.iterdir():
-            shutil.copy(item, tmpdir)
-
-        subprocess.run(
-            ["cmake", 
-             "..", 
-             "-DCMAKE_BUILD_TYPE=Release",
-             "-DCMAKE_PREFIX_PATH=" + cmake_prefix_path
-             ],
-            cwd=build_dir,
-            check=True,
-        )
-
-        subprocess.run(["make"], cwd=build_dir, check=True)
-
-        # Save and load the scripted tensor product
         with tempfile.NamedTemporaryFile(suffix=".pt") as tmp_file:
             scripted_tp.save(tmp_file.name)
 
-            result = subprocess.run(
-                ["./load_jitscript", tmp_file.name],
-                cwd=build_dir,
-                # Capture output
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
+            test_path = importlib.resources.files("openequivariance") / "extension" / "test" 
 
-            print(result.stdout.decode())
-            if result.stderr:
-                print(result.stderr.decode())
+            build_dir = os.path.join(tmpdir, "build")
+            os.makedirs(build_dir, exist_ok=True)
 
+            for item in test_path.iterdir():
+                shutil.copy(item, tmpdir)
 
-        #for file in os.listdir(tmpdir):
-        #    print(file)
+            try:
+                subprocess.run(
+                    ["cmake", 
+                    "..", 
+                    "-DCMAKE_BUILD_TYPE=Release",
+                    "-DCMAKE_PREFIX_PATH=" + cmake_prefix_path,
+                    "-DOEQ_EXTLIB=" + torch_ext_so_path,
+                    "-Wno-dev"
+                    ],
+                    cwd=build_dir,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
 
-        #print("------------")
-        #for file in os.listdir(build_dir):
-        #    print(file)
+                subprocess.run(["make"], cwd=build_dir, check=True,       
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE)
 
-        # tmpdir is a string. Iterate through all files in the folder that it names
+                result = subprocess.run(
+                    ["./load_jitscript", tmp_file.name],
+                    cwd=build_dir,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+            except subprocess.CalledProcessError as e:
+                # print stdout and stderr
+                print(e.stdout.decode(), file=sys.stderr)
+                print(e.stderr.decode(), file=sys.stderr)
+                assert False
 
-        exit(1)
-
-
-
+            exit(1)
