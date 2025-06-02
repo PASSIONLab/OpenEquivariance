@@ -5,28 +5,48 @@
 
 /* 
 * This program takes in two JITScript modules that execute 
-* a single instruction, (5, 3, 5)-UVU tensor product in FP32 precision. 
+* a single tensor product in FP32 precision. 
 * The first module is compiled with OpenEquivariance, the second is
 * e3nn's compiled module. The program will check that the
 * two outputs are equal. 
 */
 
 int main(int argc, const char* argv[]) {
-    if (argc != 2) {
-        std::cerr << "usage: example-app <path-to-exported-script-module>" << std::endl;
-        return -1;
+    if (argc != 8) {
+        std::cerr << "usage: load_jitscript "
+                    << "<path-to-e3nn-module> "
+                    << "<path-to-oeq-module> "
+                    << "<L1_dim> "
+                    << "<L2_dim> "
+                    << "<weight_numel> "
+                    << "<L3_dim> " 
+                    << "<batch_size> "
+                    << endl;
+
+        return 1;
     }
 
     torch::jit::script::Module module;
     try {
-        // Deserialize the ScriptModule from a file using torch::jit::load().
         module = torch::jit::load(argv[1]);
     }
     catch (const c10::Error& e) {
-        std::cerr << "error loading the model" << std::endl;
-        return -1;
+        std::cerr << "error loading script module" << std::endl;
+        return 1;
     }
 
-    std::cout << "ok\n";
+    int64_t L1_dim = std::stoi(argv[3]);
+    int64_t L2_dim = std::stoi(argv[4]);
+    int64_t weight_numel = std::stoi(argv[5]);
+    int64_t L3_dim = std::stoi(argv[6]);
+    int64_t batch_size = std::stoi(argv[7]); 
+
+    std::vector<torch::jit::IValue> inputs;
+    inputs.push_back(torch::randn({batch_size, L1_dim}));
+    inputs.push_back(torch::randn({batch_size, L2_dim}));
+    inputs.push_back(torch::randn({batch_size, weight_numel}));
+
+    at::Tensor output = module.forward(inputs).toTensor();
+
     return 0;
 }
