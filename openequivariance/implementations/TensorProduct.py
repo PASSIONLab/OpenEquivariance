@@ -20,4 +20,4 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
     def forward(
         self, L1: torch.Tensor, L2: torch.Tensor, W: torch.Tensor
     ) -> torch.Tensor:
-        return torch.ops.torch_tp_jit.jit_tp_forward(self.internal, L1, L2, W)
+        return torch.ops.libtorch_tp_jit.jit_tp_forward(self.internal, L1, L2, W)

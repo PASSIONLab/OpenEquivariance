@@ -103,7 +103,7 @@ class LoopUnrollTP(TensorProductBase):
             global torch
             import torch
 
-            internal_cls = torch.classes.torch_tp_jit.TorchJITProduct
+            internal_cls = torch.classes.libtorch_tp_jit.TorchJITProduct
         else:
             internal_cls = extlib.JITTPImpl
 
@@ -142,7 +142,7 @@ class LoopUnrollTP(TensorProductBase):
         global torch
         import torch
 
-        @torch._library.register_fake_class("torch_tp_jit::TorchJITProduct")
+        @torch._library.register_fake_class("libtorch_tp_jit::TorchJITProduct")
         class TorchJITProduct:
             def __init__(
                 self,
@@ -198,19 +198,19 @@ class LoopUnrollTP(TensorProductBase):
             ):
                 pass
 
-        @torch.library.register_fake("torch_tp_jit::jit_tp_forward")
+        @torch.library.register_fake("libtorch_tp_jit::jit_tp_forward")
         def fake_forward(jit, L1_in, L2_in, W):
             return L1_in.new_empty(
                 L1_in.shape[0], jit.wrapped_obj.kernel_dims["L3_dim"]
             )
 
-        @torch.library.register_fake("torch_tp_jit::jit_tp_backward")
+        @torch.library.register_fake("libtorch_tp_jit::jit_tp_backward")
         def fake_backward(jit, L1_in, L2_in, W, L3_grad):
             return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W)
 
     @classmethod
     def register_autograd(cls):
-        backward_op = torch.ops.torch_tp_jit.jit_tp_backward
+        backward_op = torch.ops.libtorch_tp_jit.jit_tp_backward
 
         def setup_context(ctx, inputs, output):
             ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights = inputs
@@ -222,20 +222,20 @@ class LoopUnrollTP(TensorProductBase):
             return None, L1_grad, L2_grad, W_grad
 
         torch.library.register_autograd(
-            "torch_tp_jit::jit_tp_forward", backward, setup_context=setup_context
+            "libtorch_tp_jit::jit_tp_forward", backward, setup_context=setup_context
         )
 
         def setup_context_double_backward(ctx, inputs, output):
             ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad = inputs
 
         def double_backward(ctx, E, F, G):
-            result = torch.ops.torch_tp_jit.jit_tp_double_backward(
+            result = torch.ops.libtorch_tp_jit.jit_tp_double_backward(
                 ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad, E, F, G
             )
             return None, result[0], result[1], result[2], result[3]
 
         torch.library.register_autograd(
-            "torch_tp_jit::jit_tp_backward",
+            "libtorch_tp_jit::jit_tp_backward",
             double_backward,
             setup_context=setup_context_double_backward,
         )

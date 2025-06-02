@@ -49,7 +49,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
         sender_perm: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         if sender_perm is None:
-            return torch.ops.torch_tp_jit.jit_conv_forward(
+            return torch.ops.libtorch_tp_jit.jit_conv_forward(
                 self.internal,
                 L1_in,
                 L2_in,
@@ -60,7 +60,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
                 self.dummy_transpose_perm,
             )
         else:
-            return torch.ops.torch_tp_jit.jit_conv_forward(
+            return torch.ops.libtorch_tp_jit.jit_conv_forward(
                 self.internal,
                 L1_in,
                 L2_in,
