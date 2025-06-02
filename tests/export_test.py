@@ -9,9 +9,9 @@ import sys
 import numpy as np
 import openequivariance as oeq
 from torch_geometric import EdgeIndex
-import importlib.resources 
+import importlib.resources
 
-from torch.utils.cpp_extension import library_paths, include_paths
+from openequivariance.implementations.E3NNTensorProduct import E3NNTensorProduct
 
 @pytest.fixture(scope="session")
 def problem_and_irreps():
@@ -134,20 +134,25 @@ def test_aoti(tp_and_inputs):
     assert torch.allclose(uncompiled_result, aoti_result, atol=1e-5)
 
 def test_jitscript_cpp_interface(problem_and_irreps):
-    problem, X_ir, Y_ir, Z_ir = problem_and_irreps
+    problem, X_ir, Y_ir, _ = problem_and_irreps
     cmake_prefix_path = torch.utils.cmake_prefix_path
     torch_ext_so_path = oeq.torch_ext_so_path()
 
-    tp = oeq.TensorProduct(problem).to("cuda")
-    scripted_tp = torch.jit.script(tp)
+    oeq_tp = oeq.TensorProduct(problem).to("cuda")
+    scripted_oeq = torch.jit.script(oeq_tp)
+
+    e3nn_tp = E3NNTensorProduct(problem).e3nn_tp.to("cuda")
+    scripted_e3nn = torch.jit.script(e3nn_tp) 
+
     batch_size = 1000
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        with tempfile.NamedTemporaryFile(suffix=".pt") as oeq_file:
-            scripted_tp.save(oeq_file.name)
+    with tempfile.TemporaryDirectory() as tmpdir, \
+        tempfile.NamedTemporaryFile(suffix=".pt") as oeq_file, \
+        tempfile.NamedTemporaryFile(suffix=".pt") as e3nn_file:  
+            scripted_oeq.save(oeq_file.name)
+            scripted_e3nn.save(e3nn_file.name) 
 
             test_path = importlib.resources.files("openequivariance") / "extension" / "test" 
-
             build_dir = os.path.join(tmpdir, "build")
             os.makedirs(build_dir, exist_ok=True)
 
@@ -160,8 +165,7 @@ def test_jitscript_cpp_interface(problem_and_irreps):
                     "..", 
                     "-DCMAKE_BUILD_TYPE=Release",
                     "-DCMAKE_PREFIX_PATH=" + cmake_prefix_path,
-                    "-DOEQ_EXTLIB=" + torch_ext_so_path,
-                    "-Wno-dev"
+                    "-DOEQ_EXTLIB=" + torch_ext_so_path
                     ],
                     cwd=build_dir,
                     check=True,
@@ -175,7 +179,7 @@ def test_jitscript_cpp_interface(problem_and_irreps):
 
                 result = subprocess.run(
                     ["./load_jitscript", 
-                     oeq_file.name, 
+                     e3nn_file.name, 
                      oeq_file.name,
                      str(X_ir.dim),
                      str(Y_ir.dim),

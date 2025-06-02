@@ -5,10 +5,10 @@
 
 /* 
 * This program takes in two JITScript modules that execute 
-* a single tensor product in FP32 precision. 
-* The first module is compiled with OpenEquivariance, the second is
-* e3nn's compiled module. The program will check that the
-* two outputs are equal. 
+* a tensor product in FP32 precision. 
+* The first module is compiled from e3nn, the second is
+* OEQ's compiled module. The program checks that the
+* two outputs are comparable. 
 */
 
 int main(int argc, const char* argv[]) {
@@ -25,15 +25,6 @@ int main(int argc, const char* argv[]) {
         return 1;
     }
 
-    torch::jit::script::Module module;
-    try {
-        module = torch::jit::load(argv[1]);
-    }
-    catch (const c10::Error& e) {
-        std::cerr << "error loading script module" << std::endl;
-        return 1;
-    }
-
     int64_t L1_dim = std::stoi(argv[3]);
     int64_t L2_dim = std::stoi(argv[4]);
     int64_t weight_numel = std::stoi(argv[5]);
@@ -44,9 +35,28 @@ int main(int argc, const char* argv[]) {
     inputs.push_back(torch::randn({batch_size, L1_dim}, device));
     inputs.push_back(torch::randn({batch_size, L2_dim}, device));
     inputs.push_back(torch::randn({batch_size, weight_numel}, device));
-    module.to(device);
 
-    at::Tensor output = module.forward(inputs).toTensor();
+    torch::jit::script::Module module_e3nn, module_oeq;
+    try {
+        module_e3nn = torch::jit::load(argv[1]);
+        module_oeq = torch::jit::load(argv[2]);
+    }
+    catch (const c10::Error& e) {
+        std::cerr << "error loading script module" << std::endl;
+        return 1;
+    }
 
-    return 0;
+    module_e3nn.to(device);
+    module_oeq.to(device);
+
+    at::Tensor output_e3nn = module_e3nn.forward(inputs).toTensor();
+    at::Tensor output_oeq = module_oeq.forward(inputs).toTensor();
+
+    if(at::allclose(output_e3nn, output_oeq, 1e-5, 1e-5)) {
+        return 0;
+    } 
+    else {
+        std::cerr << "torch.allclose returned FALSE comparing model outputs." << std::endl;
+        return 1;
+    }
 }
