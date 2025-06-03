@@ -329,7 +329,9 @@ author={Vivek Bharadwaj and Austin Glover and Aydin Buluc and James Demmel},
 title={An Efficient Sparse Kernel Generator for O(3)-Equivariant Deep Networks}, 
 booktitle = {SIAM Conference on Applied and Computational Discrete Algorithms (ACDA25)},
 chapter = {},
-url={https://arxiv.org/abs/2501.13986}
+url={https://arxiv.org/abs/2501.13986},
+publisher={Society for Industrial and Applied Mathematics},
+year={2025}
 }
 ```
 
