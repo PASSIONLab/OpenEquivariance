@@ -1,4 +1,5 @@
 # ruff: noqa: F401
+import sys
 import openequivariance.extlib
 from pathlib import Path
 from importlib.metadata import version
@@ -10,8 +11,11 @@ from openequivariance.implementations.convolution.TensorProductConv import (
 )
 from openequivariance.implementations.utils import torch_to_oeq_dtype
 
-__version__ = version("openequivariance")
-
+__version__ = None 
+try:
+    __version__ = version("openequivariance")
+except Exception as e:
+    print(f"Warning: Could not determine oeq version: {e}", file=sys.stderr)
 
 def _check_package_editable():
     import json
