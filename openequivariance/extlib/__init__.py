@@ -16,11 +16,13 @@ postprocess_kernel = lambda kernel: kernel  # noqa : E731
 
 try:
     python_lib_dir = sysconfig.get_config_var("LIBDIR")
-    python_lib_name = (
-        sysconfig.get_config_var("LINK_PYTHON_DEPS").replace("lib", "").replace(".a", "")
-    )
+    major, minor = sys.version_info.major, sys.version_info.minor
+    python_lib_name = f"python{major}.{minor}"
+
 except Exception as e:
+    print("Error while retrieving Python library information:", file=sys.stderr)
     print(e, file=sys.stderr)
+    print("Syconfig variable list:", file=sys.stderr)
     print(sysconfig.get_config_vars(), file=sys.stderr)
     exit(1)
 
@@ -48,7 +50,11 @@ else:
 
     include_dirs, extra_link_args = (
         ["util"],
-        [f"-Wl,--no-as-needed,-rpath,{python_lib_dir}", f"-L{python_lib_dir}", f"-l{python_lib_name}"],
+        [
+            f"-Wl,--no-as-needed,-rpath,{python_lib_dir}",
+            f"-L{python_lib_dir}",
+            f"-l{python_lib_name}",
+        ],
     )
 
     if torch.version.cuda:
@@ -56,7 +62,7 @@ else:
 
         try:
             torch_libs, cuda_libs = library_paths("cuda")
-            extra_link_args.append("-Wl,-rpath," + torch_libs) 
+            extra_link_args.append("-Wl,-rpath," + torch_libs)
             extra_link_args.append("-L" + cuda_libs)
             if os.path.exists(cuda_libs + "/stubs"):
                 extra_link_args.append("-L" + cuda_libs + "/stubs")
