@@ -1,4 +1,5 @@
 # ruff: noqa : F401, E402
+import sys
 import os
 import warnings
 from pathlib import Path
@@ -12,10 +13,14 @@ build_ext = True
 TORCH_COMPILE = True
 torch_module, generic_module = None, None
 postprocess_kernel = lambda kernel: kernel  # noqa : E731
-python_lib_dir = sysconfig.get_config_var("LIBDIR")
-python_lib_name = (
-    sysconfig.get_config_var("LINK_PYTHON_DEPS").replace("lib", "").replace(".a", "")
-)
+
+try:
+    python_lib_dir = sysconfig.get_config_var("LIBDIR")
+    python_lib_name = (
+        sysconfig.get_config_var("LINK_PYTHON_DEPS").replace("lib", "").replace(".a", "")
+    )
+except Exception as e:
+    print(e, file=sys.stderr)
 
 if not build_ext:
     from openequivariance.extlib.generic_module import (
@@ -41,13 +46,17 @@ else:
 
     include_dirs, extra_link_args = (
         ["util"],
-        ["-Wl,--no-as-needed", f"-L{python_lib_dir}", f"-l{python_lib_name}"],
+        [f"-Wl,--no-as-needed,-rpath,{python_lib_dir}", f"-L{python_lib_dir}", f"-l{python_lib_name}"],
     )
+
+    print(extra_link_args)
+    print(library_paths("cuda"))
     if torch.version.cuda:
         extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc"])
 
         try:
-            cuda_libs = library_paths("cuda")[1]
+            torch_libs, cuda_libs = library_paths("cuda")
+            extra_link_args.append("-Wl,-rpath," + torch_libs) 
             extra_link_args.append("-L" + cuda_libs)
             if os.path.exists(cuda_libs + "/stubs"):
                 extra_link_args.append("-L" + cuda_libs + "/stubs")
@@ -57,6 +66,8 @@ else:
         extra_cflags.append("-DCUDA_BACKEND")
     elif torch.version.hip:
         extra_link_args.extend(["-lhiprtc"])
+        torch_libs = library_paths("cuda")[0]
+        extra_link_args.append("-Wl,-rpath," + torch_libs)
 
         def postprocess(kernel):
             kernel = kernel.replace("__syncwarp();", "__threadfence_block();")
