@@ -5,7 +5,7 @@ import torch
 
 class TensorProduct(torch.nn.Module, LoopUnrollTP):
     """
-    Drop-in replacement for o3.TensorProduct from e3nn. Supports forward,
+    Drop-in replacement for ``o3.TensorProduct`` from e3nn. Supports forward,
     backward, and double-backward passes using JIT-compiled kernels. Initialization
     fails if:
 
