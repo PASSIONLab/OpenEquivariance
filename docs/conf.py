@@ -1,3 +1,6 @@
+import sys
+from pathlib import Path
+
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
@@ -25,3 +28,14 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 html_theme = 'furo'
 html_static_path = ['_static']
+
+extensions = [
+    'sphinx.ext.autodoc',
+]
+
+sys.path.insert(0, str(Path('..').resolve()))
+
+autodoc_mock_imports = ['torch', 'openequivariance.extlib'] 
+autodoc_typehints = "description"
+
+

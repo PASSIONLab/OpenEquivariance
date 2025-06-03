@@ -15,3 +15,6 @@ documentation for details.
    :maxdepth: 2
    :caption: Contents:
 
+.. autoclass:: openequivariance.TensorProduct
+   :members:
+   :undoc-members:
