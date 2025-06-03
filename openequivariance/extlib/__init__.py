@@ -21,6 +21,8 @@ try:
     )
 except Exception as e:
     print(e, file=sys.stderr)
+    print(sysconfig.get_config_vars(), file=sys.stderr)
+    exit(1)
 
 if not build_ext:
     from openequivariance.extlib.generic_module import (
@@ -49,8 +51,6 @@ else:
         [f"-Wl,--no-as-needed,-rpath,{python_lib_dir}", f"-L{python_lib_dir}", f"-l{python_lib_name}"],
     )
 
-    print(extra_link_args)
-    print(library_paths("cuda"))
     if torch.version.cuda:
         extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc"])
 
