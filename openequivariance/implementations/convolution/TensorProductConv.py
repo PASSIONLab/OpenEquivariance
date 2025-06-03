@@ -17,7 +17,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 
     def __init__(
         self,
-        config,
+        problem,
         idx_dtype=np.int64,
         torch_op=True,
         deterministic=False,
@@ -26,7 +26,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
         torch.nn.Module.__init__(self)
         LoopUnrollConv.__init__(
             self,
-            config,
+            problem,
             idx_dtype=np.int64,
             torch_op=torch_op,
             deterministic=deterministic,

@@ -1,15 +1,22 @@
 OpenEquivariance API
 ==============================
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
-
+OpenEquivariance exposes two key classes: :py:class:`openequivariance.TensorProduct`, which replaces
+``o3.TensorProduct`` from e3nn, and :py:class:`openequivariance.TensorProductConv`, which fuses
+the CG tensor product with a subsequent graph convolution. Initializing either class triggers
+JIT compilation of a custom kernel; this takes up to a few seconds. 
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
+
 .. autoclass:: openequivariance.TensorProduct
-   :members:
-   :undoc-members:
+    :members:
+    :undoc-members:
+    :exclude-members: name
+
+..
+    .. automodule:: openequivariance
+        :members:
+        :undoc-members:
