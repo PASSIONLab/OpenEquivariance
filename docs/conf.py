@@ -10,7 +10,7 @@ from pathlib import Path
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'OpenEquivariance'
-copyright = '2025, Vivek Bharadwaj, Austin Glover, Aydin Buluc, James Demmel'
+copyright = '2025, The Regents of the University of California, through Lawrence Berkeley National Laboratory.' 
 author = 'Vivek Bharadwaj, Austin Glover, Aydin Buluc, James Demmel'
 
 # -- General configuration ---------------------------------------------------
@@ -36,4 +36,4 @@ extensions = [
 sys.path.insert(0, str(Path('..').resolve()))
 
 autodoc_mock_imports = ['torch', 'openequivariance.extlib'] 
-autodoc_typehints = "description"
+#autodoc_typehints = "description"

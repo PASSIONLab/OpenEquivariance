@@ -1,14 +1,18 @@
 from openequivariance.implementations.LoopUnrollTP import LoopUnrollTP
+from openequivariance import TPProblem
 import torch
 
 
 class TensorProduct(torch.nn.Module, LoopUnrollTP):
     """
-    PyTorch-specialized dispatcher class that selects the right implementation based on problem
-    configuration.
+    Drop-in replacement for o3.TensorProduct from e3nn. Supports forward,
+    backward, and double-backward passes using JIT-compiled kernels.
     """
 
-    def __init__(self, problem, torch_op=True):
+    def __init__(self, problem: TPProblem, torch_op=True):
+        '''
+        :param problem: TPProblem instance containing the problem configuration.
+        '''
         torch.nn.Module.__init__(self)
         LoopUnrollTP.__init__(self, problem, torch_op)
         self.weight_numel = problem.weight_numel

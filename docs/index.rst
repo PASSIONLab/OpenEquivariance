@@ -3,18 +3,22 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-OpenEquivariance documentation
+OpenEquivariance
 ==============================
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
+OpenEquivariance is an CUDA and AMD HIP kernel generator for the Clebsch-Gordon
+tensor product, a key kernel in equivariant graph neural networks. We offer
+an identical interface to e3nn and produce the same results 
+(up to numerical roundoff). Our package exhibits up to an order of magnitude
+speedup over e3nn and competitive performance with NVIDIA's cuEquivariance. 
 
+Here, you can find our API reference, installation instructions, 
+and troubleshooting guide.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Contents:
 
-.. autoclass:: openequivariance.TensorProduct
-   :members:
-   :undoc-members:
+   api
+
+
