@@ -79,7 +79,7 @@ To do this, follow the steps `here <https://docs.olcf.ornl.gov/software/analytic
 
 
 .. code-block:: bash
-    :caption: OLCF Frontier 
+    :caption: env.sh 
 
     module load PrgEnv-gnu/8.6.0
     module load miniforge3/23.11.0-0
