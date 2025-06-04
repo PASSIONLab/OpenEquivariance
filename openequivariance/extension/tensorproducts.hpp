@@ -5,22 +5,27 @@
 #include <string>
 #include <unordered_map>
 #include <iostream>
+#include <cuda_runtime.h>
+#include <cuda.h>
 
 class __attribute__ ((visibility ("default"))) GenericTensorProductImpl {
 public:
     GenericTensorProductImpl() { }
 
     virtual void exec_tensor_product(uint64_t num_products,
-            void* L1_in, void* L2_in, void* L3_out, void* weights) = 0;
+            void* L1_in, void* L2_in, void* L3_out, void* weights, cudaStream_t stream) = 0;
 
     void exec_tensor_product_device_rawptrs(uint64_t num_products,
             uint64_t L1_in, uint64_t L2_in, uint64_t L3_out, uint64_t weights) {
-        
+        cudaStream_t stream;
+        cudaError_t err = cudaStreamCreate(&stream);
         exec_tensor_product(num_products,
             reinterpret_cast<void*>(L1_in),
             reinterpret_cast<void*>(L2_in),
             reinterpret_cast<void*>(L3_out),
-            reinterpret_cast<void*>(weights));
+            reinterpret_cast<void*>(weights),
+            stream
+        );
     } 
 
     virtual void backward(size_t num_products,
@@ -122,9 +127,11 @@ public:
         void* L1_in,
         void* L2_in,
         void* L3_out,
-        void* weights) {
+        void* weights,
+        cudaStream_t stream) {
 
         void *args[] = { &num_products, &L1_in, &L2_in, &L3_out, &weights};
+        forward_config.hStream = stream; 
         jit.execute(0, args, forward_config);
     }
 
