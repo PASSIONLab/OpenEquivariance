@@ -7,9 +7,8 @@ the CG tensor product with a subsequent graph convolution. Initializing either c
 JIT compilation of a custom kernel, which can take a few seconds. 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Contents:
-
 
 .. autoclass:: openequivariance.TensorProduct
     :members:

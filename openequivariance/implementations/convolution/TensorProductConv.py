@@ -74,13 +74,15 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             * ``[|E|, problem.weight_numel]`` if ``problem.shared_weights=False``
             * ``[problem.weight_numel]`` if ``problem.shared_weights=True``
         
-        :param rows: Tensor of shape ``[|E|]`` containing row indices for each nonzero in the adjacency matrix, 
-                datatype ``torch.int64``.
-        :param cols: Tensor of shape ``[|E|]`` containing column indices for each nonzero in the adjacency matrix,
-                datatype ``torch.int64``.
+        :param rows: Tensor of shape ``[|E|]`` with row indices for each nonzero in the adjacency matrix, 
+                datatype ``torch.int64``. Must be row-major sorted along with ``cols`` when ``deterministic=True``.
+        :param cols: Tensor of shape ``[|E|]`` with column indices for each nonzero in the adjacency matrix,
+                datatype ``torch.int64``. 
         :param sender_perm: Tensor of shape ``[|E|]`` and ``torch.int64`` datatype containing a 
                 permutation that transposes the adjacency matrix nonzeros from row-major to column-major order.
-                This MUST be provided when ``deterministic=True``.
+                Must be provided when ``deterministic=True``.
+        
+        :return: Tensor of shape ``[|V|, problem.irreps_out.dim()]``, datatype ``problem.irrep_dtype``.
         '''
         if sender_perm is None:
             return torch.ops.libtorch_tp_jit.jit_conv_forward(
