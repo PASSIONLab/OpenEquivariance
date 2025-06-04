@@ -1,8 +1,11 @@
-#include <pybind11/pybind11.h> 
-#include <pybind11/numpy.h>
 #include <iostream>
 #include <unordered_map>
 #include <stdexcept>
+
+#include <pybind11/pybind11.h> 
+#include <pybind11/numpy.h>
+
+#include <ATen/cuda/CUDAContext.h>
 
 #ifdef CUDA_BACKEND
     #include "backend_cuda.hpp"
@@ -12,6 +15,7 @@
 
     template<typename T>
     using GroupMM = GroupMMCUDA<T>; 
+    using Stream = cudaStream_t;
 #endif
 
 #ifdef HIP_BACKEND
@@ -22,6 +26,7 @@
 
     template<typename T>
     using GroupMM = GroupMMHIP<T>; 
+    using Stream = hipStream_t; 
 #endif
 
 #include "buffer.hpp"
@@ -44,6 +49,15 @@ std::unordered_map<string, int64_t> to_map(const Map_t &map) {
     }
     return result;
 }
+
+// inline Stream get_current_stream(){
+//     #ifdef CUDA_BACKEND
+//     return c10::cuda::getCurrentCUDAStream(); 
+//     #endif 
+//     #ifdef HIP_BACKEND 
+//     return c10::hip::getCurrentHIPStream(); 
+//     #endif 
+// }
 
 inline void* data_ptr(const torch::Tensor &tensor) {
     if(tensor.dtype() == torch::kFloat)
@@ -90,13 +104,16 @@ public:
             tuple("kernel_dims", kernel_dims));
     }
 
-    void exec_tensor_product_device_rawptrs(int64_t num_batch, int64_t L1_in, int64_t L2_in, int64_t L3_out, int64_t weights) {    
+    void exec_tensor_product_device_rawptrs(int64_t num_batch, int64_t L1_in, int64_t L2_in, int64_t L3_out, int64_t weights) { 
+        cudaStream_t stream = c10::cuda::getCurrentCUDAStream(); 
         internal.exec_tensor_product(
                 num_batch,
                 reinterpret_cast<void*>(L1_in), 
                 reinterpret_cast<void*>(L2_in), 
                 reinterpret_cast<void*>(L3_out), 
-                reinterpret_cast<void*>(weights)); 
+                reinterpret_cast<void*>(weights),
+                stream
+            ); 
     } 
 
     void backward_device_rawptrs(int64_t num_batch,
@@ -125,13 +142,16 @@ torch::Tensor jit_tp_forward(
     at::Tensor L1_contig = L1_in.contiguous();
     at::Tensor L2_contig = L2_in.contiguous();
     at::Tensor W_contig = W.contiguous();
-
+    
+    cudaStream_t stream = c10::cuda::getCurrentCUDAStream(); 
     jit_instance->internal.exec_tensor_product(
             num_batch,
             data_ptr(L1_contig), 
             data_ptr(L2_contig), 
             data_ptr(L3_out),
-            data_ptr(W_contig));
+            data_ptr(W_contig),
+            stream
+        );
 
     return L3_out;
 }
