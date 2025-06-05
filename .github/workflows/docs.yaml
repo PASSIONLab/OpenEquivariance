@@ -2,11 +2,8 @@ name: Deploy documentation to Github Pages
 on:
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions: write-all
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -29,12 +26,11 @@ jobs:
           pip install sphinx furo
       - name: Build website
         run: |
-          cd docs
           sphinx-build -M dirhtml docs docs/_build
           
       - name: Fix permissions
         run: |
-          chmod -c -R +rX "docs/_build/dirhtml" | while read line; do
+          chmod -c -R +rX "docs/_build/dirhtml/" | while read line; do
             echo "::warning title=Invalid file permissions automatically fixed::$line"
           done
       - name: Upload artifact
