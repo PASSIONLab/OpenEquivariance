@@ -25,8 +25,8 @@ To set up the editable install and run the entire testsuite, use:
 .. code-block:: bash
 
     git clone https://github.com/PASSIONLab/OpenEquivariance 
-    pip install -e .[dev] 
     cd OpenEquivariance
+    pip install -e .[dev] 
     pytest 
 
 Browse the ``tests`` directory to run specific components. 
@@ -41,8 +41,8 @@ and generate plots from our paper.
 .. code-block:: bash
 
     git clone https://github.com/PASSIONLab/OpenEquivariance 
-    pip install -e .[bench] 
     cd OpenEquivariance
+    pip install -e .[bench] 
     python tests/benchmark.py -o outputs/uvu uvu --plot
     python tests/benchmark.py -o outputs/uvw uvw --plot
     python tests/benchmark.py -o outputs/roofline roofline --plot
