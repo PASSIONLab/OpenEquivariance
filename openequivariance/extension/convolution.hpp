@@ -22,7 +22,8 @@ public:
         void* cols,
         uint64_t nnz,
         uint64_t node_count,
-        void* workspace) = 0;
+        void* workspace,
+        Stream stream) = 0;
 
     void exec_conv_rawptrs(
         uint64_t L1_in,
@@ -44,7 +45,9 @@ public:
             reinterpret_cast<void*>(cols),
             nnz,
             node_count,
-            reinterpret_cast<void*>(workspace));
+            reinterpret_cast<void*>(workspace),
+            0 // Null aka Default Stream
+            );
     }
 
     virtual void backward(
@@ -54,7 +57,8 @@ public:
         void* L3_grad,
         void* rows, void* cols,
         uint64_t nnz, uint64_t node_count,
-        void* workspace, void* inverse_perm) = 0;
+        void* workspace, void* inverse_perm,
+        Stream stream) = 0;
 
     void backward_rawptrs(
         uint64_t L1_in, uint64_t L1_grad,
@@ -78,7 +82,9 @@ public:
             nnz,
             node_count,
             reinterpret_cast<void*>(workspace),
-            reinterpret_cast<void*>(inverse_perm));
+            reinterpret_cast<void*>(inverse_perm),
+            0 // Null aka Default Stream
+            );
     }
 
     virtual ~ConvolutionImpl() {};
@@ -170,11 +176,13 @@ public:
             void* cols,
             uint64_t nnz,
             uint64_t node_count,
-            void* workspace) {
+            void* workspace, 
+            Stream stream) {
 
         ConvData conv_data = {rows, cols, nnz, node_count};
 
-        void *args[] = {&L1_in, &L2_in, &weights, &L3_out, &conv_data, &workspace}; 
+        void *args[] = {&L1_in, &L2_in, &weights, &L3_out, &conv_data, &workspace};
+        forward_config.hStream = stream;  
         jit.execute(0, args, forward_config);
 
         if(reinterpret_cast<uint64_t>(workspace) != 0) {
@@ -197,10 +205,12 @@ public:
             void* rows, void* cols,
             uint64_t nnz, uint64_t node_count,
             void* workspace,
-            void* transpose_perm) {
+            void* transpose_perm, 
+            Stream stream) {
 
         ConvData conv_data = {rows, cols, nnz, node_count};
         void *args[] = {&L1_in, &L1_grad, &L2_in, &L2_grad, &weight, &weight_grad, &L3_grad, &conv_data, &workspace, &transpose_perm};
+        backward_config.hStream = stream; 
         jit.execute(1, args, backward_config);
 
         if(reinterpret_cast<uint64_t>(workspace) != 0) {
@@ -221,14 +231,15 @@ public:
             void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad, 
             void* rows, void* cols,
             uint64_t nnz, uint64_t node_count,
-            void* wspace, void* transpose_perm) {
+            void* wspace, void* transpose_perm, 
+            Stream stream) {
 
         ConvData conv_data = {rows, cols, nnz, node_count};
         void* args[] = { 
             &L1_in, &L2_in, &W, &L3_grad, &L1_dgrad, &L2_dgrad, &w_dgrad, 
             &L1_grad, &L2_grad, &W_grad, &L3_dgrad, &conv_data, &wspace, &transpose_perm
         };
-
+        double_backward_config.hStream = stream; 
         jit.execute(4, args, forward_config);
         if(reinterpret_cast<uint64_t>(wspace) != 0) {
             void *fixup_args[] = {&wspace, &L3_dgrad};    

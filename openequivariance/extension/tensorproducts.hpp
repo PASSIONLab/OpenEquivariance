@@ -5,26 +5,22 @@
 #include <string>
 #include <unordered_map>
 #include <iostream>
-#include <cuda_runtime.h>
-#include <cuda.h>
 
 class __attribute__ ((visibility ("default"))) GenericTensorProductImpl {
 public:
     GenericTensorProductImpl() { }
 
     virtual void exec_tensor_product(uint64_t num_products,
-            void* L1_in, void* L2_in, void* L3_out, void* weights, cudaStream_t stream) = 0;
+            void* L1_in, void* L2_in, void* L3_out, void* weights, Stream stream) = 0;
 
     void exec_tensor_product_device_rawptrs(uint64_t num_products,
             uint64_t L1_in, uint64_t L2_in, uint64_t L3_out, uint64_t weights) {
-        cudaStream_t stream;
-        cudaError_t err = cudaStreamCreate(&stream);
         exec_tensor_product(num_products,
             reinterpret_cast<void*>(L1_in),
             reinterpret_cast<void*>(L2_in),
             reinterpret_cast<void*>(L3_out),
             reinterpret_cast<void*>(weights),
-            stream
+            0 // Null = Default Stream
         );
     } 
 
@@ -32,7 +28,7 @@ public:
             void* L1_in, void* L1_grad,
             void* L2_in, void* L2_grad,
             void* weight, void* weight_grad,
-            void* L3_grad) {
+            void* L3_grad, Stream stream) {
 
         throw std::logic_error("Backward pass not implemented yet!");
     }
@@ -47,7 +43,7 @@ public:
             reinterpret_cast<void*>(L1_in), reinterpret_cast<void*>(L1_grad),
             reinterpret_cast<void*>(L2_in), reinterpret_cast<void*>(L2_grad),
             reinterpret_cast<void*>(weight), reinterpret_cast<void*>(weight_grad),
-            reinterpret_cast<void*>(L3_grad)
+            reinterpret_cast<void*>(L3_grad), 0 // Null = Default Stream
         );
     }
 
@@ -128,7 +124,7 @@ public:
         void* L2_in,
         void* L3_out,
         void* weights,
-        cudaStream_t stream) {
+        Stream stream) {
 
         void *args[] = { &num_products, &L1_in, &L2_in, &L3_out, &weights};
         forward_config.hStream = stream; 
@@ -140,8 +136,9 @@ public:
             void* L1_in, void* L1_grad,
             void* L2_in, void* L2_grad,
             void* weight, void* weight_grad,
-            void* L3_grad) {
+            void* L3_grad, Stream stream) {
         void *args[] = { &num_products, &L1_in, &L1_grad, &L2_in, &L2_grad, &weight, &weight_grad, &L3_grad};
+        backward_config.hStream = stream; 
         jit.execute(1, args, backward_config);
     }
 
@@ -149,12 +146,13 @@ public:
         size_t num_products,
         void* L1_in, void* L2_in, void* W, void* L3_grad, // Inputs of backward op 
         void* L1_dgrad, void* L2_dgrad, void* w_dgrad, // Gradients w.r.t outputs of backward op
-        void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad) {
+        void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad, Stream stream) {
 
         void* args[] = { 
             &num_products, &L1_in, &L2_in, &W, &L3_grad, &L1_dgrad, &L2_dgrad, &w_dgrad, 
             &L1_grad, &L2_grad, &W_grad, &L3_dgrad
         };
+        double_backward_config.hStream = stream; 
         jit.execute(2, args, forward_config);
         jit.execute(3, args, double_backward_config);
     }

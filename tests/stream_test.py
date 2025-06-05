@@ -23,41 +23,59 @@ class Executable:
 
 
 cuda = torch.device("cuda")
-N = 10000
 
-A = torch.empty((N, N), device=cuda).normal_(0.0, 1.0).to(device=cuda)
-B = torch.empty((N, N), device=cuda).normal_(0.0, 1.0).to(device=cuda)
-torch_matmul = Executable(torch.matmul, (A, B), "torch_matmul")
 
-gen = torch.Generator(device="cuda")
-X_ir, Y_ir, Z_ir = o3.Irreps("1x2e"), o3.Irreps("1x3e"), o3.Irreps("1x2e")
-X = torch.rand(N, X_ir.dim, device="cuda", generator=gen)
-Y = torch.rand(N, Y_ir.dim, device="cuda", generator=gen)
+@pytest.fixture
+def torch_matmul():
+    N = 10000
+    A = torch.empty((N, N), device=cuda).normal_(0.0, 1.0).to(device=cuda)
+    B = torch.empty((N, N), device=cuda).normal_(0.0, 1.0).to(device=cuda)
+    return Executable(torch.matmul, (A, B), "torch_matmul")
 
-instructions = [(0, 0, 0, "uvu", True)]
 
-tp_e3nn = o3.TensorProduct(
-    X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
-).to("cuda")
+@pytest.fixture
+def e3nn_tensor_product():
+    N = 10000
+    gen = torch.Generator(device="cuda")
+    X_ir, Y_ir, Z_ir = o3.Irreps("1x2e"), o3.Irreps("1x3e"), o3.Irreps("1x2e")
+    X = torch.rand(N, X_ir.dim, device="cuda", generator=gen)
+    Y = torch.rand(N, Y_ir.dim, device="cuda", generator=gen)
 
-W = torch.rand(N, tp_e3nn.weight_numel, device="cuda", generator=gen)
+    instructions = [(0, 0, 0, "uvu", True)]
 
-e3nn_tensor_product = Executable(tp_e3nn, (X, Y, W), "e3nn_tensor_product")
+    tp_e3nn = o3.TensorProduct(
+        X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
+    ).to("cuda")
 
-tpp_oeq = TPProblem(
-    X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
-)
-tp_oeq = TensorProduct(tpp_oeq)
+    W = torch.rand(N, tp_e3nn.weight_numel, device="cuda", generator=gen)
 
-oeq_tensor_product = Executable(tp_oeq, (X, Y, W), "oeq_tensor_product")
+    return Executable(tp_e3nn, (X, Y, W), "e3nn_tensor_product")
+
+
+@pytest.fixture
+def oeq_tensor_product():
+    N = 10000
+    gen = torch.Generator(device="cuda")
+    X_ir, Y_ir, Z_ir = o3.Irreps("1x2e"), o3.Irreps("1x3e"), o3.Irreps("1x2e")
+    X = torch.rand(N, X_ir.dim, device="cuda", generator=gen)
+    Y = torch.rand(N, Y_ir.dim, device="cuda", generator=gen)
+
+    instructions = [(0, 0, 0, "uvu", True)]
+    tpp_oeq = TPProblem(
+        X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
+    )
+    tp_oeq = TensorProduct(tpp_oeq)
+
+    W = torch.rand(N, tpp_oeq.weight_numel, device="cuda", generator=gen)
+
+    return Executable(tp_oeq, (X, Y, W), "oeq_tensor_product")
 
 
 @pytest.fixture(
     params=[torch_matmul, e3nn_tensor_product, oeq_tensor_product],
-    ids=lambda x: x.label,
 )
 def executable(request):
-    return request.param
+    yield request.getfixturevalue(request.param)
 
 
 def test_separate_streams(tmp_path, executable: Executable):

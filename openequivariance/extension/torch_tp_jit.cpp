@@ -15,7 +15,6 @@
 
     template<typename T>
     using GroupMM = GroupMMCUDA<T>; 
-    using Stream = cudaStream_t;
 #endif
 
 #ifdef HIP_BACKEND
@@ -26,7 +25,6 @@
 
     template<typename T>
     using GroupMM = GroupMMHIP<T>; 
-    using Stream = hipStream_t; 
 #endif
 
 #include "buffer.hpp"
@@ -50,14 +48,14 @@ std::unordered_map<string, int64_t> to_map(const Map_t &map) {
     return result;
 }
 
-// inline Stream get_current_stream(){
-//     #ifdef CUDA_BACKEND
-//     return c10::cuda::getCurrentCUDAStream(); 
-//     #endif 
-//     #ifdef HIP_BACKEND 
-//     return c10::hip::getCurrentHIPStream(); 
-//     #endif 
-// }
+inline Stream get_current_stream(){
+    #ifdef CUDA_BACKEND
+    return c10::cuda::getCurrentCUDAStream(); 
+    #endif 
+    #ifdef HIP_BACKEND 
+    return c10::hip::getCurrentHIPStream(); 
+    #endif 
+}
 
 inline void* data_ptr(const torch::Tensor &tensor) {
     if(tensor.dtype() == torch::kFloat)
@@ -105,7 +103,7 @@ public:
     }
 
     void exec_tensor_product_device_rawptrs(int64_t num_batch, int64_t L1_in, int64_t L2_in, int64_t L3_out, int64_t weights) { 
-        cudaStream_t stream = c10::cuda::getCurrentCUDAStream(); 
+        Stream stream = get_current_stream(); 
         internal.exec_tensor_product(
                 num_batch,
                 reinterpret_cast<void*>(L1_in), 
@@ -121,11 +119,12 @@ public:
             int64_t L2_in, int64_t L2_grad, 
             int64_t weight, int64_t weight_grad,
             int64_t L3_grad) {
+        Stream stream = get_current_stream(); 
         internal.backward(num_batch,
             reinterpret_cast<void*>(L1_in), reinterpret_cast<void*>(L1_grad),
             reinterpret_cast<void*>(L2_in), reinterpret_cast<void*>(L2_grad),
             reinterpret_cast<void*>(weight), reinterpret_cast<void*>(weight_grad),
-            reinterpret_cast<void*>(L3_grad)
+            reinterpret_cast<void*>(L3_grad), stream
         );
     }
 };
@@ -135,6 +134,8 @@ torch::Tensor jit_tp_forward(
         const torch::Tensor &L1_in,
         const torch::Tensor &L2_in,
         const torch::Tensor &W) {
+    
+    Stream stream = get_current_stream(); 
 
     int64_t num_batch = L1_in.sizes()[0];
     torch::Tensor L3_out = torch::empty({num_batch, jit_instance->L3_dim}, L1_in.options());
@@ -143,7 +144,6 @@ torch::Tensor jit_tp_forward(
     at::Tensor L2_contig = L2_in.contiguous();
     at::Tensor W_contig = W.contiguous();
     
-    cudaStream_t stream = c10::cuda::getCurrentCUDAStream(); 
     jit_instance->internal.exec_tensor_product(
             num_batch,
             data_ptr(L1_contig), 
@@ -177,12 +177,15 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_backward(
     torch::Tensor W_contig = W.contiguous();
     torch::Tensor L3_grad_contig = L3_grad.contiguous();
 
+    Stream stream = get_current_stream();
+
     jit_instance->internal.backward(
             num_batch, 
             data_ptr(L1_in_contig), data_ptr(L1_grad),
             data_ptr(L2_in_contig), data_ptr(L2_grad),
             data_ptr(W_contig), data_ptr(W_grad),
-            data_ptr(L3_grad_contig)
+            data_ptr(L3_grad_contig),
+            stream
     );
 
     return tuple(L1_grad, L2_grad, W_grad);
@@ -197,6 +200,8 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_
         const torch::Tensor &L1_dgrad, 
         const torch::Tensor &L2_dgrad, 
         const torch::Tensor &W_dgrad) {
+    
+    Stream stream = get_current_stream();
 
     int64_t num_batch = L1_in.sizes()[0]; // Declaring outputs
     torch::Tensor L1_grad = torch::empty(L1_in.sizes(), L1_in.options());
@@ -224,7 +229,8 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_
             data_ptr(L1_dgrad_contig), data_ptr(L2_dgrad_contig),
             data_ptr(W_dgrad_contig),
             data_ptr(L1_grad), data_ptr(L2_grad),
-            data_ptr(W_grad), data_ptr(L3_dgrad)
+            data_ptr(W_grad), data_ptr(L3_dgrad),
+            stream
     );
 
     return tuple(L1_grad, L2_grad, W_grad, L3_dgrad); 
@@ -271,6 +277,7 @@ public:
             int64_t rows, int64_t cols,
             int64_t nnz, int64_t node_count,
             int64_t workspace) {
+        Stream stream = get_current_stream();
         internal.exec_conv(
             reinterpret_cast<void*>(L1_in), 
             reinterpret_cast<void*>(L2_in), 
@@ -279,7 +286,8 @@ public:
             reinterpret_cast<void*>(rows), 
             reinterpret_cast<void*>(cols),
             nnz, node_count,
-            reinterpret_cast<void*>(workspace));
+            reinterpret_cast<void*>(workspace),
+            stream);
     }
     void backward_rawptrs(
             int64_t L1_in, int64_t L1_grad,
@@ -290,6 +298,7 @@ public:
             int64_t nnz, int64_t node_count,
             int64_t workspace,
             int64_t transpose_perm) {
+        Stream stream = get_current_stream();
         internal.backward(
             reinterpret_cast<void*>(L1_in), reinterpret_cast<void*>(L1_grad),
             reinterpret_cast<void*>(L2_in), reinterpret_cast<void*>(L2_grad),
@@ -299,7 +308,8 @@ public:
             reinterpret_cast<void*>(cols),
             nnz, node_count,
             reinterpret_cast<void*>(workspace),
-            reinterpret_cast<void*>(transpose_perm));
+            reinterpret_cast<void*>(transpose_perm),
+            stream);
     }
 };
 
@@ -312,6 +322,8 @@ torch::Tensor jit_conv_forward(
         const torch::Tensor &cols,
         const torch::Tensor &workspace,
         const torch::Tensor &transpose_perm) {
+
+    Stream stream = get_current_stream();
 
     int64_t nnz = rows.sizes()[0];
     int64_t node_count = L1_in.sizes()[0];
@@ -332,7 +344,8 @@ torch::Tensor jit_conv_forward(
             data_ptr(rows_contig), 
             data_ptr(cols_contig),
             nnz, node_count,
-            data_ptr(workspace_contig));
+            data_ptr(workspace_contig),
+            stream);
 
     return L3_out;
 }
@@ -347,6 +360,8 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
         const torch::Tensor &cols,
         const torch::Tensor &workspace,
         const torch::Tensor &transpose_perm) {
+    
+    Stream stream = get_current_stream();
     
     int64_t nnz = rows.sizes()[0];
     int64_t node_count = L1_in.sizes()[0];
@@ -376,7 +391,8 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
             data_ptr(rows_contig), data_ptr(cols_contig),
             nnz, node_count,
             data_ptr(workspace_contig),
-            data_ptr(transpose_perm_contig));
+            data_ptr(transpose_perm_contig),
+            stream);
 
     return tuple(L1_grad, L2_grad, W_grad);
 }
@@ -394,6 +410,8 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_doubl
         const torch::Tensor &cols,
         const torch::Tensor &workspace,
         const torch::Tensor &transpose_perm) {
+    
+    Stream stream = get_current_stream();
 
     int64_t nnz = rows.sizes()[0];
     int64_t node_count = L1_in.sizes()[0];
@@ -428,7 +446,8 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_doubl
             data_ptr(W_grad), data_ptr(L3_dgrad),
             data_ptr(rows_contig), data_ptr(cols_contig),
             nnz, node_count,
-            data_ptr(workspace_contig), data_ptr(transpose_perm_contig)
+            data_ptr(workspace_contig), data_ptr(transpose_perm_contig),
+            stream
     );
 
     return tuple(L1_grad, L2_grad, W_grad, L3_dgrad);
