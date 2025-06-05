@@ -41,12 +41,13 @@ To build the extension with an alternate compiler, set the
 environment variable and retry the import:
 
 .. code-block:: bash
+
     export CCC=/path/to/your/gcc
     export CXX=/path/to/your/g++
     python -c "import openequivariance"
 
-These configuration stesp are required only ONCE after 
-installation (or upgrade) with pip due to extension caching.
+These configuration steps are required only ONCE after 
+installation (or upgrade) with pip. 
 
 Configurations on Major Platforms 
 -----------------------------

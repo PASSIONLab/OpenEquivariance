@@ -1,7 +1,9 @@
 Supported Operations
 ==============================
 
-.. list-table::
+.. toctree::
+   :maxdepth: 1
+   :caption: Contents:
 
 .. list-table:: 
    :widths: 50 25 25
@@ -66,6 +68,23 @@ We do not (yet) support:
 - Non-trainable instructions: all of your instructions must have weights associated. 
 
 If you have a use case for any of the unsupported features above, let us know.
+
+Compilation with JITScript, Export, and AOTInductor
+---------------------------------------------------
+
+OpenEquivariance supports model compilation with
+``torch.compile``, JITScript, ``torch.export``, and AOTInductor. 
+Demo the C++ model exports with
+
+.. code-block:: bash
+
+    pytest tests/export_test.py 
+
+
+NOTE: the AOTInductor test (and possibly export) fail 
+unless you are using a Nightly
+build of PyTorch past 4/10/2025 due to incomplete support for 
+TorchBind in earlier versions.
 
 
 Multiple Devices and Streams 

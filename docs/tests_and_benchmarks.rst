@@ -18,7 +18,7 @@ download the test folder and install only the dependencies with:
     pip install "https://github.com/PASSIONLab/OpenEquivariance[dev]" --only-deps
     pip install "https://github.com/PASSIONLab/OpenEquivariance[bench]" --only-deps
 
-Correctness Tests
+Correctness
 ------------------------------
 To set up the editable install and run the entire testsuite, use: 
 
@@ -61,6 +61,10 @@ For example, here's a set of invocations for an NVIDIA A5000 GPU:
     python tests/benchmark.py -o outputs/uvw uvw -b 25000 --plot
     python tests/benchmark.py -o outputs/roofline roofline --plot
     python tests/benchmark.py -o outputs/conv conv --data data/molecular_structures --limited-memory
+
+For GPUs besides the NVIDIA A100, the roofline slope / peak will be incorrect.
+The plots for the convolution fusion experiments also require a GPU 
+with a minimum of 40GB of memory. 
 
 List of GPUs Tested
 --------------------------------

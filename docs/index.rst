@@ -25,4 +25,4 @@ from C++.
    api
    supported_ops
    tests_and_benchmarks
-
+   models 
