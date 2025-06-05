@@ -159,3 +159,7 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
         {%- endfor %}
     }
 {%- endmacro %}
+
+{%- macro launch_bounds(schedule) %}
+__launch_bounds__(schedule.launch_config.num_threads)
+{%- endmacro %}
