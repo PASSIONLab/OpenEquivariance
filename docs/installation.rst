@@ -26,7 +26,7 @@ much faster since this extension is cached.
 
 
 Compiling the Integrated PyTorch Extension
------------------------------
+------------------------------------------
 To support ``torch.compile``, ``torch.export``, and
 JITScript, OpenEquivariance needs to compile a C++ extension
 tightly integrated with PyTorch. If you see a warning that
@@ -50,13 +50,13 @@ These configuration steps are required only ONCE after
 installation (or upgrade) with pip. 
 
 Configurations on Major Platforms 
------------------------------
+---------------------------------
 OpenEquivariance has been tested on both supercomputers and lab clusters.
 Here are some tested environment configuration files. If use OpenEquivariance
 on a widely-used platform, send us a pull request to add your configuration! 
 
 NERSC Perlmutter (NVIDIA A100)
-""""""""""""""""""""""
+""""""""""""""""""""""""""""""
 
 .. code-block:: bash
     :caption: env.sh (last updated June 2024)
@@ -73,7 +73,7 @@ NERSC Perlmutter (NVIDIA A100)
 
 
 OLCF Frontier (AMD MI250x)
-""""""""""""""""""""""
+""""""""""""""""""""""""""
 You need to install a HIP-enabled verison of PyTorch to use our package. 
 To do this, follow the steps `here <https://docs.olcf.ornl.gov/software/analytics/pytorch_frontier.html>`_.
 

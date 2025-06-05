@@ -17,7 +17,9 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
     :math:`y_1...y_{|E|}`, and weights :math:`W_1...W_{|E|}`, computes
 
     .. math::
+
         z_i = \sum_{(i, j, e) \in \mathcal{N}(i)} W_e (x_j \otimes_{\\textrm{CG}} y_e)
+
     where :math:`(i, j, e) \in \mathcal{N}(i)` indicates that node :math:`i` is connected to node :math:`j`
     via the edge indexed :math:`e`.
 
@@ -29,7 +31,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
     :param deterministic: if ``False``, uses atomics for the convolution. If ``True``, uses a deterministic
            fixup-based algorithm. `Default`: ``False``.
     :param kahan: if ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
-              the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
+           the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
 
     """
 

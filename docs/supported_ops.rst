@@ -45,7 +45,7 @@ Our code includes correctness checks, but the configuration space is large. If y
 a bug, let us know in a GitHub issue. We'll try our best to correct it or document the problem here.
 
 Unsupported Tensor Product Configurations 
---------------------
+-----------------------------------------
 
 We do not (yet) support:
 
@@ -74,7 +74,7 @@ TorchBind in earlier versions.
 
 
 Multiple Devices and Streams 
---------------------
+----------------------------
 OpenEquivariance compiles kernels based on the compute capability of the
 first visible GPU. On heterogeneous systems, our kernels
 will only execute correctly on devices that share the compute capability 
