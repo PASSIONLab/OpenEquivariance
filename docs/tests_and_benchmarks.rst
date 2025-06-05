@@ -75,4 +75,4 @@ request if you'd like to add your own!
 - NVIDIA A5000 (V. Bharadwaj, UCB SLICE, June 2025)
 - NVIDIA V100 (V. Bharadwaj, LBNL Einsteinium, June 2025)
 - AMD MI250x (V. Bharadwaj, OLCF Frontier, June 2025)
-- AMD MI300x (V. Bharadwaj, AMD Cloud, June 2025)
+- AMD MI300x (V. Bharadwaj, AMD Cloud, February 2025)
