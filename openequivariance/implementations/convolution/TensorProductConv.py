@@ -10,34 +10,35 @@ from openequivariance.implementations.convolution.LoopUnrollConv import LoopUnro
 from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance import TPProblem
 
+
 class TensorProductConv(torch.nn.Module, LoopUnrollConv):
     """
-    Given a **symmetric, directed** graph :math:`G = (V, E)`, inputs :math:`x_1...x_{|V|}`, 
-    :math:`y_1...y_{|E|}`, and weights :math:`W_1...W_{|E|}`, computes 
+    Given a **symmetric, directed** graph :math:`G = (V, E)`, inputs :math:`x_1...x_{|V|}`,
+    :math:`y_1...y_{|E|}`, and weights :math:`W_1...W_{|E|}`, computes
 
     .. math::
         z_i = \sum_{(i, j, e) \in \mathcal{N}(i)} W_e (x_j \otimes_{\\textrm{CG}} y_e)
-    where :math:`(i, j, e) \in \mathcal{N}(i)` indicates that node :math:`i` is connected to node :math:`j` 
-    via the edge indexed :math:`e`. 
+    where :math:`(i, j, e) \in \mathcal{N}(i)` indicates that node :math:`i` is connected to node :math:`j`
+    via the edge indexed :math:`e`.
 
     This class offers multiple options to perform the summation: an atomic algorithm and a deterministic algorithm
     that relies on a sorted adjacency matrix input. If you use the determinstic algorithm, you must also supply
-    a permutation to transpose the adjacency matrix. 
+    a permutation to transpose the adjacency matrix.
 
     :param problem: Specification of the tensor product.
     :param deterministic: if ``False``, uses atomics for the convolution. If ``True``, uses a deterministic
            fixup-based algorithm. `Default`: ``False``.
     :param kahan: if ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
-              the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``. 
-    
+              the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
+
     """
 
     def __init__(
         self,
         problem: TPProblem,
-        deterministic: bool=False,
-        kahan: bool =False,
-        torch_op=True
+        deterministic: bool = False,
+        kahan: bool = False,
+        torch_op=True,
     ):
         torch.nn.Module.__init__(self)
         LoopUnrollConv.__init__(
@@ -64,26 +65,26 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
         cols: torch.Tensor,
         sender_perm: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        '''
-        Computes the fused CG tensor product + convolution. 
+        """
+        Computes the fused CG tensor product + convolution.
 
         :param X: Tensor of shape ``[|V|, problem.irreps_in1.dim()]``, datatype ``problem.irrep_dtype``.
         :param Y: Tensor of shape ``[|E|, problem.irreps_in1.dim()]``, datatype ``problem.irrep_dtype``.
-        :param W: Tensor of datatype ``problem.weight_dtype`` and shape 
+        :param W: Tensor of datatype ``problem.weight_dtype`` and shape
 
             * ``[|E|, problem.weight_numel]`` if ``problem.shared_weights=False``
             * ``[problem.weight_numel]`` if ``problem.shared_weights=True``
-        
-        :param rows: Tensor of shape ``[|E|]`` with row indices for each nonzero in the adjacency matrix, 
+
+        :param rows: Tensor of shape ``[|E|]`` with row indices for each nonzero in the adjacency matrix,
                 datatype ``torch.int64``. Must be row-major sorted along with ``cols`` when ``deterministic=True``.
         :param cols: Tensor of shape ``[|E|]`` with column indices for each nonzero in the adjacency matrix,
-                datatype ``torch.int64``. 
-        :param sender_perm: Tensor of shape ``[|E|]`` and ``torch.int64`` datatype containing a 
+                datatype ``torch.int64``.
+        :param sender_perm: Tensor of shape ``[|E|]`` and ``torch.int64`` datatype containing a
                 permutation that transposes the adjacency matrix nonzeros from row-major to column-major order.
                 Must be provided when ``deterministic=True``.
-        
+
         :return: Tensor of shape ``[|V|, problem.irreps_out.dim()]``, datatype ``problem.irrep_dtype``.
-        '''
+        """
         if sender_perm is None:
             return torch.ops.libtorch_tp_jit.jit_conv_forward(
                 self.internal,

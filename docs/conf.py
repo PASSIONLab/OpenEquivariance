@@ -9,31 +9,30 @@ from pathlib import Path
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'OpenEquivariance'
-copyright = '2025, The Regents of the University of California, through Lawrence Berkeley National Laboratory.' 
-author = 'Vivek Bharadwaj, Austin Glover, Aydin Buluc, James Demmel'
+project = "OpenEquivariance"
+copyright = "2025, The Regents of the University of California, through Lawrence Berkeley National Laboratory."
+author = "Vivek Bharadwaj, Austin Glover, Aydin Buluc, James Demmel"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = []
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'furo'
-html_static_path = ['_static']
+html_theme = "furo"
+html_static_path = ["_static"]
 
 extensions = [
-    'sphinx.ext.autodoc',
+    "sphinx.ext.autodoc",
 ]
 
-sys.path.insert(0, str(Path('..').resolve()))
+sys.path.insert(0, str(Path("..").resolve()))
 
-autodoc_mock_imports = ['torch', 'openequivariance.extlib', 'jinja2'] 
+autodoc_mock_imports = ["torch", "openequivariance.extlib", "jinja2"]
 autodoc_typehints = "description"

@@ -359,23 +359,23 @@ class Instruction(NamedTuple):
 
 
 class TPProblem:
-    '''
-    Specification for a CG tensor product. All parameters from 
+    """
+    Specification for a CG tensor product. All parameters from
     e3nn's ``o3.TensorProduct`` are available, along with additional
     parameters for the types of weights and irreps.
 
     :param irreps_in1: Irreps for the first CG argument
     :param irreps_in2: Irreps for the second CG argument
-    :param irreps_out: Irreps for the output 
-    :param instructions: A list of 5-tuples, each of 
+    :param irreps_out: Irreps for the output
+    :param instructions: A list of 5-tuples, each of
            the form ``(i_in1, i_in2, i_out, has_weight, path_weight)``.
            ``i_in1``, ``i_in2``, and ``i_out`` each index
            an Irrep from ``irreps_in1``, ``irreps_in2``, and
            ``irreps_in3``, respectively. ``has_weight`` (True / False)
            controls whether trainable weights are included for the
-           instruction, and ``path_weight`` controls output normalization. 
+           instruction, and ``path_weight`` controls output normalization.
     :param irrep_dtype: Datatype of irrep inputs; one of ``np.float32`` or ``np.float64``.
-           *Default*: ``np.float32``. 
+           *Default*: ``np.float32``.
     :param weight_dtype: Datatype of weights; one of ``np.float32`` or ``np.float64``.
            *Default*: ``np.float32``.
     :param label: A name for this problem specification (useful for testing / benchmarking).
@@ -384,7 +384,8 @@ class TPProblem:
     :param internal_weights: Must be False; OpenEquivariance does not support internal weights. *Default*: False.
     :param irrep_normalization: One of ``["component", "norm", "none"]``. *Default*: "component".
     :param path_normalization: One of ``["element", "path", "none"]``. *Default*: "element".
-    '''
+    """
+
     instructions: List[Any]
     shared_weights: bool
     internal_weights: bool

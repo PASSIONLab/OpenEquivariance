@@ -79,7 +79,7 @@ def filter_and_analyze_problem(problem):
         f"irrep_dtype and weight_dtype must be the same, got {problem.irrep_dtype} and {problem.weight_dtype}"
     )
 
-    assert not problem.internal_weights, ( 
+    assert not problem.internal_weights, (
         f"Openequivariance does not support internal weights, got {problem.internal_weights}"
     )
 
