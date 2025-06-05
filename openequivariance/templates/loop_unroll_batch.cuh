@@ -5,7 +5,8 @@
         transpose_load, transpose_store, 
         load_ir_segments, load_ir_segments_force,
         store_ir_segments, declare_smem_variables,
-        set_launch_bound_variables with context, launch_bounds %}
+        set_launch_bound_variables, launch_bounds
+        with context%}
 
 {%- from 'loop_unroll_tp.cuh' import 
         generate_segment_kernel_forward, 

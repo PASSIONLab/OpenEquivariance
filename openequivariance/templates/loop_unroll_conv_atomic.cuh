@@ -7,7 +7,8 @@
         load_ir_segments, load_ir_segments_force,
         store_ir_segments, 
         declare_smem_variables,
-        set_launch_bound_variables with context %}
+        set_launch_bound_variables, launch_bounds
+        with context %}
 
 #define THREADS_PER_WARP {{ forward_schedule.launch_config.warp_size }} // Warp size should be the same for forward and backward
 #define FULL_MASK 0xffffffff
@@ -30,20 +31,27 @@ struct ConvData {
     unsigned long node_count;
 };
 
-__global__ void fixup_forward(void* workspace, IRREP_T* dst_ptr) {
+__global__ void 
+{{ launch_bounds(forward_schedule) }}
+fixup_forward(void* workspace, IRREP_T* dst_ptr) {
     // Empty, no fixup
 }
 
-__global__ void fixup_backward(void* workspace, IRREP_T* dst_ptr) {
+__global__ void 
+{{ launch_bounds(backward_schedule) }}
+fixup_backward(void* workspace, IRREP_T* dst_ptr) {
     // Empty, no fixup
 }
 
-__global__ void fixup_double_backwardB(void* workspace, IRREP_T* dst_ptr) {
+__global__ void 
+{{ launch_bounds(double_backward_schedule) }}
+fixup_double_backwardB(void* workspace, IRREP_T* dst_ptr) {
     // Empty, no fixup
 }
 
-__global__ void forward(
-        IRREP_T* L1_in,
+__global__ void 
+{{ launch_bounds(forward_schedule) }}
+forward(IRREP_T* L1_in,
         IRREP_T* L2_in,
         WEIGHT_T* weights,
         IRREP_T* L3_out,
@@ -96,8 +104,9 @@ __global__ void forward(
 {{ generate_segment_kernel_backward(i, segment, backward_schedule.launch_config.warp_size) }}
 {%- endfor %}
 
-__global__ void backward(
-        IRREP_T* L1_in, IRREP_T* L1_grad,
+__global__ void 
+{{ launch_bounds(backward_schedule) }}
+backward(IRREP_T* L1_in, IRREP_T* L1_grad,
         IRREP_T* L2_in, IRREP_T* L2_grad,
         WEIGHT_T* weights, WEIGHT_T* weights_grad,
         IRREP_T* L3_grad, ConvData c, void* workspace, unsigned {{idx_type}}* transpose_perm) {
@@ -170,8 +179,9 @@ __global__ void backward(
     }
 }
 
-__global__ void double_backward_A(
-        IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
+__global__ void 
+{{ launch_bounds(forward_schedule) }}
+double_backward_A(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
         IRREP_T* L1_dgrad, IRREP_T* L2_dgrad, IRREP_T* W_dgrad,
         IRREP_T* L1_grad, IRREP_T* L2_grad, WEIGHT_T* W_grad, IRREP_T* L3_dgrad,
         ConvData c, void* workspace, unsigned {{idx_type}}* transpose_perm) {
@@ -247,8 +257,9 @@ __global__ void double_backward_A(
 
 {% set schedule = double_backward_schedule %}
 
-__global__ void double_backward_B(
-        IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
+__global__ void 
+{{ launch_bounds(double_backward_schedule) }}
+double_backward_B(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
         IRREP_T* L1_dgrad, IRREP_T* L2_dgrad, IRREP_T* W_dgrad,
         IRREP_T* L1_grad, IRREP_T* L2_grad, WEIGHT_T* W_grad, IRREP_T* L3_dgrad,
         ConvData c, void* workspace, unsigned {{idx_type}}* transpose_perm) {
