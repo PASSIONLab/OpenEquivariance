@@ -20,7 +20,7 @@ download the test folder and install only the dependencies with:
 
 Correctness Tests
 ------------------------------
-To set up the editable install and run the entire testsuite, run: 
+To set up the editable install and run the entire testsuite, use: 
 
 .. code-block:: bash
 
@@ -62,4 +62,12 @@ For example, here's a set of invocations for an NVIDIA A5000 GPU:
     python tests/benchmark.py -o outputs/roofline roofline --plot
     python tests/benchmark.py -o outputs/conv conv --data data/molecular_structures --limited-memory
 
+List of GPUs Tested
+--------------------------------
+OpenEquivariance has been tested successfully the following GPUs. Submit a pull 
+request if you'd like to add your own!
 
+- NVIDIA A100-SXM-40GB and A100-SXM-80GB (A. Glover, NERSC Perlmutter)
+- NVIDIA A5000 (V. Bharadwaj, UCB SLICE)
+- AMD MI250x (V. Bharadwaj, OLCF Frontier)
+- AMD MI300x (V. Bharadwaj, AMD Cloud)

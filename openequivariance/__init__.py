@@ -29,6 +29,10 @@ _editable_install_output_path = Path(__file__).parent.parent / "outputs"
 
 
 def torch_ext_so_path():
+    '''
+    :returns: Path to a ``.so`` file that must be linked to use OpenEquivariance
+              from the PyTorch C++ Interface. 
+    '''
     return openequivariance.extlib.torch_module.__file__
 
 

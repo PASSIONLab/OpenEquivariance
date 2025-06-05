@@ -48,18 +48,17 @@ environment variable and retry the import:
 These configuration stesp are required only ONCE after 
 installation (or upgrade) with pip due to extension caching.
 
-Environment Configurations on Major Platforms 
+Configurations on Major Platforms 
 -----------------------------
-OpenEquivariance has been tested on major supercomputers and lab clusters.
-Here are some tested environment configuration files; if you get OpenEquivariance
-working on a large platform, send us a pull request to add your configuration! 
-
+OpenEquivariance has been tested on both supercomputers and lab clusters.
+Here are some tested environment configuration files. If use OpenEquivariance
+on a widely-used platform, send us a pull request to add your configuration! 
 
 NERSC Perlmutter (NVIDIA A100)
 """"""""""""""""""""""
 
 .. code-block:: bash
-    :caption: env.sh 
+    :caption: env.sh (last updated June 2024)
 
     module load gcc 
     module load conda
@@ -79,7 +78,7 @@ To do this, follow the steps `here <https://docs.olcf.ornl.gov/software/analytic
 
 
 .. code-block:: bash
-    :caption: env.sh 
+    :caption: env.sh (last updated June 2024) 
 
     module load PrgEnv-gnu/8.6.0
     module load miniforge3/23.11.0-0

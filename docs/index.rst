@@ -22,7 +22,7 @@ from C++.
    :caption: Contents:
 
    installation
-   tests_and_benchmarks
    api
-
+   supported_ops
+   tests_and_benchmarks
 

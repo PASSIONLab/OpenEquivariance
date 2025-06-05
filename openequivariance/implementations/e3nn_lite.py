@@ -247,8 +247,7 @@ class Irreps(tuple):
     def slices(self):
         r"""List of slices corresponding to indices for each irrep.
 
-        Examples
-        --------
+        Examples:
 
         >>> Irreps('2x0e + 1e').slices()
         [slice(0, 2, None), slice(2, 5, None)]
@@ -270,17 +269,9 @@ class Irreps(tuple):
         ir = Irrep(ir)
         return ir in (irrep for _, irrep in self)
 
-    def count(self, ir) -> int:
-        r"""Multiplicity of ``ir``.
-
-        Parameters
-        ----------
-        ir : `e3nn.o3.Irrep`
-
-        Returns
-        -------
-        `int`
-            total multiplicity of ``ir``
+    def count(self, ir: Irrep) -> int:
+        r"""
+        :returns: total multiplicity of ``ir``.
         """
         ir = Irrep(ir)
         return sum(mul for mul, irrep in self if ir == irrep)
@@ -368,6 +359,32 @@ class Instruction(NamedTuple):
 
 
 class TPProblem:
+    '''
+    Specification for a CG tensor product. All parameters from 
+    e3nn's ``o3.TensorProduct`` are available, along with additional
+    parameters for the types of weights and irreps.
+
+    :param irreps_in1: Irreps for the first CG argument
+    :param irreps_in2: Irreps for the second CG argument
+    :param irreps_out: Irreps for the output 
+    :param instructions: A list of 5-tuples, each of 
+           the form ``(i_in1, i_in2, i_out, has_weight, path_weight)``.
+           ``i_in1``, ``i_in2``, and ``i_out`` each index
+           an Irrep from ``irreps_in1``, ``irreps_in2``, and
+           ``irreps_in3``, respectively. ``has_weight`` (True / False)
+           controls whether trainable weights are included for the
+           instruction, and ``path_weight`` controls output normalization. 
+    :param irrep_dtype: Datatype of irrep inputs; one of ``np.float32`` or ``np.float64``.
+           *Default*: ``np.float32``. 
+    :param weight_dtype: Datatype of weights; one of ``np.float32`` or ``np.float64``.
+           *Default*: ``np.float32``.
+    :param label: A name for this problem specification (useful for testing / benchmarking).
+    :param shared_weights: If True, all elements in a batch of inputs share a common set of
+           weights. If False, each batch element has a unique set of weights. *Default*: True.
+    :param internal_weights: Must be False; OpenEquivariance does not support internal weights. *Default*: False.
+    :param irrep_normalization: One of ``["component", "norm", "none"]``. *Default*: "component".
+    :param path_normalization: One of ``["element", "path", "none"]``. *Default*: "element".
+    '''
     instructions: List[Any]
     shared_weights: bool
     internal_weights: bool
@@ -388,7 +405,7 @@ class TPProblem:
         out_var: Optional[List[float]] = None,
         irrep_normalization: str = "component",
         path_normalization: str = "element",
-        internal_weights: Optional[bool] = None,
+        internal_weights: Optional[bool] = False,
         shared_weights: Optional[bool] = None,
         label: Optional[str] = None,
         irrep_dtype: type[np.generic] = np.float32,
@@ -561,11 +578,6 @@ class TPProblem:
 
         if shared_weights is None:
             shared_weights = True
-
-        if internal_weights is None:
-            internal_weights = shared_weights and any(
-                i.has_weight for i in self.instructions
-            )
 
         assert shared_weights or not internal_weights
         self.internal_weights = internal_weights
