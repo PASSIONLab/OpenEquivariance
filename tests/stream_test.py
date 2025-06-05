@@ -8,8 +8,9 @@ import torch
 from torch.profiler import profile, record_function, ProfilerActivity
 
 from e3nn import o3
+from torch_geometric import EdgeIndex
 
-from openequivariance import TensorProduct, TPProblem
+from openequivariance import TensorProduct, TensorProductConv, TPProblem
 
 
 @dataclass
@@ -26,53 +27,107 @@ cuda = torch.device("cuda")
 
 
 @pytest.fixture
-def torch_matmul():
-    N = 10000
+def N():
+    return 1000
+
+
+@pytest.fixture
+def X_ir():
+    return o3.Irreps("1x2e")
+
+
+@pytest.fixture
+def Y_ir():
+    return o3.Irreps("1x3e")
+
+
+@pytest.fixture
+def Z_ir():
+    return o3.Irreps("1x2e")
+
+
+@pytest.fixture
+def instructions():
+    return [(0, 0, 0, "uvu", True)]
+
+
+@pytest.fixture
+def tpp(X_ir, Y_ir, Z_ir, instructions):
+    return TPProblem(
+        X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
+    )
+
+
+@pytest.fixture
+def gen():
+    return torch.Generator(device="cuda")
+
+
+@pytest.fixture
+def X(N, X_ir, gen):
+    return torch.rand(N, X_ir.dim, device="cuda", generator=gen)
+
+
+@pytest.fixture
+def Y(N, Y_ir, gen):
+    return torch.rand(N, Y_ir.dim, device="cuda", generator=gen)
+
+
+@pytest.fixture
+def W(N, e3nn_tp, gen):
+    return torch.rand(N, e3nn_tp.weight_numel, device="cuda", generator=gen)
+
+
+@pytest.fixture
+def torch_matmul(N):
     A = torch.empty((N, N), device=cuda).normal_(0.0, 1.0).to(device=cuda)
     B = torch.empty((N, N), device=cuda).normal_(0.0, 1.0).to(device=cuda)
     return Executable(torch.matmul, (A, B), "torch_matmul")
 
 
 @pytest.fixture
-def e3nn_tensor_product():
-    N = 10000
-    gen = torch.Generator(device="cuda")
-    X_ir, Y_ir, Z_ir = o3.Irreps("1x2e"), o3.Irreps("1x3e"), o3.Irreps("1x2e")
-    X = torch.rand(N, X_ir.dim, device="cuda", generator=gen)
-    Y = torch.rand(N, Y_ir.dim, device="cuda", generator=gen)
-
-    instructions = [(0, 0, 0, "uvu", True)]
-
-    tp_e3nn = o3.TensorProduct(
+def e3nn_tp(X_ir, Y_ir, Z_ir, instructions):
+    return o3.TensorProduct(
         X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
     ).to("cuda")
 
-    W = torch.rand(N, tp_e3nn.weight_numel, device="cuda", generator=gen)
 
-    return Executable(tp_e3nn, (X, Y, W), "e3nn_tensor_product")
+@pytest.fixture
+def e3nn_tp_exec(e3nn_tp, X, Y, W):
+    return Executable(e3nn_tp, (X, Y, W), "e3nn_tensor_product")
 
 
 @pytest.fixture
-def oeq_tensor_product():
-    N = 10000
-    gen = torch.Generator(device="cuda")
-    X_ir, Y_ir, Z_ir = o3.Irreps("1x2e"), o3.Irreps("1x3e"), o3.Irreps("1x2e")
-    X = torch.rand(N, X_ir.dim, device="cuda", generator=gen)
-    Y = torch.rand(N, Y_ir.dim, device="cuda", generator=gen)
-
-    instructions = [(0, 0, 0, "uvu", True)]
-    tpp_oeq = TPProblem(
-        X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
-    )
-    tp_oeq = TensorProduct(tpp_oeq)
-
-    W = torch.rand(N, tpp_oeq.weight_numel, device="cuda", generator=gen)
-
+def oeq_tp_exec(tpp, X, Y, W):
+    tp_oeq = TensorProduct(tpp)
     return Executable(tp_oeq, (X, Y, W), "oeq_tensor_product")
 
 
+@pytest.fixture
+def oeq_conv_exec(X_ir, Y_ir, tpp, gen):
+    node_ct, nonzero_ct = 3, 4
+
+    # Receiver, sender indices for message passing GNN
+    edge_index = EdgeIndex(
+        [
+            [0, 1, 1, 2],  # Receiver
+            [1, 0, 2, 1],
+        ],  # Sender
+        device="cuda",
+        dtype=torch.long,
+    )
+
+    X = torch.rand(node_ct, X_ir.dim, device="cuda", generator=gen)
+    Y = torch.rand(nonzero_ct, Y_ir.dim, device="cuda", generator=gen)
+    W = torch.rand(nonzero_ct, tpp.weight_numel, device="cuda", generator=gen)
+
+    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
+
+    return Executable(tp_conv, (X, Y, W, edge_index[0], edge_index[1]), "oeq_conv")
+
+
 @pytest.fixture(
-    params=[torch_matmul, e3nn_tensor_product, oeq_tensor_product],
+    params=["torch_matmul", "e3nn_tp_exec", "oeq_tp_exec", "oeq_conv_exec"],
 )
 def executable(request):
     yield request.getfixturevalue(request.param)
