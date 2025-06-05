@@ -192,6 +192,7 @@ public:
             fixup_config.num_blocks = forward_config.num_blocks;
             fixup_config.num_threads = forward_config.num_threads;
             fixup_config.smem = 0;
+            fixup_config.hStream = stream; 
 
             jit.execute(2, fixup_args, fixup_config);
         }
@@ -219,7 +220,7 @@ public:
             KernelLaunchConfig fixup_config;
             fixup_config.num_blocks = backward_config.num_blocks;
             fixup_config.num_threads = backward_config.num_threads;
-            fixup_config.smem = 0;
+            fixup_config.smem = 0; fixup_config.hStream = stream; 
 
             jit.execute(3, fixup_args, fixup_config);
         }
@@ -246,7 +247,7 @@ public:
             KernelLaunchConfig fixup_config;
             fixup_config.num_blocks = forward_config.num_blocks;
             fixup_config.num_threads = forward_config.num_threads;
-            fixup_config.smem = 0;
+            fixup_config.smem = 0; fixup_config.hStream = stream; 
             jit.execute(2, fixup_args, fixup_config);
         }
 
@@ -256,7 +257,7 @@ public:
             KernelLaunchConfig fixup_config;
             fixup_config.num_blocks = double_backward_config.num_blocks;
             fixup_config.num_threads = double_backward_config.num_threads;
-            fixup_config.smem = 0;
+            fixup_config.smem = 0; fixup_config.hStream = stream; 
             jit.execute(6, fixup_args, fixup_config);
         }
     }
