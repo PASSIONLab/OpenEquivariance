@@ -36,9 +36,9 @@ dev = [
   "pytest",
   "pytest-check",
   "torch_geometric",
-  "cmake"
-  "furo"
-  "sphinx"
+  "cmake",
+  "furo",
+  "sphinx",
   "sphinx-autobuild"
 ]
 
