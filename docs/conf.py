@@ -35,5 +35,5 @@ extensions = [
 
 sys.path.insert(0, str(Path('..').resolve()))
 
-autodoc_mock_imports = ['torch', 'openequivariance.extlib'] 
+autodoc_mock_imports = ['torch', 'openequivariance.extlib', 'jinja2'] 
 autodoc_typehints = "description"

@@ -1,5 +1,5 @@
 Supported Operations
-==============================
+====================
 
 .. toctree::
    :maxdepth: 1
@@ -27,20 +27,6 @@ Supported Operations
    * - Symmetric Tensor Product 
      - ✅ (beta)
      - ✅ (beta)
-
-+----------------------------+----------+------------+
-| Operation                 | CUDA     | HIP        |
-+============================+==========+============+
-| UVU                      | ✅        | ✅         |
-+----------------------------+----------+------------+
-| UVW                      | ✅        | ✅         |
-+----------------------------+----------+------------+
-| UVU + Convolution        | ✅        | ✅         |
-+----------------------------+----------+------------+
-| UVW + Convolution        | ✅        | ✅         |
-+----------------------------+----------+------------+
-| Symmetric Tensor Product | ✅ (beta) | ✅ (beta)  |
-+----------------------------+----------+------------+
 
 e3nn supports a variety of connection modes for CG tensor products. We support 
 two that are commonly used in equivariant graph neural networks:
