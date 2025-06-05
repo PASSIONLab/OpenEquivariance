@@ -6,7 +6,8 @@
 OpenEquivariance
 ==============================
 
-OpenEquivariance is a CUDA and HIP kernel generator for the Clebsch-Gordon
+`OpenEquivariance <https://github.com/PASSIONLab/OpenEquivariance>`_ is a CUDA and 
+HIP kernel generator for the Clebsch-Gordon
 tensor product, a key kernel in equivariant graph neural networks. We offer
 an identical interface to e3nn and produce the same results 
 (up to numerical roundoff). Our package exhibits up to an order of magnitude
