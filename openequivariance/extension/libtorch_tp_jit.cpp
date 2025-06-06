@@ -111,6 +111,10 @@ public:
             reinterpret_cast<void*>(L3_grad)
         );
     }
+
+    int64_t get_L3_dim() const {
+        return L3_dim;
+    }
 };
 
 torch::Tensor jit_tp_forward(
@@ -425,6 +429,7 @@ TORCH_LIBRARY_FRAGMENT(libtorch_tp_jit, m) {
         .def("__len__", [](const c10::intrusive_ptr<TorchJITProduct>& test) -> int64_t {
             return 0;
         })
+        .def("get_L3_dim", &TorchJITProduct::get_L3_dim)
         .def_pickle(
             // __getstate__
             [](const c10::intrusive_ptr<TorchJITProduct>& self)
