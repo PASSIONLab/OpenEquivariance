@@ -6,7 +6,8 @@
         transpose_load, transpose_store, 
         load_ir_segments, store_ir_segments, 
         declare_smem_variables,
-        set_launch_bound_variables with context %}
+        set_launch_bound_variables, launch_bounds
+        with context %}
 
 #define THREADS_PER_WARP {{ forward_schedule.launch_config.warp_size }} // Warp size should be the same for forward and backward
 #define FULL_MASK 0xffffffff
@@ -30,8 +31,11 @@ struct ConvData {
 };
 
 
-{%- macro generate_fixup_kernel(name, warp_size, dim, fixup_offset) %}
-__global__ void {{name}}(void* workspace, IRREP_T* dst_ptr) {
+{%- macro generate_fixup_kernel(name, schedule, dim, fixup_offset) %}
+{%- set warp_size = schedule.launch_config.warp_size %}
+__global__ void 
+{{ launch_bounds(schedule) }}
+{{name}}(void* workspace, IRREP_T* dst_ptr) {
     /*
     *  Workspace consists of: 
     *     fixup_dim * warps_launched * sizeof(IRREP_T): Data
@@ -61,7 +65,7 @@ __global__ void {{name}}(void* workspace, IRREP_T* dst_ptr) {
 }
 {%- endmacro %}
 
-{{ generate_fixup_kernel("fixup_forward", forward_schedule.launch_config.warp_size, forward_schedule.L3.dim, forward_workspace_offset) }}
+{{ generate_fixup_kernel("fixup_forward", forward_schedule, forward_schedule.L3.dim, forward_workspace_offset) }}
 
 template<int ROW_LEN>
 __device__ __forceinline__ void kahanAdd(IRREP_T* c_arr, IRREP_T* sum_arr, int lane_id) {
@@ -88,7 +92,9 @@ __device__ __forceinline__ void kahanAdd(IRREP_T* c_arr, IRREP_T* sum_arr, int l
     }
 }
 
-__global__ void forward(
+__global__ void 
+{{ launch_bounds(forward_schedule) }}
+forward(
         IRREP_T* L1_in,
         IRREP_T* L2_in,
         WEIGHT_T* weights,
@@ -174,10 +180,11 @@ __global__ void forward(
 {{ generate_segment_kernel_backward(i, segment, backward_schedule.launch_config.warp_size) }}
 {%- endfor %}
 
-{{ generate_fixup_kernel("fixup_backward", backward_schedule.launch_config.warp_size, backward_schedule.L1.dim, backward_workspace_offset) }}
+{{ generate_fixup_kernel("fixup_backward", backward_schedule, backward_schedule.L1.dim, backward_workspace_offset) }}
 
-__global__ void backward(
-        IRREP_T* L1_in, IRREP_T* L1_grad,
+__global__ void 
+{{ launch_bounds(backward_schedule) }}
+backward(IRREP_T* L1_in, IRREP_T* L1_grad,
         IRREP_T* L2_in, IRREP_T* L2_grad,
         WEIGHT_T* weights, WEIGHT_T* weights_grad,
         IRREP_T* L3_grad, ConvData c, void* workspace_raw, 
@@ -284,8 +291,9 @@ __global__ void backward(
 }
 
 
-__global__ void double_backward_A(
-        IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
+__global__ void 
+{{ launch_bounds(forward_schedule) }}
+double_backward_A(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
         IRREP_T* L1_dgrad, IRREP_T* L2_dgrad, IRREP_T* W_dgrad,
         IRREP_T* L1_grad, IRREP_T* L2_grad, WEIGHT_T* W_grad, IRREP_T* L3_dgrad,
         ConvData c, void* workspace_raw, unsigned {{idx_type}}* transpose_perm) {
@@ -391,7 +399,7 @@ __global__ void double_backward_A(
     } {%- endfor %}
 }
 
-{{ generate_fixup_kernel("fixup_double_backwardB", double_backward_schedule.launch_config.warp_size, double_backward_schedule.L1.dim, double_backwardB_offset) }}
+{{ generate_fixup_kernel("fixup_double_backwardB", double_backward_schedule, double_backward_schedule.L1.dim, double_backwardB_offset) }}
 
 {%- for i, segment in enumerate(double_backward_schedule.segments) %}
 {{ generate_segment_kernel_backward(i, segment, double_backward_schedule.launch_config.warp_size, double_bwd=True) }}
@@ -399,8 +407,9 @@ __global__ void double_backward_A(
 
 {% set schedule = double_backward_schedule %}
 
-__global__ void double_backward_B(
-        IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
+__global__ void 
+{{ launch_bounds(double_backward_schedule) }}
+double_backward_B(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
         IRREP_T* L1_dgrad, IRREP_T* L2_dgrad, IRREP_T* W_dgrad,
         IRREP_T* L1_grad, IRREP_T* L2_grad, WEIGHT_T* W_grad, IRREP_T* L3_dgrad,
         ConvData c, void* workspace_raw, unsigned {{idx_type}}* transpose_perm) {

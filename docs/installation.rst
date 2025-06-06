@@ -59,7 +59,7 @@ NERSC Perlmutter (NVIDIA A100)
 """"""""""""""""""""""""""""""
 
 .. code-block:: bash
-    :caption: env.sh (last updated June 2024)
+    :caption: env.sh (last updated June 2025)
 
     module load gcc 
     module load conda
@@ -79,7 +79,7 @@ To do this, follow the steps `here <https://docs.olcf.ornl.gov/software/analytic
 
 
 .. code-block:: bash
-    :caption: env.sh (last updated June 2024) 
+    :caption: env.sh (last updated June 2025) 
 
     module load PrgEnv-gnu/8.6.0
     module load miniforge3/23.11.0-0

@@ -25,8 +25,8 @@ To set up the editable install and run the entire testsuite, use:
 .. code-block:: bash
 
     git clone https://github.com/PASSIONLab/OpenEquivariance 
-    pip install -e .[dev] 
     cd OpenEquivariance
+    pip install -e .[dev] 
     pytest 
 
 Browse the ``tests`` directory to run specific components. 
@@ -41,8 +41,8 @@ and generate plots from our paper.
 .. code-block:: bash
 
     git clone https://github.com/PASSIONLab/OpenEquivariance 
-    pip install -e .[bench] 
     cd OpenEquivariance
+    pip install -e .[bench] 
     python tests/benchmark.py -o outputs/uvu uvu --plot
     python tests/benchmark.py -o outputs/uvw uvw --plot
     python tests/benchmark.py -o outputs/roofline roofline --plot
@@ -71,7 +71,8 @@ List of GPUs Tested
 OpenEquivariance has been tested successfully the following GPUs. Submit a pull 
 request if you'd like to add your own!
 
-- NVIDIA A100-SXM-40GB and A100-SXM-80GB (A. Glover, NERSC Perlmutter)
-- NVIDIA A5000 (V. Bharadwaj, UCB SLICE)
-- AMD MI250x (V. Bharadwaj, OLCF Frontier)
-- AMD MI300x (V. Bharadwaj, AMD Cloud)
+- NVIDIA A100-SXM-40GB and A100-SXM-80GB (A. Glover, NERSC Perlmutter, June 2025)
+- NVIDIA A5000 (V. Bharadwaj, UCB SLICE, June 2025)
+- NVIDIA V100 (V. Bharadwaj, LBNL Einsteinium, June 2025)
+- AMD MI250x (V. Bharadwaj, OLCF Frontier, June 2025)
+- AMD MI300x (V. Bharadwaj, AMD Cloud, February 2025)
