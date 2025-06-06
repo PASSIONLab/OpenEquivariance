@@ -155,7 +155,7 @@ class __attribute__((visibility("default"))) KernelLibrary {
 public:
     int device;
     KernelLibrary(hiprtcProgram &prog, vector<char> &kernel_binary, vector<string> &kernel_names) {
-        hipGetDevice(&device);
+        HIP_ERRCHK(hipGetDevice(&device));
         HIP_ERRCHK(hipModuleLoadData(&library, kernel_binary.data()));
 
         for (size_t i = 0; i < kernel_names.size(); i++) {

@@ -35,9 +35,9 @@ if __name__ == "__main__":
     import openequivariance as oeq
 
     # Use MACE-large to test >64KB shared memory allocation
-    from openequivariance.benchmark.benchmark_configs import mace_problems
+    from openequivariance.benchmark.problems import mace_problems
 
-    problem = mace_problems[0]
+    problem = mace_problems()[0]
 
     local_rank = int(os.environ["LOCAL_RANK"])
     device = f"cuda:{local_rank}"

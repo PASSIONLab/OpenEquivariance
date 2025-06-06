@@ -201,7 +201,7 @@ class LoopUnrollConv(ConvolutionBase):
             global torch
             import torch
 
-            internal_cls = torch.classes.torch_tp_jit.TorchJITConv
+            internal_cls = torch.classes.libtorch_tp_jit.TorchJITConv
         else:
             internal_cls = JITConvImpl
 
@@ -241,7 +241,7 @@ class LoopUnrollConv(ConvolutionBase):
         global torch
         import torch
 
-        @torch._library.register_fake_class("torch_tp_jit::TorchJITConv")
+        @torch._library.register_fake_class("libtorch_tp_jit::TorchJITConv")
         class TorchJITConv:
             def __init__(
                 self,
@@ -281,7 +281,7 @@ class LoopUnrollConv(ConvolutionBase):
                     self.kernel_dims,
                 ) = state
 
-        @torch.library.register_fake("torch_tp_jit::jit_conv_forward")
+        @torch.library.register_fake("libtorch_tp_jit::jit_conv_forward")
         def fake_forward(
             jit, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm
         ):
@@ -289,7 +289,7 @@ class LoopUnrollConv(ConvolutionBase):
                 L1_in.shape[0], jit.wrapped_obj.kernel_dims["L3_dim"]
             )
 
-        @torch.library.register_fake("torch_tp_jit::jit_conv_backward")
+        @torch.library.register_fake("libtorch_tp_jit::jit_conv_backward")
         def fake_backward(
             jit, L1_in, L2_in, W, L3_grad, rows, cols, workspace_buffer, sender_perm
         ):
@@ -297,8 +297,8 @@ class LoopUnrollConv(ConvolutionBase):
 
     @classmethod
     def register_autograd(cls):
-        backward_op = torch.ops.torch_tp_jit.jit_conv_backward
-        double_backward_op = torch.ops.torch_tp_jit.jit_conv_double_backward
+        backward_op = torch.ops.libtorch_tp_jit.jit_conv_backward
+        double_backward_op = torch.ops.libtorch_tp_jit.jit_conv_double_backward
 
         def setup_context(ctx, inputs, output):
             (
@@ -327,7 +327,7 @@ class LoopUnrollConv(ConvolutionBase):
             return None, L1_grad, L2_grad, W_grad, None, None, None, None
 
         torch.library.register_autograd(
-            "torch_tp_jit::jit_conv_forward", backward, setup_context=setup_context
+            "libtorch_tp_jit::jit_conv_forward", backward, setup_context=setup_context
         )
 
         def setup_context_double_backward(ctx, inputs, output):
@@ -372,7 +372,7 @@ class LoopUnrollConv(ConvolutionBase):
             )
 
         torch.library.register_autograd(
-            "torch_tp_jit::jit_conv_backward",
+            "libtorch_tp_jit::jit_conv_backward",
             double_backward,
             setup_context=setup_context_double_backward,
         )

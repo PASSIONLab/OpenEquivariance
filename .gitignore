@@ -16,6 +16,9 @@ experimental/*
 MACE_models/*
 triton_autotuning/*
 sandbox/*
+docs/_build
+docs/_static
+docs/_templates
 
 # bash scripts
 get_gpu_node.sh

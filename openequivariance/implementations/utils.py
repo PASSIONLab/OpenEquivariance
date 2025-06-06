@@ -79,6 +79,10 @@ def filter_and_analyze_problem(problem):
         f"irrep_dtype and weight_dtype must be the same, got {problem.irrep_dtype} and {problem.weight_dtype}"
     )
 
+    assert not problem.internal_weights, (
+        f"Openequivariance does not support internal weights, got {problem.internal_weights}"
+    )
+
     assert len(problem.instructions) > 0, "Tensor product has no valid instructions!"
 
     result = {
@@ -87,13 +91,18 @@ def filter_and_analyze_problem(problem):
     return result
 
 
-def torch_to_oeq_dtype(torch_dtype):
+def torch_to_oeq_dtype(torch_dtype) -> type[np.generic]:
+    """
+    Convenience function; converts a torch datatype to the corresponding
+    numpy datatype for use in TPProblem.
+
+    :param torch_dtype: torch datatype (e.g., torch.float32, torch.float64)
+    :return: numpy datatype (e.g., np.float32, np.float64)
+    """
+
     global torch
     import torch
 
-    """
-    Converts torch dtype to oeq dtype
-    """
     if torch_dtype == torch.float32:
         return np.float32
     elif torch_dtype == torch.float64:

@@ -1,0 +1,1 @@
+sphinx-autobuild -M dirhtml . _build --watch ../openequivariance 

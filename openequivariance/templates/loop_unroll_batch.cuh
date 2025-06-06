@@ -5,7 +5,8 @@
         transpose_load, transpose_store, 
         load_ir_segments, load_ir_segments_force,
         store_ir_segments, declare_smem_variables,
-        set_launch_bound_variables with context %}
+        set_launch_bound_variables, launch_bounds
+        with context%}
 
 {%- from 'loop_unroll_tp.cuh' import 
         generate_segment_kernel_forward, 
@@ -21,8 +22,9 @@ using WEIGHT_T = {{ forward_schedule.weight_dtype_cstr }};
 {{ generate_segment_kernel_forward(i, segment, forward_schedule.launch_config.warp_size) }}
 {%- endfor %}
 
-__global__ void forward(
-        size_t num_products, IRREP_T* L1_in, IRREP_T* L2_in, IRREP_T* L3_out, WEIGHT_T* weights) {
+__global__ void 
+{{ launch_bounds(forward_schedule) }}
+forward(size_t num_products, IRREP_T* L1_in, IRREP_T* L2_in, IRREP_T* L3_out, WEIGHT_T* weights) {
 
     extern __shared__ char s[];
     {{ set_launch_bound_variables(forward_schedule.launch_config) }}
@@ -64,8 +66,9 @@ __global__ void forward(
 {{ generate_segment_kernel_backward(i, segment, backward_schedule.launch_config.warp_size) }}
 {%- endfor %}
 
-__global__ void backward(
-        size_t num_products,
+__global__ void 
+{{ launch_bounds(backward_schedule) }}
+backward(size_t num_products,
         IRREP_T* L1_in, IRREP_T* L1_grad,
         IRREP_T* L2_in, IRREP_T* L2_grad,
         WEIGHT_T* weights, WEIGHT_T* weights_grad,
@@ -142,7 +145,9 @@ __global__ void backward(
 * The double backward kernel involves two passes: one combining three forward calls (A),
 * and the second combining three backward calls (B).
 */
-__global__ void double_backward_A(
+__global__ void 
+{{ launch_bounds(forward_schedule) }}
+double_backward_A(
     size_t num_products,
     IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad, // Inputs of backward op 
     IRREP_T* L1_dgrad, IRREP_T* L2_dgrad, IRREP_T* W_dgrad, // Gradients w.r.t outputs of backward op
@@ -210,7 +215,9 @@ __global__ void double_backward_A(
 {%- endfor %}
 
 {% set schedule = double_backward_schedule %}
-__global__ void double_backward_B(
+__global__ void 
+{{ launch_bounds(double_backward_schedule) }}
+double_backward_B(
         size_t num_products,
         IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad, // Inputs of backward op 
         IRREP_T* L1_dgrad, IRREP_T* L2_dgrad, IRREP_T* W_dgrad, // Gradients w.r.t outputs of backward op

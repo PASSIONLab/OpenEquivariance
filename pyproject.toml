@@ -31,11 +31,16 @@ bench = [
 ]
 
 dev = [
+  "e3nn",
   "pre-commit",
   "ruff",
   "pytest",
   "pytest-check",
-  "torch_geometric"
+  "torch_geometric",
+  "cmake",
+  "furo",
+  "sphinx",
+  "sphinx-autobuild"
 ]
 
 [tool.setuptools.packages.find]
