@@ -104,7 +104,7 @@ def test_compile(tp_and_inputs):
     tp, inputs = tp_and_inputs
     uncompiled_result = tp.forward(*inputs)
 
-    compiled_tp = torch.compile(tp) 
+    compiled_tp = torch.compile(tp)
     compiled_result = compiled_tp(*inputs)
     assert torch.allclose(uncompiled_result, compiled_result, atol=1e-5)
 
