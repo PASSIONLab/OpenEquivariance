@@ -5,9 +5,12 @@
 #include <pybind11/pybind11.h> 
 #include <pybind11/numpy.h>
 
-#include <ATen/cuda/CUDAContext.h>
+#include <ATen/Operators.h>
+#include <torch/all.h>
+#include <torch/library.h>
 
 #ifdef CUDA_BACKEND
+    #include <ATen/cuda/CUDAContext.h>
     #include "backend_cuda.hpp"
     #include "group_mm_cuda.hpp"
     using JITKernel = CUJITKernel;
@@ -15,16 +18,25 @@
 
     template<typename T>
     using GroupMM = GroupMMCUDA<T>; 
+
+    inline Stream get_current_stream() {
+        return c10::cuda::getCurrentCUDAStream(); 
+    }
 #endif
 
 #ifdef HIP_BACKEND
+    #include <c10/hip/HIPStream.h>
     #include "backend_hip.hpp"
     #include "group_mm_hip.hpp"
     using JITKernel = HIPJITKernel;
     using GPU_Allocator = HIP_Allocator;
 
     template<typename T>
-    using GroupMM = GroupMMHIP<T>; 
+    using GroupMM = GroupMMHIP<T>;
+
+    inline Stream get_current_stream() { 
+        return c10::hip::getCurrentHIPStream();  
+    }
 #endif
 
 #include "buffer.hpp"
@@ -34,10 +46,6 @@
 using namespace std;
 namespace py=pybind11;
 
-#include <ATen/Operators.h>
-#include <torch/all.h>
-#include <torch/library.h>
-
 using Map_t=torch::Dict<string, int64_t>;
 
 std::unordered_map<string, int64_t> to_map(const Map_t &map) {
@@ -46,15 +54,6 @@ std::unordered_map<string, int64_t> to_map(const Map_t &map) {
         result[it->key()] = it->value();
     }
     return result;
-}
-
-inline Stream get_current_stream(){
-    #ifdef CUDA_BACKEND
-    return c10::cuda::getCurrentCUDAStream(); 
-    #endif 
-    #ifdef HIP_BACKEND 
-    return c10::hip::getCurrentHIPStream(); 
-    #endif 
 }
 
 inline void* data_ptr(const torch::Tensor &tensor) {
