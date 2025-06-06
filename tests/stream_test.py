@@ -31,27 +31,11 @@ def N():
 
 
 @pytest.fixture
-def X_ir():
-    return o3.Irreps("1x2e")
-
-
-@pytest.fixture
-def Y_ir():
-    return o3.Irreps("1x3e")
-
-
-@pytest.fixture
-def Z_ir():
-    return o3.Irreps("1x2e")
-
-
-@pytest.fixture
-def instructions():
-    return [(0, 0, 0, "uvu", True)]
-
-
-@pytest.fixture
 def tpp(X_ir, Y_ir, Z_ir, instructions):
+    X_ir = o3.Irreps("1x2e")
+    Y_ir = o3.Irreps("1x3e")
+    Z_ir = o3.Irreps("1x2e")
+    instructions = [(0, 0, 0, "uvu", True)]
     return TPProblem(
         X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
     )
@@ -63,37 +47,13 @@ def gen():
 
 
 @pytest.fixture
-def X(N, X_ir, gen):
-    return torch.rand(N, X_ir.dim, device="cuda", generator=gen)
+def X(N, tpp, gen):
+    return torch.rand(N, tpp.irreps_in1.dim, device="cuda", generator=gen)
 
 
 @pytest.fixture
-def X_grad(X):
-    return torch.zeros_like(X)
-
-
-@pytest.fixture
-def Y(N, Y_ir, gen):
-    return torch.rand(N, Y_ir.dim, device="cuda", generator=gen)
-
-
-@pytest.fixture
-def Y_grad(Y):
-    return torch.zeros_like(Y)
-
-
-@pytest.fixture
-def torch_matmul(N):
-    A = torch.empty((N, N), device=cuda).normal_(0.0, 1.0).to(device=cuda)
-    B = torch.empty((N, N), device=cuda).normal_(0.0, 1.0).to(device=cuda)
-    return Executable(torch.matmul, (A, B))
-
-
-@pytest.fixture
-def e3nn_tp(X_ir, Y_ir, Z_ir, instructions):
-    return o3.TensorProduct(
-        X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
-    ).to("cuda")
+def Y(N, tpp, gen):
+    return torch.rand(N, tpp.irreps_in2.dim, device="cuda", generator=gen)
 
 
 @pytest.fixture
@@ -113,7 +73,7 @@ def oeq_tp_bwd(tpp, N, X, Y, gen):
         X.requires_grad_(True)
         Y.requires_grad_(True)
         W.requires_grad_(True)
-        output = tp_oeq(X, Y, W).sum()  # Summing for scalar backward
+        output = tp_oeq(X, Y, W).sum()
         output.backward()
         return output
 
@@ -289,9 +249,7 @@ def test_separate_streams(tmp_path, executable: Executable):
     ) as prof:
         streams = [1, 2]
         for priority in streams:
-            s = torch.cuda.Stream(
-                device=cuda, priority=priority
-            )  # Create a new stream.
+            s = torch.cuda.Stream(device=cuda, priority=priority)
             with torch.cuda.stream(s):
                 with record_function(f"executable_{priority}"):
                     for _ in range(5):
