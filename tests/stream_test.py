@@ -305,7 +305,6 @@ def test_separate_streams(tmp_path, executable: Executable):
 
     relevant_events = []
     for event in trace["traceEvents"]:
-        # print(event)
         if "gpu_user_annotation" == event.get("cat") and "executable_" in event.get(
             "name", ""
         ):
