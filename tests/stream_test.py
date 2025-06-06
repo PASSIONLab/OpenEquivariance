@@ -17,7 +17,6 @@ from openequivariance import TensorProduct, TensorProductConv, TPProblem
 class Executable:
     func: Callable[..., Any]
     buffers: Tuple[torch.Tensor, ...]
-    label: str
 
     def __call__(self) -> Any:
         return self.func(*self.buffers)
@@ -69,20 +68,25 @@ def X(N, X_ir, gen):
 
 
 @pytest.fixture
+def X_grad(X):
+    return torch.zeros_like(X)
+
+
+@pytest.fixture
 def Y(N, Y_ir, gen):
     return torch.rand(N, Y_ir.dim, device="cuda", generator=gen)
 
 
 @pytest.fixture
-def W(N, e3nn_tp, gen):
-    return torch.rand(N, e3nn_tp.weight_numel, device="cuda", generator=gen)
+def Y_grad(Y):
+    return torch.zeros_like(Y)
 
 
 @pytest.fixture
 def torch_matmul(N):
     A = torch.empty((N, N), device=cuda).normal_(0.0, 1.0).to(device=cuda)
     B = torch.empty((N, N), device=cuda).normal_(0.0, 1.0).to(device=cuda)
-    return Executable(torch.matmul, (A, B), "torch_matmul")
+    return Executable(torch.matmul, (A, B))
 
 
 @pytest.fixture
@@ -93,26 +97,78 @@ def e3nn_tp(X_ir, Y_ir, Z_ir, instructions):
 
 
 @pytest.fixture
-def e3nn_tp_exec(e3nn_tp, X, Y, W):
-    return Executable(e3nn_tp, (X, Y, W), "e3nn_tensor_product")
-
-
-@pytest.fixture
-def oeq_tp_exec(tpp, X, Y, W):
+def oeq_tp_fwd(tpp, N, X, Y, gen):
     tp_oeq = TensorProduct(tpp)
-    return Executable(tp_oeq, (X, Y, W), "oeq_tensor_product")
+    W = torch.rand(N, tpp.weight_numel, device="cuda", generator=gen)
+    return Executable(tp_oeq, (X, Y, W))
 
 
 @pytest.fixture
-def oeq_conv_exec(X_ir, Y_ir, tpp, gen):
+def oeq_tp_bwd(tpp, N, X, Y, gen):
+    tp_oeq = TensorProduct(tpp)
+    W = torch.rand(N, tpp.weight_numel, device="cuda", generator=gen)
+
+    # Set up backward-executing callable
+    def backward_fn(X, Y, W):
+        X.requires_grad_(True)
+        Y.requires_grad_(True)
+        W.requires_grad_(True)
+        output = tp_oeq(X, Y, W).sum()  # Summing for scalar backward
+        output.backward()
+        return output
+
+    return Executable(backward_fn, (X, Y, W))
+
+
+@pytest.fixture
+def oeq_tp_double_bwd(tpp, N, X, Y, gen):
+    tp_oeq = TensorProduct(tpp)
+    W = torch.rand(N, tpp.weight_numel, device="cuda", generator=gen)
+
+    def double_backward_fn(X, Y, W):
+        # Forward pass
+        X.requires_grad_(True)
+        Y.requires_grad_(True)
+        W.requires_grad_(True)
+
+        # First forward
+        out = tp_oeq(X, Y, W)
+        out_grad = out.clone().detach().requires_grad_(True)
+
+        # First backward (compute gradients w.r.t inputs)
+        in1_grad, in2_grad, w_grad = torch.autograd.grad(
+            outputs=out,
+            inputs=(X, Y, W),
+            grad_outputs=out_grad,
+            create_graph=True,
+        )
+
+        # Dummy loss to propagate second backward
+        dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
+
+        # Second backward
+        dummy_grad = torch.tensor(1.0, device="cuda")
+        dummy.backward(
+            dummy_grad,
+            retain_graph=True,
+            inputs=(out_grad, X, Y, W),
+        )
+
+        return dummy
+
+    return Executable(double_backward_fn, (X, Y, W))
+
+
+@pytest.fixture
+def oeq_conv_fwd(X_ir, Y_ir, tpp, gen):
     node_ct, nonzero_ct = 3, 4
 
     # Receiver, sender indices for message passing GNN
     edge_index = EdgeIndex(
         [
             [0, 1, 1, 2],  # Receiver
-            [1, 0, 2, 1],
-        ],  # Sender
+            [1, 0, 2, 1],  # Sender
+        ],
         device="cuda",
         dtype=torch.long,
     )
@@ -123,11 +179,105 @@ def oeq_conv_exec(X_ir, Y_ir, tpp, gen):
 
     tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
 
-    return Executable(tp_conv, (X, Y, W, edge_index[0], edge_index[1]), "oeq_conv")
+    return Executable(tp_conv, (X, Y, W, edge_index[0], edge_index[1]))
+
+
+@pytest.fixture
+def oeq_conv_bwd(X_ir, Y_ir, tpp, gen):
+    node_ct, nonzero_ct = 3, 4
+
+    # Receiver, sender indices for message passing GNN
+    edge_index = EdgeIndex(
+        [
+            [0, 1, 1, 2],  # Receiver
+            [1, 0, 2, 1],  # Sender
+        ],
+        device="cuda",
+        dtype=torch.long,
+    )
+
+    X = torch.rand(node_ct, X_ir.dim, device="cuda", generator=gen)
+    Y = torch.rand(nonzero_ct, Y_ir.dim, device="cuda", generator=gen)
+    W = torch.rand(nonzero_ct, tpp.weight_numel, device="cuda", generator=gen)
+
+    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
+
+    # Set up backward-executing callable
+    def backward_fn(X, Y, W, receivers, senders):
+        X.requires_grad_(True)
+        Y.requires_grad_(True)
+        W.requires_grad_(True)
+        output = tp_conv(
+            X, Y, W, receivers, senders
+        ).sum()  # Scalar output for backward
+        output.backward()
+        return output
+
+    return Executable(backward_fn, (X, Y, W, edge_index[0], edge_index[1]))
+
+
+@pytest.fixture
+def oeq_conv_double_bwd(X_ir, Y_ir, tpp, gen):
+    node_ct, nonzero_ct = 3, 4
+
+    # Receiver, sender indices for message passing GNN
+    edge_index = EdgeIndex(
+        [
+            [0, 1, 1, 2],  # Receiver
+            [1, 0, 2, 1],
+        ],
+        device="cuda",
+        dtype=torch.long,
+    )
+
+    X = torch.rand(node_ct, X_ir.dim, device="cuda", generator=gen)
+    Y = torch.rand(nonzero_ct, Y_ir.dim, device="cuda", generator=gen)
+    W = torch.rand(nonzero_ct, tpp.weight_numel, device="cuda", generator=gen)
+
+    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
+
+    def double_backward_fn(X, Y, W, receivers, senders):
+        # First forward pass
+        X.requires_grad_(True)
+        Y.requires_grad_(True)
+        W.requires_grad_(True)
+
+        out = tp_conv(X, Y, W, receivers, senders)
+        out_grad = out.clone().detach().requires_grad_(True)
+
+        # First backward (gradients w.r.t inputs)
+        in1_grad, in2_grad, w_grad = torch.autograd.grad(
+            outputs=out,
+            inputs=(X, Y, W),
+            grad_outputs=out_grad,
+            create_graph=True,
+        )
+
+        # Dummy loss for second backward
+        dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
+
+        # Second backward
+        dummy_grad = torch.tensor(1.0, device="cuda")
+        dummy.backward(
+            dummy_grad,
+            retain_graph=True,
+            inputs=(out_grad, X, Y, W),
+        )
+
+        return dummy
+
+    return Executable(double_backward_fn, (X, Y, W, edge_index[0], edge_index[1]))
 
 
 @pytest.fixture(
-    params=["torch_matmul", "e3nn_tp_exec", "oeq_tp_exec", "oeq_conv_exec"],
+    params=[
+        "oeq_tp_fwd",
+        "oeq_tp_bwd",
+        "oeq_tp_double_bwd",
+        "oeq_conv_fwd",
+        "oeq_conv_bwd",
+        "oeq_conv_double_bwd",
+    ],
 )
 def executable(request):
     yield request.getfixturevalue(request.param)
