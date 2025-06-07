@@ -1,9 +1,12 @@
+# ruff: noqa: E731
 import json
 from dataclasses import dataclass
-from typing import Callable, Tuple, Any
+from typing import Callable, Tuple, Any, NamedTuple
 import logging
 
 import pytest
+from pytest_check import check
+
 import torch
 from torch.profiler import profile, record_function, ProfilerActivity
 
@@ -13,10 +16,19 @@ from torch_geometric import EdgeIndex
 from openequivariance import TensorProduct, TensorProductConv, TPProblem
 
 
+class KernelExpectation(NamedTuple):
+    kernel_name: str
+    expected_appearances: int
+
+
+KE = KernelExpectation
+
+
 @dataclass
 class Executable:
     func: Callable[..., Any]
     buffers: Tuple[torch.Tensor, ...]
+    kernel_expectations: Tuple[KernelExpectation, ...]
 
     def __call__(self) -> Any:
         return self.func(*self.buffers)
@@ -26,12 +38,30 @@ cuda = torch.device("cuda")
 
 
 @pytest.fixture
+def gen():
+    return torch.Generator(device="cuda")
+
+
+@pytest.fixture
 def N():
     return 1000
 
 
 @pytest.fixture
-def tpp(X_ir, Y_ir, Z_ir, instructions):
+def edge_index():
+    return EdgeIndex(
+        data=[
+            [0, 1, 1, 2],  # Receiver
+            [1, 0, 2, 1],  # Sender
+        ],
+        sparse_size=(3, 4),
+        device="cuda",
+        dtype=torch.long,
+    )
+
+
+@pytest.fixture
+def tpp():
     X_ir = o3.Irreps("1x2e")
     Y_ir = o3.Irreps("1x3e")
     Z_ir = o3.Irreps("1x2e")
@@ -42,31 +72,34 @@ def tpp(X_ir, Y_ir, Z_ir, instructions):
 
 
 @pytest.fixture
-def gen():
-    return torch.Generator(device="cuda")
-
-
-@pytest.fixture
-def X(N, tpp, gen):
-    return torch.rand(N, tpp.irreps_in1.dim, device="cuda", generator=gen)
-
-
-@pytest.fixture
-def Y(N, tpp, gen):
-    return torch.rand(N, tpp.irreps_in2.dim, device="cuda", generator=gen)
-
-
-@pytest.fixture
-def oeq_tp_fwd(tpp, N, X, Y, gen):
-    tp_oeq = TensorProduct(tpp)
+def tp_buffers(N, tpp, gen):
+    X = torch.rand(N, tpp.irreps_in1.dim, device="cuda", generator=gen)
+    Y = torch.rand(N, tpp.irreps_in2.dim, device="cuda", generator=gen)
     W = torch.rand(N, tpp.weight_numel, device="cuda", generator=gen)
-    return Executable(tp_oeq, (X, Y, W))
+    return (X, Y, W)
 
 
 @pytest.fixture
-def oeq_tp_bwd(tpp, N, X, Y, gen):
+def conv_buffers(edge_index, tpp, gen):
+    X = torch.rand(
+        edge_index.num_rows, tpp.irreps_in1.dim, device="cuda", generator=gen
+    )
+    Y = torch.rand(
+        edge_index.num_cols, tpp.irreps_in2.dim, device="cuda", generator=gen
+    )
+    W = torch.rand(edge_index.num_cols, tpp.weight_numel, device="cuda", generator=gen)
+    return (X, Y, W, edge_index[0], edge_index[1])
+
+
+@pytest.fixture
+def oeq_tp_fwd(tpp, tp_buffers):
     tp_oeq = TensorProduct(tpp)
-    W = torch.rand(N, tpp.weight_numel, device="cuda", generator=gen)
+    return Executable(tp_oeq, tp_buffers, (KE("forward", 1),))
+
+
+@pytest.fixture
+def oeq_tp_bwd(tpp, tp_buffers):
+    tp_oeq = TensorProduct(tpp)
 
     # Set up backward-executing callable
     def backward_fn(X, Y, W):
@@ -77,13 +110,12 @@ def oeq_tp_bwd(tpp, N, X, Y, gen):
         output.backward()
         return output
 
-    return Executable(backward_fn, (X, Y, W))
+    return Executable(backward_fn, tp_buffers, (KE("forward", 1), KE("backward", 1)))
 
 
 @pytest.fixture
-def oeq_tp_double_bwd(tpp, N, X, Y, gen):
+def oeq_tp_double_bwd(tpp, tp_buffers):
     tp_oeq = TensorProduct(tpp)
-    W = torch.rand(N, tpp.weight_numel, device="cuda", generator=gen)
 
     def double_backward_fn(X, Y, W):
         # Forward pass
@@ -116,50 +148,27 @@ def oeq_tp_double_bwd(tpp, N, X, Y, gen):
 
         return dummy
 
-    return Executable(double_backward_fn, (X, Y, W))
+    return Executable(
+        double_backward_fn,
+        tp_buffers,
+        (
+            KE("forward", 1),
+            KE("backward", 1),
+            KE("double_backward_A", 1),
+            KE("double_backward_B", 1),
+        ),
+    )
 
 
 @pytest.fixture
-def oeq_conv_fwd(X_ir, Y_ir, tpp, gen):
-    node_ct, nonzero_ct = 3, 4
-
-    # Receiver, sender indices for message passing GNN
-    edge_index = EdgeIndex(
-        [
-            [0, 1, 1, 2],  # Receiver
-            [1, 0, 2, 1],  # Sender
-        ],
-        device="cuda",
-        dtype=torch.long,
-    )
-
-    X = torch.rand(node_ct, X_ir.dim, device="cuda", generator=gen)
-    Y = torch.rand(nonzero_ct, Y_ir.dim, device="cuda", generator=gen)
-    W = torch.rand(nonzero_ct, tpp.weight_numel, device="cuda", generator=gen)
-
+def oeq_conv_fwd(tpp, conv_buffers):
     tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
 
-    return Executable(tp_conv, (X, Y, W, edge_index[0], edge_index[1]))
+    return Executable(tp_conv, conv_buffers, (KE("forward", 1), KE("fixup_forward", 1)))
 
 
 @pytest.fixture
-def oeq_conv_bwd(X_ir, Y_ir, tpp, gen):
-    node_ct, nonzero_ct = 3, 4
-
-    # Receiver, sender indices for message passing GNN
-    edge_index = EdgeIndex(
-        [
-            [0, 1, 1, 2],  # Receiver
-            [1, 0, 2, 1],  # Sender
-        ],
-        device="cuda",
-        dtype=torch.long,
-    )
-
-    X = torch.rand(node_ct, X_ir.dim, device="cuda", generator=gen)
-    Y = torch.rand(nonzero_ct, Y_ir.dim, device="cuda", generator=gen)
-    W = torch.rand(nonzero_ct, tpp.weight_numel, device="cuda", generator=gen)
-
+def oeq_conv_bwd(tpp, conv_buffers):
     tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
 
     # Set up backward-executing callable
@@ -173,27 +182,20 @@ def oeq_conv_bwd(X_ir, Y_ir, tpp, gen):
         output.backward()
         return output
 
-    return Executable(backward_fn, (X, Y, W, edge_index[0], edge_index[1]))
+    return Executable(
+        backward_fn,
+        conv_buffers,
+        (
+            KE("forward", 1),
+            KE("fixup_forward", 1),
+            KE("backward", 1),
+            KE("fixup_backward", 1),
+        ),
+    )
 
 
 @pytest.fixture
-def oeq_conv_double_bwd(X_ir, Y_ir, tpp, gen):
-    node_ct, nonzero_ct = 3, 4
-
-    # Receiver, sender indices for message passing GNN
-    edge_index = EdgeIndex(
-        [
-            [0, 1, 1, 2],  # Receiver
-            [1, 0, 2, 1],
-        ],
-        device="cuda",
-        dtype=torch.long,
-    )
-
-    X = torch.rand(node_ct, X_ir.dim, device="cuda", generator=gen)
-    Y = torch.rand(nonzero_ct, Y_ir.dim, device="cuda", generator=gen)
-    W = torch.rand(nonzero_ct, tpp.weight_numel, device="cuda", generator=gen)
-
+def oeq_conv_double_bwd(tpp, conv_buffers):
     tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
 
     def double_backward_fn(X, Y, W, receivers, senders):
@@ -226,7 +228,19 @@ def oeq_conv_double_bwd(X_ir, Y_ir, tpp, gen):
 
         return dummy
 
-    return Executable(double_backward_fn, (X, Y, W, edge_index[0], edge_index[1]))
+    return Executable(
+        double_backward_fn,
+        conv_buffers,
+        (
+            KE("forward", 1),
+            KE("fixup_forward", 2),
+            KE("backward", 1),
+            KE("fixup_backward", 1),
+            KE("double_backward_A", 1),
+            KE("double_backward_B", 1),
+            KE("fixup_double_backwardB", 1),
+        ),
+    )
 
 
 @pytest.fixture(
@@ -243,7 +257,8 @@ def executable(request):
     yield request.getfixturevalue(request.param)
 
 
-def test_separate_streams(tmp_path, executable: Executable):
+def test_separate_streams(request, tmp_path, executable: Executable):
+    COUNT = 5
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True
     ) as prof:
@@ -252,30 +267,44 @@ def test_separate_streams(tmp_path, executable: Executable):
             s = torch.cuda.Stream(device=cuda, priority=priority)
             with torch.cuda.stream(s):
                 with record_function(f"executable_{priority}"):
-                    for _ in range(5):
+                    for _ in range(COUNT):
                         executable()
 
-    prof.export_chrome_trace(str(tmp_path))
+    prof.export_chrome_trace(str(tmp_path / "trace"))
 
     trace = None
-    with open(tmp_path, "r") as f:
+    with open(tmp_path / "trace", "r") as f:
         trace = json.load(f)
 
-    relevant_events = []
+    gpu_annotations = []
     for event in trace["traceEvents"]:
         if "gpu_user_annotation" == event.get("cat") and "executable_" in event.get(
             "name", ""
         ):
-            relevant_events.append(event)
+            gpu_annotations.append(event)
 
-    keys = [e["name"] for e in relevant_events]
-    values = [e["tid"] for e in relevant_events]
+    names = [x["name"] for x in gpu_annotations]
+    tids = [x["tid"] for x in gpu_annotations]
 
     logger = logging.getLogger()
-    logger.debug(msg=keys)
-    logger.debug(msg=values)
+    logger.debug(msg=names)
+    logger.debug(msg=tids)
 
-    assert len(keys) == len(streams)
-    assert len(values) == len(streams)
+    with check:
+        assert len(names) == len(streams)
+        assert len(tids) == len(streams)
+        assert len(set(tids)) == len(set(names)), "The CUDA streams are not unique"
 
-    assert len(set(keys)) == len(set(values)), "The CUDA streams are not unique"
+    for tid in set(tids):
+        for kernel_expectation in executable.kernel_expectations:
+            criteria = (
+                lambda event: (event.get("cat") == "kernel")
+                and (event.get("name", "").startswith(kernel_expectation.kernel_name))
+                and (event.get("tid") == tid)
+            )
+            matching = list(filter(criteria, trace["traceEvents"]))
+            num_matching = len(matching)
+            with check:
+                assert (
+                    num_matching == COUNT * kernel_expectation.expected_appearances
+                ), f"{tid}_{kernel_expectation.kernel_name}"
