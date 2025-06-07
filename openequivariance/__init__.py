@@ -1,6 +1,12 @@
 # ruff: noqa: F401
 import sys
-import openequivariance.extlib
+
+try:
+    import openequivariance.extlib
+except Exception as e:
+    raise ImportError(
+        f"Unable to load OpenEquivariance extension library: {e}"
+    )
 from pathlib import Path
 from importlib.metadata import version
 
