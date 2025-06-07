@@ -8,6 +8,7 @@
 #include <vector>
 
 using namespace std;
+using Stream = cudaStream_t;
 
 #define NVRTC_SAFE_CALL(x)                                      \
 do {                                                            \
