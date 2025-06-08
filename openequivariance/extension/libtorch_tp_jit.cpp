@@ -34,6 +34,8 @@ namespace py=pybind11;
 #include <ATen/Operators.h>
 #include <torch/all.h>
 #include <torch/library.h>
+#include <c10/macros/Macros.h>
+#include <c10/util/Exception.h>
 
 using Map_t=torch::Dict<string, int64_t>;
 
@@ -62,7 +64,10 @@ class __attribute__ ((visibility ("default"))) TorchJITProduct : public torch::C
 public:
     Map_t fwd_dict, bwd_dict, dbl_bwd_dict, kernel_dims;
     JITTPImpl<JITKernel> internal;
-    int64_t L3_dim;
+    const int64_t L1_dim; 
+    const int64_t L2_dim; 
+    const int64_t L3_dim;
+    const int64_t weight_numel; 
     int shared_weights;
     TorchJITProduct(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t dbl_bwd_dict_i, Map_t kernel_dims_i) :
         fwd_dict(fwd_dict_i.copy()),
@@ -75,7 +80,10 @@ public:
                 to_map(dbl_bwd_dict_i),
                 to_map(kernel_dims_i)
             ),
+        L1_dim(kernel_dims.at("L1_dim")),
+        L2_dim(kernel_dims.at("L2_dim")),    
         L3_dim(kernel_dims.at("L3_dim")),
+        weight_numel(kernel_dims.at("weight_numel")),
         shared_weights(kernel_dims.at("shared_weights")) { }
 
     tuple<  tuple<string, string>, 
@@ -112,6 +120,12 @@ public:
         );
     }
 
+    int64_t get_L1_dim() const {
+        return L1_dim;
+    }
+    int64_t get_L2_dim() const {
+        return L2_dim;
+    }
     int64_t get_L3_dim() const {
         return L3_dim;
     }
@@ -123,7 +137,25 @@ torch::Tensor jit_tp_forward(
         const torch::Tensor &L2_in,
         const torch::Tensor &W) {
 
-    int64_t num_batch = L1_in.sizes()[0];
+    int64_t num_batch = L1_in.size(0);
+
+    TORCH_CHECK(L1_in.dim() == 2);
+    TORCH_CHECK(L2_in.dim() == 2); 
+
+    TORCH_CHECK(L1_in.size(0) == L2_in.size(0));
+
+    TORCH_CHECK(L1_in.size(1) == jit_instance->L1_dim);
+    TORCH_CHECK(L2_in.size(1) == jit_instance->L2_dim); 
+
+    if (jit_instance->shared_weights){
+        TORCH_CHECK(W.dim() == 1);
+        TORCH_CHECK(W.size(0) == jit_instance->weight_numel);  
+    } else {
+        TORCH_CHECK(W.dim() == 2);
+        TORCH_CHECK(W.size(0) == L1_in.size(0));
+        TORCH_CHECK(W.size(1) == jit_instance->weight_numel);  
+    }
+
     torch::Tensor L3_out = torch::empty({num_batch, jit_instance->L3_dim}, L1_in.options());
         
     at::Tensor L1_contig = L1_in.contiguous();
@@ -147,12 +179,33 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_backward(
         const torch::Tensor &W, 
         const torch::Tensor &L3_grad) {
 
-    int64_t num_batch = L1_in.sizes()[0];
+    int64_t num_batch = L1_in.size(0);
+    
+    TORCH_CHECK(L1_in.dim() == 2);
+    TORCH_CHECK(L2_in.dim() == 2);
+    TORCH_CHECK(L3_grad.dim() == 2);
+
+    TORCH_CHECK(L1_in.size(0) == L2_in.size(0));
+    TORCH_CHECK(L1_in.size(0) == L3_grad.size(0));
+
+    TORCH_CHECK(L1_in.size(1) == jit_instance->L1_dim);
+    TORCH_CHECK(L2_in.size(1) == jit_instance->L2_dim); 
+    TORCH_CHECK(L3_grad.size(1) == jit_instance->L3_dim); 
+
+    if (jit_instance->shared_weights){
+        TORCH_CHECK(W.dim() == 1);
+        TORCH_CHECK(W.size(0) == jit_instance->weight_numel);  
+    } else {
+        TORCH_CHECK(W.dim() == 2);
+        TORCH_CHECK(W.size(0) == L1_in.size(0));
+        TORCH_CHECK(W.size(1) == jit_instance->weight_numel);  
+    }
+
     torch::Tensor L1_grad = torch::empty(L1_in.sizes(), L1_in.options());
     torch::Tensor L2_grad = torch::empty(L2_in.sizes(), L2_in.options());
     torch::Tensor W_grad = torch::empty(W.sizes(), W.options());
 
-    if(jit_instance->shared_weights == 1) {
+    if(jit_instance->shared_weights) {
         W_grad.zero_();
     } 
 
@@ -182,7 +235,33 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_
         const torch::Tensor &L2_dgrad, 
         const torch::Tensor &W_dgrad) {
 
-    int64_t num_batch = L1_in.sizes()[0]; // Declaring outputs
+    int64_t num_batch = L1_in.size(0); // Declaring outputs
+    
+    TORCH_CHECK(L1_in.dim() == 2);
+    TORCH_CHECK(L2_in.dim() == 2);
+    TORCH_CHECK(L3_grad.dim() == 2);
+    TORCH_CHECK(L1_dgrad.dim() == 2);
+    TORCH_CHECK(L2_dgrad.dim() == 2);
+    
+    TORCH_CHECK(L1_in.size(0) == L2_in.size(0));
+    TORCH_CHECK(L1_in.size(0) == L3_grad.size(0));
+    TORCH_CHECK(L1_in.size(0) == L1_dgrad.size(0));
+    TORCH_CHECK(L1_in.size(0) == L2_dgrad.size(0));
+
+
+    if (jit_instance->shared_weights){
+        TORCH_CHECK(W.dim() == 1);
+        TORCH_CHECK(W_dgrad.dim() == 1); 
+        TORCH_CHECK(W.size(0) == jit_instance->weight_numel);
+        TORCH_CHECK(W_dgrad.size(0) == jit_instance->weight_numel);   
+    } else {
+        TORCH_CHECK(W.dim() == 2);
+        TORCH_CHECK(W.size(0) == L1_in.size(0));
+        TORCH_CHECK(W_dgrad.size(0) == L1_in.size(0));
+        TORCH_CHECK(W.size(1) == jit_instance->weight_numel);  
+        TORCH_CHECK(W_dgrad.size(1) == jit_instance->weight_numel); 
+    }
+
     torch::Tensor L1_grad = torch::empty(L1_in.sizes(), L1_in.options());
     torch::Tensor L2_grad = torch::empty(L2_in.sizes(), L2_in.options());
     torch::Tensor W_grad = torch::empty(W.sizes(), W.options());
@@ -199,6 +278,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_
 
     if(jit_instance->shared_weights == 1) {
         W_grad.zero_();
+        TORCH_CHECK(W.dim() == 1);
     } 
 
     jit_instance->internal.double_backward(
