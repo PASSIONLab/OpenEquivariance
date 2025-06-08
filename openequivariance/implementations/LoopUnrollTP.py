@@ -114,7 +114,10 @@ class LoopUnrollTP(TensorProductBase):
             vars(self.backward_schedule.launch_config),
             vars(self.double_backward_schedule.launch_config),
             {
+                "L1_dim": self.L1.dim,
+                "L2_dim": self.L2.dim,
                 "L3_dim": self.L3.dim,
+                "weight_numel": self.config.weight_numel,
                 "shared_weights": int(self.config.shared_weights),
                 "is_uvw": int(self.is_uvw),
             },
