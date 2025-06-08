@@ -285,9 +285,13 @@ class LoopUnrollConv(ConvolutionBase):
         def fake_forward(
             jit, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm
         ):
-            return L1_in.new_empty(
-                L1_in.shape[0], jit.wrapped_obj.kernel_dims["L3_dim"]
-            )
+            L3_dim = None
+            if hasattr(jit, "wrapped_obj"):
+                L3_dim = jit.wrapped_obj.kernel_dims["L3_dim"]
+            else:
+                L3_dim = jit.get_L3_dim()
+
+            return L1_in.new_empty(L1_in.shape[0], L3_dim)
 
         @torch.library.register_fake("libtorch_tp_jit::jit_conv_backward")
         def fake_backward(
