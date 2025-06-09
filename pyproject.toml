@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "openequivariance"
-version = "0.1.0"
+dynamic = ["version"]
 authors = [
   { name="Austin Glover" },
   { name="Vivek Bharadwaj" },
@@ -63,6 +63,9 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["openequivariance*"]
+
+[tool.setuptools_scm]
+# Presence of this section necessary, even if empty 
 
 [tool.pytest.ini_options]
 addopts = [
