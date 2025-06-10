@@ -10,8 +10,10 @@ and benchmarking utilities. You'll need some additional dependencies to run
 these; we provide instructions below. 
 
 We recommend you clone our repository and use an editable install to run tests
-and benchmarks. You can still test our code with a non-editable install; just 
-download the test folder and install only the dependencies with:
+and benchmarks. 
+
+You can still test our code with a non-editable install; just 
+download the test folder and install the non-editable package and the dependencies with:
 
 .. code-block:: bash
 
