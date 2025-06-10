@@ -17,7 +17,7 @@ dependencies = [
   "ninja",
   "jinja2",
   "numpy",
-  "torch",
+  "torch >= 2.4",
 ]
 readme = "README.md"
 
