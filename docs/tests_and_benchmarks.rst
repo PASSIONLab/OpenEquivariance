@@ -15,8 +15,7 @@ download the test folder and install only the dependencies with:
 
 .. code-block:: bash
 
-    pip install "https://github.com/PASSIONLab/OpenEquivariance[dev]" --only-deps
-    pip install "https://github.com/PASSIONLab/OpenEquivariance[bench]" --only-deps
+    pip install openequivariance[dev,bench]
 
 Correctness
 ------------------------------
