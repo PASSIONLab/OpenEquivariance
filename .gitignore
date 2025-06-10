@@ -7,6 +7,7 @@
 __pycache__
 
 # working folders
+dist
 build
 outputs/*
 visualization/*

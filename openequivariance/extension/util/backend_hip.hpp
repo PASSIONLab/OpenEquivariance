@@ -9,6 +9,7 @@
 #include <memory>
 
 using namespace std;
+using Stream = hipStream_t; 
 
 #define HIPRTC_SAFE_CALL(x)                                     \
 do {                                                            \
