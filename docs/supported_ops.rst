@@ -80,7 +80,8 @@ first visible GPU. On heterogeneous systems, our kernels
 will only execute correctly on devices that share the compute capability 
 of this first device.
 
-We support streams via PyTorch's interface with our CUDA and HIP backends 
+Both CUDA and HIP backends support GPU streams.
+See PyTorch usage details `here <https://docs.pytorch.org/docs/stable/notes/cuda.html#cuda-streams>`_.
 
 Symmetric Contraction (Beta)
 ----------------------------
