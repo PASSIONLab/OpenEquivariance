@@ -14,7 +14,7 @@ TORCH_COMPILE = True
 torch_module, generic_module = None, None
 postprocess_kernel = lambda kernel: kernel  # noqa : E731
 
-LINKED_LIBPYTHON = False 
+LINKED_LIBPYTHON = False
 LINKED_LIBPYTHON_ERROR = None
 try:
     python_lib_dir = sysconfig.get_config_var("LIBDIR")
@@ -55,12 +55,10 @@ else:
     generic_sources = ["generic_module.cpp"]
     torch_sources = ["libtorch_tp_jit.cpp"]
 
-    include_dirs, extra_link_args = (
-        ["util"],
-        []
-    )
+    include_dirs, extra_link_args = (["util"], ["-Wl,--no-as-needed"])
 
     if LINKED_LIBPYTHON:
+        extra_link_args.pop()
         extra_link_args.extend(
             [
                 f"-Wl,--no-as-needed,-rpath,{python_lib_dir}",
