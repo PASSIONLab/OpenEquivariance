@@ -12,7 +12,7 @@ from openequivariance import TPProblem
 
 
 class TensorProductConv(torch.nn.Module, LoopUnrollConv):
-    """
+    r"""
     Given a **symmetric, directed** graph :math:`G = (V, E)`, inputs :math:`x_1...x_{|V|}`,
     :math:`y_1...y_{|E|}`, and weights :math:`W_1...W_{|E|}`, computes
 
@@ -67,7 +67,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
         cols: torch.Tensor,
         sender_perm: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """
+        r"""
         Computes the fused CG tensor product + convolution.
 
         :param X: Tensor of shape ``[|V|, problem.irreps_in1.dim()]``, datatype ``problem.irrep_dtype``.

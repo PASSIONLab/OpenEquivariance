@@ -72,8 +72,9 @@ List of GPUs Tested
 OpenEquivariance has been tested successfully the following GPUs. Submit a pull 
 request if you'd like to add your own!
 
+- NVIDIA V100 (V. Bharadwaj, LBNL Einsteinium, June 2025)
 - NVIDIA A100-SXM-40GB and A100-SXM-80GB (A. Glover, NERSC Perlmutter, June 2025)
 - NVIDIA A5000 (V. Bharadwaj, UCB SLICE, June 2025)
-- NVIDIA V100 (V. Bharadwaj, LBNL Einsteinium, June 2025)
+- NVIDIA H100 (L. Larsen, P1 DTU HPC, June 2025)
 - AMD MI250x (V. Bharadwaj, OLCF Frontier, June 2025)
 - AMD MI300x (V. Bharadwaj, AMD Cloud, February 2025)
