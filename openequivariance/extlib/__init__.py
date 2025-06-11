@@ -31,7 +31,7 @@ try:
     LINKED_LIBPYTHON = True
 
 except Exception as e:
-    LINKED_LIBPYTHON_ERROR = f"Error retrieving libpython:\n{e}\nSysconfig variable list:\n{sysconfig.get_config_vars()}"
+    LINKED_LIBPYTHON_ERROR = f"Error linking libpython:\n{e}\nSysconfig variables:\n{sysconfig.get_config_vars()}"
 
 if not build_ext:
     from openequivariance.extlib.generic_module import (
