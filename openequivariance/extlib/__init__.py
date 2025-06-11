@@ -14,8 +14,8 @@ TORCH_COMPILE = True
 torch_module, generic_module = None, None
 postprocess_kernel = lambda kernel: kernel  # noqa : E731
 
-FOUND_LIBPYTHON = False 
-FOUND_LIBPYTHON_ERROR = None
+LINKED_LIBPYTHON = False 
+LINKED_LIBPYTHON_ERROR = None
 try:
     python_lib_dir = sysconfig.get_config_var("LIBDIR")
     major, minor = sys.version_info.major, sys.version_info.minor
@@ -28,10 +28,10 @@ try:
             f"libpython not found, tried {libpython_so} and {libpython_a}"
         )
 
-    FOUND_LIBPYTHON = True
+    LINKED_LIBPYTHON = True
 
 except Exception as e:
-    FOUND_LIBPYTHON_ERROR = f"Error retrieving libpython:\n{e}\nSysconfig variable list:\n{sysconfig.get_config_vars()}"
+    LINKED_LIBPYTHON_ERROR = f"Error retrieving libpython:\n{e}\nSysconfig variable list:\n{sysconfig.get_config_vars()}"
 
 if not build_ext:
     from openequivariance.extlib.generic_module import (
@@ -60,7 +60,7 @@ else:
         []
     )
 
-    if FOUND_LIBPYTHON:
+    if LINKED_LIBPYTHON:
         extra_link_args.extend(
             [
                 f"-Wl,--no-as-needed,-rpath,{python_lib_dir}",
