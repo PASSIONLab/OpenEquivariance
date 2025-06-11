@@ -10,13 +10,14 @@ and benchmarking utilities. You'll need some additional dependencies to run
 these; we provide instructions below. 
 
 We recommend you clone our repository and use an editable install to run tests
-and benchmarks. You can still test our code with a non-editable install; just 
-download the test folder and install only the dependencies with:
+and benchmarks. 
+
+You can still test our code with a non-editable install; just 
+download the test folder and install the non-editable package and the dependencies with:
 
 .. code-block:: bash
 
-    pip install "https://github.com/PASSIONLab/OpenEquivariance[dev]" --only-deps
-    pip install "https://github.com/PASSIONLab/OpenEquivariance[bench]" --only-deps
+    pip install openequivariance[dev,bench]
 
 Correctness
 ------------------------------
@@ -71,8 +72,9 @@ List of GPUs Tested
 OpenEquivariance has been tested successfully the following GPUs. Submit a pull 
 request if you'd like to add your own!
 
+- NVIDIA V100 (V. Bharadwaj, LBNL Einsteinium, June 2025)
 - NVIDIA A100-SXM-40GB and A100-SXM-80GB (A. Glover, NERSC Perlmutter, June 2025)
 - NVIDIA A5000 (V. Bharadwaj, UCB SLICE, June 2025)
-- NVIDIA V100 (V. Bharadwaj, LBNL Einsteinium, June 2025)
+- NVIDIA H100 (L. Larsen, P1 DTU HPC, June 2025)
 - AMD MI250x (V. Bharadwaj, OLCF Frontier, June 2025)
 - AMD MI300x (V. Bharadwaj, AMD Cloud, February 2025)

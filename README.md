@@ -16,7 +16,7 @@ started, ensure that you have GCC 9+ on your system
 and install our package via
 
 ```bash
-pip install git+https://github.com/PASSIONLab/OpenEquivariance
+pip install openequivariance
 ```
 
 We provide up to an order of magnitude acceleration over e3nn perform on par with the latest
