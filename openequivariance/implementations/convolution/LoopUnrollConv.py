@@ -292,7 +292,7 @@ class LoopUnrollConv(ConvolutionBase):
             if hasattr(jit, "wrapped_obj"):
                 L3_dim = jit.wrapped_obj.kernel_dims["L3_dim"]
             else:
-                L3_dim = jit.L3_dim()
+                L3_dim = jit.L3_dim
 
             return L1_in.new_empty(L1_in.shape[0], L3_dim)
 
