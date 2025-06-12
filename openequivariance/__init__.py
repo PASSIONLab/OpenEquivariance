@@ -41,6 +41,9 @@ def torch_ext_so_path():
     return openequivariance.extlib.torch_module.__file__
 
 
+LINKED_LIBPYTHON = openequivariance.extlib.LINKED_LIBPYTHON
+LINKED_LIBPYTHON_ERROR = openequivariance.extlib.LINKED_LIBPYTHON_ERROR
+
 __all__ = [
     "TPProblem",
     "Irreps",

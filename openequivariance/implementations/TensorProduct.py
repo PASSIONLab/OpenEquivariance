@@ -5,7 +5,7 @@ import torch
 import typing
 
 class TensorProduct(torch.nn.Module, LoopUnrollTP):
-    """
+    r"""
     Drop-in replacement for ``o3.TensorProduct`` from e3nn. Supports forward,
     backward, and double-backward passes using JIT-compiled kernels. Initialization
     fails if:
@@ -33,7 +33,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
     def forward(
         self, x: torch.Tensor, y: torch.Tensor, W: torch.Tensor
     ) -> torch.Tensor:
-        """
+        r"""
         Computes :math:`W (x \otimes_{\\textrm{CG}} y)`, identical to
         ``o3.TensorProduct.forward``.
 

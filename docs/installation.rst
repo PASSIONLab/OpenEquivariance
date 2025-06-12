@@ -17,7 +17,7 @@ Installation is one easy command, followed by import verification:
 
 .. code-block:: bash 
 
-    pip install git+https://github.com/PASSIONLab/OpenEquivariance 
+    pip install openequivariance
     python -c "import openequivariance"
 
 The second line triggers a build of the C++ extension we use to compile
