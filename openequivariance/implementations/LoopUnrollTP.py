@@ -13,7 +13,6 @@ from openequivariance.implementations.utils import (
 
 logger = getLogger()
 
-
 class LoopUnrollTP(TensorProductBase):
     def __init__(self, config, torch_op=True):
         super().__init__(config, torch_op=torch_op)
@@ -122,9 +121,6 @@ class LoopUnrollTP(TensorProductBase):
         logger.info("Kernel compiled!")
 
         logger.info(f"Kernel File Size: {len(self.jit_kernel) // 1024} KB")
-
-        if self.torch_op:
-            self.setup_torch_custom_op()
 
         self.reorder_weights_e3nn_to_oeq = (
             lambda input, output, has_batch_dim: self.forward_schedule.reorder_weights(
