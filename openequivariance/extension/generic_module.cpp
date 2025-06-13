@@ -52,7 +52,8 @@ PYBIND11_MODULE(generic_module, m) {
                         std::unordered_map<string, int64_t>, 
                         std::unordered_map<string, int64_t>, 
                         std::unordered_map<string, int64_t>, 
-                        std::unordered_map<string, int64_t>>());
+                        std::unordered_map<string, int64_t>>())
+        .def("double_backward_rawptrs", &JITConvImpl<JITKernel>::double_backward_rawptrs);
 
     py::class_<GroupMM<float>>(m, "GroupMM_F32")
         .def(py::init<int, int>())
