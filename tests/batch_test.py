@@ -29,8 +29,12 @@ class TPCorrectness:
         return request.param
 
     @pytest.fixture(scope="class")
-    def tp_and_problem(self, problem):
-        tp = TensorProduct(problem)
+    def extra_tp_constructor_args(self):
+        return {}
+
+    @pytest.fixture(scope="class")
+    def tp_and_problem(self, problem, extra_tp_constructor_args):
+        tp = TensorProduct(problem, **extra_tp_constructor_args)
         return tp, problem
 
     def test_tp_fwd(self, tp_and_problem):
@@ -243,3 +247,9 @@ class TestSharedWeights(TPCorrectness):
         problem.irrep_dtype, problem.weight_dtype = dtype, dtype
         problem.shared_weights = True
         return problem
+
+
+class TestTorchbindDisable(TestProductionModels):
+    @pytest.fixture(scope="class")
+    def extra_tp_constructor_args(self):
+        return {"torchbind": False}

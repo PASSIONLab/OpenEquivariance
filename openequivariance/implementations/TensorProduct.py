@@ -20,7 +20,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
 
     def __init__(self, problem: TPProblem, torch_op=True, torchbind=True):
         torch.nn.Module.__init__(self)
-        LoopUnrollTP.__init__(self, problem, torch_op)
+        LoopUnrollTP.__init__(self, problem, torch_op, torchbind)
         self.weight_numel = problem.weight_numel
 
         if not (torchbind and extlib.TORCH_COMPILE):

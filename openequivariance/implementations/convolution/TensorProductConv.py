@@ -53,6 +53,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             torch_op=torch_op,
             deterministic=deterministic,
             kahan=kahan,
+            torchbind=torchbind
         )
 
         self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device="cuda")

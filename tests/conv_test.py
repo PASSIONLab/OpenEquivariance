@@ -40,7 +40,7 @@ class ConvCorrectness:
         # graph = load_graph("data/1drf_radius3.5.pickle")
         return graph
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def extra_conv_constructor_args(self):
         return {}
 
@@ -241,6 +241,6 @@ class TestAtomicSharedWeights(ConvCorrectness):
 
 
 class TestTorchbindDisable(TestProductionModels):
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def extra_conv_constructor_args(self):
         return {"torchbind": False}
