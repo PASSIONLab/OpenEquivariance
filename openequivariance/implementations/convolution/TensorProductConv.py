@@ -293,9 +293,20 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
                 transpose_perm_ptr,
             )
             return [L1_grad, L2_grad, W_grad, L3_dgrad]
-        
-        @double_backward_helper.register_fake 
-        def _(L1_in, L2_in, W, L3_grad, L1_dgrad, L2_dgrad, w_dgrad, rows, cols, transpose_perm=None):
+
+        @double_backward_helper.register_fake
+        def _(
+            L1_in,
+            L2_in,
+            W,
+            L3_grad,
+            L1_dgrad,
+            L2_dgrad,
+            w_dgrad,
+            rows,
+            cols,
+            transpose_perm=None,
+        ):
             return [
                 L1_in.new_empty(*L1_in.shape),
                 L2_in.new_empty(*L2_in.shape),
