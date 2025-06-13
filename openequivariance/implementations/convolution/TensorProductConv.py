@@ -272,10 +272,10 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
                                     rows: torch.Tensor,
                                     cols: torch.Tensor,
                                     transpose_perm: Optional[torch.Tensor] = None) -> List[torch.Tensor]:
-            L1_grad = L1_in.new_zeros()
-            L2_grad = L2_in.new_empty() 
-            W_grad = W.new_empty()
-            L3_dgrad = L3_grad.new_zeros()
+            L1_grad = torch.zeros_like(L1_in)
+            L2_grad = torch.empty_like(L2_in)
+            W_grad = torch.empty_like(W)
+            L3_dgrad = torch.zeros_like(L3_grad)
 
             if self.config.shared_weights:
                 W_grad[:] = 0.0
