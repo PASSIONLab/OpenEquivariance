@@ -30,11 +30,9 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
     :param problem: Specification of the tensor product.
     :param deterministic: if ``False``, uses atomics for the convolution. If ``True``, uses a deterministic
            fixup-based algorithm. `Default`: ``False``.
-    :param kahan: if ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
+    :param kahan: If ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
            the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
-    :param torchbind: If True, uses TorchBind for internal class representations.
-                      Otherwise, uses opaque custom ops which cannot compose with JITScript / AOTI.
-                      `Default`: ``True``.
+    :param use_opaque: If ``True, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``. 
     """
 
     def __init__(
@@ -43,7 +41,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
         deterministic: bool = False,
         kahan: bool = False,
         torch_op=True,
-        torchbind=True
+        use_opaque: bool = False,
     ):
         torch.nn.Module.__init__(self)
         LoopUnrollConv.__init__(
@@ -52,15 +50,15 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             idx_dtype=np.int64,
             torch_op=torch_op,
             deterministic=deterministic,
-            kahan=kahan,
-            torchbind=torchbind
+            kahan=kahan
         )
 
         self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device="cuda")
         self.weight_numel = self.config.weight_numel
+        self._setup_notorchbind()
 
-        if not (torchbind and extlib.TORCH_COMPILE):
-            self._setup_notorchbind()
+        if (not extlib.TORCH_COMPILE) or use_opaque:
+            self.forward = self.forward_opaque
 
 
     def forward(
@@ -161,7 +159,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
         def _(L1_in, L2_in, weights, rows, cols, transpose_perm):
             return L1_in.new_empty(L1_in.shape[0], self.L3.dim)
 
-        self.forward = forward
+        self.forward_opaque = forward
 
         @torch.library.custom_op(
             f"openequivariance::conv_backward{self.conv_id}",
@@ -236,7 +234,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             )
             return result[0], result[1], result[2], None, None, None
 
-        self.forward.register_autograd(backward, setup_context=setup_context)
+        self.forward_opaque.register_autograd(backward, setup_context=setup_context)
 
         def setup_context_double_backward(ctx, inputs, output):
             (

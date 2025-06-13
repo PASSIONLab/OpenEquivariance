@@ -14,17 +14,17 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
     * The provided tensor product specification is unsupported.
 
     :param problem: Specification of the tensor product.
-    :param torchbind: If True, uses TorchBind for internal class representations.
-                      Otherwise, uses opaque custom ops which cannot compose with JITScript / AOTI.
+    :param use_opaque: If ``True, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``. 
     """
 
-    def __init__(self, problem: TPProblem, torch_op=True, torchbind=True):
+    def __init__(self, problem: TPProblem, torch_op=True, use_opaque=False):
         torch.nn.Module.__init__(self)
-        LoopUnrollTP.__init__(self, problem, torch_op, torchbind)
+        LoopUnrollTP.__init__(self, problem, torch_op)
         self.weight_numel = problem.weight_numel
 
-        if not (torchbind and extlib.TORCH_COMPILE):
-            self._setup_notorchbind()
+        self._setup_notorchbind()
+        if (not extlib.TORCH_COMPILE) or use_opaque:
+            self.forward = self.forward_opaque
 
     @staticmethod
     def name():
@@ -85,7 +85,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
         def _(L1_in, L2_in, weights):
             return L1_in.new_empty(L1_in.shape[0], self.L3.dim)
 
-        self.forward = forward
+        self.forward_opaque = forward
 
         # ---------------- Backward pass -----------------
         @torch.library.custom_op(
@@ -134,7 +134,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
             result = backward_helper(ctx.L1_in, ctx.L2_in, ctx.weights, grad_output)
             return result[0], result[1], result[2]
 
-        self.forward.register_autograd(backward, setup_context=setup_context)
+        self.forward_opaque.register_autograd(backward, setup_context=setup_context)
 
         def setup_context_double_backward(ctx, inputs, output):
             ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad = inputs

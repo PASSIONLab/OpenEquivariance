@@ -243,4 +243,4 @@ class TestAtomicSharedWeights(ConvCorrectness):
 class TestTorchbindDisable(TestProductionModels):
     @pytest.fixture(scope="class")
     def extra_conv_constructor_args(self):
-        return {"torchbind": False}
+        return {"use_opaque": True}

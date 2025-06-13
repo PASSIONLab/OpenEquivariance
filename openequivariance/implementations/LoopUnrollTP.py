@@ -14,9 +14,8 @@ from openequivariance.implementations.utils import (
 logger = getLogger()
 
 class LoopUnrollTP(TensorProductBase):
-    def __init__(self, config, torch_op=True, torchbind=True):
+    def __init__(self, config, torch_op=True):
         super().__init__(config, torch_op=torch_op)
-        self.torchbind = torchbind
 
         env = get_jinja_environment()
         template = env.get_template("loop_unroll_batch.cuh")
@@ -99,7 +98,7 @@ class LoopUnrollTP(TensorProductBase):
         #    f.write(self.jit_kernel)
 
         internal_cls = None
-        if self.torch_op and extlib.TORCH_COMPILE and torchbind:
+        if self.torch_op and extlib.TORCH_COMPILE: 
             global torch
             import torch
 

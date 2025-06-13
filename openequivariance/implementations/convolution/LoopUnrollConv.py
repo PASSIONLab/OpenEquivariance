@@ -24,11 +24,9 @@ class LoopUnrollConv(ConvolutionBase):
         idx_dtype=np.int64,
         torch_op=False,
         deterministic=False,
-        kahan=False,
-        torchbind=True
+        kahan=False
     ):
         super().__init__(config, idx_dtype, torch_op, deterministic)
-        self.torchbind = torchbind
 
         if kahan:
             assert deterministic
@@ -195,7 +193,7 @@ class LoopUnrollConv(ConvolutionBase):
         )
         self.jit_kernel = postprocess_kernel(self.jit_kernel)
 
-        if self.torch_op and extlib.TORCH_COMPILE and torchbind:
+        if self.torch_op and extlib.TORCH_COMPILE: 
             global torch
             import torch
 

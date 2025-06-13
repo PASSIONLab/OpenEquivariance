@@ -252,4 +252,4 @@ class TestSharedWeights(TPCorrectness):
 class TestTorchbindDisable(TestProductionModels):
     @pytest.fixture(scope="class")
     def extra_tp_constructor_args(self):
-        return {"torchbind": False}
+        return {"use_opaque": True}
