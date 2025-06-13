@@ -34,6 +34,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
            the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
     :param torchbind: If True, uses TorchBind for internal class representations.
                       Otherwise, uses opaque custom ops which cannot compose with JITScript / AOTI.
+                      `Default`: ``True``.
     """
 
     def __init__(
@@ -253,15 +254,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             device_types="cuda",
         )
 
-        #void double_backward_rawptrs(
-        #        uint64_t L1_in, uint64_t L2_in, uint64_t W, uint64_t L3_grad,
-        #        uint64_t L1_dgrad, uint64_t L2_dgrad, uint64_t w_dgrad,
-        #        uint64_t L1_grad, uint64_t L2_grad, uint64_t W_grad, uint64_t L3_dgrad,
-        #        uint64_t rows, uint64_t cols,
-        #        uint64_t nnz, uint64_t node_count,
-        #        uint64_t wspace, uint64_t transpose_perm) {
-
-        # Function below calls double_backward_rawptrs
         def double_backward_helper( L1_in: torch.Tensor, 
                                     L2_in: torch.Tensor, 
                                     W: torch.Tensor, 

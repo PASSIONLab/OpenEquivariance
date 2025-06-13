@@ -10,7 +10,7 @@ from distutils import sysconfig
 oeq_root = str(Path(__file__).parent.parent)
 
 build_ext = True
-TORCH_COMPILE = False 
+TORCH_COMPILE = True 
 torch_module, generic_module = None, None
 postprocess_kernel = lambda kernel: kernel  # noqa : E731
 
