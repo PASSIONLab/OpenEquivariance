@@ -17,6 +17,7 @@ from openequivariance.benchmark.logging_utils import getLogger
 
 logger = getLogger()
 
+
 class LoopUnrollConv(ConvolutionBase):
     def __init__(
         self,
@@ -24,7 +25,7 @@ class LoopUnrollConv(ConvolutionBase):
         idx_dtype=np.int64,
         torch_op=False,
         deterministic=False,
-        kahan=False
+        kahan=False,
     ):
         super().__init__(config, idx_dtype, torch_op, deterministic)
 
@@ -193,7 +194,7 @@ class LoopUnrollConv(ConvolutionBase):
         )
         self.jit_kernel = postprocess_kernel(self.jit_kernel)
 
-        if self.torch_op and extlib.TORCH_COMPILE: 
+        if self.torch_op and extlib.TORCH_COMPILE:
             global torch
             import torch
 

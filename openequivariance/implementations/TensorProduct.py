@@ -4,6 +4,7 @@ from openequivariance import extlib
 import torch
 import typing
 
+
 class TensorProduct(torch.nn.Module, LoopUnrollTP):
     r"""
     Drop-in replacement for ``o3.TensorProduct`` from e3nn. Supports forward,
@@ -14,7 +15,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
     * The provided tensor product specification is unsupported.
 
     :param problem: Specification of the tensor product.
-    :param use_opaque: If ``True, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``. 
+    :param use_opaque: If ``True, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``.
     """
 
     def __init__(self, problem: TPProblem, torch_op=True, use_opaque=False):
@@ -49,13 +50,13 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
         :return: Tensor of shape ``[batch_size, problem.irreps_out.dim()]``, datatype ``problem.irrep_dtype``.
         """
         return torch.ops.libtorch_tp_jit.jit_tp_forward(self.internal, x, y, W)
-    
 
     def _setup_notorchbind(self):
-        '''
-        In case TorchBind is not available (e.g. for torch.compile below PT2.8, etc.), 
+        """
+        In case TorchBind is not available (e.g. for torch.compile below PT2.8, etc.),
         set up operations using custom ops.
-        '''
+        """
+
         @torch.library.custom_op(
             f"openequivariance::tp_forward{self.tp_id}",
             mutates_args=(),
@@ -146,7 +147,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
             op1 = backward_helper(E, F, D, C)
             op2 = backward_helper(A, B, G, C)
             op3 = forward(E, B, D)
-            op4 = backward_helper(E, B, D, C)  
+            op4 = backward_helper(E, B, D, C)
             op5 = backward_helper(A, F, D, C)
             op6 = forward(A, F, D)
             op7 = forward(A, B, G)

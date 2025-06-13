@@ -1,7 +1,5 @@
-import typing
 import numpy as np
 
-import openequivariance.extlib as extlib
 from openequivariance.extlib import DeviceBuffer, GPUTimer
 
 from openequivariance.implementations.e3nn_lite import TPProblem, wigner_3j

@@ -1,7 +1,5 @@
 import copy
-import typing
 import numpy as np
-from openequivariance import extlib
 from openequivariance.extlib import DeviceBuffer, GPUTimer
 from openequivariance.benchmark.random_buffer_utils import (
     get_random_buffers_forward_conv,

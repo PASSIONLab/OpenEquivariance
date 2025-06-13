@@ -13,6 +13,7 @@ from openequivariance.implementations.utils import (
 
 logger = getLogger()
 
+
 class LoopUnrollTP(TensorProductBase):
     def __init__(self, config, torch_op=True):
         super().__init__(config, torch_op=torch_op)
@@ -98,7 +99,7 @@ class LoopUnrollTP(TensorProductBase):
         #    f.write(self.jit_kernel)
 
         internal_cls = None
-        if self.torch_op and extlib.TORCH_COMPILE: 
+        if self.torch_op and extlib.TORCH_COMPILE:
             global torch
             import torch
 

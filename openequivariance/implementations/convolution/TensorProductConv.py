@@ -1,5 +1,4 @@
 from typing import Optional, List
-import types
 
 import numpy as np
 import torch
@@ -32,7 +31,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
            fixup-based algorithm. `Default`: ``False``.
     :param kahan: If ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
            the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
-    :param use_opaque: If ``True, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``. 
+    :param use_opaque: If ``True, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``.
     """
 
     def __init__(
@@ -50,7 +49,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             idx_dtype=np.int64,
             torch_op=torch_op,
             deterministic=deterministic,
-            kahan=kahan
+            kahan=kahan,
         )
 
         self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device="cuda")
@@ -59,7 +58,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 
         if (not extlib.TORCH_COMPILE) or use_opaque:
             self.forward = self.forward_opaque
-
 
     def forward(
         self,
@@ -116,7 +114,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
     @staticmethod
     def name():
         return LoopUnrollConv.name()
-
 
     def _setup_notorchbind(self):
         @torch.library.custom_op(
@@ -184,7 +181,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 
             transpose_perm_ptr = 0
             if transpose_perm is not None:
-                transpose_perm_ptr = transpose_perm.data_ptr() 
+                transpose_perm_ptr = transpose_perm.data_ptr()
 
             self.internal.backward_rawptrs(
                 L1_in.contiguous().data_ptr(),
@@ -252,17 +249,18 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             mutates_args=(),
             device_types="cuda",
         )
-
-        def double_backward_helper( L1_in: torch.Tensor, 
-                                    L2_in: torch.Tensor, 
-                                    W: torch.Tensor, 
-                                    L3_grad: torch.Tensor, 
-                                    L1_dgrad: torch.Tensor, 
-                                    L2_dgrad: torch.Tensor, 
-                                    w_dgrad: torch.Tensor,
-                                    rows: torch.Tensor,
-                                    cols: torch.Tensor,
-                                    transpose_perm: Optional[torch.Tensor] = None) -> List[torch.Tensor]:
+        def double_backward_helper(
+            L1_in: torch.Tensor,
+            L2_in: torch.Tensor,
+            W: torch.Tensor,
+            L3_grad: torch.Tensor,
+            L1_dgrad: torch.Tensor,
+            L2_dgrad: torch.Tensor,
+            w_dgrad: torch.Tensor,
+            rows: torch.Tensor,
+            cols: torch.Tensor,
+            transpose_perm: Optional[torch.Tensor] = None,
+        ) -> List[torch.Tensor]:
             L1_grad = torch.zeros_like(L1_in)
             L2_grad = torch.empty_like(L2_in)
             W_grad = torch.empty_like(W)
@@ -273,7 +271,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 
             transpose_perm_ptr = 0
             if transpose_perm is not None:
-                transpose_perm_ptr = transpose_perm.data_ptr() 
+                transpose_perm_ptr = transpose_perm.data_ptr()
 
             self.internal.double_backward_rawptrs(
                 L1_in.contiguous().data_ptr(),
@@ -296,7 +294,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             )
             return [L1_grad, L2_grad, W_grad, L3_dgrad]
 
-
         def double_backward(ctx, grad_output):
             L1_dgrad, L2_dgrad, w_dgrad = grad_output[0], grad_output[1], grad_output[2]
 
@@ -310,7 +307,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
                 w_dgrad,
                 ctx.rows,
                 ctx.cols,
-                ctx.transpose_perm
+                ctx.transpose_perm,
             )
 
             if ctx.transpose_perm is None:

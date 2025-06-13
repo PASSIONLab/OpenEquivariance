@@ -47,20 +47,24 @@ class ConvCorrectness:
     @pytest.fixture(params=["atomic", "deterministic", "kahan"], scope="class")
     def conv_object(self, request, problem, extra_conv_constructor_args):
         if request.param == "atomic":
-            return oeq.TensorProductConv(problem, deterministic=False,
-                                         **extra_conv_constructor_args)
+            return oeq.TensorProductConv(
+                problem, deterministic=False, **extra_conv_constructor_args
+            )
         elif request.param == "deterministic":
             if not problem.shared_weights:
-                return oeq.TensorProductConv(problem, deterministic=True,
-                                             **extra_conv_constructor_args)
+                return oeq.TensorProductConv(
+                    problem, deterministic=True, **extra_conv_constructor_args
+                )
             else:
                 pytest.skip("Shared weights not supported with deterministic")
         elif request.param == "kahan":
             if problem.irrep_dtype == np.float32:
                 if not problem.shared_weights:
                     return oeq.TensorProductConv(
-                        problem, deterministic=True, kahan=True,
-                        **extra_conv_constructor_args
+                        problem,
+                        deterministic=True,
+                        kahan=True,
+                        **extra_conv_constructor_args,
                     )
                 else:
                     pytest.skip("Shared weights not supported with kahan")
