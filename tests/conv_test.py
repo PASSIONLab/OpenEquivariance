@@ -40,20 +40,31 @@ class ConvCorrectness:
         # graph = load_graph("data/1drf_radius3.5.pickle")
         return graph
 
+    @pytest.fixture(scope="class")
+    def extra_conv_constructor_args(self):
+        return {}
+
     @pytest.fixture(params=["atomic", "deterministic", "kahan"], scope="class")
-    def conv_object(self, request, problem):
+    def conv_object(self, request, problem, extra_conv_constructor_args):
         if request.param == "atomic":
-            return oeq.TensorProductConv(problem, deterministic=False)
+            return oeq.TensorProductConv(
+                problem, deterministic=False, **extra_conv_constructor_args
+            )
         elif request.param == "deterministic":
             if not problem.shared_weights:
-                return oeq.TensorProductConv(problem, deterministic=True)
+                return oeq.TensorProductConv(
+                    problem, deterministic=True, **extra_conv_constructor_args
+                )
             else:
                 pytest.skip("Shared weights not supported with deterministic")
         elif request.param == "kahan":
             if problem.irrep_dtype == np.float32:
                 if not problem.shared_weights:
                     return oeq.TensorProductConv(
-                        problem, deterministic=True, kahan=True
+                        problem,
+                        deterministic=True,
+                        kahan=True,
+                        **extra_conv_constructor_args,
                     )
                 else:
                     pytest.skip("Shared weights not supported with kahan")
@@ -231,3 +242,9 @@ class TestAtomicSharedWeights(ConvCorrectness):
     @pytest.fixture(scope="class")
     def conv_object(self, request, problem):
         return oeq.TensorProductConv(problem, deterministic=False)
+
+
+class TestTorchbindDisable(TestProductionModels):
+    @pytest.fixture(scope="class")
+    def extra_conv_constructor_args(self):
+        return {"use_opaque": True}

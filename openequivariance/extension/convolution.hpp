@@ -46,7 +46,7 @@ public:
             nnz,
             node_count,
             reinterpret_cast<void*>(workspace),
-            0 // Null aka Default Stream
+            0 // Default Stream
             );
     }
 
@@ -83,7 +83,7 @@ public:
             node_count,
             reinterpret_cast<void*>(workspace),
             reinterpret_cast<void*>(inverse_perm),
-            0 // Null aka Default Stream
+            0 // Default Stream
             );
     }
 
@@ -260,6 +260,36 @@ public:
             fixup_config.smem = 0; fixup_config.hStream = stream; 
             jit.execute(6, fixup_args, fixup_config);
         }
+    }
+
+    void double_backward_rawptrs(
+            uint64_t L1_in, uint64_t L2_in, uint64_t W, uint64_t L3_grad,
+            uint64_t L1_dgrad, uint64_t L2_dgrad, uint64_t w_dgrad,
+            uint64_t L1_grad, uint64_t L2_grad, uint64_t W_grad, uint64_t L3_dgrad,
+            uint64_t rows, uint64_t cols,
+            uint64_t nnz, uint64_t node_count,
+            uint64_t wspace, uint64_t transpose_perm) {
+
+        double_backward(
+            reinterpret_cast<void*>(L1_in),
+            reinterpret_cast<void*>(L2_in),
+            reinterpret_cast<void*>(W),
+            reinterpret_cast<void*>(L3_grad),
+            reinterpret_cast<void*>(L1_dgrad),
+            reinterpret_cast<void*>(L2_dgrad),
+            reinterpret_cast<void*>(w_dgrad),
+            reinterpret_cast<void*>(L1_grad),
+            reinterpret_cast<void*>(L2_grad),
+            reinterpret_cast<void*>(W_grad),
+            reinterpret_cast<void*>(L3_dgrad),
+            reinterpret_cast<void*>(rows),
+            reinterpret_cast<void*>(cols),
+            nnz,
+            node_count,
+            reinterpret_cast<void*>(wspace),
+            reinterpret_cast<void*>(transpose_perm),
+            0
+        );
     }
 
     ~JITConvImpl() = default; 

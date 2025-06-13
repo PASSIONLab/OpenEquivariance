@@ -1,6 +1,8 @@
 from openequivariance.implementations.LoopUnrollTP import LoopUnrollTP
 from openequivariance import TPProblem
+from openequivariance import extlib
 import torch
+import typing
 
 
 class TensorProduct(torch.nn.Module, LoopUnrollTP):
@@ -13,12 +15,17 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
     * The provided tensor product specification is unsupported.
 
     :param problem: Specification of the tensor product.
+    :param use_opaque: If ``True, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``.
     """
 
-    def __init__(self, problem: TPProblem, torch_op=True):
+    def __init__(self, problem: TPProblem, torch_op=True, use_opaque=False):
         torch.nn.Module.__init__(self)
         LoopUnrollTP.__init__(self, problem, torch_op)
         self.weight_numel = problem.weight_numel
+
+        self._setup_notorchbind()
+        if (not extlib.TORCH_COMPILE) or use_opaque:
+            self.forward = self.forward_opaque
 
     @staticmethod
     def name():
@@ -43,3 +50,115 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
         :return: Tensor of shape ``[batch_size, problem.irreps_out.dim()]``, datatype ``problem.irrep_dtype``.
         """
         return torch.ops.libtorch_tp_jit.jit_tp_forward(self.internal, x, y, W)
+
+    def _setup_notorchbind(self):
+        """
+        In case TorchBind is not available (e.g. for torch.compile below PT2.8, etc.),
+        set up operations using custom ops.
+        """
+
+        @torch.library.custom_op(
+            f"openequivariance::tp_forward{self.tp_id}",
+            mutates_args=(),
+            device_types="cuda",
+        )
+        def forward(
+            L1_in: torch.Tensor, L2_in: torch.Tensor, weights: torch.Tensor
+        ) -> torch.Tensor:
+            L1_in_c, L2_in_c, weights_c = (
+                L1_in.contiguous(),
+                L2_in.contiguous(),
+                weights.contiguous(),
+            )
+            L3_out = torch.empty(
+                (L1_in_c.shape[0], self.L3.dim), dtype=L1_in.dtype, device="cuda"
+            )
+            self.forward_raw(
+                L1_in_c.shape[0],
+                L1_in_c.data_ptr(),
+                L2_in_c.data_ptr(),
+                L3_out.data_ptr(),
+                weights_c.data_ptr(),
+            )
+            return L3_out
+
+        @forward.register_fake
+        def _(L1_in, L2_in, weights):
+            return L1_in.new_empty(L1_in.shape[0], self.L3.dim)
+
+        self.forward_opaque = forward
+
+        # ---------------- Backward pass -----------------
+        @torch.library.custom_op(
+            f"openequivariance::tp_grad_helper{self.tp_id}",
+            mutates_args=(),
+            device_types="cuda",
+        )
+        def backward_helper(
+            L1_in: torch.Tensor,
+            L2_in: torch.Tensor,
+            weights: torch.Tensor,
+            L3_grad: torch.Tensor,
+        ) -> typing.List[torch.Tensor]:
+            L1_grad = torch.empty_like(L1_in)
+            L2_grad = torch.empty_like(L2_in)
+            weights_grad = torch.empty_like(weights)
+
+            if self.config.shared_weights:
+                weights_grad[:] = 0.0
+
+            self.backward_raw(
+                L1_in.shape[0],
+                L1_in.contiguous().data_ptr(),
+                L1_grad.data_ptr(),
+                L2_in.contiguous().data_ptr(),
+                L2_grad.data_ptr(),
+                weights.contiguous().data_ptr(),
+                weights_grad.data_ptr(),
+                L3_grad.contiguous().data_ptr(),
+            )
+
+            return [L1_grad, L2_grad, weights_grad]
+
+        @backward_helper.register_fake
+        def _(L1_in, L2_in, weights, L3_grad):
+            return [
+                L1_in.new_empty(*L1_in.shape),
+                L2_in.new_empty(*L2_in.shape),
+                weights.new_empty(*weights.shape),
+            ]
+
+        def setup_context(ctx, inputs, output):
+            ctx.L1_in, ctx.L2_in, ctx.weights = inputs
+
+        def backward(ctx, grad_output):
+            result = backward_helper(ctx.L1_in, ctx.L2_in, ctx.weights, grad_output)
+            return result[0], result[1], result[2]
+
+        self.forward_opaque.register_autograd(backward, setup_context=setup_context)
+
+        def setup_context_double_backward(ctx, inputs, output):
+            ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad = inputs
+
+        def double_backward(ctx, grad_output):
+            A, B, C, D = ctx.L1_in, ctx.L2_in, ctx.L3_grad, ctx.weights
+            E, F, G = grad_output[0], grad_output[1], grad_output[2]
+
+            op1 = backward_helper(E, F, D, C)
+            op2 = backward_helper(A, B, G, C)
+            op3 = forward(E, B, D)
+            op4 = backward_helper(E, B, D, C)
+            op5 = backward_helper(A, F, D, C)
+            op6 = forward(A, F, D)
+            op7 = forward(A, B, G)
+
+            return (
+                op1[0] + op2[0],
+                op1[1] + op2[1],
+                (op4[2] + op5[2]),
+                (op3 + op6 + op7),
+            )
+
+        backward_helper.register_autograd(
+            double_backward, setup_context=setup_context_double_backward
+        )

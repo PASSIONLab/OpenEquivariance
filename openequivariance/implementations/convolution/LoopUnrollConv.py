@@ -132,9 +132,6 @@ class LoopUnrollConv(ConvolutionBase):
 
         idx_type_map = {np.int32: "int", np.int64: "long"}
 
-        if self.torch_op:
-            self.setup_torch_module()
-
         self.forward_workspace_offset = None
         self.backward_workspace_offset = None
         self.double_backwardB_offset = None

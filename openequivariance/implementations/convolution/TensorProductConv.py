@@ -1,5 +1,4 @@
-from typing import Optional
-import types
+from typing import Optional, List
 
 import numpy as np
 import torch
@@ -30,9 +29,9 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
     :param problem: Specification of the tensor product.
     :param deterministic: if ``False``, uses atomics for the convolution. If ``True``, uses a deterministic
            fixup-based algorithm. `Default`: ``False``.
-    :param kahan: if ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
+    :param kahan: If ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
            the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
-
+    :param use_opaque: If ``True, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``.
     """
 
     def __init__(
@@ -41,6 +40,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
         deterministic: bool = False,
         kahan: bool = False,
         torch_op=True,
+        use_opaque: bool = False,
     ):
         torch.nn.Module.__init__(self)
         LoopUnrollConv.__init__(
@@ -54,9 +54,10 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 
         self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device="cuda")
         self.weight_numel = self.config.weight_numel
+        self._setup_notorchbind()
 
-        if not extlib.TORCH_COMPILE:
-            self.forward = types.MethodType(LoopUnrollConv.forward, self)
+        if (not extlib.TORCH_COMPILE) or use_opaque:
+            self.forward = self.forward_opaque
 
     def forward(
         self,
@@ -113,6 +114,230 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
     @staticmethod
     def name():
         return LoopUnrollConv.name()
+
+    def _setup_notorchbind(self):
+        @torch.library.custom_op(
+            f"openequivariance::conv_forward{self.conv_id}",
+            mutates_args=(),
+            device_types="cuda",
+        )
+        def forward(
+            L1_in: torch.Tensor,
+            L2_in: torch.Tensor,
+            weights: torch.Tensor,
+            rows: torch.Tensor,
+            cols: torch.Tensor,
+            transpose_perm: Optional[torch.Tensor] = None,
+        ) -> torch.Tensor:
+            L1_in_c, L2_in_c, weights_c = (
+                L1_in.contiguous(),
+                L2_in.contiguous(),
+                weights.contiguous(),
+            )
+            L3_out = torch.zeros(
+                (L1_in_c.shape[0], self.L3.dim), dtype=L1_in.dtype, device="cuda"
+            )
+
+            self.internal.exec_conv_rawptrs(
+                L1_in_c.data_ptr(),
+                L2_in_c.data_ptr(),
+                weights_c.data_ptr(),
+                L3_out.data_ptr(),
+                rows.contiguous().data_ptr(),
+                cols.contiguous().data_ptr(),
+                rows.shape[0],
+                L1_in.shape[0],
+                self.workspace_ptr,
+            )
+
+            return L3_out
+
+        @forward.register_fake
+        def _(L1_in, L2_in, weights, rows, cols, transpose_perm=None):
+            return L1_in.new_empty(L1_in.shape[0], self.L3.dim)
+
+        self.forward_opaque = forward
+
+        @torch.library.custom_op(
+            f"openequivariance::conv_backward{self.conv_id}",
+            mutates_args=(),
+            device_types="cuda",
+        )
+        def backward_helper(
+            L1_in: torch.Tensor,
+            L2_in: torch.Tensor,
+            weights: torch.Tensor,
+            L3_grad: torch.Tensor,
+            rows: torch.Tensor,
+            cols: torch.Tensor,
+            transpose_perm: Optional[torch.Tensor] = None,
+        ) -> List[torch.Tensor]:
+            L1_grad = torch.zeros_like(L1_in)
+            L2_grad = torch.empty_like(L2_in)
+            weights_grad = torch.empty_like(weights)
+
+            if self.config.shared_weights:
+                weights_grad[:] = 0.0
+
+            transpose_perm_ptr = 0
+            if transpose_perm is not None:
+                transpose_perm_ptr = transpose_perm.data_ptr()
+
+            self.internal.backward_rawptrs(
+                L1_in.contiguous().data_ptr(),
+                L1_grad.data_ptr(),
+                L2_in.contiguous().data_ptr(),
+                L2_grad.data_ptr(),
+                weights.contiguous().data_ptr(),
+                weights_grad.data_ptr(),
+                L3_grad.contiguous().data_ptr(),
+                rows.contiguous().data_ptr(),
+                cols.contiguous().data_ptr(),
+                rows.shape[0],
+                L1_in.shape[0],
+                self.workspace_ptr,
+                transpose_perm_ptr,
+            )
+
+            return [L1_grad, L2_grad, weights_grad]
+
+        @backward_helper.register_fake
+        def _(L1_in, L2_in, weights, L3_grad, rows, cols, transpose_perm=None):
+            return [
+                L1_in.new_empty(*L1_in.shape),
+                L2_in.new_empty(*L2_in.shape),
+                weights.new_empty(*weights.shape),
+            ]
+
+        def setup_context(ctx, inputs, output):
+            (
+                ctx.L1_in,
+                ctx.L2_in,
+                ctx.weights,
+                ctx.rows,
+                ctx.cols,
+                ctx.transpose_perm,
+            ) = inputs
+
+        def backward(ctx, grad_output):
+            result = backward_helper(
+                ctx.L1_in,
+                ctx.L2_in,
+                ctx.weights,
+                grad_output,
+                ctx.rows,
+                ctx.cols,
+                ctx.transpose_perm,
+            )
+            return result[0], result[1], result[2], None, None, None
+
+        self.forward_opaque.register_autograd(backward, setup_context=setup_context)
+
+        def setup_context_double_backward(ctx, inputs, output):
+            (
+                ctx.L1_in,
+                ctx.L2_in,
+                ctx.weights,
+                ctx.L3_grad,
+                ctx.rows,
+                ctx.cols,
+                ctx.transpose_perm,
+            ) = inputs
+
+        @torch.library.custom_op(
+            f"openequivariance::conv_double_backward{self.conv_id}",
+            mutates_args=(),
+            device_types="cuda",
+        )
+        def double_backward_helper(
+            L1_in: torch.Tensor,
+            L2_in: torch.Tensor,
+            W: torch.Tensor,
+            L3_grad: torch.Tensor,
+            L1_dgrad: torch.Tensor,
+            L2_dgrad: torch.Tensor,
+            w_dgrad: torch.Tensor,
+            rows: torch.Tensor,
+            cols: torch.Tensor,
+            transpose_perm: Optional[torch.Tensor] = None,
+        ) -> List[torch.Tensor]:
+            L1_grad = torch.zeros_like(L1_in)
+            L2_grad = torch.empty_like(L2_in)
+            W_grad = torch.empty_like(W)
+            L3_dgrad = torch.zeros_like(L3_grad)
+
+            if self.config.shared_weights:
+                W_grad[:] = 0.0
+
+            transpose_perm_ptr = 0
+            if transpose_perm is not None:
+                transpose_perm_ptr = transpose_perm.data_ptr()
+
+            self.internal.double_backward_rawptrs(
+                L1_in.contiguous().data_ptr(),
+                L2_in.contiguous().data_ptr(),
+                W.contiguous().data_ptr(),
+                L3_grad.contiguous().data_ptr(),
+                L1_dgrad.contiguous().data_ptr(),
+                L2_dgrad.contiguous().data_ptr(),
+                w_dgrad.contiguous().data_ptr(),
+                L1_grad.data_ptr(),
+                L2_grad.data_ptr(),
+                W_grad.data_ptr(),
+                L3_dgrad.data_ptr(),
+                rows.contiguous().data_ptr(),
+                cols.contiguous().data_ptr(),
+                rows.shape[0],
+                L1_in.shape[0],
+                self.workspace_ptr,
+                transpose_perm_ptr,
+            )
+            return [L1_grad, L2_grad, W_grad, L3_dgrad]
+
+        @double_backward_helper.register_fake
+        def _(
+            L1_in,
+            L2_in,
+            W,
+            L3_grad,
+            L1_dgrad,
+            L2_dgrad,
+            w_dgrad,
+            rows,
+            cols,
+            transpose_perm=None,
+        ):
+            return [
+                L1_in.new_empty(*L1_in.shape),
+                L2_in.new_empty(*L2_in.shape),
+                W.new_empty(*W.shape),
+                L3_grad.new_empty(*L3_grad.shape),
+            ]
+
+        def double_backward(ctx, grad_output):
+            L1_dgrad, L2_dgrad, w_dgrad = grad_output[0], grad_output[1], grad_output[2]
+
+            L1_grad, L2_grad, W_grad, L3_dgrad = double_backward_helper(
+                ctx.L1_in,
+                ctx.L2_in,
+                ctx.weights,
+                ctx.L3_grad,
+                L1_dgrad,
+                L2_dgrad,
+                w_dgrad,
+                ctx.rows,
+                ctx.cols,
+                ctx.transpose_perm,
+            )
+
+            if ctx.transpose_perm is None:
+                return L1_grad, L2_grad, W_grad, L3_dgrad, None, None
+            else:
+                return L1_grad, L2_grad, W_grad, L3_dgrad, None, None, None
+
+        backward_helper.register_autograd(
+            double_backward, setup_context=setup_context_double_backward
+        )
 
 
 # ==================================================================

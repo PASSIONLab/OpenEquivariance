@@ -123,9 +123,6 @@ class LoopUnrollTP(TensorProductBase):
 
         logger.info(f"Kernel File Size: {len(self.jit_kernel) // 1024} KB")
 
-        if self.torch_op:
-            self.setup_torch_custom_op()
-
         self.reorder_weights_e3nn_to_oeq = (
             lambda input, output, has_batch_dim: self.forward_schedule.reorder_weights(
                 input, output, "forward", has_batch_dim
