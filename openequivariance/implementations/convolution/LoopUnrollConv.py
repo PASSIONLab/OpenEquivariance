@@ -6,7 +6,7 @@ from openequivariance.implementations.ComputationSchedule import (
     SMEMCapacityException,
 )
 
-
+from openequivariance.implementations.dtype_enum import NUMPY_DTYPE_ENUM
 from openequivariance.templates.jinja_utils import get_jinja_environment
 from openequivariance import extlib
 from openequivariance.extlib import JITConvImpl, postprocess_kernel, DeviceProp
@@ -218,6 +218,10 @@ class LoopUnrollConv(ConvolutionBase):
                 "weight_numel": self.config.weight_numel,
                 "is_uvw": int(self.is_uvw),
                 "shared_weights": int(config.shared_weights),
+                "deterministic": int(self.deterministic),
+                "irrep_dtype": NUMPY_DTYPE_ENUM[self.config.irrep_dtype],
+                "weight_dtype": NUMPY_DTYPE_ENUM[self.config.weight_dtype],
+                "idx_dtype": NUMPY_DTYPE_ENUM[self.idx_dtype],
             },
         )
         logger.info("Kernel compiled!")
