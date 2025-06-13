@@ -153,7 +153,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             return L3_out
 
         @forward.register_fake
-        def _(L1_in, L2_in, weights, rows, cols, transpose_perm):
+        def _(L1_in, L2_in, weights, rows, cols, transpose_perm=None):
             return L1_in.new_empty(L1_in.shape[0], self.L3.dim)
 
         self.forward_opaque = forward
@@ -202,7 +202,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             return [L1_grad, L2_grad, weights_grad]
 
         @backward_helper.register_fake
-        def _(L1_in, L2_in, weights, L3_grad, rows, cols, transpose_perm):
+        def _(L1_in, L2_in, weights, L3_grad, rows, cols, transpose_perm=None):
             return [
                 L1_in.new_empty(*L1_in.shape),
                 L2_in.new_empty(*L2_in.shape),
@@ -293,6 +293,15 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
                 transpose_perm_ptr,
             )
             return [L1_grad, L2_grad, W_grad, L3_dgrad]
+        
+        @double_backward_helper.register_fake 
+        def _(L1_in, L2_in, W, L3_grad, L1_dgrad, L2_dgrad, w_dgrad, rows, cols, transpose_perm=None):
+            return [
+                L1_in.new_empty(*L1_in.shape),
+                L2_in.new_empty(*L2_in.shape),
+                W.new_empty(*W.shape),
+                L3_grad.new_empty(*L3_grad.shape),
+            ]
 
         def double_backward(ctx, grad_output):
             L1_dgrad, L2_dgrad, w_dgrad = grad_output[0], grad_output[1], grad_output[2]
