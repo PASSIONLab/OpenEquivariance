@@ -501,6 +501,9 @@ TORCH_LIBRARY_FRAGMENT(libtorch_tp_jit, m) {
             return 0;
         })
         .def("get_L3_dim", &TorchJITProduct::get_L3_dim)
+        .def("__eq__", [](const c10::IValue & self, const c10::IValue& other) -> bool {
+            return self.is(other); 
+        })
         .def_pickle(
             // __getstate__
             [](const c10::intrusive_ptr<TorchJITProduct>& self)
@@ -528,6 +531,9 @@ TORCH_LIBRARY_FRAGMENT(libtorch_tp_jit, m) {
             return 0;
         })
         .def("get_L3_dim", &TorchJITConv::get_L3_dim)
+        .def("__eq__", [](const c10::IValue & self, const c10::IValue& other) -> bool {
+            return self.is(other); 
+        })
         .def_pickle(
             // __getstate__
             [](const c10::intrusive_ptr<TorchJITConv>& self)
