@@ -64,14 +64,16 @@ std::unordered_map<string, int64_t> to_map(const Map_t &map) {
     return result;
 } 
 
-torch::Dtype torch_dtype_map(int64_t i){
+torch::Dtype enum_to_torch_dtype_map(int64_t i){
     switch(i) {
         case 1:
         return torch::kFloat; 
         case 2: 
         return torch::kDouble;
         case 3: 
-        return torch::kInt; 
+        return torch::kInt;
+        case 4: 
+        return torch::kLong; 
     }
     throw logic_error("Unsupported tensor datatype!");
 } 
@@ -129,8 +131,8 @@ public:
         L3_dim(kernel_dims.at("L3_dim")),
         weight_numel(kernel_dims.at("weight_numel")),
         shared_weights(kernel_dims.at("shared_weights")),
-        irrep_dtype(torch_dtype_map(kernel_dims.at("irrep_dtype"))),
-        weight_dtype(torch_dtype_map(kernel_dims.at("weight_dtype"))){}
+        irrep_dtype(enum_to_torch_dtype_map(kernel_dims.at("irrep_dtype"))),
+        weight_dtype(enum_to_torch_dtype_map(kernel_dims.at("weight_dtype"))){}
 
     tuple<  tuple<string, string>, 
             tuple<string, Map_t>, 
@@ -372,9 +374,9 @@ public:
         weight_numel(kernel_dims.at("weight_numel")),            
         shared_weights(kernel_dims.at("shared_weights")),
         deterministic(kernel_dims.at("deterministic")),
-        irrep_dtype(torch_dtype_map(kernel_dims.at("irrep_dtype"))),
-        weight_dtype(torch_dtype_map(kernel_dims.at("weight_dtype"))),
-        idx_dtype(torch_dtype_map(kernel_dims.at("idx_dtype"))) { }
+        irrep_dtype(enum_to_torch_dtype_map(kernel_dims.at("irrep_dtype"))),
+        weight_dtype(enum_to_torch_dtype_map(kernel_dims.at("weight_dtype"))),
+        idx_dtype(enum_to_torch_dtype_map(kernel_dims.at("idx_dtype"))) { }
 
     tuple<tuple<string, string>, 
         tuple<string, Map_t>, 
@@ -458,9 +460,9 @@ torch::Tensor jit_conv_forward(
     torch_check_helper(rows, {nnz}, idx_dtype, "rows");
     torch_check_helper(cols, {nnz}, idx_dtype, "cols"); 
     if (jit_instance->deterministic){
-        torch_check_helper(transpose_perm, {1}, idx_dtype, "transpose perm"); 
+        torch_check_helper(transpose_perm, {nnz}, idx_dtype, "transpose perm");
     } else {
-        torch_check_helper(transpose_perm, {nnz}, idx_dtype, "transpose perm"); 
+         torch_check_helper(transpose_perm, {1}, idx_dtype, "transpose perm"); 
     }
 
     if (jit_instance->shared_weights){
@@ -523,9 +525,9 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
     torch_check_helper(rows, {nnz}, idx_dtype, "rows"); 
     torch_check_helper(cols, {nnz}, idx_dtype, "cols"); 
     if (jit_instance->deterministic){
-        torch_check_helper(transpose_perm, {1}, idx_dtype, "transpose perm"); 
-    } else {
         torch_check_helper(transpose_perm, {nnz}, idx_dtype, "transpose perm"); 
+    } else {
+        torch_check_helper(transpose_perm, {1}, idx_dtype, "transpose perm"); 
     }
     
     if (jit_instance->shared_weights){
@@ -602,9 +604,9 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_doubl
     torch_check_helper(rows, {nnz}, idx_dtype, "rows"); 
     torch_check_helper(cols, {nnz},  idx_dtype, "cols"); 
     if (jit_instance->deterministic){
-        torch_check_helper(transpose_perm, {1}, idx_dtype, "transpose perm"); 
+        torch_check_helper(transpose_perm, {nnz}, idx_dtype, "transpose perm");
     } else {
-        torch_check_helper(transpose_perm, {nnz}, idx_dtype, "transpose perm"); 
+        torch_check_helper(transpose_perm, {1}, idx_dtype, "transpose perm"); 
     }
     
     if (jit_instance->shared_weights){
