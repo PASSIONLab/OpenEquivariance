@@ -1,7 +1,7 @@
 # ruff: noqa: E731
 import json
-from dataclasses import dataclass
-from typing import Callable, Tuple, Any, NamedTuple
+
+from typing import NamedTuple
 import logging
 
 import pytest
@@ -13,6 +13,7 @@ from torch.profiler import profile, record_function, ProfilerActivity
 from e3nn import o3
 from torch_geometric import EdgeIndex
 
+from tests.utils import Executable
 from openequivariance import TensorProduct, TensorProductConv, TPProblem
 
 
@@ -22,16 +23,6 @@ class KernelExpectation(NamedTuple):
 
 
 KE = KernelExpectation
-
-
-@dataclass
-class Executable:
-    func: Callable[..., Any]
-    buffers: Tuple[torch.Tensor, ...]
-    kernel_expectations: list[KernelExpectation]
-
-    def __call__(self) -> Any:
-        return self.func(*self.buffers)
 
 
 cuda = torch.device("cuda")
@@ -94,7 +85,7 @@ def conv_buffers(edge_index, tpp, gen):
 @pytest.fixture
 def oeq_tp_fwd(tpp, tp_buffers):
     tp_oeq = TensorProduct(tpp)
-    return Executable(tp_oeq, tp_buffers, [KE("forward", 1)])
+    return Executable(tp_oeq, tp_buffers), [KE("forward", 1)]
 
 
 @pytest.fixture
@@ -110,7 +101,7 @@ def oeq_tp_bwd(tpp, tp_buffers):
         output.backward()
         return output
 
-    return Executable(backward_fn, tp_buffers, [KE("forward", 1), KE("backward", 1)])
+    return Executable(backward_fn, tp_buffers), [KE("forward", 1), KE("backward", 1)]
 
 
 @pytest.fixture
@@ -148,23 +139,19 @@ def oeq_tp_double_bwd(tpp, tp_buffers):
 
         return dummy
 
-    return Executable(
-        double_backward_fn,
-        tp_buffers,
-        [
-            KE("forward", 1),
-            KE("backward", 1),
-            KE("double_backward_A", 1),
-            KE("double_backward_B", 1),
-        ],
-    )
+    return Executable(double_backward_fn, tp_buffers), [
+        KE("forward", 1),
+        KE("backward", 1),
+        KE("double_backward_A", 1),
+        KE("double_backward_B", 1),
+    ]
 
 
 @pytest.fixture
 def oeq_conv_atomic_fwd(tpp, conv_buffers):
     tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
 
-    return Executable(tp_conv, conv_buffers, [KE("forward", 1)])
+    return Executable(tp_conv, conv_buffers), [KE("forward", 1)]
 
 
 @pytest.fixture
@@ -185,11 +172,10 @@ def oeq_conv_atomic_bwd(tpp, conv_buffers):
     return Executable(
         backward_fn,
         conv_buffers,
-        [
-            KE("forward", 1),
-            KE("backward", 1),
-        ],
-    )
+    ), [
+        KE("forward", 1),
+        KE("backward", 1),
+    ]
 
 
 @pytest.fixture
@@ -229,20 +215,19 @@ def oeq_conv_atomic_double_bwd(tpp, conv_buffers):
     return Executable(
         double_backward_fn,
         conv_buffers,
-        [
-            KE("forward", 1),
-            KE("backward", 1),
-            KE("double_backward_A", 1),
-            KE("double_backward_B", 1),
-        ],
-    )
+    ), [
+        KE("forward", 1),
+        KE("backward", 1),
+        KE("double_backward_A", 1),
+        KE("double_backward_B", 1),
+    ]
 
 
 @pytest.fixture
 def oeq_conv_det_fwd(tpp, conv_buffers):
     tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
 
-    return Executable(tp_conv, conv_buffers, [KE("forward", 1), KE("fixup_forward", 1)])
+    return Executable(tp_conv, conv_buffers), [KE("forward", 1), KE("fixup_forward", 1)]
 
 
 @pytest.fixture
@@ -263,13 +248,12 @@ def oeq_conv_det_bwd(tpp, conv_buffers):
     return Executable(
         backward_fn,
         conv_buffers,
-        [
-            KE("forward", 1),
-            KE("fixup_forward", 1),
-            KE("backward", 1),
-            KE("fixup_backward", 1),
-        ],
-    )
+    ), [
+        KE("forward", 1),
+        KE("fixup_forward", 1),
+        KE("backward", 1),
+        KE("fixup_backward", 1),
+    ]
 
 
 @pytest.fixture
@@ -309,16 +293,15 @@ def oeq_conv_det_double_bwd(tpp, conv_buffers):
     return Executable(
         double_backward_fn,
         conv_buffers,
-        [
-            KE("forward", 1),
-            KE("fixup_forward", 2),
-            KE("backward", 1),
-            KE("fixup_backward", 1),
-            KE("double_backward_A", 1),
-            KE("double_backward_B", 1),
-            KE("fixup_double_backwardB", 1),
-        ],
-    )
+    ), [
+        KE("forward", 1),
+        KE("fixup_forward", 2),
+        KE("backward", 1),
+        KE("fixup_backward", 1),
+        KE("double_backward_A", 1),
+        KE("double_backward_B", 1),
+        KE("fixup_double_backwardB", 1),
+    ]
 
 
 @pytest.fixture(
@@ -334,11 +317,16 @@ def oeq_conv_det_double_bwd(tpp, conv_buffers):
         "oeq_conv_det_double_bwd",
     ],
 )
-def executable(request):
+def executable_and_expectations(request):
     yield request.getfixturevalue(request.param)
 
 
-def test_separate_streams(request, tmp_path, executable: Executable):
+def test_separate_streams(
+    request,
+    tmp_path,
+    executable_and_expectations: tuple[Executable, list[KernelExpectation]],
+):
+    executable, expectations = executable_and_expectations
     COUNT = 5
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True
@@ -377,7 +365,7 @@ def test_separate_streams(request, tmp_path, executable: Executable):
         assert len(set(tids)) == len(set(names)), "The CUDA streams are not unique"
 
     for tid in set(tids):
-        for kernel_expectation in executable.kernel_expectations:
+        for kernel_expectation in expectations:
             criteria = (
                 lambda event: (event.get("cat") == "kernel")
                 and (event.get("name", "").startswith(kernel_expectation.kernel_name))
