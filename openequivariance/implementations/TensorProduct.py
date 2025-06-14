@@ -3,7 +3,7 @@ from openequivariance import TPProblem
 from openequivariance import extlib
 import torch
 import typing
-
+from openequivariance.implementations.utils import torch_to_oeq_dtype
 
 class TensorProduct(torch.nn.Module, LoopUnrollTP):
     r"""
@@ -20,12 +20,35 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
 
     def __init__(self, problem: TPProblem, torch_op=True, use_opaque=False):
         torch.nn.Module.__init__(self)
-        LoopUnrollTP.__init__(self, problem, torch_op)
-        self.weight_numel = problem.weight_numel
+        self.input_args = {
+            "problem": problem,
+            "torch_op": torch_op,
+            "use_opaque": use_opaque,
+        }
+        self._init_class()
 
+    def _init_class(self):
+        LoopUnrollTP.__init__(self, self.input_args["problem"], 
+                                self.input_args["torch_op"])
+        self.weight_numel = self.input_args["problem"].weight_numel
         self._setup_notorchbind()
-        if (not extlib.TORCH_COMPILE) or use_opaque:
+        if (not extlib.TORCH_COMPILE) or self.input_args["use_opaque"]:
             self.forward = self.forward_opaque
+
+    def to(self, *args, **kwargs):
+        torch.nn.Module.to(self, *args, **kwargs)
+        device, dtype, non_blocking, convert_to_format = torch._C._nn._parse_to(
+            *args, **kwargs
+        )
+
+        if dtype is not None:
+            updated_problem = self.input_args["problem"].clone()
+            updated_problem.irrep_dtype = torch_to_oeq_dtype(dtype)
+            updated_problem.weight_dtype = torch_to_oeq_dtype(dtype)
+            self.input_args["problem"] = updated_problem
+            self._init_class()
+
+        return self
 
     @staticmethod
     def name():

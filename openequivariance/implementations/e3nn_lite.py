@@ -43,6 +43,7 @@ import collections
 import numpy as np
 import numpy.linalg as la
 import functools
+import copy
 
 
 def perm_inverse(p):
@@ -643,6 +644,8 @@ class TPProblem:
         ins = self.instructions[instruction]
         return offset, offset + prod(ins.path_shape), ins.path_shape
 
+    def clone(self):
+        return copy.deepcopy(self)
 
 def change_basis_real_to_complex(l: int, dtype=None) -> np.ndarray:
     # https://en.wikipedia.org/wiki/Spherical_harmonics#Real_form
