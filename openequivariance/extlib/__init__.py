@@ -33,18 +33,9 @@ try:
 except Exception as e:
     LINKED_LIBPYTHON_ERROR = f"Error linking libpython:\n{e}\nSysconfig variables:\n{sysconfig.get_config_vars()}"
 
+generic_module = None
 if not build_ext:
-    from openequivariance.extlib.generic_module import (
-        GenericTensorProductImpl,
-        JITTPImpl,
-        ConvolutionImpl,
-        JITConvImpl,
-        GroupMM_F32,
-        GroupMM_F64,
-        DeviceProp,
-        DeviceBuffer,
-        GPUTimer,
-    )
+    generic_module = openequivariance.extlib.generic_module
 else:
     from torch.utils.cpp_extension import library_paths, include_paths
 
@@ -134,14 +125,12 @@ else:
             + f", but JITScript, compile fullgraph, and export will fail.\n {torch_compile_exception}"
         )
 
-    from generic_module import (
-        GenericTensorProductImpl,
-        JITTPImpl,
-        ConvolutionImpl,
-        JITConvImpl,
-        GroupMM_F32,
-        GroupMM_F64,
-        DeviceProp,
-        DeviceBuffer,
-        GPUTimer,
-    )
+from generic_module import (
+    JITTPImpl,
+    JITConvImpl,
+    GroupMM_F32,
+    GroupMM_F64,
+    DeviceProp,
+    DeviceBuffer,
+    GPUTimer,
+)
