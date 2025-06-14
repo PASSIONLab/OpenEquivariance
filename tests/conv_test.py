@@ -14,6 +14,7 @@ from openequivariance.benchmark.problems import (
     diffdock_problems,
 )
 
+
 class ConvCorrectness:
     def thresh(self, direction):
         return {"fwd": 3e-4, "bwd": 3e-4, "double_bwd": 3e-4}[direction]
@@ -253,12 +254,16 @@ class TestTorchTo(ConvCorrectness):
         problem = request.param
         problem.irrep_dtype, problem.weight_dtype = dtype, dtype
         return problem
- 
+
     @pytest.fixture(params=["atomic", "deterministic"], scope="class")
     def conv_object(self, request, problem, extra_conv_constructor_args):
         switch_map = {
             np.float32: torch.float64,
             np.float64: torch.float32,
         }
-        module =  oeq.TensorProductConv(problem, deterministic=(request.param == "deterministic"), **extra_conv_constructor_args)
+        module = oeq.TensorProductConv(
+            problem,
+            deterministic=(request.param == "deterministic"),
+            **extra_conv_constructor_args,
+        )
         return module.to(switch_map[problem.irrep_dtype])

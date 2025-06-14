@@ -647,6 +647,7 @@ class TPProblem:
     def clone(self):
         return copy.deepcopy(self)
 
+
 def change_basis_real_to_complex(l: int, dtype=None) -> np.ndarray:
     # https://en.wikipedia.org/wiki/Spherical_harmonics#Real_form
     q = np.zeros((2 * l + 1, 2 * l + 1), dtype=np.complex128)

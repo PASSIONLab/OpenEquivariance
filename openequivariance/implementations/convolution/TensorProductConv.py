@@ -7,8 +7,9 @@ from openequivariance import extlib
 from openequivariance.implementations.convolution.ConvolutionBase import ConvolutionBase
 from openequivariance.implementations.convolution.LoopUnrollConv import LoopUnrollConv
 from openequivariance.implementations.TensorProduct import TensorProduct
-from openequivariance import TPProblem 
+from openequivariance import TPProblem
 from openequivariance.implementations.utils import torch_to_oeq_dtype
+
 
 class TensorProductConv(torch.nn.Module, LoopUnrollConv):
     r"""
@@ -33,6 +34,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
            the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
     :param use_opaque: If ``True, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``.
     """
+
     def __init__(
         self,
         problem: TPProblem,
@@ -51,7 +53,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
         }
         self._init_class()
 
-    def _init_class(self): 
+    def _init_class(self):
         LoopUnrollConv.__init__(
             self,
             self.input_args["problem"],
@@ -66,7 +68,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 
         if (not extlib.TORCH_COMPILE) or self.input_args["use_opaque"]:
             self.forward = self.forward_opaque
-
 
     def to(self, *args, **kwargs):
         torch.nn.Module.to(self, *args, **kwargs)

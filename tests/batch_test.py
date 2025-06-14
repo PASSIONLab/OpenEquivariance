@@ -19,6 +19,7 @@ from openequivariance.benchmark.problems import (
 from itertools import product
 import torch
 
+
 class TPCorrectness:
     def thresh(self, direction):
         return {"fwd": 1e-5, "bwd": 3e-4, "double_bwd": 3e-4}[direction]
@@ -267,4 +268,4 @@ class TestTorchTo(TPCorrectness):
             np.float64: torch.float32,
         }
         tp.to(switch_map[problem.irrep_dtype])
-        return tp, tp.config 
+        return tp, tp.config

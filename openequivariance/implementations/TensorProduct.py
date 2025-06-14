@@ -5,6 +5,7 @@ import torch
 import typing
 from openequivariance.implementations.utils import torch_to_oeq_dtype
 
+
 class TensorProduct(torch.nn.Module, LoopUnrollTP):
     r"""
     Drop-in replacement for ``o3.TensorProduct`` from e3nn. Supports forward,
@@ -28,8 +29,9 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
         self._init_class()
 
     def _init_class(self):
-        LoopUnrollTP.__init__(self, self.input_args["problem"], 
-                                self.input_args["torch_op"])
+        LoopUnrollTP.__init__(
+            self, self.input_args["problem"], self.input_args["torch_op"]
+        )
         self.weight_numel = self.input_args["problem"].weight_numel
         self._setup_notorchbind()
         if (not extlib.TORCH_COMPILE) or self.input_args["use_opaque"]:

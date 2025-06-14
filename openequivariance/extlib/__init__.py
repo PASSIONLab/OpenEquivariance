@@ -10,7 +10,7 @@ from distutils import sysconfig
 oeq_root = str(Path(__file__).parent.parent)
 
 build_ext = True
-TORCH_COMPILE = True 
+TORCH_COMPILE = True
 torch_module, generic_module = None, None
 postprocess_kernel = lambda kernel: kernel  # noqa : E731
 
@@ -35,6 +35,8 @@ except Exception as e:
 
 generic_module = None
 if not build_ext:
+    import openequivariance.extlib.generic_module
+
     generic_module = openequivariance.extlib.generic_module
 else:
     from torch.utils.cpp_extension import library_paths, include_paths
