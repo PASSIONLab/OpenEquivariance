@@ -24,6 +24,7 @@ class TensorProductBase:
     def __init__(self, config: TPProblem, torch_op: bool = False):
         assert isinstance(config, TPProblem)
         assert isinstance(torch_op, bool)
+        config = config.clone()
         self.config, self.torch_op = config, torch_op
         self.L1, self.L2, self.L3 = (
             config.irreps_in1,

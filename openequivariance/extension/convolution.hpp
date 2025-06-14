@@ -6,90 +6,6 @@
 #include <pybind11/numpy.h>
 #include <cstdint>
 
-class __attribute__ ((visibility ("default"))) ConvolutionImpl {
-public:
-    bool record_internal_stats = false;
-
-    ConvolutionImpl() {
-    }
-
-    virtual void exec_conv(
-        void* L1_in,
-        void* L2_in,
-        void* weights, 
-        void* L3_out,
-        void* rows,
-        void* cols,
-        uint64_t nnz,
-        uint64_t node_count,
-        void* workspace,
-        Stream stream) = 0;
-
-    void exec_conv_rawptrs(
-        uint64_t L1_in,
-        uint64_t L2_in,
-        uint64_t weights,
-        uint64_t L3_out,
-        uint64_t rows,
-        uint64_t cols,
-        uint64_t nnz,
-        uint64_t node_count,
-        uint64_t workspace) {
-
-        exec_conv(
-            reinterpret_cast<void*>(L1_in),
-            reinterpret_cast<void*>(L2_in),
-            reinterpret_cast<void*>(weights),
-            reinterpret_cast<void*>(L3_out),
-            reinterpret_cast<void*>(rows),
-            reinterpret_cast<void*>(cols),
-            nnz,
-            node_count,
-            reinterpret_cast<void*>(workspace),
-            0 // Default Stream
-            );
-    }
-
-    virtual void backward(
-        void* L1_in, void* L1_grad,
-        void* L2_in, void* L2_grad,
-        void* weight, void* weight_grad,
-        void* L3_grad,
-        void* rows, void* cols,
-        uint64_t nnz, uint64_t node_count,
-        void* workspace, void* inverse_perm,
-        Stream stream) = 0;
-
-    void backward_rawptrs(
-        uint64_t L1_in, uint64_t L1_grad,
-        uint64_t L2_in, uint64_t L2_grad,
-        uint64_t weight, uint64_t weight_grad,
-        uint64_t L3_grad,
-        uint64_t rows, uint64_t cols,
-        uint64_t nnz, uint64_t node_count,
-        uint64_t workspace, uint64_t inverse_perm) {
-
-        backward(
-            reinterpret_cast<void*>(L1_in),
-            reinterpret_cast<void*>(L1_grad),
-            reinterpret_cast<void*>(L2_in),
-            reinterpret_cast<void*>(L2_grad),
-            reinterpret_cast<void*>(weight),
-            reinterpret_cast<void*>(weight_grad),
-            reinterpret_cast<void*>(L3_grad),
-            reinterpret_cast<void*>(rows),
-            reinterpret_cast<void*>(cols),
-            nnz,
-            node_count,
-            reinterpret_cast<void*>(workspace),
-            reinterpret_cast<void*>(inverse_perm),
-            0 // Default Stream
-            );
-    }
-
-    virtual ~ConvolutionImpl() {};
-};
-
 struct ConvData {
     void* rows;
     void* cols;
@@ -98,7 +14,7 @@ struct ConvData {
 };
 
 template<typename JIT_IMPL>
-class __attribute__ ((visibility ("default"))) JITConvImpl : public ConvolutionImpl{
+class __attribute__ ((visibility ("default"))) JITConvImpl {
 public:
     JIT_IMPL jit;
     KernelLaunchConfig forward_config; 
@@ -262,6 +178,62 @@ public:
         }
     }
 
+    ~JITConvImpl() = default; 
+
+    // Integer pointer versions of the functions above
+
+    void exec_conv_rawptrs(
+        uint64_t L1_in,
+        uint64_t L2_in,
+        uint64_t weights,
+        uint64_t L3_out,
+        uint64_t rows,
+        uint64_t cols,
+        uint64_t nnz,
+        uint64_t node_count,
+        uint64_t workspace) {
+
+        exec_conv(
+            reinterpret_cast<void*>(L1_in),
+            reinterpret_cast<void*>(L2_in),
+            reinterpret_cast<void*>(weights),
+            reinterpret_cast<void*>(L3_out),
+            reinterpret_cast<void*>(rows),
+            reinterpret_cast<void*>(cols),
+            nnz,
+            node_count,
+            reinterpret_cast<void*>(workspace),
+            0 // Default Stream
+            );
+    }
+
+    void backward_rawptrs(
+        uint64_t L1_in, uint64_t L1_grad,
+        uint64_t L2_in, uint64_t L2_grad,
+        uint64_t weight, uint64_t weight_grad,
+        uint64_t L3_grad,
+        uint64_t rows, uint64_t cols,
+        uint64_t nnz, uint64_t node_count,
+        uint64_t workspace, uint64_t inverse_perm) {
+
+        backward(
+            reinterpret_cast<void*>(L1_in),
+            reinterpret_cast<void*>(L1_grad),
+            reinterpret_cast<void*>(L2_in),
+            reinterpret_cast<void*>(L2_grad),
+            reinterpret_cast<void*>(weight),
+            reinterpret_cast<void*>(weight_grad),
+            reinterpret_cast<void*>(L3_grad),
+            reinterpret_cast<void*>(rows),
+            reinterpret_cast<void*>(cols),
+            nnz,
+            node_count,
+            reinterpret_cast<void*>(workspace),
+            reinterpret_cast<void*>(inverse_perm),
+            0 // Default Stream
+            );
+    }
+
     void double_backward_rawptrs(
             uint64_t L1_in, uint64_t L2_in, uint64_t W, uint64_t L3_grad,
             uint64_t L1_dgrad, uint64_t L2_dgrad, uint64_t w_dgrad,
@@ -291,6 +263,4 @@ public:
             0
         );
     }
-
-    ~JITConvImpl() = default; 
 };

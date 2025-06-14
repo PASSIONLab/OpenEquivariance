@@ -7,6 +7,12 @@ import numpy as np
 import openequivariance as oeq
 from openequivariance.benchmark.ConvBenchmarkSuite import load_graph
 from itertools import product
+import torch
+
+from openequivariance.benchmark.problems import (
+    mace_problems,
+    diffdock_problems,
+)
 
 
 class ConvCorrectness:
@@ -117,11 +123,6 @@ class ConvCorrectness:
 
 
 class TestProductionModels(ConvCorrectness):
-    from openequivariance.benchmark.problems import (
-        mace_problems,
-        diffdock_problems,
-    )
-
     production_model_tpps = mace_problems() + diffdock_problems()
 
     @pytest.fixture(params=production_model_tpps, ids=lambda x: x.label, scope="class")
@@ -218,11 +219,6 @@ class TestUVWSingleIrrep(ConvCorrectness):
 
 
 class TestAtomicSharedWeights(ConvCorrectness):
-    from openequivariance.benchmark.problems import (
-        mace_problems,
-        diffdock_problems,
-    )
-
     problems = [mace_problems()[0], diffdock_problems()[0]]
 
     def thresh(self, direction):
@@ -248,3 +244,26 @@ class TestTorchbindDisable(TestProductionModels):
     @pytest.fixture(scope="class")
     def extra_conv_constructor_args(self):
         return {"use_opaque": True}
+
+
+class TestTorchTo(ConvCorrectness):
+    problems = [mace_problems()[0]]
+
+    @pytest.fixture(params=problems, ids=lambda x: x.label, scope="class")
+    def problem(self, request, dtype):
+        problem = request.param
+        problem.irrep_dtype, problem.weight_dtype = dtype, dtype
+        return problem
+
+    @pytest.fixture(params=["atomic", "deterministic"], scope="class")
+    def conv_object(self, request, problem, extra_conv_constructor_args):
+        switch_map = {
+            np.float32: torch.float64,
+            np.float64: torch.float32,
+        }
+        module = oeq.TensorProductConv(
+            problem,
+            deterministic=(request.param == "deterministic"),
+            **extra_conv_constructor_args,
+        )
+        return module.to(switch_map[problem.irrep_dtype])

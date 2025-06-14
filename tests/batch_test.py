@@ -9,7 +9,15 @@ from openequivariance.benchmark.correctness_utils import (
     correctness_backward,
     correctness_double_backward,
 )
+
+from openequivariance.benchmark.problems import (
+    e3nn_torch_tetris_poly_problems,
+    diffdock_problems,
+    mace_problems,
+    nequip_problems,
+)
 from itertools import product
+import torch
 
 
 class TPCorrectness:
@@ -83,13 +91,6 @@ class TPCorrectness:
 
 
 class TestProductionModels(TPCorrectness):
-    from openequivariance.benchmark.problems import (
-        e3nn_torch_tetris_poly_problems,
-        diffdock_problems,
-        mace_problems,
-        nequip_problems,
-    )
-
     production_model_tpps = (
         mace_problems()
         + nequip_problems()
@@ -227,11 +228,6 @@ class TestUVWSingleIrrep(TPCorrectness):
 
 
 class TestSharedWeights(TPCorrectness):
-    from openequivariance.benchmark.problems import (
-        mace_problems,
-        diffdock_problems,
-    )
-
     problems = [mace_problems()[0], diffdock_problems()[0]]
 
     def thresh(self, direction):
@@ -253,3 +249,23 @@ class TestTorchbindDisable(TestProductionModels):
     @pytest.fixture(scope="class")
     def extra_tp_constructor_args(self):
         return {"use_opaque": True}
+
+
+class TestTorchTo(TPCorrectness):
+    problems = [mace_problems()[0]]
+
+    @pytest.fixture(params=problems, ids=lambda x: x.label, scope="class")
+    def problem(self, request, dtype):
+        problem = request.param
+        problem.irrep_dtype, problem.weight_dtype = dtype, dtype
+        return problem
+
+    @pytest.fixture(scope="class")
+    def tp_and_problem(self, problem, extra_tp_constructor_args):
+        tp = TensorProduct(problem, **extra_tp_constructor_args)
+        switch_map = {
+            np.float32: torch.float64,
+            np.float64: torch.float32,
+        }
+        tp.to(switch_map[problem.irrep_dtype])
+        return tp, tp.config

@@ -8,6 +8,7 @@ from openequivariance.implementations.convolution.ConvolutionBase import Convolu
 from openequivariance.implementations.convolution.LoopUnrollConv import LoopUnrollConv
 from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance import TPProblem
+from openequivariance.implementations.utils import torch_to_oeq_dtype
 
 
 class TensorProductConv(torch.nn.Module, LoopUnrollConv):
@@ -43,21 +44,45 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
         use_opaque: bool = False,
     ):
         torch.nn.Module.__init__(self)
+        self.input_args = {
+            "problem": problem,
+            "deterministic": deterministic,
+            "kahan": kahan,
+            "torch_op": torch_op,
+            "use_opaque": use_opaque,
+        }
+        self._init_class()
+
+    def _init_class(self):
         LoopUnrollConv.__init__(
             self,
-            problem,
+            self.input_args["problem"],
             idx_dtype=np.int64,
-            torch_op=torch_op,
-            deterministic=deterministic,
-            kahan=kahan,
+            torch_op=self.input_args["torch_op"],
+            deterministic=self.input_args["deterministic"],
+            kahan=self.input_args["kahan"],
         )
-
         self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device="cuda")
         self.weight_numel = self.config.weight_numel
         self._setup_notorchbind()
 
-        if (not extlib.TORCH_COMPILE) or use_opaque:
+        if (not extlib.TORCH_COMPILE) or self.input_args["use_opaque"]:
             self.forward = self.forward_opaque
+
+    def to(self, *args, **kwargs):
+        torch.nn.Module.to(self, *args, **kwargs)
+        device, dtype, non_blocking, convert_to_format = torch._C._nn._parse_to(
+            *args, **kwargs
+        )
+
+        if dtype is not None:
+            updated_problem = self.input_args["problem"].clone()
+            updated_problem.irrep_dtype = torch_to_oeq_dtype(dtype)
+            updated_problem.weight_dtype = torch_to_oeq_dtype(dtype)
+            self.input_args["problem"] = updated_problem
+            self._init_class()
+
+        return self
 
     def forward(
         self,

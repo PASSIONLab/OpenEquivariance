@@ -88,6 +88,7 @@ class ConvolutionBase:
     next_conv_id = 0  # Used to assign unique IDs to each conv instance
 
     def __init__(self, config, idx_dtype, torch_op=False, deterministic=False):
+        config = config.clone()
         self.config = config
         self.L1, self.L2, self.L3 = (
             config.irreps_in1,

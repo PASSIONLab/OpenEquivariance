@@ -43,6 +43,7 @@ import collections
 import numpy as np
 import numpy.linalg as la
 import functools
+import copy
 
 
 def perm_inverse(p):
@@ -642,6 +643,9 @@ class TPProblem:
         offset = sum(prod(ins.path_shape) for ins in self.instructions[:instruction])
         ins = self.instructions[instruction]
         return offset, offset + prod(ins.path_shape), ins.path_shape
+
+    def clone(self):
+        return copy.deepcopy(self)
 
 
 def change_basis_real_to_complex(l: int, dtype=None) -> np.ndarray:

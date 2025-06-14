@@ -343,7 +343,7 @@ def test_separate_streams(request, tmp_path, executable: Executable):
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True
     ) as prof:
-        streams = [1, 2]
+        streams = [-1, -2]
         for priority in streams:
             s = torch.cuda.Stream(device=cuda, priority=priority)
             with torch.cuda.stream(s):
