@@ -11,27 +11,21 @@ class __attribute__ ((visibility ("default"))) JITTPImpl {
 public:
     JIT_IMPL jit;
     KernelLaunchConfig forward_config, backward_config, double_backward_config; 
-    bool is_uvw;
+    int opt_level;
 
     JITTPImpl(
         std::string jit_kernel,
         KernelLaunchConfig forward_config_i,
         KernelLaunchConfig backward_config_i,
         KernelLaunchConfig double_backward_config_i,
-        bool is_uvw_i) :
+        int opt_level_i) :
             jit(jit_kernel),
             forward_config(forward_config_i),  
             backward_config(backward_config_i),
             double_backward_config(double_backward_config_i),
-            is_uvw(is_uvw_i) {
-        vector<string> kernels = {"forward", "backward", "double_backward_A", "double_backward_B"};
+            opt_level(opt_level_i) {
 
-        int opt_level = 3;
-        #ifdef HIP_BACKEND
-        if(is_uvw) {
-            opt_level = 1;
-        }
-        #endif 
+        vector<string> kernels = {"forward", "backward", "double_backward_A", "double_backward_B"};
         jit.compile(kernels, {{}, {}, {}, {}}, opt_level); 
 
         if(forward_config.smem > 0) {
@@ -71,7 +65,7 @@ public:
                 dbl_bwd_dict["num_threads"],
                 dbl_bwd_dict["smem"]
             ),
-            kernel_dims["is_uvw"] == 1 
+            static_cast<int>(kernel_dims["opt_level"]) 
         ) { } 
 
     void exec_tensor_product(

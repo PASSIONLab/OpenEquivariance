@@ -70,7 +70,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             self.forward = self.forward_opaque
 
     def to(self, *args, **kwargs):
-        torch.nn.Module.to(self, *args, **kwargs)
         device, dtype, non_blocking, convert_to_format = torch._C._nn._parse_to(
             *args, **kwargs
         )
@@ -82,6 +81,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             self.input_args["problem"] = updated_problem
             self._init_class()
 
+        torch.nn.Module.to(self, *args, **kwargs)
         return self
 
     def forward(
