@@ -27,3 +27,13 @@ dtype_to_enum_mapping = MappingProxyType(
         np.dtype(np.int64): DTypeEnum.INT64,
     }
 )
+
+
+enum_to_torch_dtype_mapping = MappingProxyType(
+    {
+        DTypeEnum.FLOAT32: torch.float32,
+        DTypeEnum.FLOAT64: torch.float64,
+        DTypeEnum.INT32: torch.int32,
+        DTypeEnum.INT64: torch.int64,
+    }
+)
