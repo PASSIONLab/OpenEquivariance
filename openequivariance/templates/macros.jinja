@@ -97,7 +97,7 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
     {%- set warps_per_block = divide(config.num_threads, config.warp_size) %}
     const int t_idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int warp_id = t_idx / {{ threads_per_warp }};
-    const int lane_id = threadIdx.x % {{ threads_per_warp }};
+    const int lane_id = t_idx % {{ threads_per_warp }};
     const int warp_loc = warp_id % {{ warps_per_block }};
     const size_t warps_launched = blockDim.x * gridDim.x / {{ threads_per_warp }};
     const size_t nnz_per_warp = (num_products + warps_launched - 1) / warps_launched;
