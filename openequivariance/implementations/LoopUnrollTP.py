@@ -116,7 +116,7 @@ class LoopUnrollTP(TensorProductBase):
             {
                 "L3_dim": self.L3.dim,
                 "shared_weights": int(self.config.shared_weights),
-                "is_uvw": int(self.is_uvw),
+                "opt_level": 3,
             },
         )
         logger.info("Kernel compiled!")

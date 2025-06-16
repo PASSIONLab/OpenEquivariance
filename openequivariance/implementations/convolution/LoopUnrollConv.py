@@ -210,7 +210,7 @@ class LoopUnrollConv(ConvolutionBase):
             vars(self.double_backward_schedule.launch_config),
             {
                 "L3_dim": self.L3.dim,
-                "is_uvw": int(self.is_uvw),
+                "opt_level": 3,
                 "shared_weights": int(config.shared_weights),
             },
         )
