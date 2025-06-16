@@ -1,4 +1,4 @@
-# ruff: noqa: E731
+# ruff: noqa: E731, F401
 import json
 
 from typing import NamedTuple
@@ -6,15 +6,25 @@ import logging
 
 import pytest
 from pytest_check import check
+from pytest_lazy_fixtures import lf
 
 import torch
 from torch.profiler import profile, record_function, ProfilerActivity
 
-from e3nn import o3
-from torch_geometric import EdgeIndex
-
-from tests.utils import Executable
-from openequivariance import TensorProduct, TensorProductConv, TPProblem
+from tests.conftest import Executable
+from tests.executable_utils import (
+    simple_oeq_tp_fwd_executable,
+    simple_oeq_tp_bwd_executable,
+    simple_oeq_tp_double_bwd_executable,
+    #
+    simple_oeq_conv_atomic_fwd_executable,
+    simple_oeq_conv_atomic_bwd_executable,
+    simple_oeq_conv_atomic_double_bwd_executable,
+    #
+    simple_oeq_conv_det_fwd_executable,
+    simple_oeq_conv_det_bwd_executable,
+    simple_oeq_conv_det_double_bwd_executable,
+)
 
 
 class KernelExpectation(NamedTuple):
@@ -24,122 +34,22 @@ class KernelExpectation(NamedTuple):
 
 KE = KernelExpectation
 
-
 cuda = torch.device("cuda")
 
 
 @pytest.fixture
-def gen():
-    return torch.Generator(device="cuda")
+def oeq_tp_fwd_kernel_expectations():
+    return [KE("forward", 1)]
 
 
 @pytest.fixture
-def N():
-    return 1000
+def oeq_tp_bwd_kernel_expectations():
+    return [KE("forward", 1), KE("backward", 1)]
 
 
 @pytest.fixture
-def edge_index():
-    return EdgeIndex(
-        data=[
-            [0, 1, 1, 2],  # Receiver
-            [1, 0, 2, 1],  # Sender
-        ],
-        sparse_size=(3, 4),
-        device="cuda",
-        dtype=torch.long,
-    )
-
-
-@pytest.fixture
-def tpp():
-    X_ir = o3.Irreps("1x2e")
-    Y_ir = o3.Irreps("1x3e")
-    Z_ir = o3.Irreps("1x2e")
-    instructions = [(0, 0, 0, "uvu", True)]
-    return TPProblem(
-        X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
-    )
-
-
-@pytest.fixture
-def tp_buffers(N, tpp, gen):
-    X = torch.rand(N, tpp.irreps_in1.dim, device="cuda", generator=gen)
-    Y = torch.rand(N, tpp.irreps_in2.dim, device="cuda", generator=gen)
-    W = torch.rand(N, tpp.weight_numel, device="cuda", generator=gen)
-    return (X, Y, W)
-
-
-@pytest.fixture
-def conv_buffers(edge_index, tpp, gen):
-    X = torch.rand(
-        edge_index.num_rows, tpp.irreps_in1.dim, device="cuda", generator=gen
-    )
-    Y = torch.rand(
-        edge_index.num_cols, tpp.irreps_in2.dim, device="cuda", generator=gen
-    )
-    W = torch.rand(edge_index.num_cols, tpp.weight_numel, device="cuda", generator=gen)
-    return (X, Y, W, edge_index[0], edge_index[1])
-
-
-@pytest.fixture
-def oeq_tp_fwd(tpp, tp_buffers):
-    tp_oeq = TensorProduct(tpp)
-    return Executable(tp_oeq, tp_buffers), [KE("forward", 1)]
-
-
-@pytest.fixture
-def oeq_tp_bwd(tpp, tp_buffers):
-    tp_oeq = TensorProduct(tpp)
-
-    # Set up backward-executing callable
-    def backward_fn(X, Y, W):
-        X.requires_grad_(True)
-        Y.requires_grad_(True)
-        W.requires_grad_(True)
-        output = tp_oeq(X, Y, W).sum()
-        output.backward()
-        return output
-
-    return Executable(backward_fn, tp_buffers), [KE("forward", 1), KE("backward", 1)]
-
-
-@pytest.fixture
-def oeq_tp_double_bwd(tpp, tp_buffers):
-    tp_oeq = TensorProduct(tpp)
-
-    def double_backward_fn(X, Y, W):
-        # Forward pass
-        X.requires_grad_(True)
-        Y.requires_grad_(True)
-        W.requires_grad_(True)
-
-        # First forward
-        out = tp_oeq(X, Y, W)
-        out_grad = out.clone().detach().requires_grad_(True)
-
-        # First backward (compute gradients w.r.t inputs)
-        in1_grad, in2_grad, w_grad = torch.autograd.grad(
-            outputs=out,
-            inputs=(X, Y, W),
-            grad_outputs=out_grad,
-            create_graph=True,
-        )
-
-        # Dummy loss to propagate second backward
-        dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
-
-        # Second backward
-        dummy_grad = torch.tensor(1.0, device="cuda")
-        dummy.backward(
-            dummy_grad,
-            retain_graph=True,
-            inputs=(out_grad, X, Y, W),
-        )
-
-        return dummy
-
-    return Executable(double_backward_fn, tp_buffers), [
+def oeq_tp_double_bwd_kernel_expectations():
+    return [
         KE("forward", 1),
         KE("backward", 1),
         KE("double_backward_A", 1),
@@ -148,74 +58,21 @@ def oeq_tp_double_bwd(tpp, tp_buffers):
 
 
 @pytest.fixture
-def oeq_conv_atomic_fwd(tpp, conv_buffers):
-    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
-
-    return Executable(tp_conv, conv_buffers), [KE("forward", 1)]
+def oeq_conv_atomic_fwd_kernel_expectations():
+    return [KE("forward", 1)]
 
 
 @pytest.fixture
-def oeq_conv_atomic_bwd(tpp, conv_buffers):
-    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
-
-    # Set up backward-executing callable
-    def backward_fn(X, Y, W, receivers, senders):
-        X.requires_grad_(True)
-        Y.requires_grad_(True)
-        W.requires_grad_(True)
-        output = tp_conv(
-            X, Y, W, receivers, senders
-        ).sum()  # Scalar output for backward
-        output.backward()
-        return output
-
-    return Executable(
-        backward_fn,
-        conv_buffers,
-    ), [
+def oeq_conv_atomic_bwd_kernel_expectations():
+    return [
         KE("forward", 1),
         KE("backward", 1),
     ]
 
 
 @pytest.fixture
-def oeq_conv_atomic_double_bwd(tpp, conv_buffers):
-    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
-
-    def double_backward_fn(X, Y, W, receivers, senders):
-        # First forward pass
-        X.requires_grad_(True)
-        Y.requires_grad_(True)
-        W.requires_grad_(True)
-
-        out = tp_conv(X, Y, W, receivers, senders)
-        out_grad = out.clone().detach().requires_grad_(True)
-
-        # First backward (gradients w.r.t inputs)
-        in1_grad, in2_grad, w_grad = torch.autograd.grad(
-            outputs=out,
-            inputs=(X, Y, W),
-            grad_outputs=out_grad,
-            create_graph=True,
-        )
-
-        # Dummy loss for second backward
-        dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
-
-        # Second backward
-        dummy_grad = torch.tensor(1.0, device="cuda")
-        dummy.backward(
-            dummy_grad,
-            retain_graph=True,
-            inputs=(out_grad, X, Y, W),
-        )
-
-        return dummy
-
-    return Executable(
-        double_backward_fn,
-        conv_buffers,
-    ), [
+def oeq_conv_atomic_double_bwd_expectations():
+    return [
         KE("forward", 1),
         KE("backward", 1),
         KE("double_backward_A", 1),
@@ -224,31 +81,13 @@ def oeq_conv_atomic_double_bwd(tpp, conv_buffers):
 
 
 @pytest.fixture
-def oeq_conv_det_fwd(tpp, conv_buffers):
-    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
-
-    return Executable(tp_conv, conv_buffers), [KE("forward", 1), KE("fixup_forward", 1)]
+def oeq_conv_det_fwd_kernel_expectations():
+    return [KE("forward", 1), KE("fixup_forward", 1)]
 
 
-@pytest.fixture
-def oeq_conv_det_bwd(tpp, conv_buffers):
-    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
-
-    # Set up backward-executing callable
-    def backward_fn(X, Y, W, receivers, senders):
-        X.requires_grad_(True)
-        Y.requires_grad_(True)
-        W.requires_grad_(True)
-        output = tp_conv(
-            X, Y, W, receivers, senders
-        ).sum()  # Scalar output for backward
-        output.backward()
-        return output
-
-    return Executable(
-        backward_fn,
-        conv_buffers,
-    ), [
+@pytest.fixture()
+def oeq_conv_det_bwd_kernel_expectations():
+    return [
         KE("forward", 1),
         KE("fixup_forward", 1),
         KE("backward", 1),
@@ -256,44 +95,9 @@ def oeq_conv_det_bwd(tpp, conv_buffers):
     ]
 
 
-@pytest.fixture
-def oeq_conv_det_double_bwd(tpp, conv_buffers):
-    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
-
-    def double_backward_fn(X, Y, W, receivers, senders):
-        # First forward pass
-        X.requires_grad_(True)
-        Y.requires_grad_(True)
-        W.requires_grad_(True)
-
-        out = tp_conv(X, Y, W, receivers, senders)
-        out_grad = out.clone().detach().requires_grad_(True)
-
-        # First backward (gradients w.r.t inputs)
-        in1_grad, in2_grad, w_grad = torch.autograd.grad(
-            outputs=out,
-            inputs=(X, Y, W),
-            grad_outputs=out_grad,
-            create_graph=True,
-        )
-
-        # Dummy loss for second backward
-        dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
-
-        # Second backward
-        dummy_grad = torch.tensor(1.0, device="cuda")
-        dummy.backward(
-            dummy_grad,
-            retain_graph=True,
-            inputs=(out_grad, X, Y, W),
-        )
-
-        return dummy
-
-    return Executable(
-        double_backward_fn,
-        conv_buffers,
-    ), [
+@pytest.fixture()
+def oeq_conv_det_double_bwd_kernel_expectations():
+    return [
         KE("forward", 1),
         KE("fixup_forward", 2),
         KE("backward", 1),
@@ -306,19 +110,40 @@ def oeq_conv_det_double_bwd(tpp, conv_buffers):
 
 @pytest.fixture(
     params=[
-        "oeq_tp_fwd",
-        "oeq_tp_bwd",
-        "oeq_tp_double_bwd",
-        "oeq_conv_atomic_fwd",
-        "oeq_conv_atomic_bwd",
-        "oeq_conv_atomic_double_bwd",
-        "oeq_conv_det_fwd",
-        "oeq_conv_det_bwd",
-        "oeq_conv_det_double_bwd",
-    ],
+        (lf("simple_oeq_tp_fwd_executable"), lf("oeq_tp_fwd_kernel_expectations")),
+        (lf("simple_oeq_tp_bwd_executable"), lf("oeq_tp_bwd_kernel_expectations")),
+        (
+            lf("simple_oeq_tp_double_bwd_executable"),
+            lf("oeq_tp_double_bwd_kernel_expectations"),
+        ),
+        (
+            lf("simple_oeq_conv_atomic_fwd_executable"),
+            lf("oeq_conv_atomic_fwd_kernel_expectations"),
+        ),
+        (
+            lf("simple_oeq_conv_atomic_bwd_executable"),
+            lf("oeq_conv_atomic_bwd_kernel_expectations"),
+        ),
+        (
+            lf("simple_oeq_conv_atomic_double_bwd_executable"),
+            lf("oeq_conv_atomic_double_bwd_expectations"),
+        ),
+        (
+            lf("simple_oeq_conv_det_fwd_executable"),
+            lf("oeq_conv_det_fwd_kernel_expectations"),
+        ),
+        (
+            lf("simple_oeq_conv_det_bwd_executable"),
+            lf("oeq_conv_det_bwd_kernel_expectations"),
+        ),
+        (
+            lf("simple_oeq_conv_det_double_bwd_executable"),
+            lf("oeq_conv_det_double_bwd_kernel_expectations"),
+        ),
+    ]
 )
 def executable_and_expectations(request):
-    yield request.getfixturevalue(request.param)
+    return request.param
 
 
 def test_separate_streams(
