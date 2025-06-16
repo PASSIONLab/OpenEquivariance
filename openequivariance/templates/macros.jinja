@@ -95,15 +95,15 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
 {%- macro set_launch_bound_variables(config) %}
     {%- set threads_per_warp = config.warp_size %}
     {%- set warps_per_block = divide(config.num_threads, config.warp_size) %}
-    int t_idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int warp_id = t_idx / {{ threads_per_warp }};
-    int lane_id = t_idx % {{ threads_per_warp }};
-    int warp_loc = warp_id % {{ warps_per_block }};
-    size_t warps_launched = blockDim.x * gridDim.x / {{ threads_per_warp }};
-    size_t nnz_per_warp = (num_products + warps_launched - 1) / warps_launched;
+    const int t_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int warp_id = t_idx / {{ threads_per_warp }};
+    const int lane_id = threadIdx.x % {{ threads_per_warp }};
+    const int warp_loc = warp_id % {{ warps_per_block }};
+    const size_t warps_launched = blockDim.x * gridDim.x / {{ threads_per_warp }};
+    const size_t nnz_per_warp = (num_products + warps_launched - 1) / warps_launched;
 
-    size_t start = nnz_per_warp * ((size_t) warp_id);
-    size_t end = min(start + nnz_per_warp, num_products);
+    const size_t start = nnz_per_warp * ((size_t) warp_id);
+    const size_t end = min(start + nnz_per_warp, num_products);
 {%- endmacro %}
 
 {%- macro transpose_smem_A(irreps, smem_ptr) %}

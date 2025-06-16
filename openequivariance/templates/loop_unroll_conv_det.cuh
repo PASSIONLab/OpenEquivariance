@@ -68,7 +68,8 @@ __global__ void
 {{ generate_fixup_kernel("fixup_forward", forward_schedule, forward_schedule.L3.dim, forward_workspace_offset) }}
 
 template<int ROW_LEN>
-__device__ __forceinline__ void kahanAdd(IRREP_T* c_arr, IRREP_T* sum_arr, int lane_id) {
+__device__ __forceinline__ void kahanAdd(IRREP_T* c_arr, IRREP_T* sum_arr) { 
+    int lane_id = threadIdx.x % THREADS_PER_WARP;
     c_arr += lane_id;
     sum_arr += lane_id;
     #pragma unroll 
@@ -156,7 +157,8 @@ forward(
             __syncwarp();
 
             {%- if forward_schedule.kahan %}
-                kahanAdd<{{segment.L3.dim}}>(L3_kahan_smem, L3_smem, lane_id);
+                kahanAdd<{{segment.L3.dim}}>(L3_kahan_smem, L3_smem);
+                __syncwarp();
             {%- endif %}
 
             bool changeRow = (i < end - 1) && (row != rows[i+1]);
@@ -266,7 +268,7 @@ backward(IRREP_T* L1_in, IRREP_T* L1_grad,
             __syncwarp();
 
             {%- if backward_schedule.kahan %}
-                kahanAdd<{{segment.L1.dim}}>(L1_kahan_smem, L1_grad_smem, lane_id);
+                kahanAdd<{{segment.L1.dim}}>(L1_kahan_smem, L1_grad_smem);
             {%- endif %}
 
             bool changeRow = (i < end - 1) && (col != cols[i+1]);
@@ -380,7 +382,7 @@ double_backward_A(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
             }
 
             {%- if forward_schedule.kahan %}
-                kahanAdd<{{segment.L3.dim}}>(L3_kahan_smem, L3_smem, lane_id);
+                kahanAdd<{{segment.L3.dim}}>(L3_kahan_smem, L3_smem);
             {%- endif %}
 
             bool changeRow = (i < end - 1) && (row != rows[i+1]);
@@ -512,7 +514,7 @@ double_backward_B(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
             }
 
             {%- if backward_schedule.kahan %}
-                kahanAdd<{{segment.L1.dim}}>(L1_kahan_smem, L1_grad_smem, lane_id);
+                kahanAdd<{{segment.L1.dim}}>(L1_kahan_smem, L1_grad_smem);
             {%- endif %}
 
             IRREP_T* l1_grad_shft = L1_grad + col * {{schedule.L1.dim}} + lane_id;

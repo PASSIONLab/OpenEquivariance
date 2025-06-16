@@ -4,8 +4,7 @@
 
 template<typename T> 
 __device__ __forceinline__ void {{name}}(const T* __restrict__ A, const T* __restrict__ B, T* C) {    
-    int t_idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int lane_id = t_idx % {{warp_size}};
+    int lane_id = threadIdx.x % {{warp_size}};
 
     int const rpt = {{(M + TILES_PER_COL - 1) // TILES_PER_COL}};
     int const cpt = {{(N + TILES_PER_ROW - 1) // TILES_PER_ROW}};
