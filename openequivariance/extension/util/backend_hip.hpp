@@ -199,7 +199,6 @@ public:
     HIPJITKernel(string plaintext) :
         kernel_plaintext(plaintext) {
 
-        //HIP_ERRCHK(hipFree(0)); // No-op to initialize the primary context 
         HIPRTC_SAFE_CALL(
         hiprtcCreateProgram( &prog,                    // prog
                             kernel_plaintext.c_str(),  // buffer
