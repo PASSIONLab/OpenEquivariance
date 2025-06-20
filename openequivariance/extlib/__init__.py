@@ -2,10 +2,10 @@
 import sys
 import os
 import warnings
+import sysconfig
 from pathlib import Path
 
 from openequivariance.benchmark.logging_utils import getLogger
-from distutils import sysconfig
 
 oeq_root = str(Path(__file__).parent.parent)
 
