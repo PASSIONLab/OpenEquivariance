@@ -96,7 +96,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
                 weights.contiguous(),
             )
             L3_out = torch.empty(
-                (L1_in_c.shape[0], self.L3.dim), dtype=L1_in.dtype, device="cuda"
+                (L1_in_c.shape[0], self.L3.dim), dtype=L1_in.dtype, device=L1_in.device
             )
             self.forward_raw(
                 L1_in_c.shape[0],
