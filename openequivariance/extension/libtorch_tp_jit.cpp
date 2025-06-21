@@ -167,8 +167,8 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_backward(
         const torch::Tensor &L3_grad) {
 
     int64_t num_batch = L1_in.sizes()[0];
-    torch::Tensor L1_grad = torch::empty(L1_in.sizes(), L1_in.options());
-    torch::Tensor L2_grad = torch::empty(L2_in.sizes(), L2_in.options());
+    torch::Tensor L1_grad = torch::zeros(L1_in.sizes(), L1_in.options());
+    torch::Tensor L2_grad = torch::zeros(L2_in.sizes(), L2_in.options());
     torch::Tensor W_grad = torch::empty(W.sizes(), W.options());
 
     if(jit_instance->shared_weights == 1) {
@@ -207,8 +207,8 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_
     Stream stream = get_current_stream();
 
     int64_t num_batch = L1_in.sizes()[0]; // Declaring outputs
-    torch::Tensor L1_grad = torch::empty(L1_in.sizes(), L1_in.options());
-    torch::Tensor L2_grad = torch::empty(L2_in.sizes(), L2_in.options());
+    torch::Tensor L1_grad = torch::zeros(L1_in.sizes(), L1_in.options());
+    torch::Tensor L2_grad = torch::zeros(L2_in.sizes(), L2_in.options());
     torch::Tensor W_grad = torch::empty(W.sizes(), W.options());
     torch::Tensor L3_dgrad = torch::empty(L3_grad.sizes(), L3_grad.options());
 
@@ -402,7 +402,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
     int64_t nnz = rows.sizes()[0];
     int64_t node_count = L1_in.sizes()[0];
     torch::Tensor L1_grad = torch::zeros(L1_in.sizes(), L1_in.options());
-    torch::Tensor L2_grad = torch::empty(L2_in.sizes(), L2_in.options());
+    torch::Tensor L2_grad = torch::zeros(L2_in.sizes(), L2_in.options());
     torch::Tensor W_grad = torch::empty(W.sizes(), W.options());
     
     torch::Tensor L1_in_contig = L1_in.contiguous();
@@ -452,7 +452,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_doubl
     int64_t nnz = rows.sizes()[0];
     int64_t node_count = L1_in.sizes()[0];
     torch::Tensor L1_grad = torch::zeros(L1_in.sizes(), L1_in.options());
-    torch::Tensor L2_grad = torch::empty(L2_in.sizes(), L2_in.options());
+    torch::Tensor L2_grad = torch::zeros(L2_in.sizes(), L2_in.options());
     torch::Tensor W_grad = torch::empty(W.sizes(), W.options());
     torch::Tensor L3_dgrad = torch::zeros(L3_grad.sizes(), L3_grad.options());
 

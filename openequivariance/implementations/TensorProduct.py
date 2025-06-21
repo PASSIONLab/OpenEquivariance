@@ -96,7 +96,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
                 weights.contiguous(),
             )
             L3_out = torch.empty(
-                (L1_in_c.shape[0], self.L3.dim), dtype=L1_in.dtype, device="cuda"
+                (L1_in_c.shape[0], self.L3.dim), dtype=L1_in.dtype, device=L1_in.device
             )
             self.forward_raw(
                 L1_in_c.shape[0],
@@ -125,8 +125,8 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
             weights: torch.Tensor,
             L3_grad: torch.Tensor,
         ) -> typing.List[torch.Tensor]:
-            L1_grad = torch.empty_like(L1_in)
-            L2_grad = torch.empty_like(L2_in)
+            L1_grad = torch.zeros_like(L1_in)
+            L2_grad = torch.zeros_like(L2_in)
             weights_grad = torch.empty_like(weights)
 
             if self.config.shared_weights:

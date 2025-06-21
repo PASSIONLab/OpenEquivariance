@@ -168,7 +168,6 @@ public:
     CUJITKernel(string plaintext) :
         kernel_plaintext(plaintext) {
 
-        CUDA_ERRCHK(cudaFree(0)); // No-op to initialize the primary context 
         NVRTC_SAFE_CALL(
         nvrtcCreateProgram( &prog,                     // prog
                             kernel_plaintext.c_str(),  // buffer
