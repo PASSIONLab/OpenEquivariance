@@ -60,7 +60,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
         self, x: torch.Tensor, y: torch.Tensor, W: torch.Tensor
     ) -> torch.Tensor:
         r"""
-        Computes :math:`W (x \otimes_{\\textrm{CG}} y)`, identical to
+        Computes :math:`W (x \otimes_{\textrm{CG}} y)`, identical to
         ``o3.TensorProduct.forward``.
 
         :param x: Tensor of shape ``[batch_size, problem.irreps_in1.dim()]``, datatype

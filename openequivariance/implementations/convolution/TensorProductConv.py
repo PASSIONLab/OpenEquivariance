@@ -18,7 +18,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 
     .. math::
 
-        z_i = \sum_{(i, j, e) \in \mathcal{N}(i)} W_e (x_j \otimes_{\\textrm{CG}} y_e)
+        z_i = \sum_{(i, j, e) \in \mathcal{N}(i)} W_e (x_j \otimes_{\textrm{CG}} y_e)
 
     where :math:`(i, j, e) \in \mathcal{N}(i)` indicates that node :math:`i` is connected to node :math:`j`
     via the edge indexed :math:`e`.
