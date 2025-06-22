@@ -86,6 +86,18 @@ def tp_and_inputs(request, problem_and_irreps):
             )
 
 
+def test_torch_load(tp_and_inputs):
+    tp, inputs = tp_and_inputs
+    original_result = tp.forward(*inputs)
+
+    with tempfile.NamedTemporaryFile(suffix=".pt") as tmp_file:
+        torch.save(tp, tmp_file.name)
+        loaded_tp = torch.load(tmp_file.name)
+
+    reloaded_result = loaded_tp(*inputs)
+    assert torch.allclose(original_result, reloaded_result, atol=1e-5)
+
+
 def test_jitscript(tp_and_inputs):
     tp, inputs = tp_and_inputs
     uncompiled_result = tp.forward(*inputs)

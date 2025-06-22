@@ -55,6 +55,26 @@ We do not (yet) support:
 
 If you have a use case for any of the unsupported features above, let us know.
 
+
+Torch Save / Load 
+---------------------------------------------------
+OpenEquivariance's ``TensorProduct`` / ``TensorProductConv`` modules 
+can be saved via ``torch.save`` and restored via ``torch.load``.
+You must call ``import openequivariance`` before attempting to load, i.e.
+
+.. code-block::
+
+    import torch
+    import openequivariance
+    module = torch.load("my_module_with_tp.pt")
+
+If you do NOT use ``torch.compile`` or ``torch.export``, these modules 
+can be loaded on a platform with a distinct GPU architecture from the saving
+platform. In this case, kernels are recompiled dynamically. After compilation, 
+a module may only be used on a platform with GPU architecture identical 
+to the machine that saved it. 
+
+
 Compilation with JITScript, Export, and AOTInductor
 ---------------------------------------------------
 
@@ -71,7 +91,6 @@ NOTE: the AOTInductor test (and possibly export) fail
 unless you are using a Nightly
 build of PyTorch past 4/10/2025 due to incomplete support for 
 TorchBind in earlier versions.
-
 
 Multiple Devices and Streams 
 ----------------------------
