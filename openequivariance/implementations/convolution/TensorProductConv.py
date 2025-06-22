@@ -84,6 +84,14 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
         torch.nn.Module.to(self, *args, **kwargs)
         return self
 
+    def __getstate__(self):
+        return self.input_args
+    
+    def __setstate__(self, state):
+        torch.nn.Module.__init__(self)
+        self.input_args = state
+        self._init_class()
+
     def forward(
         self,
         X: torch.Tensor,
