@@ -10,7 +10,13 @@ except Exception as e:
 from pathlib import Path
 from importlib.metadata import version
 
-from openequivariance.implementations.e3nn_lite import TPProblem, Irrep, Irreps, _MulIr, Instruction
+from openequivariance.implementations.e3nn_lite import (
+    TPProblem,
+    Irrep,
+    Irreps,
+    _MulIr,
+    Instruction,
+)
 from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance.implementations.convolution.TensorProductConv import (
     TensorProductConv,
@@ -42,17 +48,20 @@ def torch_ext_so_path():
     """
     return openequivariance.extlib.torch_module.__file__
 
-torch.serialization.add_safe_globals([
-                TensorProduct, 
-                TensorProductConv, 
-                TPProblem, 
-                Irrep,
-                Irreps,
-                _MulIr,
-                Instruction,
-                np.float32,
-                np.float64
-])
+
+torch.serialization.add_safe_globals(
+    [
+        TensorProduct,
+        TensorProductConv,
+        TPProblem,
+        Irrep,
+        Irreps,
+        _MulIr,
+        Instruction,
+        np.float32,
+        np.float64,
+    ]
+)
 
 LINKED_LIBPYTHON = openequivariance.extlib.LINKED_LIBPYTHON
 LINKED_LIBPYTHON_ERROR = openequivariance.extlib.LINKED_LIBPYTHON_ERROR

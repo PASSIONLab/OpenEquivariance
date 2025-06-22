@@ -54,7 +54,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
 
     def __getstate__(self):
         return self.input_args
-    
+
     def __setstate__(self, state):
         torch.nn.Module.__init__(self)
         self.input_args = state

@@ -85,6 +85,7 @@ def tp_and_inputs(request, problem_and_irreps):
                 sender_perm,
             )
 
+
 def test_torch_load(tp_and_inputs):
     tp, inputs = tp_and_inputs
     original_result = tp.forward(*inputs)
