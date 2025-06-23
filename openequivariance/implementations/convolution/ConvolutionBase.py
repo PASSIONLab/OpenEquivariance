@@ -9,6 +9,7 @@ from openequivariance.benchmark.random_buffer_utils import (
 from openequivariance.benchmark.logging_utils import getLogger, bcolors
 from openequivariance.benchmark.correctness_utils import check_similiarity
 from openequivariance.implementations.e3nn_lite import wigner_3j
+from openequivariance.implementations.utils import benchmark
 
 logger = getLogger()
 
@@ -317,93 +318,25 @@ class ConvolutionBase:
         assert graph.rows.dtype == self.idx_dtype
         assert graph.cols.dtype == self.idx_dtype
 
-        time_millis = np.zeros(num_iter, dtype=np.float32)
-        timer = GPUTimer()
+        torch_L1_in = torch.tensor(L1_in, device="cuda")
+        torch_L2_in = torch.tensor(L2_in, device="cuda")
+        torch_weights = torch.tensor(weights, device="cuda")
 
-        if self.torch_op:
-            torch_L1_in = torch.tensor(L1_in, device="cuda")
-            torch_L2_in = torch.tensor(L2_in, device="cuda")
-            torch_weights = torch.tensor(weights, device="cuda")
+        torch_rows = torch.tensor(graph.rows, device="cuda")
+        torch_cols = torch.tensor(graph.cols, device="cuda")
+        torch_transpose_perm = torch.tensor(graph.transpose_perm, device="cuda") if self.deterministic else None
 
-            torch_rows = torch.tensor(graph.rows, device="cuda")
-            torch_cols = torch.tensor(graph.cols, device="cuda")
-            torch_transpose_perm = torch.tensor(graph.transpose_perm, device="cuda")
+        mode = "gpu_time" if self.torch_op else "torch_kernel_time" 
+        func = lambda: self.forward(
+            torch_L1_in, torch_L2_in, torch_weights, torch_rows, torch_cols, torch_transpose_perm)
 
-            if not self.deterministic:
-                for i in range(num_warmup):
-                    self.forward(
-                        torch_L1_in, torch_L2_in, torch_weights, torch_rows, torch_cols
-                    )
-
-                for i in range(num_iter):
-                    timer.clear_L2_cache()
-                    timer.start()
-                    self.forward(
-                        torch_L1_in, torch_L2_in, torch_weights, torch_rows, torch_cols
-                    )
-                    time_millis[i] = timer.stop_clock_get_elapsed()
-            else:
-                for i in range(num_warmup):
-                    self.forward(
-                        torch_L1_in,
-                        torch_L2_in,
-                        torch_weights,
-                        torch_rows,
-                        torch_cols,
-                        torch_transpose_perm,
-                    )
-
-                for i in range(num_iter):
-                    timer.clear_L2_cache()
-                    timer.start()
-                    self.forward(
-                        torch_L1_in,
-                        torch_L2_in,
-                        torch_weights,
-                        torch_rows,
-                        torch_cols,
-                        torch_transpose_perm,
-                    )
-                    time_millis[i] = timer.stop_clock_get_elapsed()
-
-        elif not self.torch_op:
-            L1_d, L2_d, weights_d = (
-                DeviceBuffer(L1_in),
-                DeviceBuffer(L2_in),
-                DeviceBuffer(weights),
-            )
-            L3_d = DeviceBuffer(L3_buffer)
-            rows_d = DeviceBuffer(graph.rows)
-            cols_d = DeviceBuffer(graph.cols)
-
-            for i in range(num_warmup):
-                self.internal.exec_conv_rawptrs(
-                    L1_d.data_ptr(),
-                    L2_d.data_ptr(),
-                    weights_d.data_ptr(),
-                    L3_d.data_ptr(),
-                    rows_d.data_ptr(),
-                    cols_d.data_ptr(),
-                    graph.nnz,
-                    graph.node_count,
-                    self.workspace_ptr,
-                )
-
-            for i in range(num_iter):
-                timer.clear_L2_cache()
-                timer.start()
-                self.internal.exec_conv_rawptrs(
-                    L1_d.data_ptr(),
-                    L2_d.data_ptr(),
-                    weights_d.data_ptr(),
-                    L3_d.data_ptr(),
-                    rows_d.data_ptr(),
-                    cols_d.data_ptr(),
-                    graph.nnz,
-                    graph.node_count,
-                    self.workspace_ptr,
-                )
-                time_millis[i] = timer.stop_clock_get_elapsed()
+        time_millis = benchmark(
+            func,
+            num_warmup,
+            num_iter,
+            mode=mode,
+            kernel_names=["forward"],
+        )
 
         ops_per_tp, data_per_tp, _ = flops_data_per_tp(self.config, direction)
         ops_per_tp += self.config.irreps_out.dim
