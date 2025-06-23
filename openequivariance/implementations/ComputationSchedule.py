@@ -1,5 +1,5 @@
 import numpy as np
-from openequivariance.implementations.e3nn_lite import Irreps, TPProblem
+from openequivariance.implementations.e3nn_lite import Irreps, TPProblem, wigner_3j
 from itertools import accumulate
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.implementations.TensorProductBase import TensorProductBase
@@ -60,7 +60,7 @@ class CGTensor:
     def __init__(self, l1, l2, l3, normalization_factor, dtype):
         suffix_map = {np.float32: "f", np.float64: "L"}
 
-        tensor = TensorProductBase.load_cg_tensor(l1, l2, l3)
+        tensor = wigner_3j(l1, l2, l3)
         coord1, coord2, coord3 = [
             arr.astype(np.int32).copy() for arr in np.nonzero(tensor)
         ]

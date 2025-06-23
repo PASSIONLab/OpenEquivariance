@@ -4,8 +4,8 @@ from openequivariance.implementations.utils import (
     count_cg_non_zero,
     sparse_outer_product_work,
 )
-from openequivariance.implementations.TensorProductBase import TensorProductBase
-from openequivariance.implementations.e3nn_lite import TPProblem
+
+from openequivariance.implementations.e3nn_lite import TPProblem, wigner_3j
 from openequivariance.benchmark.logging_utils import getLogger
 import numpy as np
 
@@ -70,7 +70,7 @@ def calculate_minimum_flops_forward(tpp: TPProblem, batch_size: int) -> dict:
         )
 
         flops_count["outer_products"] += sparse_outer_product_work(
-            TensorProductBase.load_cg_tensor(l1, l2, l3)
+            wigner_3j(l1, l2, l3)
         )
         flops_count["CG_decomposition"] += count_cg_non_zero(l1, l2, l3) * (
             ins.path_shape[0] * ins.path_shape[1]

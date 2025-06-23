@@ -5,10 +5,10 @@ from openequivariance.benchmark.random_buffer_utils import (
     get_random_buffers_forward_conv,
     get_random_buffers_backward_conv,
 )
-from openequivariance.implementations.TensorProductBase import TensorProductBase
 
 from openequivariance.benchmark.logging_utils import getLogger, bcolors
 from openequivariance.benchmark.correctness_utils import check_similiarity
+from openequivariance.implementations.e3nn_lite import wigner_3j
 
 logger = getLogger()
 
@@ -41,7 +41,7 @@ def flops_data_per_tp(config, direction):
     ops_per_tp = 0
     nnz = 0
     for u, v, w, connection_mode, *others in config.instructions:
-        tensor = TensorProductBase.load_cg_tensor(L1[u].ir.l, L2[v].ir.l, L3[w].ir.l)
+        tensor = wigner_3j(L1[u].ir.l, L2[v].ir.l, L3[w].ir.l)
         local_nnz = np.count_nonzero(tensor)
         nnz += local_nnz
         ops_per_tp += (

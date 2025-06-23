@@ -2,7 +2,7 @@ import numpy as np
 
 from openequivariance.extlib import DeviceBuffer, GPUTimer
 
-from openequivariance.implementations.e3nn_lite import TPProblem, wigner_3j
+from openequivariance.implementations.e3nn_lite import TPProblem 
 from openequivariance.benchmark.logging_utils import getLogger
 
 logger = getLogger()
@@ -10,10 +10,6 @@ logger = getLogger()
 
 class TensorProductBase:
     next_tp_id = 0  # Assign unique IDs to each TP instance
-
-    @staticmethod
-    def load_cg_tensor(l1, l2, l3):
-        return wigner_3j(l1, l2, l3)
 
     """
     Each class implementation of a TensorProduct uses
