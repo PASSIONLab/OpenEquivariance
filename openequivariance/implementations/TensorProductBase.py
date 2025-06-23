@@ -165,9 +165,6 @@ class TensorProductBase:
         L2_in: np.ndarray,
         L3_buffer: np.ndarray,
         weights: np.ndarray,
-        L1_grad: np.ndarray,
-        L2_grad: np.ndarray,
-        weights_grad: np.ndarray,
         with_torch_overhead: bool = True,
     ) -> np.ndarray:
         torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
@@ -190,17 +187,10 @@ class TensorProductBase:
         num_iter: int,
         L1_in: np.ndarray,
         L2_in: np.ndarray,
-        L3_buffer: np.ndarray,
         weights: np.ndarray,
-        L1_grad: np.ndarray,
-        L2_grad: np.ndarray,
         weights_grad: np.ndarray,
-        L3_double_grad: np.ndarray,
         with_torch_overhead: bool = True,
     ) -> np.ndarray:
-        time_millis = np.zeros(num_iter, dtype=np.float32)
-        timer = GPUTimer()
-
         torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
         torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
         torch_weights = torch.tensor(weights, requires_grad=True, device="cuda")
@@ -238,7 +228,7 @@ class TensorProductBase:
                 grad_outputs=dummy_grad,
                 retain_graph=True)
         
-        return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=["double_backward"])
+        return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=["double_backward_A", "double_backward_B"])
 
 
     def calculate_memory_streamed_forward(self, batch_size: int) -> dict:

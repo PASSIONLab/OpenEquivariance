@@ -171,9 +171,6 @@ def benchmark_backward(
             L2_in=in2,
             L3_buffer=out_grad,
             weights=weights,
-            L1_grad=in1_grad,
-            L2_grad=in2_grad,
-            weights_grad=weights_grad,
             with_torch_overhead=with_torch_overhead,
         )
     except NotImplementedError:
@@ -249,12 +246,8 @@ def benchmark_double_backward(
             num_iter=num_iter,
             L1_in=in1,
             L2_in=in2,
-            L3_buffer=out_grad,
             weights=weights,
-            L1_grad=in1_grad,
-            L2_grad=in2_grad,
             weights_grad=weights_grad,
-            L3_double_grad=out_double_grad,
             with_torch_overhead=with_torch_overhead,
         )
     except NotImplementedError:
