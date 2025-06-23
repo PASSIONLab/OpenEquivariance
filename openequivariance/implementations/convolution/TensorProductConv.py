@@ -379,7 +379,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 
 class TensorProductConvKahan(TensorProductConv):
     def __init__(self, config, idx_dtype=np.int64, torch_op=True):
-        super().__init__(config, idx_dtype, torch_op, deterministic=True, kahan=True)
+        super().__init__(config, torch_op=torch_op, deterministic=True, kahan=True)
 
     @staticmethod
     def name():
@@ -388,7 +388,7 @@ class TensorProductConvKahan(TensorProductConv):
 
 class TensorProductConvDeterministic(TensorProductConv):
     def __init__(self, config, idx_dtype=np.int64, torch_op=True):
-        super().__init__(config, idx_dtype, torch_op, deterministic=True)
+        super().__init__(config, torch_op=torch_op, deterministic=True)
 
     @staticmethod
     def name():
@@ -397,7 +397,7 @@ class TensorProductConvDeterministic(TensorProductConv):
 
 class TensorProductConvAtomic(TensorProductConv):
     def __init__(self, config, idx_dtype=np.int64, torch_op=True):
-        super().__init__(config, idx_dtype, torch_op, deterministic=False)
+        super().__init__(config, torch_op=torch_op, deterministic=False)
 
     @staticmethod
     def name():
@@ -410,7 +410,7 @@ class TensorProductConvScatterSum(ConvolutionBase):
         global torch
         import torch
 
-        super().__init__(config, idx_dtype, torch_op=torch_op, deterministic=False)
+        super().__init__(config, idx_dtype=idx_dtype, torch_op=torch_op, deterministic=False)
 
         self.reference_tp = TensorProduct(config, torch_op=torch_op)
         from openequivariance.implementations.convolution.scatter import scatter_sum
