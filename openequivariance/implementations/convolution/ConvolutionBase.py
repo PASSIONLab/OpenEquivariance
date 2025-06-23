@@ -561,19 +561,19 @@ class ConvolutionBase:
 
         result = {
             "direction": direction,
-            "flops_per_tp": ops_per_tp,
-            "data_per_tp": data_per_tp,
+            "flops_per_tp": int(ops_per_tp),
+            "data_per_tp": int(data_per_tp),
             "time_millis": list(time_millis),
             "throughputs_gflops": list(throughputs_gflops),
             "bandwidth_gbps": list(bandwidth_gbps),
             "L1": str(self.config.irreps_in1),
             "L2": str(self.config.irreps_in2),
             "L3": str(self.config.irreps_out),
-            "graph_node_count": graph.node_count,
-            "graph_adj_nnz": graph.nnz,
-            "num_warmup": num_warmup,
-            "num_iter": num_iter,
-            "prng_seed": prng_seed,
+            "graph_node_count": int(graph.node_count),
+            "graph_adj_nnz": int(graph.nnz),
+            "num_warmup": int(num_warmup),
+            "num_iter": int(num_iter),
+            "prng_seed": int(prng_seed),
         }
 
         logger.info(

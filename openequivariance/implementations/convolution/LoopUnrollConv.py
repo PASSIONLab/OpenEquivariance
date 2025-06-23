@@ -22,6 +22,7 @@ class LoopUnrollConv(ConvolutionBase):
     def __init__(
         self,
         config,
+        *,
         idx_dtype=np.int64,
         torch_op=False,
         deterministic=False,
