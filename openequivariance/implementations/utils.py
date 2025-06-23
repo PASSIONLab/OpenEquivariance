@@ -125,7 +125,6 @@ def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
             timer.clear_L2_cache()
             timer.start()
             func()
-            timer.stop()
             time_millis[i] = timer.stop_clock_get_elapsed()
 
     else:

@@ -147,12 +147,13 @@ class TensorProductBase:
         L2_in: np.ndarray,
         L3_buffer: np.ndarray,
         weights: np.ndarray,
+        with_torch_overhead: bool = True,
     ) -> np.ndarray:
         torch_L1_in = torch.tensor(L1_in).to(device="cuda").detach()
         torch_L2_in = torch.tensor(L2_in).to(device="cuda").detach()
         torch_weights = torch.tensor(weights).to(device="cuda").detach()
 
-        mode = "gpu_time" if self.torch_op else "torch_kernel_time"
+        mode = "gpu_time" if with_torch_overhead else "torch_kernel_time"
         func = lambda: self.forward(torch_L1_in, torch_L2_in, torch_weights)
         return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=["forward"])
 
@@ -167,82 +168,21 @@ class TensorProductBase:
         L1_grad: np.ndarray,
         L2_grad: np.ndarray,
         weights_grad: np.ndarray,
+        with_torch_overhead: bool = True,
     ) -> np.ndarray:
-        time_millis = np.zeros(num_iter, dtype=np.float32)
-        timer = GPUTimer()
+        torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
+        torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
+        torch_weights = torch.tensor(weights, requires_grad=True, device="cuda")
+        torch_out = self.forward(torch_L1_in, torch_L2_in, torch_weights)
+        torch_L3_grad_in = torch.tensor(L3_buffer, device="cuda")
 
-        if self.torch_op:
-            torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
-            torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
-            torch_weights = torch.tensor(weights, requires_grad=True, device="cuda")
-            torch_out = self.forward(torch_L1_in, torch_L2_in, torch_weights)
-            torch_L3_grad_in = torch.tensor(L3_buffer, device="cuda")
-
-            for i in range(num_warmup):
-                torch_out.backward(
+        mode = "gpu_time" if with_torch_overhead else "torch_kernel_time"
+        func = lambda: torch_out.backward(
                     gradient=torch_L3_grad_in,
                     retain_graph=True,
-                    inputs=[torch_L1_in, torch_L2_in, torch_weights],
-                )
+                    inputs=[torch_L1_in, torch_L2_in, torch_weights])
 
-            for i in range(num_iter):
-                torch_L1_in.grad.zero_()
-                torch_L2_in.grad.zero_()
-                torch_weights.grad.zero_()
-
-                timer.clear_L2_cache()
-                timer.start()
-                torch_out.backward(
-                    gradient=torch_L3_grad_in,
-                    retain_graph=True,
-                    inputs=[torch_L1_in, torch_L2_in, torch_weights],
-                )
-                time_millis[i] = timer.stop_clock_get_elapsed()
-
-            L1_grad[:] = torch_L1_in.grad.numpy(force=True)
-            L2_grad[:] = torch_L2_in.grad.numpy(force=True)
-            weights_grad[:] = torch_weights.grad.numpy(force=True)
-        else:
-            batch = L1_in.shape[0]
-            L1_d, L2_d, L3_d = (
-                DeviceBuffer(L1_in),
-                DeviceBuffer(L2_in),
-                DeviceBuffer(L3_buffer),
-            )
-            L1_grad_d, L2_grad_d = DeviceBuffer(L1_grad), DeviceBuffer(L2_grad)
-            weights_d, weights_grad_d = (
-                DeviceBuffer(weights),
-                DeviceBuffer(weights_grad),
-            )
-
-            for i in range(num_warmup):
-                self.internal.backward_rawptr(
-                    batch,
-                    L1_d.data_ptr(),
-                    L1_grad_d.data_ptr(),
-                    L2_d.data_ptr(),
-                    L2_grad_d.data_ptr(),
-                    weights_d.data_ptr(),
-                    weights_grad_d.data_ptr(),
-                    L3_d.data_ptr(),
-                )
-
-            for i in range(num_iter):
-                timer.clear_L2_cache()
-                timer.start()
-                self.internal.backward_rawptr(
-                    batch,
-                    L1_d.data_ptr(),
-                    L1_grad_d.data_ptr(),
-                    L2_d.data_ptr(),
-                    L2_grad_d.data_ptr(),
-                    weights_d.data_ptr(),
-                    weights_grad_d.data_ptr(),
-                    L3_d.data_ptr(),
-                )
-                time_millis[i] = timer.stop_clock_get_elapsed()
-
-        return time_millis
+        return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=["backward"])
 
     def benchmark_double_backward(
         self,
@@ -256,6 +196,7 @@ class TensorProductBase:
         L2_grad: np.ndarray,
         weights_grad: np.ndarray,
         L3_double_grad: np.ndarray,
+        with_torch_overhead: bool = True,
     ) -> np.ndarray:
         time_millis = np.zeros(num_iter, dtype=np.float32)
         timer = GPUTimer()

@@ -184,7 +184,7 @@ class TestBenchmarkSuite:
                         num_warmup=self.num_warmup,
                         num_iter=self.num_iter,
                         prng_seed=self.prng_seed,
-                        torch_op=self.torch_op,
+                        with_torch_overhead=self.torch_op,
                     )
 
             if test.direction == "backward":
