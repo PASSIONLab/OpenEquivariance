@@ -4,6 +4,7 @@ from openequivariance.extlib import DeviceBuffer, GPUTimer
 
 from openequivariance.implementations.e3nn_lite import TPProblem 
 from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.implementations.utils import benchmark
 
 logger = getLogger()
 
@@ -147,55 +148,13 @@ class TensorProductBase:
         L3_buffer: np.ndarray,
         weights: np.ndarray,
     ) -> np.ndarray:
-        time_millis = np.zeros(num_iter, dtype=np.float32)
+        torch_L1_in = torch.tensor(L1_in).to(device="cuda").detach()
+        torch_L2_in = torch.tensor(L2_in).to(device="cuda").detach()
+        torch_weights = torch.tensor(weights).to(device="cuda").detach()
 
-        # GPUTimer introduces significantly less overhead when kernel runtime < 1ms
-        timer = GPUTimer()
-
-        if self.torch_op:
-            torch_L1_in = torch.tensor(L1_in).to(device="cuda").detach()
-            torch_L2_in = torch.tensor(L2_in).to(device="cuda").detach()
-            torch_weights = torch.tensor(weights).to(device="cuda").detach()
-
-            for i in range(num_warmup):
-                self.forward(torch_L1_in, torch_L2_in, torch_weights)
-
-            for i in range(num_iter):
-                timer.clear_L2_cache()
-                timer.start()
-                self.forward(torch_L1_in, torch_L2_in, torch_weights)
-                time_millis[i] = timer.stop_clock_get_elapsed()
-        else:
-            batch = L1_in.shape[0]
-            L1_d, L2_d, L3_d = (
-                DeviceBuffer(L1_in),
-                DeviceBuffer(L2_in),
-                DeviceBuffer(L3_buffer),
-            )
-            weights_d = DeviceBuffer(weights)
-
-            for i in range(num_warmup):
-                self.internal.exec_tensor_product_rawptr(
-                    batch,
-                    L1_d.data_ptr(),
-                    L2_d.data_ptr(),
-                    L3_d.data_ptr(),
-                    weights_d.data_ptr(),
-                )
-
-            for i in range(num_iter):
-                timer.clear_L2_cache()
-                timer.start()
-                self.internal.exec_tensor_product_rawptr(
-                    batch,
-                    L1_d.data_ptr(),
-                    L2_d.data_ptr(),
-                    L3_d.data_ptr(),
-                    weights_d.data_ptr(),
-                )
-                time_millis[i] = timer.stop_clock_get_elapsed()
-
-        return time_millis
+        mode = "gpu_time" if self.torch_op else "torch_kernel_time"
+        func = lambda: self.forward(torch_L1_in, torch_L2_in, torch_weights)
+        return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=["forward"])
 
     def benchmark_backward(
         self,
