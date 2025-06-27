@@ -5,9 +5,9 @@ from openequivariance.implementations.E3NNTensorProduct import E3NNTensorProduct
 
 
 class E3NNConv(ConvolutionBase):
-    def __init__(self, config, idx_dtype=np.int64, torch_op=True):
+    def __init__(self, config, *, idx_dtype=np.int64, torch_op=True):
         assert torch_op
-        super().__init__(config, idx_dtype, torch_op)
+        super().__init__(config, idx_dtype=idx_dtype, torch_op=torch_op)
 
         from e3nn import o3
         import torch
