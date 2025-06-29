@@ -8,6 +8,7 @@ from openequivariance.benchmark.plotting.plotting_utils import (
     grouped_barchart,
     calculate_tp_per_sec,
     load_benchmarks,
+    filter_experiments
 )
 
 
@@ -31,7 +32,7 @@ def plot_uvw(data_folder):
                         if b["benchmark results"]["rep_dtype"]
                         == "<class 'numpy.float32'>"
                     ]
-                    exp = filter(
+                    exp = filter_experiments(
                         f32_benches,
                         {
                             "config_label": desc,
@@ -54,7 +55,7 @@ def plot_uvw(data_folder):
                         if b["benchmark results"]["rep_dtype"]
                         == "<class 'numpy.float64'>"
                     ]
-                    exp = filter(
+                    exp = filter_experiments(
                         f64_benches,
                         {
                             "config_label": desc,

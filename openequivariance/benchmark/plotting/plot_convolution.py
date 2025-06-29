@@ -11,6 +11,7 @@ from openequivariance.benchmark.plotting.plotting_utils import (
     dtype_labelmap,
     grouped_barchart,
     load_benchmarks,
+    filter_experiments
 )
 
 
@@ -42,7 +43,7 @@ def plot_convolution(data_folder):
             for graph in graphs:
                 data[direction][dtype][graph_lmap[graph]] = {}
                 for impl in implementations:
-                    exp = filter(
+                    exp = filter_experiments(
                         benchmarks,
                         {
                             "graph": graph,

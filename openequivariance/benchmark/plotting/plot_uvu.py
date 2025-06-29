@@ -7,6 +7,7 @@ from openequivariance.benchmark.plotting.plotting_utils import (
     labelmap,
     grouped_barchart,
     load_benchmarks,
+    filter_experiments
 )
 
 
@@ -42,7 +43,7 @@ def plot_uvu(data_folder):
                     for b in benchmarks
                     if b["benchmark results"]["rep_dtype"] == "<class 'numpy.float32'>"
                 ]
-                exp = filter(
+                exp = filter_experiments(
                     f32_benches,
                     {
                         "config_label": desc,
@@ -66,7 +67,7 @@ def plot_uvu(data_folder):
                     for b in benchmarks
                     if b["benchmark results"]["rep_dtype"] == "<class 'numpy.float64'>"
                 ]
-                exp = filter(
+                exp = filter_experiments(
                     f64_benches,
                     {
                         "config_label": desc,
