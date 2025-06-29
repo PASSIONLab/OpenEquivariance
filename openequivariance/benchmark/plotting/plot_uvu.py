@@ -7,7 +7,7 @@ from openequivariance.benchmark.plotting.plotting_utils import (
     labelmap,
     grouped_barchart,
     load_benchmarks,
-    filter_experiments
+    filter_experiments,
 )
 
 

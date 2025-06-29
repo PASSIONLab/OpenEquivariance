@@ -8,7 +8,7 @@ from openequivariance.benchmark.plotting.plotting_utils import (
     grouped_barchart,
     calculate_tp_per_sec,
     load_benchmarks,
-    filter_experiments
+    filter_experiments,
 )
 
 

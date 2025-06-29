@@ -32,7 +32,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
            fixup-based algorithm. `Default`: ``False``.
     :param kahan: If ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
            the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
-    :param use_opaque: If ``True, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``.
+    :param use_opaque: If ``True``, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``.
     """
 
     def __init__(

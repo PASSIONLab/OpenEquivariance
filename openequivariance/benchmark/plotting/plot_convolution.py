@@ -11,7 +11,7 @@ from openequivariance.benchmark.plotting.plotting_utils import (
     dtype_labelmap,
     grouped_barchart,
     load_benchmarks,
-    filter_experiments
+    filter_experiments,
 )
 
 
