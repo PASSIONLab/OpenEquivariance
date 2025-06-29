@@ -22,12 +22,15 @@ class LoopUnrollConv(ConvolutionBase):
     def __init__(
         self,
         config,
-        idx_dtype=np.int64,
-        torch_op=False,
-        deterministic=False,
-        kahan=False,
+        *,
+        idx_dtype: type[np.generic] = np.int64,
+        torch_op: bool = False,
+        deterministic: bool = False,
+        kahan: bool = False,
     ):
-        super().__init__(config, idx_dtype, torch_op, deterministic)
+        super().__init__(
+            config, idx_dtype=idx_dtype, torch_op=torch_op, deterministic=deterministic
+        )
 
         if kahan:
             assert deterministic

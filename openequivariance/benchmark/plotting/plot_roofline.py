@@ -5,6 +5,7 @@ from openequivariance.benchmark.plotting.plotting_utils import (
     labelmap,
     load_benchmarks,
     roofline_plot,
+    filter_experiments,
 )
 
 
@@ -20,7 +21,7 @@ def plot_roofline(data_folder):
         for direction in ["forward", "backward"]:
             data[direction][desc] = {}
             for impl in implementations:
-                exp = filter(
+                exp = filter_experiments(
                     benchmarks,
                     {
                         "config_label": desc,

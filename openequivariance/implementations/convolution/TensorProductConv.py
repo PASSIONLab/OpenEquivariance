@@ -32,15 +32,16 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
            fixup-based algorithm. `Default`: ``False``.
     :param kahan: If ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
            the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
-    :param use_opaque: If ``True, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``.
+    :param use_opaque: If ``True``, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``.
     """
 
     def __init__(
         self,
         problem: TPProblem,
+        *,
         deterministic: bool = False,
         kahan: bool = False,
-        torch_op=True,
+        torch_op: bool = True,
         use_opaque: bool = False,
     ):
         torch.nn.Module.__init__(self)
@@ -378,8 +379,8 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 
 
 class TensorProductConvKahan(TensorProductConv):
-    def __init__(self, config, idx_dtype=np.int64, torch_op=True):
-        super().__init__(config, idx_dtype, torch_op, deterministic=True, kahan=True)
+    def __init__(self, config, *, torch_op=True):
+        super().__init__(config, torch_op=torch_op, deterministic=True, kahan=True)
 
     @staticmethod
     def name():
@@ -387,8 +388,8 @@ class TensorProductConvKahan(TensorProductConv):
 
 
 class TensorProductConvDeterministic(TensorProductConv):
-    def __init__(self, config, idx_dtype=np.int64, torch_op=True):
-        super().__init__(config, idx_dtype, torch_op, deterministic=True)
+    def __init__(self, config, *, torch_op=True):
+        super().__init__(config, torch_op=torch_op, deterministic=True)
 
     @staticmethod
     def name():
@@ -396,8 +397,8 @@ class TensorProductConvDeterministic(TensorProductConv):
 
 
 class TensorProductConvAtomic(TensorProductConv):
-    def __init__(self, config, idx_dtype=np.int64, torch_op=True):
-        super().__init__(config, idx_dtype, torch_op, deterministic=False)
+    def __init__(self, config, *, torch_op=True):
+        super().__init__(config, torch_op=torch_op, deterministic=False)
 
     @staticmethod
     def name():
@@ -405,12 +406,12 @@ class TensorProductConvAtomic(TensorProductConv):
 
 
 class TensorProductConvScatterSum(ConvolutionBase):
-    def __init__(self, config, idx_dtype=np.int64, torch_op=True):
+    def __init__(self, config, *, torch_op=True):
         assert torch_op
         global torch
         import torch
 
-        super().__init__(config, idx_dtype, torch_op=torch_op, deterministic=False)
+        super().__init__(config, torch_op=torch_op, deterministic=False)
 
         self.reference_tp = TensorProduct(config, torch_op=torch_op)
         from openequivariance.implementations.convolution.scatter import scatter_sum

@@ -64,7 +64,7 @@ def load_benchmarks(path: pathlib.Path):
     return benchmarks, metadata
 
 
-def filter(benchmarks, base, match_one=True):
+def filter_experiments(benchmarks, base, match_one=True):
     filtered_results = []
     for benchmark in benchmarks:
         matched = True
