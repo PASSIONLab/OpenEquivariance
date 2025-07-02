@@ -120,19 +120,13 @@ class LoopUnrollTP(TensorProductBase):
             },
         )
         logger.info("Kernel compiled!")
-
         logger.info(f"Kernel File Size: {len(self.jit_kernel) // 1024} KB")
 
-        self.reorder_weights_e3nn_to_oeq = (
-            lambda input, output, has_batch_dim: self.forward_schedule.reorder_weights(
-                input, output, "forward", has_batch_dim
-            )
-        )
-        self.reorder_weights_oeq_to_e3nn = (
-            lambda input, output, has_batch_dim: self.forward_schedule.reorder_weights(
-                input, output, "backward", has_batch_dim
-            )
-        )
+    def reorder_weights_e3nn_to_oeq(self, weights, has_batch_dim):
+        return self.forward_schedule.reorder_weights_e3nn_to_oeq(weights, has_batch_dim)
+    
+    def reorder_weights_oeq_to_e3nn(self, weights, has_batch_dim):
+        return self.forward_schedule.reorder_weights_oeq_to_e3nn(weights, has_batch_dim)
 
     @classmethod
     def register_torch_fakes(cls):

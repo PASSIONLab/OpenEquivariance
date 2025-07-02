@@ -32,7 +32,6 @@ class TensorProductBase:
             config.irreps_out,
         )
         self.irrep_dtype, self.weight_dtype = config.irrep_dtype, config.weight_dtype
-        self.reorder_weights_e3nn_to_oeq, self.reorder_weights_oeq_to_e3nn = None, None
 
         self.tp_id = TensorProductBase.next_tp_id
         TensorProductBase.next_tp_id += 1
@@ -76,13 +75,11 @@ class TensorProductBase:
         L3_out: np.ndarray,
         weights: np.ndarray,
     ) -> None:
-        weights_chunked = np.zeros_like(weights)
+        weights_chunked = weights 
         if self.reorder_weights_e3nn_to_oeq is not None:
-            self.reorder_weights_e3nn_to_oeq(
-                weights, weights_chunked, not self.config.shared_weights
+            weights_chunked = self.reorder_weights_e3nn_to_oeq(
+                weights, not self.config.shared_weights
             )
-        else:
-            weights_chunked = weights
 
         batch = L1_in.shape[0]
         L1_d = DeviceBuffer(L1_in)
@@ -101,13 +98,11 @@ class TensorProductBase:
     def backward_cpu(
         self, L1_in, L1_grad, L2_in, L2_grad, L3_grad, weights, weights_grad
     ) -> None:
-        weights_chunked = np.zeros_like(weights)
+        weights_chunked = weights 
         if self.reorder_weights_e3nn_to_oeq is not None:
-            self.reorder_weights_e3nn_to_oeq(
-                weights, weights_chunked, not self.config.shared_weights
+            weights_chunked = self.reorder_weights_e3nn_to_oeq(
+                weights, not self.config.shared_weights
             )
-        else:
-            weights_chunked = weights
 
         batch = L1_in.shape[0]
         L1_d, L2_d, L3_d = (
@@ -137,9 +132,8 @@ class TensorProductBase:
         weights_grad_d.copy_to_host()
 
         if self.reorder_weights_oeq_to_e3nn is not None:
-            weights_grad_copy = weights_grad.copy()
-            self.reorder_weights_oeq_to_e3nn(
-                weights_grad_copy, weights_grad, not self.config.shared_weights
+            weights_grad[:] = self.reorder_weights_oeq_to_e3nn(
+                weights_grad, not self.config.shared_weights
             )
 
     def benchmark_forward(
