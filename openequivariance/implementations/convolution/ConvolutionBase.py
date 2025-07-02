@@ -87,7 +87,14 @@ class CoordGraph:
 class ConvolutionBase:
     next_conv_id = 0  # Used to assign unique IDs to each conv instance
 
-    def __init__(self, config, idx_dtype, torch_op=False, deterministic=False):
+    def __init__(
+        self,
+        config,
+        *,
+        idx_dtype: type[np.generic] = np.int64,
+        torch_op=False,
+        deterministic=False,
+    ):
         config = config.clone()
         self.config = config
         self.L1, self.L2, self.L3 = (
@@ -560,8 +567,8 @@ class ConvolutionBase:
 
         result = {
             "direction": direction,
-            "flops_per_tp": ops_per_tp,
-            "data_per_tp": data_per_tp,
+            "flops_per_tp": int(ops_per_tp),
+            "data_per_tp": int(data_per_tp),
             "time_millis": list(time_millis),
             "throughputs_gflops": list(throughputs_gflops),
             "bandwidth_gbps": list(bandwidth_gbps),
