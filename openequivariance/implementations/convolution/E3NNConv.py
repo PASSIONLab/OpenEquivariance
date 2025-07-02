@@ -1,7 +1,9 @@
 import numpy as np
 
-import torch
-from openequivariance.implementations.convolution.ConvolutionBase import ConvolutionBase
+from openequivariance.implementations.convolution.ConvolutionBase import (
+    ConvolutionBase,
+    scatter_forward,
+)
 from openequivariance.implementations.E3NNTensorProduct import E3NNTensorProduct
 
 
@@ -35,21 +37,7 @@ class E3NNConv(ConvolutionBase):
         if config.irrep_dtype == np.float64:
             torch.set_default_dtype(torch.float32)  # Reset to default
 
-    def forward(self, L1_in, L2_in, weights, rows, cols):
-        messages = self.reference_tp(L1_in[cols], L2_in, weights)
-
-        L3_dim = messages.size(1)
-        num_rows = L1_in.size(0)
-
-        idx = rows.unsqueeze(1).expand(-1, L3_dim)
-        out = messages.new_zeros((num_rows, L3_dim))
-
-        return torch.scatter_add(
-            input=out,
-            dim=0,
-            index=idx,
-            src=messages,
-        )
+    forward = scatter_forward
 
     @staticmethod
     def name():
