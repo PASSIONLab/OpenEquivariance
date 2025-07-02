@@ -124,7 +124,7 @@ class LoopUnrollTP(TensorProductBase):
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
         return self.forward_schedule.reorder_weights_from_e3nn(weights, has_batch_dim)
-    
+
     def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
         return self.forward_schedule.reorder_weights_to_e3nn(weights, has_batch_dim)
 
@@ -171,13 +171,13 @@ class LoopUnrollTP(TensorProductBase):
                 self.dbl_bwd_config = state["dbl_bwd_config"]
                 self.kernel_dims = state["kernel_dims"]
 
-            def exec_tensor_product_rawptr(*args, **kwargs): 
+            def exec_tensor_product_rawptr(*args, **kwargs):
                 pass
 
             def backward_rawptr(*args, **kwargs):
                 pass
 
-            def get_L3_dim(self):  
+            def get_L3_dim(self):
                 return self.kernel_dims["L3_dim"]
 
         @torch.library.register_fake("libtorch_tp_jit::jit_tp_forward")

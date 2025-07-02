@@ -38,9 +38,9 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
             self.forward = self.forward_opaque
 
     def to(self, *args, **kwargs):
-        r'''
+        r"""
         See `torch.nn.Module.to() <https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.to>`_.
-        '''
+        """
         device, dtype, non_blocking, convert_to_format = torch._C._nn._parse_to(
             *args, **kwargs
         )

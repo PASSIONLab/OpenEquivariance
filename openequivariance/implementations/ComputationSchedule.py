@@ -629,9 +629,9 @@ class ComputationSchedule:
         If has_batch_dim is true, the first dimension of the input weight matrix
         is treated as the batch dimension.
         """
-        import torch # TODO-someday: no need to specialize this to PyTorch
+        import torch  # TODO-someday: no need to specialize this to PyTorch
 
-        weights_out = torch.zeros_like(weights_in) 
+        weights_out = torch.zeros_like(weights_in)
         assert direction in ["forward", "backward"]
         for i, child_inst in enumerate(self.problem_splitter.new_instructions):
             parent_start, parent_end = (
@@ -694,7 +694,7 @@ class ComputationSchedule:
         weights_in = torch.from_numpy(weights_in.copy())
         result = self.reorder_weights(weights_in, direction, has_batch_dim)
         return result.detach().cpu().numpy().copy()
-    
+
     def reorder_weights_from_e3nn(self, weights_in, has_batch_dim):
         import torch
 
@@ -702,7 +702,7 @@ class ComputationSchedule:
             return self.reorder_weights_numpy(weights_in, "forward", has_batch_dim)
         elif isinstance(weights_in, torch.Tensor):
             return self.reorder_weights(weights_in, "forward", has_batch_dim)
-        
+
     def reorder_weights_to_e3nn(self, weights_in, has_batch_dim):
         import torch
 

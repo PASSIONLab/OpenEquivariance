@@ -224,7 +224,7 @@ class LoopUnrollConv(ConvolutionBase):
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
         return self.forward_schedule.reorder_weights_from_e3nn(weights, has_batch_dim)
-    
+
     def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
         return self.forward_schedule.reorder_weights_to_e3nn(weights, has_batch_dim)
 
@@ -286,9 +286,8 @@ class LoopUnrollConv(ConvolutionBase):
             def double_backward_rawptrs(*args, **kwargs):
                 pass
 
-            def get_L3_dim(self):  
+            def get_L3_dim(self):
                 return self.kernel_dims["L3_dim"]
-        
 
         @torch.library.register_fake("libtorch_tp_jit::jit_conv_forward")
         def fake_forward(
