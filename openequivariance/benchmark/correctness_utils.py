@@ -214,9 +214,7 @@ def correctness_double_backward(
         if impl == CUETensorProduct and problem.shared_weights:
             weights = weights[np.newaxis, :]
 
-        weights_reordered = weights
-        if tp.reorder_weights_e3nn_to_oeq is not None:
-            weights[:] = tp.reorder_weights_e3nn_to_oeq(weights, not tp.config.shared_weights)
+        weights_reordered = tp.reorder_weights_from_e3nn(weights, not tp.config.shared_weights)
 
         in1_torch = torch.tensor(in1, device="cuda", requires_grad=True)
         in2_torch = torch.tensor(in2, device="cuda", requires_grad=True)
@@ -244,10 +242,9 @@ def correctness_double_backward(
         )
 
         weights_grad = weights_torch.grad.detach().cpu().numpy()
-        if tp.reorder_weights_oeq_to_e3nn is not None:
-            weights_grad[:] = tp.reorder_weights_oeq_to_e3nn(
-                weights_grad, not tp.config.shared_weights
-            )
+        weights_grad = tp.reorder_weights_to_e3nn(
+            weights_grad, not tp.config.shared_weights
+        )
 
         tensors.append(
             (

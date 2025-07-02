@@ -42,6 +42,12 @@ class TensorProductBase:
 
     def __call__(self, L1_in, L2_in, weights):
         return self.forward(L1_in, L2_in, weights)
+    
+    def reorder_weights_from_e3nn(self, weights, has_batch_dim):
+        return weights
+    
+    def reorder_weights_to_e3nn(self, weights, has_batch_dim):
+        return weights
 
     def forward_raw(
         self,
@@ -75,11 +81,8 @@ class TensorProductBase:
         L3_out: np.ndarray,
         weights: np.ndarray,
     ) -> None:
-        weights_chunked = weights 
-        if self.reorder_weights_e3nn_to_oeq is not None:
-            weights_chunked = self.reorder_weights_e3nn_to_oeq(
-                weights, not self.config.shared_weights
-            )
+
+        weights_chunked = self.reorder_weights_from_e3nn(weights, not self.config.shared_weights)
 
         batch = L1_in.shape[0]
         L1_d = DeviceBuffer(L1_in)
@@ -98,11 +101,10 @@ class TensorProductBase:
     def backward_cpu(
         self, L1_in, L1_grad, L2_in, L2_grad, L3_grad, weights, weights_grad
     ) -> None:
-        weights_chunked = weights 
-        if self.reorder_weights_e3nn_to_oeq is not None:
-            weights_chunked = self.reorder_weights_e3nn_to_oeq(
-                weights, not self.config.shared_weights
-            )
+
+        weights_chunked = self.reorder_weights_from_e3nn(
+            weights, not self.config.shared_weights
+        )
 
         batch = L1_in.shape[0]
         L1_d, L2_d, L3_d = (
@@ -131,10 +133,9 @@ class TensorProductBase:
         L2_grad_d.copy_to_host()
         weights_grad_d.copy_to_host()
 
-        if self.reorder_weights_oeq_to_e3nn is not None:
-            weights_grad[:] = self.reorder_weights_oeq_to_e3nn(
-                weights_grad, not self.config.shared_weights
-            )
+        weights_grad[:] = self.reorder_weights_to_e3nn(
+            weights_grad, not self.config.shared_weights
+        )
 
     def benchmark_forward(
         self,

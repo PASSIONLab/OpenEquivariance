@@ -695,7 +695,7 @@ class ComputationSchedule:
         self.reorder_weights(weights_in, direction, has_batch_dim)
         return weights_in.detach().numpy()
     
-    def reorder_weights_e3nn_to_oeq(self, weights_in, has_batch_dim):
+    def reorder_weights_from_e3nn(self, weights_in, has_batch_dim):
         import torch
 
         if isinstance(weights_in, np.ndarray):
@@ -703,7 +703,7 @@ class ComputationSchedule:
         elif isinstance(weights_in, torch.Tensor):
             return self.reorder_weights(weights_in, "forward", has_batch_dim)
         
-    def reorder_weights_oeq_to_e3nn(self, weights_in, has_batch_dim):
+    def reorder_weights_to_e3nn(self, weights_in, has_batch_dim):
         import torch
 
         if isinstance(weights_in, np.ndarray):

@@ -3,7 +3,10 @@ import itertools
 from typing import Iterator
 
 from openequivariance.implementations.CUETensorProduct import CUETensorProduct
-from openequivariance.implementations.convolution.ConvolutionBase import ConvolutionBase
+from openequivariance.implementations.convolution.ConvolutionBase import (
+    ConvolutionBase,
+    scatter_add_wrapper,
+)
 
 
 class CUEConv(ConvolutionBase):
@@ -16,15 +19,9 @@ class CUEConv(ConvolutionBase):
         self.reference_tp = CUETensorProduct(config, torch_op)
         self.cue_tp = self.reference_tp.cue_tp
 
-        from openequivariance.implementations.convolution.scatter import scatter_sum
-
-        self.scatter_sum = scatter_sum
-
     def forward(self, L1_in, L2_in, weights, rows, cols):
-        tp_outputs = self.cue_tp(L1_in[cols], L2_in, weights)
-        return self.scatter_sum(
-            src=tp_outputs, index=rows, dim=0, dim_size=L1_in.shape[0]
-        )
+        messages = self.reference_tp(L1_in[cols], L2_in, weights)
+        return scatter_add_wrapper(messages, rows, L1_in.size(0))
 
     @staticmethod
     def name():

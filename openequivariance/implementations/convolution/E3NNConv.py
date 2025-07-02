@@ -1,6 +1,9 @@
 import numpy as np
 
-from openequivariance.implementations.convolution.ConvolutionBase import ConvolutionBase
+from openequivariance.implementations.convolution.ConvolutionBase import (
+    ConvolutionBase,
+    scatter_add_wrapper,
+)
 from openequivariance.implementations.E3NNTensorProduct import E3NNTensorProduct
 
 
@@ -34,15 +37,9 @@ class E3NNConv(ConvolutionBase):
         if config.irrep_dtype == np.float64:
             torch.set_default_dtype(torch.float32)  # Reset to default
 
-        from openequivariance.implementations.convolution.scatter import scatter_sum
-
-        self.scatter_sum = scatter_sum
-
     def forward(self, L1_in, L2_in, weights, rows, cols):
-        tp_outputs = self.reference_tp(L1_in[cols], L2_in, weights)
-        return self.scatter_sum(
-            src=tp_outputs, index=rows, dim=0, dim_size=L1_in.shape[0]
-        )
+        messages = self.reference_tp(L1_in[cols], L2_in, weights)
+        return scatter_add_wrapper(messages, rows, L1_in.size(0))
 
     @staticmethod
     def name():
