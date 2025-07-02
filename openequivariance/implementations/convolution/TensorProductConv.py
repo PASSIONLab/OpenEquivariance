@@ -4,7 +4,10 @@ import numpy as np
 import torch
 
 from openequivariance import extlib
-from openequivariance.implementations.convolution.ConvolutionBase import ConvolutionBase
+from openequivariance.implementations.convolution.ConvolutionBase import (
+    ConvolutionBase,
+    scatter_add_wrapper,
+)
 from openequivariance.implementations.convolution.LoopUnrollConv import LoopUnrollConv
 from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance import TPProblem
@@ -32,15 +35,16 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
            fixup-based algorithm. `Default`: ``False``.
     :param kahan: If ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
            the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
-    :param use_opaque: If ``True, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``.
+    :param use_opaque: If ``True``, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``.
     """
 
     def __init__(
         self,
         problem: TPProblem,
+        *,
         deterministic: bool = False,
         kahan: bool = False,
-        torch_op=True,
+        torch_op: bool = True,
         use_opaque: bool = False,
     ):
         torch.nn.Module.__init__(self)
@@ -70,6 +74,9 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             self.forward = self.forward_opaque
 
     def to(self, *args, **kwargs):
+        r"""
+        See `torch.nn.Module.to() <https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.to>`_.
+        """
         device, dtype, non_blocking, convert_to_format = torch._C._nn._parse_to(
             *args, **kwargs
         )
@@ -378,7 +385,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
 
 
 class TensorProductConvKahan(TensorProductConv):
-    def __init__(self, config, idx_dtype=np.int64, torch_op=True):
+    def __init__(self, config, *, torch_op=True):
         super().__init__(config, torch_op=torch_op, deterministic=True, kahan=True)
 
     @staticmethod
@@ -387,7 +394,7 @@ class TensorProductConvKahan(TensorProductConv):
 
 
 class TensorProductConvDeterministic(TensorProductConv):
-    def __init__(self, config, idx_dtype=np.int64, torch_op=True):
+    def __init__(self, config, *, torch_op=True):
         super().__init__(config, torch_op=torch_op, deterministic=True)
 
     @staticmethod
@@ -396,7 +403,7 @@ class TensorProductConvDeterministic(TensorProductConv):
 
 
 class TensorProductConvAtomic(TensorProductConv):
-    def __init__(self, config, idx_dtype=np.int64, torch_op=True):
+    def __init__(self, config, *, torch_op=True):
         super().__init__(config, torch_op=torch_op, deterministic=False)
 
     @staticmethod
@@ -405,23 +412,20 @@ class TensorProductConvAtomic(TensorProductConv):
 
 
 class TensorProductConvScatterSum(ConvolutionBase):
-    def __init__(self, config, idx_dtype=np.int64, torch_op=True):
+    def __init__(self, config, *, torch_op=True):
         assert torch_op
         global torch
         import torch
 
-        super().__init__(config, idx_dtype=idx_dtype, torch_op=torch_op, deterministic=False)
+        super().__init__(config, torch_op=torch_op, deterministic=False)
 
         self.reference_tp = TensorProduct(config, torch_op=torch_op)
-        from openequivariance.implementations.convolution.scatter import scatter_sum
-
-        self.scatter_sum = scatter_sum
+        self.reorder_weights_from_e3nn = self.reference_tp.reorder_weights_from_e3nn
+        self.reorder_weights_to_e3nn = self.reference_tp.reorder_weights_to_e3nn
 
     def forward(self, L1_in, L2_in, weights, rows, cols):
-        tp_outputs = self.reference_tp(L1_in[cols], L2_in, weights)
-        return self.scatter_sum(
-            src=tp_outputs, index=rows, dim=0, dim_size=L1_in.shape[0]
-        )
+        messages = self.reference_tp(L1_in[cols], L2_in, weights)
+        return scatter_add_wrapper(messages, rows, L1_in.size(0))
 
     def forward_cpu(self, L1_in, L2_in, weights, L3_out, graph):
         tp_outputs = np.zeros((graph.nnz, self.L3.dim), dtype=L3_out.dtype)

@@ -620,7 +620,7 @@ class ComputationSchedule:
             smem=self.memory_per_warp * warps_per_block,
         )
 
-    def reorder_weights(self, weights_in, weights_out, direction, has_batch_dim):
+    def reorder_weights(self, weights_in, direction, has_batch_dim):
         """
         Reorders weights from the canonical e3nn form to the
         form that LoopUnrollTP can ingest. Can also reorder the parameters
@@ -629,7 +629,9 @@ class ComputationSchedule:
         If has_batch_dim is true, the first dimension of the input weight matrix
         is treated as the batch dimension.
         """
-        weights_out *= 0.0
+        import torch  # TODO-someday: no need to specialize this to PyTorch
+
+        weights_out = torch.zeros_like(weights_in)
         assert direction in ["forward", "backward"]
         for i, child_inst in enumerate(self.problem_splitter.new_instructions):
             parent_start, parent_end = (
@@ -670,7 +672,7 @@ class ComputationSchedule:
                 sliced_weights = weights_in[tuple(parent_range)].reshape(parent_shape)[
                     tuple(weights_subrange)
                 ]
-                weights_out[tuple(child_range)] = sliced_weights.transpose(
+                weights_out[tuple(child_range)] = sliced_weights.permute(
                     transpose_perm
                 ).reshape(reshape_size)
             elif direction == "backward":
@@ -678,8 +680,33 @@ class ComputationSchedule:
                 sliced_weights = (
                     weights_in[tuple(child_range)]
                     .reshape(transpose_child_shape)
-                    .transpose(transpose_perm)
+                    .permute(transpose_perm)
                 )
                 weights_out[tuple(parent_range)].reshape(parent_shape)[
                     tuple(weights_subrange)
                 ] = sliced_weights.flatten().reshape(child_shape)
+
+        return weights_out
+
+    def reorder_weights_numpy(self, weights_in, direction, has_batch_dim):
+        import torch
+
+        weights_in = torch.from_numpy(weights_in.copy())
+        result = self.reorder_weights(weights_in, direction, has_batch_dim)
+        return result.detach().cpu().numpy().copy()
+
+    def reorder_weights_from_e3nn(self, weights_in, has_batch_dim):
+        import torch
+
+        if isinstance(weights_in, np.ndarray):
+            return self.reorder_weights_numpy(weights_in, "forward", has_batch_dim)
+        elif isinstance(weights_in, torch.Tensor):
+            return self.reorder_weights(weights_in, "forward", has_batch_dim)
+
+    def reorder_weights_to_e3nn(self, weights_in, has_batch_dim):
+        import torch
+
+        if isinstance(weights_in, np.ndarray):
+            return self.reorder_weights_numpy(weights_in, "backward", has_batch_dim)
+        elif isinstance(weights_in, torch.Tensor):
+            return self.reorder_weights(weights_in, "backward", has_batch_dim)

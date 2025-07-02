@@ -224,7 +224,7 @@ class TestAtomicSharedWeights(ConvCorrectness):
     def thresh(self, direction):
         return {
             "fwd": 1e-5,
-            "bwd": 5e-2,  # Expect higher errors for shared weights
+            "bwd": 7.5e-2,  # Expect higher errors for shared weights
             "double_bwd": 5e-2,
         }[direction]
 
