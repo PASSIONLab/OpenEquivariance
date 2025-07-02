@@ -784,15 +784,10 @@ class ConvolutionBase:
         return result
 
 
-def scatter_forward(self, L1_in, L2_in, weights, rows, cols):
-    messages = self.reference_tp(L1_in[cols], L2_in, weights)
-
+def scatter_add_wrapper(messages, rows, target_dim):
     L3_dim = messages.size(1)
-    num_rows = L1_in.size(0)
-
     idx = rows.unsqueeze(1).expand(-1, L3_dim)
-    out = messages.new_zeros((num_rows, L3_dim))
-
+    out = messages.new_zeros((target_dim, L3_dim))
     return torch.scatter_add(
         input=out,
         dim=0,

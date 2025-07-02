@@ -6,7 +6,7 @@ import torch
 from openequivariance import extlib
 from openequivariance.implementations.convolution.ConvolutionBase import (
     ConvolutionBase,
-    scatter_forward,
+    scatter_add_wrapper,
 )
 from openequivariance.implementations.convolution.LoopUnrollConv import LoopUnrollConv
 from openequivariance.implementations.TensorProduct import TensorProduct
@@ -420,7 +420,9 @@ class TensorProductConvScatterSum(ConvolutionBase):
         self.reorder_weights_e3nn_to_oeq = self.reference_tp.reorder_weights_e3nn_to_oeq
         self.reorder_weights_oeq_to_e3nn = self.reference_tp.reorder_weights_oeq_to_e3nn
 
-    forward = scatter_forward
+    def forward(self, L1_in, L2_in, weights, rows, cols):
+        messages = self.reference_tp(L1_in[cols], L2_in, weights)
+        return scatter_add_wrapper(messages, rows, L1_in.size(0))
 
     def forward_cpu(self, L1_in, L2_in, weights, L3_out, graph):
         tp_outputs = np.zeros((graph.nnz, self.L3.dim), dtype=L3_out.dtype)
