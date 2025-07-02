@@ -118,9 +118,15 @@ class ConvolutionBase:
         self.workspace_size = 0
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim):
+        r'''
+        See :py:func:`oeq.TensorProduct.reorder_weights_from_e3nn`.
+        '''
         return weights
     
     def reorder_weights_to_e3nn(self, weights, has_batch_dim):
+        r'''
+        See :py:func:`oeq.TensorProduct.reorder_weights_to_e3nn`. 
+        '''
         return weights
 
     def allocate_workspace(self, size_bytes):
@@ -216,7 +222,6 @@ class ConvolutionBase:
         L1_grad_d.copy_to_host()
         L2_grad_d.copy_to_host()
         weights_grad_d.copy_to_host()
-
 
         weights_grad[:] = self.reorder_weights_to_e3nn(
             weights_grad, not self.config.shared_weights
@@ -709,7 +714,7 @@ class ConvolutionBase:
             in1_torch = torch.tensor(in1, device="cuda", requires_grad=True)
             in2_torch = torch.tensor(in2, device="cuda", requires_grad=True)
 
-            weights_reordered = self.reorder_weights_from_e3nn(
+            weights_reordered = tp.reorder_weights_from_e3nn(
                     weights, not self.config.shared_weights
             )
             
@@ -744,10 +749,9 @@ class ConvolutionBase:
             )
 
             weights_grad = weights_torch.grad.detach().cpu().numpy()
-            if i == 0:
-                weights_grad[:] = self.reorder_weights_to_e3nn(
-                    weights_grad, not self.config.shared_weights
-                )
+            weights_grad = tp.reorder_weights_to_e3nn(
+                weights_grad, not self.config.shared_weights
+            )
 
             tensors.append(
                 (

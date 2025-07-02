@@ -43,10 +43,32 @@ class TensorProductBase:
     def __call__(self, L1_in, L2_in, weights):
         return self.forward(L1_in, L2_in, weights)
     
-    def reorder_weights_from_e3nn(self, weights, has_batch_dim):
+    def reorder_weights_from_e3nn(self, 
+                                  weights, 
+                                  has_batch_dim: bool):
+        r'''
+        Reorders weights from ``e3nn`` canonical order to the order used by ``oeq``.
+
+        :param weights: Weights in ``e3nn`` canonical order, either an
+        ``np.ndarray`` or a ``torch.Tensor``.
+        :param has_batch_dim: If ``True``, treats the first dimension as a batch dimension.
+
+        :return: Weights in ``oeq`` order. Output type is identical to input. 
+        '''
         return weights
     
-    def reorder_weights_to_e3nn(self, weights, has_batch_dim):
+    def reorder_weights_to_e3nn(self, 
+                                weights, 
+                                has_batch_dim: bool):
+        r'''
+        Reorders weights from ``oeq`` canonical order to the order used by ``e3nn``.
+
+        :param weights: Weights in ``oeq`` canonical order, either an
+        ``np.ndarray`` or a ``torch.Tensor``.
+        :param has_batch_dim: If ``True``, treats the first dimension as a batch dimension.
+
+        :return: Weights in ``e3nn`` order. Output type is identical to input. 
+        '''
         return weights
 
     def forward_raw(

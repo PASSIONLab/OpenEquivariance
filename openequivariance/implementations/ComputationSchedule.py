@@ -691,9 +691,9 @@ class ComputationSchedule:
     def reorder_weights_numpy(self, weights_in, direction, has_batch_dim):
         import torch
 
-        weights_in = torch.from_numpy(weights_in)
-        self.reorder_weights(weights_in, direction, has_batch_dim)
-        return weights_in.detach().numpy()
+        weights_in = torch.from_numpy(weights_in.copy())
+        result = self.reorder_weights(weights_in, direction, has_batch_dim)
+        return result.detach().cpu().numpy().copy()
     
     def reorder_weights_from_e3nn(self, weights_in, has_batch_dim):
         import torch
