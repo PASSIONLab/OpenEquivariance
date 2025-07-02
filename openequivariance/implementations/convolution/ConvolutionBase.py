@@ -713,7 +713,11 @@ class ConvolutionBase:
             in2_torch = torch.tensor(in2, device="cuda", requires_grad=True)
 
             weights_reordered = np.zeros_like(weights)
-            if i == 0 and self.reorder_weights_e3nn_to_oeq is not None:
+            if (
+                i == 0
+                and hasattr(self, "reorder_weights_e3nn_to_oeq")
+                and self.reorder_weights_e3nn_to_oeq is not None
+            ):
                 self.reorder_weights_e3nn_to_oeq(
                     weights, weights_reordered, not self.config.shared_weights
                 )
@@ -750,7 +754,11 @@ class ConvolutionBase:
             )
 
             weights_grad = weights_torch.grad.detach().cpu().numpy()
-            if i == 0 and self.reorder_weights_oeq_to_e3nn is not None:
+            if (
+                i == 0
+                and hasattr(self, "reorder_weights_e3nn_to_oeq")
+                and self.reorder_weights_oeq_to_e3nn is not None
+            ):
                 weights_grad_copy = weights_grad.copy()
                 self.reorder_weights_oeq_to_e3nn(
                     weights_grad_copy, weights_grad, not self.config.shared_weights
@@ -774,3 +782,15 @@ class ConvolutionBase:
             result[name] = check_similiarity(name, to_check, ground_truth, thresh)
 
         return result
+
+
+def scatter_add_wrapper(messages, rows, target_dim):
+    L3_dim = messages.size(1)
+    idx = rows.unsqueeze(1).expand(-1, L3_dim)
+    out = messages.new_zeros((target_dim, L3_dim))
+    return torch.scatter_add(
+        input=out,
+        dim=0,
+        index=idx,
+        src=messages,
+    )
