@@ -117,6 +117,18 @@ class ConvolutionBase:
         self.workspace_ptr = 0
         self.workspace_size = 0
 
+    def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
+        r"""
+        See :py:func:`oeq.TensorProduct.reorder_weights_from_e3nn`.
+        """
+        return weights
+
+    def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
+        r"""
+        See :py:func:`oeq.TensorProduct.reorder_weights_to_e3nn`.
+        """
+        return weights
+
     def allocate_workspace(self, size_bytes):
         self.workspace_size = size_bytes
         if self.torch_op:
@@ -136,13 +148,9 @@ class ConvolutionBase:
         assert graph.rows.dtype == self.idx_dtype
         assert graph.cols.dtype == self.idx_dtype
 
-        weights_chunked = np.zeros_like(weights)
-        if self.reorder_weights_e3nn_to_oeq is not None:
-            self.reorder_weights_e3nn_to_oeq(
-                weights, weights_chunked, not self.config.shared_weights
-            )
-        else:
-            weights_chunked = weights
+        weights_chunked = self.reorder_weights_from_e3nn(
+            weights, not self.config.shared_weights
+        )
 
         L1_d, L2_d, weights_d = (
             DeviceBuffer(L1_in),
@@ -174,13 +182,9 @@ class ConvolutionBase:
         assert graph.rows.dtype == self.idx_dtype
         assert graph.cols.dtype == self.idx_dtype
 
-        weights_chunked = np.zeros_like(weights)
-        if self.reorder_weights_e3nn_to_oeq is not None:
-            self.reorder_weights_e3nn_to_oeq(
-                weights, weights_chunked, not self.config.shared_weights
-            )
-        else:
-            weights_chunked = weights
+        weights_chunked = self.reorder_weights_from_e3nn(
+            weights, not self.config.shared_weights
+        )
 
         L1_d = DeviceBuffer(L1_in)
         L2_d = DeviceBuffer(L2_in)
@@ -219,11 +223,9 @@ class ConvolutionBase:
         L2_grad_d.copy_to_host()
         weights_grad_d.copy_to_host()
 
-        if self.reorder_weights_oeq_to_e3nn is not None:
-            weights_grad_copy = weights_grad.copy()
-            self.reorder_weights_oeq_to_e3nn(
-                weights_grad_copy, weights_grad, not self.config.shared_weights
-            )
+        weights_grad[:] = self.reorder_weights_to_e3nn(
+            weights_grad, not self.config.shared_weights
+        )
 
         return L1_grad, L2_grad, weights_grad
 
@@ -712,17 +714,10 @@ class ConvolutionBase:
             in1_torch = torch.tensor(in1, device="cuda", requires_grad=True)
             in2_torch = torch.tensor(in2, device="cuda", requires_grad=True)
 
-            weights_reordered = np.zeros_like(weights)
-            if (
-                i == 0
-                and hasattr(self, "reorder_weights_e3nn_to_oeq")
-                and self.reorder_weights_e3nn_to_oeq is not None
-            ):
-                self.reorder_weights_e3nn_to_oeq(
-                    weights, weights_reordered, not self.config.shared_weights
-                )
-            else:
-                weights_reordered[:] = weights
+            weights_reordered = tp.reorder_weights_from_e3nn(
+                weights, not self.config.shared_weights
+            )
+
             weights_torch = torch.tensor(
                 weights_reordered, device="cuda", requires_grad=True
             )
@@ -754,15 +749,9 @@ class ConvolutionBase:
             )
 
             weights_grad = weights_torch.grad.detach().cpu().numpy()
-            if (
-                i == 0
-                and hasattr(self, "reorder_weights_e3nn_to_oeq")
-                and self.reorder_weights_oeq_to_e3nn is not None
-            ):
-                weights_grad_copy = weights_grad.copy()
-                self.reorder_weights_oeq_to_e3nn(
-                    weights_grad_copy, weights_grad, not self.config.shared_weights
-                )
+            weights_grad = tp.reorder_weights_to_e3nn(
+                weights_grad, not self.config.shared_weights
+            )
 
             tensors.append(
                 (

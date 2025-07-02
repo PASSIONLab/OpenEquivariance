@@ -74,6 +74,9 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             self.forward = self.forward_opaque
 
     def to(self, *args, **kwargs):
+        r"""
+        See `torch.nn.Module.to() <https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.to>`_.
+        """
         device, dtype, non_blocking, convert_to_format = torch._C._nn._parse_to(
             *args, **kwargs
         )
@@ -417,8 +420,8 @@ class TensorProductConvScatterSum(ConvolutionBase):
         super().__init__(config, torch_op=torch_op, deterministic=False)
 
         self.reference_tp = TensorProduct(config, torch_op=torch_op)
-        self.reorder_weights_e3nn_to_oeq = self.reference_tp.reorder_weights_e3nn_to_oeq
-        self.reorder_weights_oeq_to_e3nn = self.reference_tp.reorder_weights_oeq_to_e3nn
+        self.reorder_weights_from_e3nn = self.reference_tp.reorder_weights_from_e3nn
+        self.reorder_weights_to_e3nn = self.reference_tp.reorder_weights_to_e3nn
 
     def forward(self, L1_in, L2_in, weights, rows, cols):
         messages = self.reference_tp(L1_in[cols], L2_in, weights)

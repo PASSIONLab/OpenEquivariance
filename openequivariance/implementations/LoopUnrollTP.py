@@ -120,19 +120,13 @@ class LoopUnrollTP(TensorProductBase):
             },
         )
         logger.info("Kernel compiled!")
-
         logger.info(f"Kernel File Size: {len(self.jit_kernel) // 1024} KB")
 
-        self.reorder_weights_e3nn_to_oeq = (
-            lambda input, output, has_batch_dim: self.forward_schedule.reorder_weights(
-                input, output, "forward", has_batch_dim
-            )
-        )
-        self.reorder_weights_oeq_to_e3nn = (
-            lambda input, output, has_batch_dim: self.forward_schedule.reorder_weights(
-                input, output, "backward", has_batch_dim
-            )
-        )
+    def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
+        return self.forward_schedule.reorder_weights_from_e3nn(weights, has_batch_dim)
+
+    def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
+        return self.forward_schedule.reorder_weights_to_e3nn(weights, has_batch_dim)
 
     @classmethod
     def register_torch_fakes(cls):
@@ -177,23 +171,14 @@ class LoopUnrollTP(TensorProductBase):
                 self.dbl_bwd_config = state["dbl_bwd_config"]
                 self.kernel_dims = state["kernel_dims"]
 
-            def exec_tensor_product_rawptr(
-                self, batch: int, L1_in: int, L2_in: int, L3_out: int, weights: int
-            ) -> None:
+            def exec_tensor_product_rawptr(*args, **kwargs):
                 pass
 
-            def backward_rawptr(
-                self,
-                batch_size: int,
-                L1_in: int,
-                L1_grad: int,
-                L2_in: int,
-                L2_grad: int,
-                weights: int,
-                weights_grad: int,
-                L3_grad: int,
-            ):
+            def backward_rawptr(*args, **kwargs):
                 pass
+
+            def get_L3_dim(self):
+                return self.kernel_dims["L3_dim"]
 
         @torch.library.register_fake("libtorch_tp_jit::jit_tp_forward")
         def fake_forward(jit, L1_in, L2_in, W):

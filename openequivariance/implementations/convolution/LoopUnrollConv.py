@@ -222,15 +222,11 @@ class LoopUnrollConv(ConvolutionBase):
         # with open("scratch.txt", "w") as f:
         #    f.write(self.jit_kernel)
 
-    def reorder_weights_e3nn_to_oeq(self, input, output, has_batch_dim):
-        return self.forward_schedule.reorder_weights(
-            input, output, "forward", has_batch_dim
-        )
+    def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
+        return self.forward_schedule.reorder_weights_from_e3nn(weights, has_batch_dim)
 
-    def reorder_weights_oeq_to_e3nn(self, input, output, has_batch_dim):
-        return self.forward_schedule.reorder_weights(
-            input, output, "backward", has_batch_dim
-        )
+    def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
+        return self.forward_schedule.reorder_weights_to_e3nn(weights, has_batch_dim)
 
     @staticmethod
     def name():
@@ -280,6 +276,18 @@ class LoopUnrollConv(ConvolutionBase):
                     self.dbl_bwd_config,
                     self.kernel_dims,
                 ) = state
+
+            def exec_conv_rawptrs(*args, **kwargs):
+                pass
+
+            def backward_rawptrs(*args, **kwargs):
+                pass
+
+            def double_backward_rawptrs(*args, **kwargs):
+                pass
+
+            def get_L3_dim(self):
+                return self.kernel_dims["L3_dim"]
 
         @torch.library.register_fake("libtorch_tp_jit::jit_conv_forward")
         def fake_forward(

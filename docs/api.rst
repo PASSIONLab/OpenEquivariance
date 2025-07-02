@@ -18,12 +18,12 @@ trying our code. OpenEquivariance cannot accelerate all tensor products; see
 :doc:`this page </supported_ops>` for a list of supported configurations.
 
 .. autoclass:: openequivariance.TensorProduct
-    :members:
+    :members: forward, reorder_weights_from_e3nn, reorder_weights_to_e3nn, to
     :undoc-members:
     :exclude-members: name
 
 .. autoclass:: openequivariance.TensorProductConv
-    :members:
+    :members: forward, reorder_weights_from_e3nn, reorder_weights_to_e3nn, to
     :undoc-members:
     :exclude-members: name
 
