@@ -45,7 +45,7 @@ class TensorProductBase:
     
     def reorder_weights_from_e3nn(self, 
                                   weights, 
-                                  has_batch_dim: bool):
+                                  has_batch_dim: bool=True):
         r"""
         Reorders weights from ``e3nn`` canonical order to the order used by ``oeq``.
 
@@ -53,7 +53,7 @@ class TensorProductBase:
                         np.ndarray or a torch.Tensor. Tensor of dimensions ``[B, problem.weight_numel]``
                         when ``has_batch_dim=True``, otherwise of dimensions ``[problem.weight_numel]``.
         
-        :param has_batch_dim: If ``True``, treats the first dimension as a batch dimension.
+        :param has_batch_dim: If ``True``, treats the first dimension of weights as a batch dimension. Default: ``True``.
 
         :return: Weights in ``oeq`` order. Output type is identical to input. 
         """
@@ -61,7 +61,7 @@ class TensorProductBase:
     
     def reorder_weights_to_e3nn(self, 
                                 weights, 
-                                has_batch_dim: bool):
+                                has_batch_dim: bool=True):
         r'''
         Reorders weights from ``oeq`` canonical order to the order used by ``e3nn``.
 
@@ -69,7 +69,7 @@ class TensorProductBase:
                         np.ndarray or a torch.Tensor. Tensor of dimensions ``[B, problem.weight_numel]``
                         when ``has_batch_dim=True``, otherwise of dimensions ``[problem.weight_numel]``.
  
-        :param has_batch_dim: If ``True``, treats the first dimension as a batch dimension.
+        :param has_batch_dim: If ``True``, treats the first dimension of wieghts as a batch dimension. Default: ``True``.
 
         :return: Weights in ``e3nn`` order. Output type is identical to input. 
         '''
