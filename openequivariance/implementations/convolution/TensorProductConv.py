@@ -413,14 +413,23 @@ class TensorProductConvScatterSum(ConvolutionBase):
         super().__init__(config, idx_dtype, torch_op=torch_op, deterministic=False)
 
         self.reference_tp = TensorProduct(config, torch_op=torch_op)
-        from openequivariance.implementations.convolution.scatter import scatter_sum
-
-        self.scatter_sum = scatter_sum
+        self.reorder_weights_e3nn_to_oeq = self.reference_tp.reorder_weights_e3nn_to_oeq
+        self.reorder_weights_oeq_to_e3nn = self.reference_tp.reorder_weights_oeq_to_e3nn
 
     def forward(self, L1_in, L2_in, weights, rows, cols):
-        tp_outputs = self.reference_tp(L1_in[cols], L2_in, weights)
-        return self.scatter_sum(
-            src=tp_outputs, index=rows, dim=0, dim_size=L1_in.shape[0]
+        messages = self.reference_tp(L1_in[cols], L2_in, weights)
+
+        L3_dim = messages.size(1)
+        num_rows = L1_in.size(0)
+
+        idx = rows.unsqueeze(1).expand(-1, L3_dim)
+        out = messages.new_zeros((num_rows, L3_dim))
+
+        return torch.scatter_add(
+            input=out,
+            dim=0,
+            index=idx,
+            src=messages,
         )
 
     def forward_cpu(self, L1_in, L2_in, weights, L3_out, graph):

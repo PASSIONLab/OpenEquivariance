@@ -16,14 +16,20 @@ class CUEConv(ConvolutionBase):
         self.reference_tp = CUETensorProduct(config, torch_op)
         self.cue_tp = self.reference_tp.cue_tp
 
-        from openequivariance.implementations.convolution.scatter import scatter_sum
-
-        self.scatter_sum = scatter_sum
-
     def forward(self, L1_in, L2_in, weights, rows, cols):
-        tp_outputs = self.cue_tp(L1_in[cols], L2_in, weights)
-        return self.scatter_sum(
-            src=tp_outputs, index=rows, dim=0, dim_size=L1_in.shape[0]
+        messages = self.reference_tp(L1_in[cols], L2_in, weights)
+
+        L3_dim = messages.size(1)
+        num_rows = L1_in.size(0)
+
+        idx = rows.unsqueeze(1).expand(-1, L3_dim)
+        out = messages.new_zeros((num_rows, L3_dim))
+
+        return torch.scatter_add(
+            input=out,
+            dim=0,
+            index=idx,
+            src=messages,
         )
 
     @staticmethod
