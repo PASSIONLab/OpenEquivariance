@@ -1,5 +1,4 @@
 import numpy as np
-import tempfile
 import json
 import os
 import itertools
@@ -13,7 +12,6 @@ from openequivariance.benchmark.tpp_creation_utils import (
     FullyConnectedTPProblem,
     SingleInstruction,
 )
-from openequivariance.extlib import GPUTimer
 from openequivariance.implementations.utils import count_cg_non_zero
 
 os.environ["CUEQUIVARIANCE_OPS_USE_JIT"] = "1"
@@ -123,6 +121,12 @@ class CUETensorProduct(TensorProductBase):
             self.tp_correctness.to("cuda")
             self.forward_correctness = lambda x, y, W: self.tp_correctness(W, x, y)
 
+        self.kernel_names = [
+            "TensorProductUniform1dKernel",
+            "channelwise_kernel_fwd",
+            "channelwise_kernel_bwd",
+        ]
+
     def forward_cpu(
         self,
         L1_in: np.ndarray,
@@ -197,42 +201,18 @@ class CUETensorProduct(TensorProductBase):
         L2_in: np.ndarray,
         L3_buffer: np.ndarray,
         weights: np.ndarray,
+        with_torch_overhead: bool = True,
     ) -> np.ndarray:
-        """
-        When we don't want to include torch overhead, we use the Pytorch profiler
-        to extract the device time that the kernel takes.
-        """
-        if self.torch_op:
-            return super().benchmark_forward(
-                num_warmup, num_iter, L1_in, L2_in, L3_buffer, weights
-            )
-        else:
-            from torch.profiler import profile, record_function, ProfilerActivity
-
-            time_millis = np.zeros(num_iter, dtype=np.float32)
-            torch_L1_in = torch.tensor(L1_in).to(device="cuda").detach()
-            torch_L2_in = torch.tensor(L2_in).to(device="cuda").detach()
-            torch_weights = torch.tensor(weights).to(device="cuda").detach()
-
-            timer = GPUTimer()
-
-            for i in range(num_warmup):
-                self.forward(torch_L1_in, torch_L2_in, torch_weights)
-
-            trace_file = tempfile.NamedTemporaryFile().name
-
-            for i in range(num_iter):
-                timer.clear_L2_cache()
-                with profile(
-                    activities=[ProfilerActivity.CUDA], record_shapes=True
-                ) as prof:
-                    with record_function("cue_forward"):
-                        self.forward(torch_L1_in, torch_L2_in, torch_weights)
-
-                prof.export_chrome_trace(trace_file)
-                time_millis[i] = self.analyze_trace(trace_file)
-
-            return time_millis
+        return super().benchmark_forward(
+            num_warmup,
+            num_iter,
+            L1_in,
+            L2_in,
+            L3_buffer,
+            weights,
+            with_torch_overhead,
+            kernel_names=["TensorProductUniform1DKernel", "channelwise_kernel_"],
+        )
 
     def benchmark_backward(
         self,
@@ -242,60 +222,18 @@ class CUETensorProduct(TensorProductBase):
         L2_in: np.ndarray,
         L3_buffer: np.ndarray,
         weights: np.ndarray,
-        L1_grad: np.ndarray,
-        L2_grad: np.ndarray,
-        weights_grad: np.ndarray,
+        with_torch_overhead: bool = True,
     ) -> np.ndarray:
-        if self.torch_op:
-            return super().benchmark_backward(
-                num_warmup,
-                num_iter,
-                L1_in,
-                L2_in,
-                L3_buffer,
-                weights,
-                L1_grad,
-                L2_grad,
-                weights_grad,
-            )
-        else:
-            from torch.profiler import profile, record_function, ProfilerActivity
-
-            time_millis = np.zeros(num_iter, dtype=np.float32)
-
-            torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
-            torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
-            torch_weights = torch.tensor(weights, requires_grad=True, device="cuda")
-            torch_out = self.forward(torch_L1_in, torch_L2_in, torch_weights)
-            torch_L3_grad_in = torch.tensor(L3_buffer, device="cuda")
-
-            timer = GPUTimer()
-
-            for i in range(num_warmup):
-                torch_out.backward(
-                    gradient=torch_L3_grad_in,
-                    retain_graph=True,
-                    inputs=[torch_L1_in, torch_L2_in, torch_weights],
-                )
-
-            trace_file = tempfile.NamedTemporaryFile().name
-
-            for i in range(num_iter):
-                timer.clear_L2_cache()
-                with profile(
-                    activities=[ProfilerActivity.CUDA], record_shapes=True
-                ) as prof:
-                    with record_function("cue_backward"):
-                        torch_out.backward(
-                            gradient=torch_L3_grad_in,
-                            retain_graph=True,
-                            inputs=[torch_L1_in, torch_L2_in, torch_weights],
-                        )
-
-                prof.export_chrome_trace(trace_file)
-                time_millis[i] = self.analyze_trace(trace_file)
-
-            return time_millis
+        return super().benchmark_backward(
+            num_warmup,
+            num_iter,
+            L1_in,
+            L2_in,
+            L3_buffer,
+            weights,
+            with_torch_overhead,
+            kernel_names=self.kernel_names,
+        )
 
     # Copied over from loop unroller to match arithmetic intensity on roofline plots
     def calculate_flops_forward(self, batch_size: int) -> dict:

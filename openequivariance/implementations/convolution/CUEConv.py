@@ -19,7 +19,7 @@ class CUEConv(ConvolutionBase):
         self.reference_tp = CUETensorProduct(config, torch_op)
         self.cue_tp = self.reference_tp.cue_tp
 
-    def forward(self, L1_in, L2_in, weights, rows, cols):
+    def forward(self, L1_in, L2_in, weights, rows, cols, sender_perm=None):
         messages = self.reference_tp(L1_in[cols], L2_in, weights)
         return scatter_add_wrapper(messages, rows, L1_in.size(0))
 
@@ -89,7 +89,7 @@ class CUEConvFused(ConvolutionBase):
             math_dtype=np_to_torch_dtype[config.irrep_dtype],
         )
 
-    def forward(self, L1_in, L2_in, weights, rows, cols):
+    def forward(self, L1_in, L2_in, weights, rows, cols, sender_perm=None):
         return self.tp(weights, L1_in, L2_in, None, rows, None, cols, L1_in.shape[0])
 
     @staticmethod

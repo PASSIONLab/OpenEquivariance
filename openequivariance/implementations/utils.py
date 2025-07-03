@@ -3,26 +3,21 @@ import math
 
 import numpy as np
 
-from openequivariance.implementations.TensorProductBase import TensorProductBase
-from openequivariance.implementations.e3nn_lite import (
-    Irreps,
-    Instruction,
-    TPProblem,
-)
+from openequivariance.implementations.e3nn_lite import Instruction, TPProblem, wigner_3j
+
+import json
+import tempfile
+from openequivariance.extlib import GPUTimer
 
 
 def sparse_outer_product_work(cg: np.ndarray) -> int:
     return np.sum(np.max(cg != 0, axis=2))
 
 
-def convenience_namer(L1: Irreps, L2: Irreps, L3: Irreps):
-    return f"({L1}x{L2}->{L3})"
-
-
-# Non Zeros
+# Nonzeros
 @functools.lru_cache(typed=True)
 def count_cg_non_zero(l1, l2, l3) -> int:
-    return np.count_nonzero(TensorProductBase.load_cg_tensor(l1, l2, l3))
+    return np.count_nonzero(wigner_3j(l1, l2, l3))
 
 
 def calculate_total_nnz(tpp: TPProblem) -> int:
@@ -109,3 +104,57 @@ def torch_to_oeq_dtype(torch_dtype) -> type[np.generic]:
         return np.float64
     else:
         raise ValueError("Unsupported torch dtype!")
+
+
+def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
+    """
+    mode=gpu_time may include PyTorch overhead
+    mode=kernel_time measures runtime for only the specified kernels
+    """
+    assert mode in ["gpu_time", "torch_kernel_time"]
+    time_millis = np.zeros(num_iter, dtype=np.float32)
+    timer = GPUTimer()
+
+    for i in range(num_warmup):
+        func()
+
+    if mode == "gpu_time":
+        for i in range(num_iter):
+            timer.clear_L2_cache()
+            timer.start()
+            func()
+            time_millis[i] = timer.stop_clock_get_elapsed()
+
+    else:
+        from torch.profiler import profile, record_function, ProfilerActivity
+
+        trace_file = tempfile.NamedTemporaryFile().name
+
+        for i in range(num_iter):
+            timer.clear_L2_cache()
+            with profile(
+                activities=[ProfilerActivity.CUDA], record_shapes=True
+            ) as prof:
+                with record_function("profile"):
+                    func()
+
+            prof.export_chrome_trace(trace_file)
+            with open(trace_file, "r") as f:
+                trace = json.load(f)
+
+            kernel_time = 0.0
+            for event in trace["traceEvents"]:
+                if "args" in event and "stream" in event["args"]:
+                    event_time_ms = event["dur"] / 1000
+
+                    add_event = False
+                    for kernel_name in kernel_names:
+                        if kernel_name in event["name"]:
+                            add_event = True
+
+                    if add_event:
+                        kernel_time += event_time_ms
+
+            time_millis[i] = kernel_time
+
+    return time_millis

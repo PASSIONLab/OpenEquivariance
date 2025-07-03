@@ -423,7 +423,7 @@ class TensorProductConvScatterSum(ConvolutionBase):
         self.reorder_weights_from_e3nn = self.reference_tp.reorder_weights_from_e3nn
         self.reorder_weights_to_e3nn = self.reference_tp.reorder_weights_to_e3nn
 
-    def forward(self, L1_in, L2_in, weights, rows, cols):
+    def forward(self, L1_in, L2_in, weights, rows, cols, sender_perm=None):
         messages = self.reference_tp(L1_in[cols], L2_in, weights)
         return scatter_add_wrapper(messages, rows, L1_in.size(0))
 

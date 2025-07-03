@@ -1,14 +1,15 @@
 import copy
 import numpy as np
-from openequivariance.extlib import DeviceBuffer, GPUTimer
+from openequivariance.extlib import DeviceBuffer
 from openequivariance.benchmark.random_buffer_utils import (
     get_random_buffers_forward_conv,
     get_random_buffers_backward_conv,
 )
-from openequivariance.implementations.TensorProductBase import TensorProductBase
 
 from openequivariance.benchmark.logging_utils import getLogger, bcolors
 from openequivariance.benchmark.correctness_utils import check_similiarity
+from openequivariance.implementations.e3nn_lite import wigner_3j
+from openequivariance.implementations.utils import benchmark
 
 logger = getLogger()
 
@@ -41,7 +42,7 @@ def flops_data_per_tp(config, direction):
     ops_per_tp = 0
     nnz = 0
     for u, v, w, connection_mode, *others in config.instructions:
-        tensor = TensorProductBase.load_cg_tensor(L1[u].ir.l, L2[v].ir.l, L3[w].ir.l)
+        tensor = wigner_3j(L1[u].ir.l, L2[v].ir.l, L3[w].ir.l)
         local_nnz = np.count_nonzero(tensor)
         nnz += local_nnz
         ops_per_tp += (
@@ -317,7 +318,9 @@ class ConvolutionBase:
 
         return result
 
-    def benchmark_forward(self, num_warmup, num_iter, graph, prng_seed=12345):
+    def benchmark_forward(
+        self, num_warmup, num_iter, graph, prng_seed=12345, kernel_names=["forward"]
+    ):
         direction = "forward"
         L1_in, L2_in, weights, L3_buffer = get_random_buffers_forward_conv(
             self.config, graph.node_count, graph.nnz, prng_seed
@@ -326,93 +329,36 @@ class ConvolutionBase:
         assert graph.rows.dtype == self.idx_dtype
         assert graph.cols.dtype == self.idx_dtype
 
-        time_millis = np.zeros(num_iter, dtype=np.float32)
-        timer = GPUTimer()
+        torch_L1_in = torch.tensor(L1_in, device="cuda")
+        torch_L2_in = torch.tensor(L2_in, device="cuda")
+        torch_weights = torch.tensor(weights, device="cuda")
 
-        if self.torch_op:
-            torch_L1_in = torch.tensor(L1_in, device="cuda")
-            torch_L2_in = torch.tensor(L2_in, device="cuda")
-            torch_weights = torch.tensor(weights, device="cuda")
+        torch_rows = torch.tensor(graph.rows, device="cuda")
+        torch_cols = torch.tensor(graph.cols, device="cuda")
+        torch_transpose_perm = (
+            torch.tensor(graph.transpose_perm, device="cuda")
+            if self.deterministic
+            else None
+        )
 
-            torch_rows = torch.tensor(graph.rows, device="cuda")
-            torch_cols = torch.tensor(graph.cols, device="cuda")
-            torch_transpose_perm = torch.tensor(graph.transpose_perm, device="cuda")
+        mode = "gpu_time" if self.torch_op else "torch_kernel_time"
 
-            if not self.deterministic:
-                for i in range(num_warmup):
-                    self.forward(
-                        torch_L1_in, torch_L2_in, torch_weights, torch_rows, torch_cols
-                    )
-
-                for i in range(num_iter):
-                    timer.clear_L2_cache()
-                    timer.start()
-                    self.forward(
-                        torch_L1_in, torch_L2_in, torch_weights, torch_rows, torch_cols
-                    )
-                    time_millis[i] = timer.stop_clock_get_elapsed()
-            else:
-                for i in range(num_warmup):
-                    self.forward(
-                        torch_L1_in,
-                        torch_L2_in,
-                        torch_weights,
-                        torch_rows,
-                        torch_cols,
-                        torch_transpose_perm,
-                    )
-
-                for i in range(num_iter):
-                    timer.clear_L2_cache()
-                    timer.start()
-                    self.forward(
-                        torch_L1_in,
-                        torch_L2_in,
-                        torch_weights,
-                        torch_rows,
-                        torch_cols,
-                        torch_transpose_perm,
-                    )
-                    time_millis[i] = timer.stop_clock_get_elapsed()
-
-        elif not self.torch_op:
-            L1_d, L2_d, weights_d = (
-                DeviceBuffer(L1_in),
-                DeviceBuffer(L2_in),
-                DeviceBuffer(weights),
-            )
-            L3_d = DeviceBuffer(L3_buffer)
-            rows_d = DeviceBuffer(graph.rows)
-            cols_d = DeviceBuffer(graph.cols)
-
-            for i in range(num_warmup):
-                self.internal.exec_conv_rawptrs(
-                    L1_d.data_ptr(),
-                    L2_d.data_ptr(),
-                    weights_d.data_ptr(),
-                    L3_d.data_ptr(),
-                    rows_d.data_ptr(),
-                    cols_d.data_ptr(),
-                    graph.nnz,
-                    graph.node_count,
-                    self.workspace_ptr,
+        time_millis = benchmark(
+            (
+                lambda: self.forward(
+                    torch_L1_in,
+                    torch_L2_in,
+                    torch_weights,
+                    torch_rows,
+                    torch_cols,
+                    torch_transpose_perm,
                 )
-
-            for i in range(num_iter):
-                timer.clear_L2_cache()
-                timer.start()
-                self.internal.exec_conv_rawptrs(
-                    L1_d.data_ptr(),
-                    L2_d.data_ptr(),
-                    weights_d.data_ptr(),
-                    L3_d.data_ptr(),
-                    rows_d.data_ptr(),
-                    cols_d.data_ptr(),
-                    graph.nnz,
-                    graph.node_count,
-                    self.workspace_ptr,
-                )
-                time_millis[i] = timer.stop_clock_get_elapsed()
+            ),
+            num_warmup,
+            num_iter,
+            mode=mode,
+            kernel_names=kernel_names,
+        )
 
         ops_per_tp, data_per_tp, _ = flops_data_per_tp(self.config, direction)
         ops_per_tp += self.config.irreps_out.dim
@@ -428,7 +374,9 @@ class ConvolutionBase:
             prng_seed,
         )
 
-    def benchmark_backward(self, num_warmup, num_iter, graph, prng_seed=12345):
+    def benchmark_backward(
+        self, num_warmup, num_iter, graph, prng_seed=12345, kernel_names=["backward"]
+    ):
         direction = "backward"
         in1, in2, out_grad, weights, weights_grad, in1_grad, in2_grad = (
             get_random_buffers_backward_conv(
@@ -439,100 +387,35 @@ class ConvolutionBase:
         assert graph.rows.dtype == self.idx_dtype
         assert graph.cols.dtype == self.idx_dtype
 
-        time_millis = np.zeros(num_iter, dtype=np.float32)
-        timer = GPUTimer()
+        torch_L1_in = torch.tensor(in1, device="cuda", requires_grad=True)
+        torch_L2_in = torch.tensor(in2, device="cuda", requires_grad=True)
+        torch_weights = torch.tensor(weights, device="cuda", requires_grad=True)
 
-        if self.torch_op:
-            torch_L1_in = torch.tensor(in1, device="cuda", requires_grad=True)
-            torch_L2_in = torch.tensor(in2, device="cuda", requires_grad=True)
-            torch_weights = torch.tensor(weights, device="cuda", requires_grad=True)
+        torch_rows = torch.tensor(graph.rows, device="cuda").detach()
+        torch_cols = torch.tensor(graph.cols, device="cuda").detach()
+        torch_transpose_perm = torch.tensor(graph.transpose_perm, device="cuda")
 
-            torch_rows = torch.tensor(graph.rows, device="cuda").detach()
-            torch_cols = torch.tensor(graph.cols, device="cuda").detach()
-            torch_transpose_perm = torch.tensor(graph.transpose_perm, device="cuda")
+        fwd_args = [torch_L1_in, torch_L2_in, torch_weights, torch_rows, torch_cols]
+        if self.deterministic:
+            fwd_args.append(torch_transpose_perm)
+        torch_out = self.forward(*fwd_args)
+        torch_L3_grad = torch.tensor(out_grad, device="cuda")
 
-            fwd_args = [torch_L1_in, torch_L2_in, torch_weights, torch_rows, torch_cols]
-            if self.deterministic:
-                fwd_args.append(torch_transpose_perm)
+        mode = "gpu_time" if self.torch_op else "torch_kernel_time"
 
-            torch_out = self.forward(*fwd_args)
-            torch_L3_grad = torch.tensor(out_grad, device="cuda")
-
-            for i in range(num_warmup):
-                torch_out.backward(
+        time_millis = benchmark(
+            (
+                lambda: torch_out.backward(
                     torch_L3_grad,
                     retain_graph=True,
                     inputs=[torch_L1_in, torch_L2_in, torch_weights],
                 )
-
-            for i in range(num_iter):
-                torch_L1_in.grad.zero_()
-                torch_L2_in.grad.zero_()
-                torch_weights.grad.zero_()
-
-                timer.clear_L2_cache()
-                timer.start()
-                torch_out.backward(
-                    torch_L3_grad,
-                    retain_graph=True,
-                    inputs=[torch_L1_in, torch_L2_in, torch_weights],
-                )
-                time_millis[i] = timer.stop_clock_get_elapsed()
-
-        elif not self.torch_op:
-            L1_d = DeviceBuffer(in1)
-            L2_d = DeviceBuffer(in2)
-            weights_d = DeviceBuffer(weights)
-            L3_d = DeviceBuffer(out_grad)
-            rows_d = DeviceBuffer(graph.rows)
-            cols_d = DeviceBuffer(graph.cols)
-
-            L1_grad_d = DeviceBuffer(in1_grad)
-            L2_grad_d = DeviceBuffer(in2_grad)
-            weights_grad_d = DeviceBuffer(weights_grad)
-
-            transpose_perm_d = None
-            transpose_perm_ptr = 0
-            if self.deterministic:
-                transpose_perm_d = DeviceBuffer(graph.transpose_perm)
-                transpose_perm_ptr = transpose_perm_d.data_ptr()
-
-            for i in range(num_warmup):
-                self.internal.backward_rawptrs(
-                    L1_d.data_ptr(),
-                    L1_grad_d.data_ptr(),
-                    L2_d.data_ptr(),
-                    L2_grad_d.data_ptr(),
-                    weights_d.data_ptr(),
-                    weights_grad_d.data_ptr(),
-                    L3_d.data_ptr(),
-                    rows_d.data_ptr(),
-                    cols_d.data_ptr(),
-                    graph.nnz,
-                    graph.node_count,
-                    self.workspace_ptr,
-                    transpose_perm_ptr,
-                )
-
-            for i in range(num_iter):
-                timer.clear_L2_cache()
-                timer.start()
-                self.internal.backward_rawptrs(
-                    L1_d.data_ptr(),
-                    L1_grad_d.data_ptr(),
-                    L2_d.data_ptr(),
-                    L2_grad_d.data_ptr(),
-                    weights_d.data_ptr(),
-                    weights_grad_d.data_ptr(),
-                    L3_d.data_ptr(),
-                    rows_d.data_ptr(),
-                    cols_d.data_ptr(),
-                    graph.nnz,
-                    graph.node_count,
-                    self.workspace_ptr,
-                    transpose_perm_ptr,
-                )
-                time_millis[i] = timer.stop_clock_get_elapsed()
+            ),
+            num_warmup,
+            num_iter,
+            mode=mode,
+            kernel_names=kernel_names,
+        )
 
         ops_per_tp, data_per_tp, _ = flops_data_per_tp(self.config, direction)
         ops_per_tp += self.config.irreps_out.dim

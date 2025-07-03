@@ -70,7 +70,7 @@ def benchmark_forward(
     num_warmup: int,
     num_iter: int,
     prng_seed: int,
-    torch_op: bool,
+    with_torch_overhead: bool,
 ) -> dict:
     """
     This function sets up the necessary materials and calls the internal benchmarker
@@ -89,7 +89,7 @@ def benchmark_forward(
         weights = weights[np.newaxis, :]
 
     logger.info("Initialized input / output data.")
-    tp = implementation(problem, torch_op=torch_op)
+    tp = implementation(problem)
 
     # BENCHMARK
     try:
@@ -100,6 +100,7 @@ def benchmark_forward(
             L2_in=L2_in,
             weights=weights,
             L3_buffer=L3_buffer,
+            with_torch_overhead=with_torch_overhead,
         )
     except NotImplementedError:
         logger.warning(
@@ -145,7 +146,7 @@ def benchmark_backward(
     num_warmup: int,
     num_iter: int,
     prng_seed: int,
-    torch_op: bool,
+    with_torch_overhead: bool,
 ) -> dict:
     result = {
         "tp_direction": "backward",
@@ -161,7 +162,7 @@ def benchmark_backward(
         weights = weights[np.newaxis, :]
 
     logger.info("Initialized input / output data.")
-    tp = implementation(problem, torch_op=torch_op)
+    tp = implementation(problem)
 
     try:
         time_millis = tp.benchmark_backward(
@@ -171,9 +172,7 @@ def benchmark_backward(
             L2_in=in2,
             L3_buffer=out_grad,
             weights=weights,
-            L1_grad=in1_grad,
-            L2_grad=in2_grad,
-            weights_grad=weights_grad,
+            with_torch_overhead=with_torch_overhead,
         )
     except NotImplementedError:
         logger.warning(
@@ -223,7 +222,7 @@ def benchmark_double_backward(
     num_warmup: int,
     num_iter: int,
     prng_seed: int,
-    torch_op: bool,
+    with_torch_overhead: bool,
 ) -> dict:
     result = {
         "tp_direction": "double_backward",
@@ -240,7 +239,7 @@ def benchmark_double_backward(
         weights = weights[np.newaxis, :]
 
     logger.info("Initialized input / output data.")
-    tp = implementation(problem, torch_op=torch_op)
+    tp = implementation(problem)
 
     try:
         time_millis = tp.benchmark_double_backward(
@@ -248,12 +247,9 @@ def benchmark_double_backward(
             num_iter=num_iter,
             L1_in=in1,
             L2_in=in2,
-            L3_buffer=out_grad,
             weights=weights,
-            L1_grad=in1_grad,
-            L2_grad=in2_grad,
             weights_grad=weights_grad,
-            L3_double_grad=out_double_grad,
+            with_torch_overhead=with_torch_overhead,
         )
     except NotImplementedError:
         logger.warning(
