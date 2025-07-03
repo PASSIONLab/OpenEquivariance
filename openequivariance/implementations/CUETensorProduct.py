@@ -1,5 +1,4 @@
 import numpy as np
-import tempfile
 import json
 import os
 import itertools
@@ -13,7 +12,6 @@ from openequivariance.benchmark.tpp_creation_utils import (
     FullyConnectedTPProblem,
     SingleInstruction,
 )
-from openequivariance.extlib import GPUTimer
 from openequivariance.implementations.utils import count_cg_non_zero
 
 os.environ["CUEQUIVARIANCE_OPS_USE_JIT"] = "1"
@@ -123,9 +121,11 @@ class CUETensorProduct(TensorProductBase):
             self.tp_correctness.to("cuda")
             self.forward_correctness = lambda x, y, W: self.tp_correctness(W, x, y)
 
-        self.kernel_names = ["TensorProductUniform1dKernel",
-                             "channelwise_kernel_fwd",
-                             "channelwise_kernel_bwd"]
+        self.kernel_names = [
+            "TensorProductUniform1dKernel",
+            "channelwise_kernel_fwd",
+            "channelwise_kernel_bwd",
+        ]
 
     def forward_cpu(
         self,
@@ -201,18 +201,19 @@ class CUETensorProduct(TensorProductBase):
         L2_in: np.ndarray,
         L3_buffer: np.ndarray,
         weights: np.ndarray,
-        with_torch_overhead: bool = True
+        with_torch_overhead: bool = True,
     ) -> np.ndarray:
-            return super().benchmark_forward(
-                num_warmup,
-                num_iter,
-                L1_in,
-                L2_in,
-                L3_buffer,
-                weights,
-                with_torch_overhead,
-                kernel_names=["TensorProductUniform1DKernel", "channelwise_kernel_"])
-     
+        return super().benchmark_forward(
+            num_warmup,
+            num_iter,
+            L1_in,
+            L2_in,
+            L3_buffer,
+            weights,
+            with_torch_overhead,
+            kernel_names=["TensorProductUniform1DKernel", "channelwise_kernel_"],
+        )
+
     def benchmark_backward(
         self,
         num_warmup: int,
@@ -222,16 +223,16 @@ class CUETensorProduct(TensorProductBase):
         L3_buffer: np.ndarray,
         weights: np.ndarray,
         with_torch_overhead: bool = True,
-    ) -> np.ndarray: 
+    ) -> np.ndarray:
         return super().benchmark_backward(
-            num_warmup, 
-            num_iter, 
-            L1_in, 
-            L2_in, 
-            L3_buffer, 
-            weights, 
-            with_torch_overhead, 
-            kernel_names=self.kernel_names
+            num_warmup,
+            num_iter,
+            L1_in,
+            L2_in,
+            L3_buffer,
+            weights,
+            with_torch_overhead,
+            kernel_names=self.kernel_names,
         )
 
     # Copied over from loop unroller to match arithmetic intensity on roofline plots

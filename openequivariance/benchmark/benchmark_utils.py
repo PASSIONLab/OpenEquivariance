@@ -18,6 +18,7 @@ from openequivariance.benchmark.logging_utils import getLogger, bcolors
 
 logger = getLogger()
 
+
 def calculate_performance_statistics(
     problem: TPProblem,
     batch_size: int,
@@ -88,7 +89,7 @@ def benchmark_forward(
         weights = weights[np.newaxis, :]
 
     logger.info("Initialized input / output data.")
-    tp = implementation(problem) 
+    tp = implementation(problem)
 
     # BENCHMARK
     try:
@@ -99,7 +100,7 @@ def benchmark_forward(
             L2_in=L2_in,
             weights=weights,
             L3_buffer=L3_buffer,
-            with_torch_overhead=with_torch_overhead
+            with_torch_overhead=with_torch_overhead,
         )
     except NotImplementedError:
         logger.warning(
@@ -161,7 +162,7 @@ def benchmark_backward(
         weights = weights[np.newaxis, :]
 
     logger.info("Initialized input / output data.")
-    tp = implementation(problem) 
+    tp = implementation(problem)
 
     try:
         time_millis = tp.benchmark_backward(
@@ -238,7 +239,7 @@ def benchmark_double_backward(
         weights = weights[np.newaxis, :]
 
     logger.info("Initialized input / output data.")
-    tp = implementation(problem) 
+    tp = implementation(problem)
 
     try:
         time_millis = tp.benchmark_double_backward(

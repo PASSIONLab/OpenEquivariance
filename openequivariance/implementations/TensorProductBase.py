@@ -1,10 +1,9 @@
 import numpy as np
 
-from openequivariance.extlib import DeviceBuffer, GPUTimer
-
-from openequivariance.implementations.e3nn_lite import TPProblem 
+from openequivariance.implementations.e3nn_lite import TPProblem
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.implementations.utils import benchmark
+from openequivariance.extlib import DeviceBuffer
 
 logger = getLogger()
 
@@ -165,15 +164,20 @@ class TensorProductBase:
         L3_buffer: np.ndarray,
         weights: np.ndarray,
         with_torch_overhead: bool = True,
-        kernel_names = ["forward"]
+        kernel_names=["forward"],
     ) -> np.ndarray:
         torch_L1_in = torch.tensor(L1_in).to(device="cuda").detach()
         torch_L2_in = torch.tensor(L2_in).to(device="cuda").detach()
         torch_weights = torch.tensor(weights).to(device="cuda").detach()
 
         mode = "gpu_time" if with_torch_overhead else "torch_kernel_time"
-        func = lambda: self.forward(torch_L1_in, torch_L2_in, torch_weights)
-        return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=kernel_names)
+        return benchmark(
+            (lambda: self.forward(torch_L1_in, torch_L2_in, torch_weights)),
+            num_warmup,
+            num_iter,
+            mode=mode,
+            kernel_names=kernel_names,
+        )
 
     def benchmark_backward(
         self,
@@ -184,7 +188,7 @@ class TensorProductBase:
         L3_buffer: np.ndarray,
         weights: np.ndarray,
         with_torch_overhead: bool = True,
-        kernel_names=["backward"]
+        kernel_names=["backward"],
     ) -> np.ndarray:
         torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
         torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
@@ -193,12 +197,20 @@ class TensorProductBase:
         torch_L3_grad_in = torch.tensor(L3_buffer, device="cuda")
 
         mode = "gpu_time" if with_torch_overhead else "torch_kernel_time"
-        func = lambda: torch_out.backward(
+
+        return benchmark(
+            (
+                lambda: torch_out.backward(
                     gradient=torch_L3_grad_in,
                     retain_graph=True,
-                    inputs=[torch_L1_in, torch_L2_in, torch_weights])
-
-        return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=kernel_names)
+                    inputs=[torch_L1_in, torch_L2_in, torch_weights],
+                )
+            ),
+            num_warmup,
+            num_iter,
+            mode=mode,
+            kernel_names=kernel_names,
+        )
 
     def benchmark_double_backward(
         self,
@@ -209,7 +221,7 @@ class TensorProductBase:
         weights: np.ndarray,
         weights_grad: np.ndarray,
         with_torch_overhead: bool = True,
-        kernel_names=["double_backward_A", "double_backward_B"]
+        kernel_names=["double_backward_A", "double_backward_B"],
     ) -> np.ndarray:
         torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
         torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
@@ -242,14 +254,21 @@ class TensorProductBase:
         )
 
         mode = "gpu_time" if with_torch_overhead else "torch_kernel_time"
-        func = lambda: torch.autograd.grad(
-                outputs=dummy,
-                inputs=[torch_L1_in, torch_L2_in, torch_weights, torch_out_grad],
-                grad_outputs=dummy_grad,
-                retain_graph=True)
-        
-        return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=kernel_names)
 
+        return benchmark(
+            (
+                lambda: torch.autograd.grad(
+                    outputs=dummy,
+                    inputs=[torch_L1_in, torch_L2_in, torch_weights, torch_out_grad],
+                    grad_outputs=dummy_grad,
+                    retain_graph=True,
+                )
+            ),
+            num_warmup,
+            num_iter,
+            mode=mode,
+            kernel_names=kernel_names,
+        )
 
     def calculate_memory_streamed_forward(self, batch_size: int) -> dict:
         raise NotImplementedError("This needs to be implemented in your class")

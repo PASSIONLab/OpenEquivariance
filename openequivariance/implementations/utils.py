@@ -3,18 +3,16 @@ import math
 
 import numpy as np
 
-from openequivariance.implementations.e3nn_lite import (
-    Instruction,
-    TPProblem,
-    wigner_3j
-)
+from openequivariance.implementations.e3nn_lite import Instruction, TPProblem, wigner_3j
 
 import json
 import tempfile
 from openequivariance.extlib import GPUTimer
 
+
 def sparse_outer_product_work(cg: np.ndarray) -> int:
     return np.sum(np.max(cg != 0, axis=2))
+
 
 # Nonzeros
 @functools.lru_cache(typed=True)
@@ -109,10 +107,10 @@ def torch_to_oeq_dtype(torch_dtype) -> type[np.generic]:
 
 
 def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
-    '''
-    mode=gpu_time may include PyTorch overhead 
-    mode=kernel_time measures runtime for only the specified kernels 
-    '''
+    """
+    mode=gpu_time may include PyTorch overhead
+    mode=kernel_time measures runtime for only the specified kernels
+    """
     assert mode in ["gpu_time", "torch_kernel_time"]
     time_millis = np.zeros(num_iter, dtype=np.float32)
     timer = GPUTimer()
@@ -138,7 +136,7 @@ def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
                 activities=[ProfilerActivity.CUDA], record_shapes=True
             ) as prof:
                 with record_function("profile"):
-                    func() 
+                    func()
 
             prof.export_chrome_trace(trace_file)
             with open(trace_file, "r") as f:
@@ -157,6 +155,6 @@ def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
                     if add_event:
                         kernel_time += event_time_ms
 
-            time_millis[i] = kernel_time 
+            time_millis[i] = kernel_time
 
     return time_millis

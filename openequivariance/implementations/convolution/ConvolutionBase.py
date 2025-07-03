@@ -1,6 +1,6 @@
 import copy
 import numpy as np
-from openequivariance.extlib import DeviceBuffer, GPUTimer
+from openequivariance.extlib import DeviceBuffer
 from openequivariance.benchmark.random_buffer_utils import (
     get_random_buffers_forward_conv,
     get_random_buffers_backward_conv,
@@ -318,7 +318,9 @@ class ConvolutionBase:
 
         return result
 
-    def benchmark_forward(self, num_warmup, num_iter, graph, prng_seed=12345, kernel_names=["forward"]):
+    def benchmark_forward(
+        self, num_warmup, num_iter, graph, prng_seed=12345, kernel_names=["forward"]
+    ):
         direction = "forward"
         L1_in, L2_in, weights, L3_buffer = get_random_buffers_forward_conv(
             self.config, graph.node_count, graph.nnz, prng_seed
@@ -333,14 +335,25 @@ class ConvolutionBase:
 
         torch_rows = torch.tensor(graph.rows, device="cuda")
         torch_cols = torch.tensor(graph.cols, device="cuda")
-        torch_transpose_perm = torch.tensor(graph.transpose_perm, device="cuda") if self.deterministic else None
+        torch_transpose_perm = (
+            torch.tensor(graph.transpose_perm, device="cuda")
+            if self.deterministic
+            else None
+        )
 
-        mode = "gpu_time" if self.torch_op else "torch_kernel_time" 
-        func = lambda: self.forward(
-            torch_L1_in, torch_L2_in, torch_weights, torch_rows, torch_cols, torch_transpose_perm)
+        mode = "gpu_time" if self.torch_op else "torch_kernel_time"
 
         time_millis = benchmark(
-            func,
+            (
+                lambda: self.forward(
+                    torch_L1_in,
+                    torch_L2_in,
+                    torch_weights,
+                    torch_rows,
+                    torch_cols,
+                    torch_transpose_perm,
+                )
+            ),
             num_warmup,
             num_iter,
             mode=mode,
@@ -361,7 +374,9 @@ class ConvolutionBase:
             prng_seed,
         )
 
-    def benchmark_backward(self, num_warmup, num_iter, graph, prng_seed=12345, kernel_names=["backward"]):
+    def benchmark_backward(
+        self, num_warmup, num_iter, graph, prng_seed=12345, kernel_names=["backward"]
+    ):
         direction = "backward"
         in1, in2, out_grad, weights, weights_grad, in1_grad, in2_grad = (
             get_random_buffers_backward_conv(
@@ -387,13 +402,15 @@ class ConvolutionBase:
         torch_L3_grad = torch.tensor(out_grad, device="cuda")
 
         mode = "gpu_time" if self.torch_op else "torch_kernel_time"
-        func = lambda: torch_out.backward(
-            torch_L3_grad,
-            retain_graph=True,
-            inputs=[torch_L1_in, torch_L2_in, torch_weights])
 
         time_millis = benchmark(
-            func,
+            (
+                lambda: torch_out.backward(
+                    torch_L3_grad,
+                    retain_graph=True,
+                    inputs=[torch_L1_in, torch_L2_in, torch_weights],
+                )
+            ),
             num_warmup,
             num_iter,
             mode=mode,

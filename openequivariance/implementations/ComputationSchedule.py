@@ -2,7 +2,6 @@ import numpy as np
 from openequivariance.implementations.e3nn_lite import Irreps, TPProblem, wigner_3j
 from itertools import accumulate
 from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance.implementations.TensorProductBase import TensorProductBase
 
 logger = getLogger()
 
