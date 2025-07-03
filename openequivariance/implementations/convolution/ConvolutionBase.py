@@ -318,7 +318,7 @@ class ConvolutionBase:
 
         return result
 
-    def benchmark_forward(self, num_warmup, num_iter, graph, prng_seed=12345):
+    def benchmark_forward(self, num_warmup, num_iter, graph, prng_seed=12345, kernel_names=["forward"]):
         direction = "forward"
         L1_in, L2_in, weights, L3_buffer = get_random_buffers_forward_conv(
             self.config, graph.node_count, graph.nnz, prng_seed
@@ -344,7 +344,7 @@ class ConvolutionBase:
             num_warmup,
             num_iter,
             mode=mode,
-            kernel_names=["forward"],
+            kernel_names=kernel_names,
         )
 
         ops_per_tp, data_per_tp, _ = flops_data_per_tp(self.config, direction)
@@ -361,7 +361,7 @@ class ConvolutionBase:
             prng_seed,
         )
 
-    def benchmark_backward(self, num_warmup, num_iter, graph, prng_seed=12345):
+    def benchmark_backward(self, num_warmup, num_iter, graph, prng_seed=12345, kernel_names=["backward"]):
         direction = "backward"
         in1, in2, out_grad, weights, weights_grad, in1_grad, in2_grad = (
             get_random_buffers_backward_conv(
@@ -397,7 +397,7 @@ class ConvolutionBase:
             num_warmup,
             num_iter,
             mode=mode,
-            kernel_names=["backward"],
+            kernel_names=kernel_names,
         )
 
         ops_per_tp, data_per_tp, _ = flops_data_per_tp(self.config, direction)

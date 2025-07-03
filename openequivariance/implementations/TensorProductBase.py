@@ -165,6 +165,7 @@ class TensorProductBase:
         L3_buffer: np.ndarray,
         weights: np.ndarray,
         with_torch_overhead: bool = True,
+        kernel_names = ["forward"]
     ) -> np.ndarray:
         torch_L1_in = torch.tensor(L1_in).to(device="cuda").detach()
         torch_L2_in = torch.tensor(L2_in).to(device="cuda").detach()
@@ -172,7 +173,7 @@ class TensorProductBase:
 
         mode = "gpu_time" if with_torch_overhead else "torch_kernel_time"
         func = lambda: self.forward(torch_L1_in, torch_L2_in, torch_weights)
-        return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=["forward"])
+        return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=kernel_names)
 
     def benchmark_backward(
         self,
@@ -183,6 +184,7 @@ class TensorProductBase:
         L3_buffer: np.ndarray,
         weights: np.ndarray,
         with_torch_overhead: bool = True,
+        kernel_names=["backward"]
     ) -> np.ndarray:
         torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
         torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
@@ -196,7 +198,7 @@ class TensorProductBase:
                     retain_graph=True,
                     inputs=[torch_L1_in, torch_L2_in, torch_weights])
 
-        return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=["backward"])
+        return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=kernel_names)
 
     def benchmark_double_backward(
         self,
@@ -207,6 +209,7 @@ class TensorProductBase:
         weights: np.ndarray,
         weights_grad: np.ndarray,
         with_torch_overhead: bool = True,
+        kernel_names=["double_backward_A", "double_backward_B"]
     ) -> np.ndarray:
         torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
         torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
@@ -245,7 +248,7 @@ class TensorProductBase:
                 grad_outputs=dummy_grad,
                 retain_graph=True)
         
-        return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=["double_backward_A", "double_backward_B"])
+        return benchmark(func, num_warmup, num_iter, mode=mode, kernel_names=kernel_names)
 
 
     def calculate_memory_streamed_forward(self, batch_size: int) -> dict:
