@@ -222,10 +222,8 @@ class CUETensorProduct(TensorProductBase):
         L3_buffer: np.ndarray,
         weights: np.ndarray,
         with_torch_overhead: bool = True,
-        kernel_names=["backward"]
     ) -> np.ndarray: 
         return super().benchmark_backward(
-            self,
             num_warmup, 
             num_iter, 
             L1_in, 
