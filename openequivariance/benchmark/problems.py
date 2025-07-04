@@ -153,7 +153,7 @@ def nequip_problems():
 
 def e3tools_problems():
     return [
-        FCTPP(in1, in2, out, label=label, shared_weight=sw, internal_weights=iw)
+        FCTPP(in1, in2, out, label=label, shared_weights=sw, internal_weights=iw)
         for (in1, in2, out, label, sw, iw) in [
             (
                 "64x0e+16x1o",
@@ -169,7 +169,7 @@ def e3tools_problems():
                 "64x0e+16x1o",
                 "e3tools_transformer",
                 True,
-                True,
+                False,  # Should be true, we don't support currently
             ),
         ]
     ]
