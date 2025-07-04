@@ -4,6 +4,7 @@ import openequivariance.extlib as extlib
 from openequivariance.templates.jinja_utils import get_jinja_environment
 from openequivariance.implementations.ComputationSchedule import ComputationSchedule
 
+from openequivariance.implementations.dtype_enum import dtype_to_enum_mapping
 from openequivariance.implementations.TensorProductBase import TensorProductBase
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.implementations.utils import (
@@ -114,9 +115,14 @@ class LoopUnrollTP(TensorProductBase):
             vars(self.backward_schedule.launch_config),
             vars(self.double_backward_schedule.launch_config),
             {
+                "L1_dim": self.L1.dim,
+                "L2_dim": self.L2.dim,
                 "L3_dim": self.L3.dim,
+                "weight_numel": self.config.weight_numel,
                 "shared_weights": int(self.config.shared_weights),
                 "opt_level": 3,
+                "irrep_dtype": dtype_to_enum_mapping[self.config.irrep_dtype],
+                "weight_dtype": dtype_to_enum_mapping[self.config.weight_dtype],
             },
         )
         logger.info("Kernel compiled!")
@@ -186,7 +192,7 @@ class LoopUnrollTP(TensorProductBase):
             if hasattr(jit, "wrapped_obj"):
                 L3_dim = jit.wrapped_obj.kernel_dims["L3_dim"]
             else:
-                L3_dim = jit.get_L3_dim()
+                L3_dim = jit.L3_dim
 
             return L1_in.new_empty(L1_in.shape[0], L3_dim)
 
