@@ -12,6 +12,7 @@ import torch
 from openequivariance.benchmark.problems import (
     mace_problems,
     diffdock_problems,
+    e3tools_problems,
 )
 
 
@@ -123,7 +124,9 @@ class ConvCorrectness:
 
 
 class TestProductionModels(ConvCorrectness):
-    production_model_tpps = mace_problems() + diffdock_problems()
+    production_model_tpps = (
+        mace_problems() + diffdock_problems() + [e3tools_problems()[0]]
+    )
 
     @pytest.fixture(params=production_model_tpps, ids=lambda x: x.label, scope="class")
     def problem(self, request, dtype):
@@ -219,7 +222,7 @@ class TestUVWSingleIrrep(ConvCorrectness):
 
 
 class TestAtomicSharedWeights(ConvCorrectness):
-    problems = [mace_problems()[0], diffdock_problems()[0]]
+    problems = [mace_problems()[0], diffdock_problems()[0], e3tools_problems()[1]]
 
     def thresh(self, direction):
         return {

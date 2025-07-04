@@ -149,3 +149,27 @@ def nequip_problems():
             ),
         ]
     ]
+
+
+def e3tools_problems():
+    return [
+        FCTPP(in1, in2, out, label=label, shared_weights=sw, internal_weights=iw)
+        for (in1, in2, out, label, sw, iw) in [
+            (
+                "64x0e+16x1o",
+                "1x0e+1x1o",
+                "80x0e+16x1o",
+                "e3tools_conv",
+                False,
+                False,
+            ),
+            (
+                "64x0e+16x1o",
+                "1x0e+1x1o",
+                "64x0e+16x1o",
+                "e3tools_transformer",
+                True,
+                False,  # Should be true, we don't support currently
+            ),
+        ]
+    ]
