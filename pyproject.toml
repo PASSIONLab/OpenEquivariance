@@ -54,6 +54,7 @@ dev = [
   "ruff",
   "pytest",
   "pytest-check",
+  "pytest-subtests",
   "torch_geometric",
   "cmake",
   "furo",

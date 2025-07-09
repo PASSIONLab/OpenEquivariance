@@ -6,13 +6,12 @@ from openequivariance.implementations.ComputationSchedule import (
     SMEMCapacityException,
 )
 
-
+from openequivariance.implementations.dtype_enum import dtype_to_enum
 from openequivariance.templates.jinja_utils import get_jinja_environment
 from openequivariance import extlib
 from openequivariance.extlib import JITConvImpl, postprocess_kernel, DeviceProp
 
 from openequivariance.implementations.utils import filter_and_analyze_problem
-
 from openequivariance.benchmark.logging_utils import getLogger
 
 logger = getLogger()
@@ -212,9 +211,17 @@ class LoopUnrollConv(ConvolutionBase):
             vars(self.backward_schedule.launch_config),
             vars(self.double_backward_schedule.launch_config),
             {
+                "L1_dim": self.L1.dim,
+                "L2_dim": self.L2.dim,
                 "L3_dim": self.L3.dim,
+                "weight_numel": self.config.weight_numel,
+                "workspace_size": self.workspace_size,
                 "opt_level": 3,
                 "shared_weights": int(config.shared_weights),
+                "deterministic": int(self.deterministic),
+                "irrep_dtype": dtype_to_enum[self.config.irrep_dtype],
+                "weight_dtype": dtype_to_enum[self.config.weight_dtype],
+                "idx_dtype": dtype_to_enum[self.idx_dtype],
             },
         )
         logger.info("Kernel compiled!")
@@ -286,9 +293,6 @@ class LoopUnrollConv(ConvolutionBase):
             def double_backward_rawptrs(*args, **kwargs):
                 pass
 
-            def get_L3_dim(self):
-                return self.kernel_dims["L3_dim"]
-
         @torch.library.register_fake("libtorch_tp_jit::jit_conv_forward")
         def fake_forward(
             jit, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm
@@ -297,7 +301,7 @@ class LoopUnrollConv(ConvolutionBase):
             if hasattr(jit, "wrapped_obj"):
                 L3_dim = jit.wrapped_obj.kernel_dims["L3_dim"]
             else:
-                L3_dim = jit.get_L3_dim()
+                L3_dim = jit.L3_dim
 
             return L1_in.new_empty(L1_in.shape[0], L3_dim)
 
