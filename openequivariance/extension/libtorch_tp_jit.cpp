@@ -112,7 +112,7 @@ struct KernelProp {
     torch::Dtype idx_dtype;
     torch::Dtype workspace_dtype;
 
-    TP_prop(Map_t &kernel_dims, bool is_convolution):
+    KernelProp(Map_t &kernel_dims, bool is_convolution):
             L1_dim(kernel_dims.at("L1_dim")),
             L2_dim(kernel_dims.at("L2_dim")),    
             L3_dim(kernel_dims.at("L3_dim")),
@@ -122,7 +122,7 @@ struct KernelProp {
             weight_dtype(enum_to_torch_dtype(kernel_dims.at("weight_dtype"))),
             workspace_dtype(torch::kByte) { 
         if(is_convolution) {
-            workspace_size = workspace_size(kernel_dims.at("workspace_size"));
+            workspace_size = kernel_dims.at("workspace_size");
             deterministic = kernel_dims.at("deterministic");
             idx_dtype = enum_to_torch_dtype(kernel_dims.at("idx_dtype"));
         }
@@ -133,7 +133,8 @@ class __attribute__ ((visibility ("default"))) TorchJITProduct : public torch::C
 public:
     Map_t fwd_dict, bwd_dict, dbl_bwd_dict, kernel_dims;
     JITTPImpl<JITKernel> internal;
-    KernelProp kernelProp; 
+    KernelProp kernelProp;
+    int64_t L3_dim; 
 
     TorchJITProduct(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t dbl_bwd_dict_i, Map_t kernel_dims_i) :
         fwd_dict(fwd_dict_i.copy()),
@@ -146,7 +147,9 @@ public:
                 to_map(dbl_bwd_dict_i),
                 to_map(kernel_dims_i)
             ),
-        kernelProp(kernel_dims, false)
+        kernelProp(kernel_dims, false),
+        L3_dim(kernelProp.L3_dim) 
+        { }
 
     tuple<  tuple<string, string>, 
             tuple<string, Map_t>, 
@@ -196,12 +199,12 @@ torch::Tensor jit_tp_forward(
     Stream stream = get_current_stream(); 
 
     const int64_t num_batch = L1_in.size(0);
-    const TP_Prop &k = jit_instance->kernelProp;
+    const KernelProp &k = jit_instance->kernelProp;
 
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_in"); 
 
-    if (jit_instance->shared_weights)
+    if (k.shared_weights)
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
     else 
         check_tensor(W, {num_batch, k.weight_numel}, k.weight_dtype, "W");
@@ -234,13 +237,13 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_backward(
     Stream stream = get_current_stream();
 
     const int64_t num_batch = L1_in.size(0);
-    const TP_Prop &k = jit_instance->kernelProp;
+    const KernelProp &k = jit_instance->kernelProp;
 
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_in");
     check_tensor(L3_grad, {num_batch, k.L3_dim}, k.irrep_dtype, "L3_grad");
 
-    if (jit_instance->shared_weights)
+    if (k.shared_weights)
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
     else
         check_tensor(W, {num_batch, k.weight_numel}, k.weight_dtype, "W");
@@ -249,7 +252,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_backward(
     torch::Tensor L2_grad = torch::empty(L2_in.sizes(), L2_in.options());
     torch::Tensor W_grad = torch::empty(W.sizes(), W.options());
 
-    if(jit_instance->shared_weights)
+    if(k.shared_weights)
         W_grad.zero_();
 
     torch::Tensor L1_in_contig = L1_in.contiguous();
@@ -282,7 +285,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_
     Stream stream = get_current_stream();
 
     const int64_t num_batch = L1_in.size(0);
-    const TP_Prop &k = jit_instance->kernelProp;
+    const KernelProp &k = jit_instance->kernelProp;
 
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_in");
@@ -290,7 +293,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_
     check_tensor(L1_dgrad, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_dgrad");
     check_tensor(L2_dgrad, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_dgrad");
 
-    if (jit_instance->shared_weights){
+    if (k.shared_weights){
         check_tensor(W, {k.weight_numel}, k.weight_dtype,  "W");
         check_tensor(W_dgrad, {k.weight_numel}, k.weight_dtype, "W_dgrad");
     } else {
@@ -312,7 +315,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_
     torch::Tensor L2_dgrad_contig = L2_dgrad.contiguous();
     torch::Tensor W_dgrad_contig = W_dgrad.contiguous();
 
-    if(jit_instance->shared_weights) {
+    if(k.shared_weights) {
         W_grad.zero_();
         TORCH_CHECK(W.dim() == 1);
     } 
@@ -339,6 +342,7 @@ public:
     Map_t fwd_dict, bwd_dict, dbl_bwd_dict, kernel_dims;
     JITConvImpl<JITKernel> internal;
     KernelProp kernelProp;
+    int64_t L3_dim;
 
     TorchJITConv(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t dbl_bwd_dict_i, Map_t kernel_dims_i) :
         fwd_dict(fwd_dict_i.copy()),
@@ -351,7 +355,8 @@ public:
                 to_map(dbl_bwd_dict_i),
                 to_map(kernel_dims_i)
             ),
-        kernelProp(kernel_dims, true) 
+        kernelProp(kernel_dims, true),
+        L3_dim(kernelProp.L3_dim)
         { }
 
     tuple<tuple<string, string>, 
@@ -457,15 +462,15 @@ torch::Tensor jit_conv_forward(
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
-    if (jit_instance->deterministic)
+    if (k.deterministic)
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
 
-    if (jit_instance->shared_weights)
-        check_tensor(W, {weight_numel}, weight_dtype, "W");
+    if (k.shared_weights)
+        check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
     else
-        check_tensor(W, {nnz, weight_numel}, weight_dtype, "W");
+        check_tensor(W, {nnz, k.weight_numel}, k.weight_dtype, "W");
 
-    torch::Tensor L3_out = torch::zeros({node_count, L3_dim}, L1_in.options());
+    torch::Tensor L3_out = torch::zeros({node_count, k.L3_dim}, L1_in.options());
     
     torch::Tensor L1_contig = L1_in.contiguous();
     torch::Tensor L2_contig = L2_in.contiguous();
@@ -512,10 +517,10 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
-    if (jit_instance->deterministic) 
+    if (k.deterministic) 
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
     
-    if (jit_instance->shared_weights)
+    if (k.shared_weights)
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
     else
         check_tensor(W, {nnz, k.weight_numel}, k.weight_dtype, "W");
@@ -534,7 +539,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
     torch::Tensor workspace_contig = workspace.contiguous();
     torch::Tensor transpose_perm_contig = transpose_perm.contiguous();
 
-    if(jit_instance->shared_weights)
+    if(k.shared_weights)
         W_grad.zero_();
 
     jit_instance->internal.backward(
@@ -580,12 +585,10 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_doubl
     check_tensor(rows, {nnz}, k.idx_dtype, "rows"); 
     check_tensor(cols, {nnz},  k.idx_dtype, "cols"); 
 
-    if (jit_instance->deterministic)
+    if (k.deterministic)
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
-    else
-        check_tensor(transpose_perm, {1}, k.idx_dtype, "transpose perm");
-    
-    if (jit_instance->shared_weights) {
+
+    if (k.shared_weights) {
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
         check_tensor(W_dgrad, {k.weight_numel}, k.weight_dtype, "W_dgrad");
     }
@@ -612,7 +615,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_doubl
     torch::Tensor workspace_contig = workspace.contiguous();
     torch::Tensor transpose_perm_contig = transpose_perm.contiguous();
 
-    if(jit_instance->shared_weights)
+    if(k.shared_weights)
         W_grad.zero_();
 
     jit_instance->internal.double_backward(
@@ -642,8 +645,6 @@ TORCH_LIBRARY_FRAGMENT(libtorch_tp_jit, m) {
         .def("__len__", [](const c10::intrusive_ptr<TorchJITProduct>& test) -> int64_t {
             return 0;
         })
-        .def_readonly("L1_dim", &TorchJITProduct::L1_dim)
-        .def_readonly("L2_dim", &TorchJITProduct::L2_dim)
         .def_readonly("L3_dim", &TorchJITProduct::L3_dim)
         .def("__eq__", [](const c10::IValue & self, const c10::IValue& other) -> bool {
             return self.is(other); 
@@ -674,8 +675,6 @@ TORCH_LIBRARY_FRAGMENT(libtorch_tp_jit, m) {
         .def("__len__", [](const c10::intrusive_ptr<TorchJITConv>& test) -> int64_t {
             return 0;
         })
-        .def_readonly("L1_dim", &TorchJITConv::L1_dim)
-        .def_readonly("L2_dim", &TorchJITConv::L2_dim)
         .def_readonly("L3_dim", &TorchJITConv::L3_dim)
         .def("__eq__", [](const c10::IValue & self, const c10::IValue& other) -> bool {
             return self.is(other); 
