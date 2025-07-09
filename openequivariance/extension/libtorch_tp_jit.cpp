@@ -435,6 +435,38 @@ public:
             reinterpret_cast<void*>(transpose_perm),
             stream);
     }
+    void double_backward_rawptrs(
+            int64_t L1_in, int64_t L2_in, int64_t W, int64_t L3_grad,
+            int64_t L1_dgrad, int64_t L2_dgrad, int64_t w_dgrad,
+            int64_t L1_grad, int64_t L2_grad, int64_t W_grad, int64_t L3_dgrad,
+            int64_t rows, int64_t cols,
+            int64_t nnz, int64_t node_count,
+            int64_t wspace, int64_t transpose_perm) {
+       
+        Stream stream = get_current_stream();
+        internal.double_backward(
+            reinterpret_cast<void*>(L1_in), 
+            reinterpret_cast<void*>(L2_in), 
+            reinterpret_cast<void*>(W), 
+            reinterpret_cast<void*>(L3_grad),
+            reinterpret_cast<void*>(L1_dgrad), 
+            reinterpret_cast<void*>(L2_dgrad), 
+            reinterpret_cast<void*>(w_dgrad),
+            reinterpret_cast<void*>(L1_grad), 
+            reinterpret_cast<void*>(L2_grad),
+            reinterpret_cast<void*>(W_grad), 
+            reinterpret_cast<void*>(L3_dgrad),
+            reinterpret_cast<void*>(rows), 
+            reinterpret_cast<void*>(cols),
+            nnz, node_count,
+            reinterpret_cast<void*>(wspace),
+            reinterpret_cast<void*>(transpose_perm),
+            stream);
+    }
+
+    int64_t get_L3_dim() const {
+        return L3_dim;
+    }
 };
 
 torch::Tensor jit_conv_forward(
@@ -712,6 +744,7 @@ TORCH_LIBRARY_FRAGMENT(libtorch_tp_jit, m) {
         .def("__obj_flatten__", &TorchJITConv::__obj_flatten__)
         .def("exec_conv_rawptrs", &TorchJITConv::exec_conv_rawptrs)
         .def("backward_rawptrs", &TorchJITConv::backward_rawptrs)
+        .def("double_backward_rawptrs", &TorchJITConv::double_backward_rawptrs)
         .def("__len__", [](const c10::intrusive_ptr<TorchJITConv>& test) -> int64_t {
             return 0;
         })
