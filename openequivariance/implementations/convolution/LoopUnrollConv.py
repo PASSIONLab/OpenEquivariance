@@ -216,12 +216,14 @@ class LoopUnrollConv(ConvolutionBase):
                 "L2_dim": self.L2.dim,
                 "L3_dim": self.L3.dim,
                 "weight_numel": self.config.weight_numel,
+                "workspace_size": self.workspace_size,
                 "opt_level": 3,
                 "shared_weights": int(config.shared_weights),
                 "deterministic": int(self.deterministic),
                 "irrep_dtype": dtype_to_enum_mapping[self.config.irrep_dtype],
                 "weight_dtype": dtype_to_enum_mapping[self.config.weight_dtype],
                 "idx_dtype": dtype_to_enum_mapping[self.idx_dtype],
+                "workspace_dtype": dtype_to_enum_mapping[torch.uint8],
             },
         )
         logger.info("Kernel compiled!")

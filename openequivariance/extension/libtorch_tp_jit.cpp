@@ -73,7 +73,9 @@ torch::Dtype enum_to_torch_dtype_map(int64_t i){
         case 3: 
         return torch::kInt;
         case 4: 
-        return torch::kLong; 
+        return torch::kLong;
+        case 5: 
+        return torch::kUInt8;
     }
     throw logic_error("Unsupported tensor datatype!");
 } 
@@ -351,12 +353,14 @@ public:
     const int64_t L1_dim; 
     const int64_t L2_dim; 
     const int64_t L3_dim;
-    const int64_t weight_numel; 
+    const int64_t weight_numel;
+    const int64_t workspace_size;  
     const bool shared_weights;
     const bool deterministic; 
     const torch::Dtype irrep_dtype; 
     const torch::Dtype weight_dtype;
     const torch::Dtype idx_dtype;  
+    const torch::Dtype workspace_dtype; 
     TorchJITConv(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t dbl_bwd_dict_i, Map_t kernel_dims_i) :
         fwd_dict(fwd_dict_i.copy()),
         bwd_dict(bwd_dict_i.copy()),
@@ -371,12 +375,14 @@ public:
         L1_dim(kernel_dims.at("L1_dim")),    
         L2_dim(kernel_dims.at("L2_dim")),
         L3_dim(kernel_dims.at("L3_dim")),
-        weight_numel(kernel_dims.at("weight_numel")),            
+        weight_numel(kernel_dims.at("weight_numel")),
+        workspace_size(kernel_dims.at("workspace_size")),            
         shared_weights(kernel_dims.at("shared_weights")),
         deterministic(kernel_dims.at("deterministic")),
         irrep_dtype(enum_to_torch_dtype_map(kernel_dims.at("irrep_dtype"))),
         weight_dtype(enum_to_torch_dtype_map(kernel_dims.at("weight_dtype"))),
-        idx_dtype(enum_to_torch_dtype_map(kernel_dims.at("idx_dtype"))) { }
+        idx_dtype(enum_to_torch_dtype_map(kernel_dims.at("idx_dtype"))),
+        workspace_dtype(enum_to_torch_dtype_map(kernel_dims.at("workspace_dtype"))){ }
 
     tuple<tuple<string, string>, 
         tuple<string, Map_t>, 
@@ -449,13 +455,17 @@ torch::Tensor jit_conv_forward(
     const int64_t L2_dim = jit_instance->L2_dim; 
     const int64_t L3_dim = jit_instance->L3_dim; 
     const int64_t weight_numel = jit_instance->weight_numel; 
+    const int64_t workspace_size = jit_instance->workspace_size; 
 
     const torch::Dtype irrep_dtype = jit_instance->irrep_dtype; 
     const torch::Dtype weight_dtype = jit_instance->weight_dtype;  
     const torch::Dtype idx_dtype = jit_instance->idx_dtype; 
+    const torch::Dtype workspace_dtype = jit_instance->workspace_dtype; 
     
     torch_check_helper(L1_in, {node_count, L1_dim}, irrep_dtype, "L1_in"); 
     torch_check_helper(L2_in, {nnz, L2_dim}, irrep_dtype, "L2_in"); 
+
+    torch_check_helper(workspace, {workspace_size}, workspace_dtype, "workspace");
 
     torch_check_helper(rows, {nnz}, idx_dtype, "rows");
     torch_check_helper(cols, {nnz}, idx_dtype, "cols"); 
@@ -513,14 +523,18 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
     const int64_t L2_dim = jit_instance->L2_dim; 
     const int64_t L3_dim = jit_instance->L3_dim; 
     const int64_t weight_numel = jit_instance->weight_numel; 
+    const int64_t workspace_size = jit_instance->workspace_size; 
     
     const torch::Dtype irrep_dtype = jit_instance->irrep_dtype; 
     const torch::Dtype weight_dtype = jit_instance->weight_dtype;
-    const torch::Dtype idx_dtype = jit_instance->idx_dtype; 
+    const torch::Dtype idx_dtype = jit_instance->idx_dtype;
+    const torch::Dtype workspace_dtype = jit_instance->workspace_dtype; 
 
     torch_check_helper(L1_in, {node_count, L1_dim}, irrep_dtype, "L1_in"); 
     torch_check_helper(L2_in, {nnz, L2_dim}, irrep_dtype, "L2_in"); 
     torch_check_helper(L3_grad, {node_count, L3_dim}, irrep_dtype, "L3_grad"); 
+
+    torch_check_helper(workspace, {workspace_size}, workspace_dtype, "workspace");
 
     torch_check_helper(rows, {nnz}, idx_dtype, "rows"); 
     torch_check_helper(cols, {nnz}, idx_dtype, "cols"); 
@@ -590,16 +604,20 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_doubl
     const int64_t L2_dim = jit_instance->L2_dim; 
     const int64_t L3_dim = jit_instance->L3_dim; 
     const int64_t weight_numel = jit_instance->weight_numel;
+    const int64_t workspace_size = jit_instance->workspace_size; 
 
     const torch::Dtype irrep_dtype = jit_instance->irrep_dtype; 
     const torch::Dtype weight_dtype = jit_instance->weight_dtype;
     const torch::Dtype idx_dtype = jit_instance->idx_dtype; 
+    const torch::Dtype workspace_dtype = jit_instance->workspace_dtype; 
     
     torch_check_helper(L1_in, {node_count, L1_dim}, irrep_dtype, "L1_in"); 
     torch_check_helper(L2_in, {nnz, L2_dim}, irrep_dtype, "L2_in"); 
     torch_check_helper(L3_grad, {node_count, L3_dim}, irrep_dtype, "L3_grad"); 
     torch_check_helper(L1_dgrad, {node_count, L1_dim}, irrep_dtype, "L1_dgrad"); 
-    torch_check_helper(L2_dgrad, {nnz, L2_dim}, irrep_dtype, "L2_dgrad"); 
+    torch_check_helper(L2_dgrad, {nnz, L2_dim}, irrep_dtype, "L2_dgrad");
+    
+    torch_check_helper(workspace, {workspace_size}, workspace_dtype, "workspace");
     
     torch_check_helper(rows, {nnz}, idx_dtype, "rows"); 
     torch_check_helper(cols, {nnz},  idx_dtype, "cols"); 
@@ -694,7 +712,6 @@ TORCH_LIBRARY_FRAGMENT(libtorch_tp_jit, m) {
         .def("__obj_flatten__", &TorchJITConv::__obj_flatten__)
         .def("exec_conv_rawptrs", &TorchJITConv::exec_conv_rawptrs)
         .def("backward_rawptrs", &TorchJITConv::backward_rawptrs)
-        .def("double_backward_rawptrs", &TorchJITConv::double_backward_rawptrs)
         .def("__len__", [](const c10::intrusive_ptr<TorchJITConv>& test) -> int64_t {
             return 0;
         })
