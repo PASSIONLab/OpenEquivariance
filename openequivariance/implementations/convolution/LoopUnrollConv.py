@@ -12,7 +12,6 @@ from openequivariance import extlib
 from openequivariance.extlib import JITConvImpl, postprocess_kernel, DeviceProp
 
 from openequivariance.implementations.utils import filter_and_analyze_problem
-
 from openequivariance.benchmark.logging_utils import getLogger
 
 logger = getLogger()
@@ -222,7 +221,7 @@ class LoopUnrollConv(ConvolutionBase):
                 "deterministic": int(self.deterministic),
                 "irrep_dtype": dtype_to_enum[self.config.irrep_dtype],
                 "weight_dtype": dtype_to_enum[self.config.weight_dtype],
-                "idx_dtype": dtype_to_enum[self.idx_dtype]
+                "idx_dtype": dtype_to_enum[self.idx_dtype],
             },
         )
         logger.info("Kernel compiled!")

@@ -5,6 +5,7 @@ import pytest
 
 from openequivariance import TPProblem, TensorProduct, TensorProductConv
 
+
 @pytest.fixture
 def tpp():
     X_ir = o3.Irreps("1x2e")
@@ -14,6 +15,7 @@ def tpp():
     return TPProblem(
         X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
     )
+
 
 @pytest.fixture
 def edge_index():
@@ -29,6 +31,7 @@ def edge_index():
     )
     ei.fill_cache_()
     return ei
+
 
 @pytest.fixture
 def tp_buffers(tpp):
@@ -60,6 +63,7 @@ def conv_buffers(edge_index, tpp):
 
 def new_copy(bufs: list[torch.Tensor]) -> list[torch.Tensor]:
     return [buf.clone().detach() for buf in bufs]
+
 
 @pytest.fixture(
     params=[
@@ -108,7 +112,7 @@ def test_cpp_checks_forward_sizes(executable_and_buffers, subtests):
                 msg="Size Checks in each dim", buffer_index=i, dimension=j
             ):
                 if i == 0 and j == 0 and isinstance(executable, TensorProductConv):
-                    pytest.skip(reason="There is no way to check if this is wrong")
+                    pytest.skip(reason="Skipping check that falsifies node count.")
                 with pytest.raises(RuntimeError, match=r"Shape mismatch"):
                     shape = list(buffers[i].shape)
                     shape[j] += 1
