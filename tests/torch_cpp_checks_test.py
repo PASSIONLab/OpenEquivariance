@@ -18,15 +18,20 @@ def N():
 
 @pytest.fixture
 def edge_index():
-    return EdgeIndex(
+    ei = EdgeIndex(
         data=[
             [0, 1, 1, 2],  # Receiver
             [1, 0, 2, 1],  # Sender
         ],
+        sort_order="row",
         sparse_size=(3, 4),
         device="cuda",
         dtype=torch.long,
     )
+
+    ei.fill_cache_()
+
+    return ei
 
 
 @pytest.fixture
@@ -57,20 +62,35 @@ def conv_buffers(edge_index, tpp, gen):
         edge_index.num_cols, tpp.irreps_in2.dim, device="cuda", generator=gen
     )
     W = torch.rand(edge_index.num_cols, tpp.weight_numel, device="cuda", generator=gen)
-    return [X, Y, W, edge_index[0], edge_index[1]]
+    _, inv_perm = edge_index.get_csc()
+    return [X, Y, W, edge_index[0], edge_index[1], inv_perm]
 
 
 def new_copy(buffs: list[torch.Tensor]) -> list[torch.Tensor]:
     return [buf.clone().detach() for buf in buffs]
 
 
-@pytest.fixture(params=["TensorProduct", "TensorProductConv"])
+@pytest.fixture(
+    params=[
+        "TensorProduct",
+        "TensorProductConvAtomic",
+        "TensorProductConvDeterministic",
+        "TensorProductConvKahan",
+    ]
+)
 def executable_and_buffers(request, conv_buffers, tp_buffers, tpp):
     match request.param:
         case "TensorProduct":
             return (TensorProduct(tpp), tp_buffers)
-        case "TensorProductConv":
-            return (TensorProductConv(tpp), conv_buffers)
+        case "TensorProductConvAtomic":
+            return (TensorProductConv(tpp, deterministic=False), conv_buffers[:-1])
+        case "TensorProductConvDeterministic":
+            return (TensorProductConv(tpp, deterministic=True), conv_buffers)
+        case "TensorProductConvKahan":
+            return (
+                TensorProductConv(tpp, deterministic=True, kahan=True),
+                conv_buffers,
+            )
 
 
 def test_cpp_checks_forward_positive(executable_and_buffers):
