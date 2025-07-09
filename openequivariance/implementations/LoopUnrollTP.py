@@ -4,7 +4,7 @@ import openequivariance.extlib as extlib
 from openequivariance.templates.jinja_utils import get_jinja_environment
 from openequivariance.implementations.ComputationSchedule import ComputationSchedule
 
-from openequivariance.implementations.dtype_enum import dtype_to_enum_mapping
+from openequivariance.implementations.dtype_enum import dtype_to_enum
 from openequivariance.implementations.TensorProductBase import TensorProductBase
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.implementations.utils import (
@@ -121,8 +121,8 @@ class LoopUnrollTP(TensorProductBase):
                 "weight_numel": self.config.weight_numel,
                 "shared_weights": int(self.config.shared_weights),
                 "opt_level": 3,
-                "irrep_dtype": dtype_to_enum_mapping[self.config.irrep_dtype],
-                "weight_dtype": dtype_to_enum_mapping[self.config.weight_dtype],
+                "irrep_dtype": dtype_to_enum[self.config.irrep_dtype],
+                "weight_dtype": dtype_to_enum[self.config.weight_dtype],
             },
         )
         logger.info("Kernel compiled!")

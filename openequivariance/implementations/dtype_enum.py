@@ -13,7 +13,7 @@ class DTypeEnum(IntEnum):
     UINT8 = 5
 
 
-dtype_to_enum_mapping: Mapping[torch.dtype | type[np.generic] | np.dtype, DTypeEnum] = (
+dtype_to_enum: Mapping[torch.dtype | type[np.generic] | np.dtype, DTypeEnum] = (
     MappingProxyType(
         {
             torch.float32: DTypeEnum.FLOAT32,
@@ -39,7 +39,7 @@ dtype_to_enum_mapping: Mapping[torch.dtype | type[np.generic] | np.dtype, DTypeE
 )
 
 
-enum_to_torch_dtype_mapping: Mapping[DTypeEnum, torch.dtype] = MappingProxyType(
+enum_to_torch_dtype: Mapping[DTypeEnum, torch.dtype] = MappingProxyType(
     {
         DTypeEnum.FLOAT32: torch.float32,
         DTypeEnum.FLOAT64: torch.float64,
