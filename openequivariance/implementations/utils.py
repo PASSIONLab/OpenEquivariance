@@ -105,7 +105,6 @@ def torch_to_oeq_dtype(torch_dtype) -> type[np.generic]:
     else:
         raise ValueError("Unsupported torch dtype!")
 
-
 def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
     """
     mode=gpu_time may include PyTorch overhead

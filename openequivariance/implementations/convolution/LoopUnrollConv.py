@@ -6,12 +6,12 @@ from openequivariance.implementations.ComputationSchedule import (
     SMEMCapacityException,
 )
 
-from openequivariance.implementations.dtype_enum import dtype_to_enum
+from openequivariance.implementations.dtype_enum import dtype_to_enum, enum_to_torch_dtype
 from openequivariance.templates.jinja_utils import get_jinja_environment
 from openequivariance import extlib
 from openequivariance.extlib import JITConvImpl, postprocess_kernel, DeviceProp
 
-from openequivariance.implementations.utils import filter_and_analyze_problem
+from openequivariance.implementations.utils import filter_and_analyze_problem, oeq_to_torch_dtype
 from openequivariance.benchmark.logging_utils import getLogger
 
 logger = getLogger()
@@ -297,13 +297,15 @@ class LoopUnrollConv(ConvolutionBase):
         def fake_forward(
             jit, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm
         ):
-            L3_dim = None
+            L3_dim, irrep_dtype = None, None
             if hasattr(jit, "wrapped_obj"):
                 L3_dim = jit.wrapped_obj.kernel_dims["L3_dim"]
+                irrep_dtype = jit.wrapped_obj.kernel_dims["irrep_dtype"]
             else:
                 L3_dim = jit.L3_dim
+                irrep_dtype = jit.irrep_dtype
 
-            return L1_in.new_empty(L1_in.shape[0], L3_dim)
+            return torch.empty(L1_in.shape[0], L3_dim, device='cuda', dtype=enum_to_torch_dtype[irrep_dtype])
 
         @torch.library.register_fake("libtorch_tp_jit::jit_conv_backward")
         def fake_backward(
