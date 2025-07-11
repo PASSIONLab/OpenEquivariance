@@ -11,7 +11,7 @@ from openequivariance.templates.jinja_utils import get_jinja_environment
 from openequivariance import extlib
 from openequivariance.extlib import JITConvImpl, postprocess_kernel, DeviceProp
 
-from openequivariance.implementations.utils import filter_and_analyze_problem, oeq_to_torch_dtype
+from openequivariance.implementations.utils import filter_and_analyze_problem 
 from openequivariance.benchmark.logging_utils import getLogger
 
 logger = getLogger()
