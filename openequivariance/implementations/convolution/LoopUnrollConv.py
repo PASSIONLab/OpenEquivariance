@@ -393,7 +393,20 @@ class LoopUnrollConv(ConvolutionBase):
             setup_context=setup_context_double_backward,
         )
 
+    @classmethod
+    def register_autocast(cls):
+        torch.library.register_autocast(
+            "libtorch_tp_jit::jit_conv_forward", "cuda", None
+        )
+        torch.library.register_autocast(
+            "libtorch_tp_jit::jit_conv_backward", "cuda", None
+        )
+        torch.library.register_autocast(
+            "libtorch_tp_jit::jit_conv_double_backward", "cuda", None
+        )
+
 
 if extlib.TORCH_COMPILE:
     LoopUnrollConv.register_torch_fakes()
     LoopUnrollConv.register_autograd()
+    LoopUnrollConv.register_autocast()
