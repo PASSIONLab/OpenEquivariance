@@ -300,8 +300,9 @@ class LoopUnrollTP(TensorProductBase):
             flop_count["total"] = sum(flop_count.values())
             return flop_count
 
-LoopUnrollTP.register_autocast()
+
 if extlib.TORCH_COMPILE:
     LoopUnrollTP.register_torch_fakes()
     LoopUnrollTP.register_autograd()
+    LoopUnrollTP.register_autocast()
     
