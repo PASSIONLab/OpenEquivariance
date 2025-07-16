@@ -342,7 +342,7 @@ public:
     Map_t fwd_dict, bwd_dict, dbl_bwd_dict, kernel_dims;
     JITConvImpl<JITKernel> internal;
     KernelProp kernelProp;
-    int64_t L3_dim;
+    int64_t L3_dim, irrep_dtype;
 
     TorchJITConv(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t dbl_bwd_dict_i, Map_t kernel_dims_i) :
         fwd_dict(fwd_dict_i.copy()),
@@ -356,7 +356,8 @@ public:
                 to_map(kernel_dims_i)
             ),
         kernelProp(kernel_dims, true),
-        L3_dim(kernelProp.L3_dim)
+        L3_dim(kernelProp.L3_dim),
+        irrep_dtype(kernel_dims_i.at("irrep_dtype"))
         { }
 
     tuple<tuple<string, string>, 
@@ -676,6 +677,7 @@ TORCH_LIBRARY_FRAGMENT(libtorch_tp_jit, m) {
             return 0;
         })
         .def_readonly("L3_dim", &TorchJITConv::L3_dim)
+        .def_readonly("irrep_dtype", &TorchJITConv::irrep_dtype)
         .def("__eq__", [](const c10::IValue & self, const c10::IValue& other) -> bool {
             return self.is(other); 
         })
@@ -705,5 +707,96 @@ TORCH_LIBRARY_IMPL(libtorch_tp_jit, CUDA, m) {
     m.impl("jit_conv_backward", &jit_conv_backward);
     m.impl("jit_conv_double_backward", &jit_conv_double_backward);
 };
+
+// // ================== Autocast implementations ==================
+
+// torch::Tensor jit_conv_forward_autocast(
+//         const c10::intrusive_ptr<TorchJITConv> &jit_instance,
+//         const torch::Tensor &L1_in,
+//         const torch::Tensor &L2_in,
+//         const torch::Tensor &W,
+//         const torch::Tensor &rows,
+//         const torch::Tensor &cols,
+//         const torch::Tensor &workspace,
+//         const torch::Tensor &transpose_perm) { 
+//     c10::impl::ExcludeDispatchKeyGuard no_autocast(c10::DispatchKey::Autocast);
+//     auto target_dtype = jit_instance->kernelProp.irrep_dtype;
+//     return jit_conv_forward(
+//         jit_instance,
+//         L1_in.to(target_dtype),
+//         L2_in.to(target_dtype),
+//         W.to(target_dtype),
+//         rows,
+//         cols,
+//         workspace,
+//         transpose_perm
+//     );
+// }
+
+// tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward_autocast(
+//         const c10::intrusive_ptr<TorchJITConv> &jit_instance,
+//         const torch::Tensor &L1_in,
+//         const torch::Tensor &L2_in,
+//         const torch::Tensor &W,
+//         const torch::Tensor &L3_grad,
+//         const torch::Tensor &rows,
+//         const torch::Tensor &cols,
+//         const torch::Tensor &workspace,
+//         const torch::Tensor &transpose_perm) {
+
+//     c10::impl::ExcludeDispatchKeyGuard no_autocast(c10::DispatchKey::Autocast);
+//     auto target_dtype = jit_instance->kernelProp.irrep_dtype;
+//     return jit_conv_backward(
+//         jit_instance,
+//         L1_in.to(target_dtype),
+//         L2_in.to(target_dtype),
+//         W.to(target_dtype),
+//         L3_grad.to(target_dtype),
+//         rows,
+//         cols,
+//         workspace,
+//         transpose_perm
+//     );
+// }
+
+// tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_double_backward_autocast(
+//         const c10::intrusive_ptr<TorchJITConv> &jit_instance,
+//         const torch::Tensor &L1_in,
+//         const torch::Tensor &L2_in,
+//         const torch::Tensor &W,
+//         const torch::Tensor &L3_grad,
+//         const torch::Tensor &L1_dgrad,
+//         const torch::Tensor &L2_dgrad,
+//         const torch::Tensor &W_dgrad,
+//         const torch::Tensor &rows,
+//         const torch::Tensor &cols,
+//         const torch::Tensor &workspace,
+//         const torch::Tensor &transpose_perm) {
+
+//     c10::impl::ExcludeDispatchKeyGuard no_autocast(c10::DispatchKey::Autocast);
+//     auto target_dtype = jit_instance->kernelProp.irrep_dtype;
+//     return jit_conv_double_backward(
+//         jit_instance,
+//         L1_in.to(target_dtype),
+//         L2_in.to(target_dtype),
+//         W.to(target_dtype),
+//         L3_grad.to(target_dtype),
+//         L1_dgrad.to(target_dtype),
+//         L2_dgrad.to(target_dtype),
+//         W_dgrad.to(target_dtype),
+//         rows,
+//         cols,
+//         workspace,
+//         transpose_perm
+//     );
+// }
+
+// TORCH_LIBRARY_IMPL(libtorch_tp_jit, Autocast, m) { 
+//     m.impl("jit_conv_forward", &jit_conv_forward_autocast);
+//     m.impl("jit_conv_backward", &jit_conv_backward_autocast);
+//     m.impl("jit_conv_double_backward", &jit_conv_double_backward_autocast);
+// };
+
+
 
 PYBIND11_MODULE(libtorch_tp_jit, m) {}
