@@ -6,7 +6,7 @@ from openequivariance.implementations.ComputationSchedule import (
     SMEMCapacityException,
 )
 
-from openequivariance.implementations.dtype_enum import dtype_to_enum
+from openequivariance.implementations.dtype_enum import dtype_to_enum, enum_to_torch_dtype
 from openequivariance.templates.jinja_utils import get_jinja_environment
 from openequivariance import extlib
 from openequivariance.extlib import JITConvImpl, postprocess_kernel, DeviceProp
@@ -297,19 +297,43 @@ class LoopUnrollConv(ConvolutionBase):
         def fake_forward(
             jit, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm
         ):
-            L3_dim = None
+            L3_dim, irrep_dtype = None, None
             if hasattr(jit, "wrapped_obj"):
                 L3_dim = jit.wrapped_obj.kernel_dims["L3_dim"]
+                irrep_dtype = jit.wrapped_obj.kernel_dims["irrep_dtype"]
             else:
                 L3_dim = jit.L3_dim
+                irrep_dtype = jit.irrep_dtype
 
-            return L1_in.new_empty(L1_in.shape[0], L3_dim)
+            return torch.empty(L1_in.shape[0], L3_dim, device='cuda', dtype=enum_to_torch_dtype[irrep_dtype])
 
         @torch.library.register_fake("libtorch_tp_jit::jit_conv_backward")
         def fake_backward(
             jit, L1_in, L2_in, W, L3_grad, rows, cols, workspace_buffer, sender_perm
         ):
             return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W)
+        
+        @torch.library.register_fake("libtorch_tp_jit::jit_conv_double_backward")
+        def fake_double_backward(
+            jit,
+            L1_in,
+            L2_in,
+            W,
+            L3_grad,
+            L1_dgrad,
+            L2_dgrad,
+            w_dgrad,
+            rows,
+            cols,
+            workspace_buffer,
+            transpose_perm=None,
+        ):
+            return [
+                L1_in.new_empty(*L1_in.shape),
+                L2_in.new_empty(*L2_in.shape),
+                W.new_empty(*W.shape),
+                L3_grad.new_empty(*L3_grad.shape),
+            ]
 
     @classmethod
     def register_autograd(cls):
@@ -395,14 +419,16 @@ class LoopUnrollConv(ConvolutionBase):
 
     @classmethod
     def register_autocast(cls):
+        global torch
+        import torch
         torch.library.register_autocast(
-            "libtorch_tp_jit::jit_conv_forward", "cuda", None
+            "libtorch_tp_jit::jit_conv_forward", "cuda", torch.float32
         )
         torch.library.register_autocast(
-            "libtorch_tp_jit::jit_conv_backward", "cuda", None
+            "libtorch_tp_jit::jit_conv_backward", "cuda", torch.float32
         )
         torch.library.register_autocast(
-            "libtorch_tp_jit::jit_conv_double_backward", "cuda", None
+            "libtorch_tp_jit::jit_conv_double_backward", "cuda", torch.float32
         )
 
 
@@ -410,3 +436,4 @@ if extlib.TORCH_COMPILE:
     LoopUnrollConv.register_torch_fakes()
     LoopUnrollConv.register_autograd()
     LoopUnrollConv.register_autocast()
+    
