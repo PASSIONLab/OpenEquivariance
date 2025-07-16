@@ -234,12 +234,16 @@ class LoopUnrollTP(TensorProductBase):
 
     @classmethod
     def register_autocast(cls):
-        torch.library.register_autocast("libtorch_tp_jit::jit_tp_forward", "cuda", None)
+        global torch
+        import torch
         torch.library.register_autocast(
-            "libtorch_tp_jit::jit_tp_backward", "cuda", None
+            "libtorch_tp_jit::jit_tp_forward", "cuda", torch.float32
         )
         torch.library.register_autocast(
-            "libtorch_tp_jit::jit_tp_double_backward", "cuda", None
+            "libtorch_tp_jit::jit_tp_backward", "cuda", torch.float32
+        )
+        torch.library.register_autocast(
+            "libtorch_tp_jit::jit_tp_double_backward", "cuda", torch.float32
         )
 
     @staticmethod
@@ -296,8 +300,8 @@ class LoopUnrollTP(TensorProductBase):
             flop_count["total"] = sum(flop_count.values())
             return flop_count
 
-
+LoopUnrollTP.register_autocast()
 if extlib.TORCH_COMPILE:
     LoopUnrollTP.register_torch_fakes()
     LoopUnrollTP.register_autograd()
-    LoopUnrollTP.register_autocast()
+    
