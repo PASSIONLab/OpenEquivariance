@@ -392,8 +392,9 @@ labelmap = {
     "CUEConvolutionFused": "cuE-fused",
     "LoopUnrollConvDeterministic": "fast-fused-det",
     "LoopUnrollConvAtomic": "fast-fused-atomic",
+    "FlashTPConv": "flashtp"
 }
-colormap = {"e3nn": "lightblue", "cuE": "orange", "ours": "g"}
+colormap = {"e3nn": "lightblue", "cuE": "orange", "ours": "g", "flashtp": "purple"}
 
 for key in ["fast-scattersum", "fast-fused-det", "fast-fused-atomic"]:
     colormap[key] = colormap["ours"]

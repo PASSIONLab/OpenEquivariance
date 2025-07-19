@@ -19,14 +19,9 @@ def plot_convolution(data_folder):
     data_folder = pathlib.Path(data_folder)
     benchmarks, metadata = load_benchmarks(data_folder)
 
-    implementations = [
-        "CUEConvolution",
-        "CUEConvolutionFused",
-        "LoopUnrollConvScatterSum",
-        "LoopUnrollConvAtomic",
-        "LoopUnrollConvDeterministic",
-    ]
-
+    implementations = metadata["implementations"]
+    assert "CUEConvolution" in implementations
+    
     graphs = ["1drf_radius6.0", "covid_spike_radius3.0", "carbon_lattice_radius6.0"]
     graph_lmap = {
         "covid_spike_radius3.0": "COVID spike",
@@ -81,7 +76,7 @@ def plot_convolution(data_folder):
                 rotate_xlabels=True,
                 colormap=colormap,
                 hatchmap=hatchmap,
-                group_spacing=6.0,
+                group_spacing=7.0,
             )
 
             axes[i][j].set_xlabel(dtype_labelmap[dtype])

@@ -105,6 +105,17 @@ def torch_to_oeq_dtype(torch_dtype) -> type[np.generic]:
     else:
         raise ValueError("Unsupported torch dtype!")
 
+def oeq_to_torch_dtype(oeq_dtype: type[np.generic]): 
+    global torch
+    import torch
+
+    if oeq_dtype == np.float32:
+        return torch.float32
+    elif oeq_dtype == np.float64:
+        return torch.float64
+    else:
+        raise ValueError("Unsupported numpy dtype!")
+
 
 def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
     """
