@@ -38,7 +38,7 @@ from openequivariance.implementations.convolution.TensorProductConv import (
 )
 
 from openequivariance.implementations.convolution.CUEConv import CUEConv, CUEConvFused
-from openequivariance.implementations.convolution.FlashTPConv import FlashTPConv 
+from openequivariance.implementations.convolution.FlashTPConv import FlashTPConv
 from openequivariance.benchmark.ConvBenchmarkSuite import ConvBenchmarkSuite, load_graph
 
 from openequivariance.benchmark.problems import (
@@ -62,13 +62,13 @@ implementation_map_tp = {
     "oeq": TensorProduct,
 }
 
-implementation_map_conv = { 
+implementation_map_conv = {
     "cue_unfused": CUEConv,
     "oeq_scattersum": TensorProductConvScatterSum,
     "flashtp": FlashTPConv,
     "cue_fused": CUEConvFused,
     "oeq_det": TensorProductConvDeterministic,
-    "oeq_atomic": TensorProductConvAtomic
+    "oeq_atomic": TensorProductConvAtomic,
 }
 
 datatype_map = {"float32": np.float32, "float64": np.float64}
@@ -298,8 +298,9 @@ def benchmark_convolution(params):
 
         bench = ConvBenchmarkSuite(configs, test_name="convolution")
 
-
-        implementations = [implementation_map_conv[impl] for impl in params.implementations]
+        implementations = [
+            implementation_map_conv[impl] for impl in params.implementations
+        ]
 
         if params.limited_memory:
             implementations = [
@@ -508,7 +509,7 @@ if __name__ == "__main__":
         nargs="+",
         default=["cue_unfused", "oeq_scattersum", "cue_fused", "oeq_atomic", "oeq_det"],
         help="Implementations to benchmark",
-        choices=list(implementation_map_conv.keys())
+        choices=list(implementation_map_conv.keys()),
     )
 
     parser_conv.set_defaults(func=benchmark_convolution)

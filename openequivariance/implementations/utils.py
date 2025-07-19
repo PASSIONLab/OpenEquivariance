@@ -105,7 +105,8 @@ def torch_to_oeq_dtype(torch_dtype) -> type[np.generic]:
     else:
         raise ValueError("Unsupported torch dtype!")
 
-def oeq_to_torch_dtype(oeq_dtype: type[np.generic]): 
+
+def oeq_to_torch_dtype(oeq_dtype: type[np.generic]):
     global torch
     import torch
 

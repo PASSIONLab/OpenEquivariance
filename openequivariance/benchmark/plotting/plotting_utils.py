@@ -392,7 +392,7 @@ labelmap = {
     "CUEConvolutionFused": "cuE-fused",
     "LoopUnrollConvDeterministic": "fast-fused-det",
     "LoopUnrollConvAtomic": "fast-fused-atomic",
-    "FlashTPConv": "flashtp"
+    "FlashTPConv": "flashtp",
 }
 colormap = {"e3nn": "lightblue", "cuE": "orange", "ours": "g", "flashtp": "purple"}
 

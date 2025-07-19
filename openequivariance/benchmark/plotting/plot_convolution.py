@@ -21,7 +21,7 @@ def plot_convolution(data_folder):
 
     implementations = metadata["implementations"]
     assert "CUEConvolution" in implementations
-    
+
     graphs = ["1drf_radius6.0", "covid_spike_radius3.0", "carbon_lattice_radius6.0"]
     graph_lmap = {
         "covid_spike_radius3.0": "COVID spike",
