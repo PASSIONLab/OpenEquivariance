@@ -236,6 +236,7 @@ class LoopUnrollTP(TensorProductBase):
     def register_autocast(cls):
         global torch
         import torch
+
         torch.library.register_autocast(
             "libtorch_tp_jit::jit_tp_forward", "cuda", torch.float32
         )
@@ -305,4 +306,3 @@ if extlib.TORCH_COMPILE:
     LoopUnrollTP.register_torch_fakes()
     LoopUnrollTP.register_autograd()
     LoopUnrollTP.register_autocast()
-    
