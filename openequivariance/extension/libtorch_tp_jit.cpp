@@ -342,7 +342,7 @@ public:
     Map_t fwd_dict, bwd_dict, dbl_bwd_dict, kernel_dims;
     JITConvImpl<JITKernel> internal;
     KernelProp kernelProp;
-    int64_t L3_dim;
+    int64_t L3_dim, irrep_dtype;
 
     TorchJITConv(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t dbl_bwd_dict_i, Map_t kernel_dims_i) :
         fwd_dict(fwd_dict_i.copy()),
@@ -356,7 +356,8 @@ public:
                 to_map(kernel_dims_i)
             ),
         kernelProp(kernel_dims, true),
-        L3_dim(kernelProp.L3_dim)
+        L3_dim(kernelProp.L3_dim),
+        irrep_dtype(kernel_dims_i.at("irrep_dtype"))
         { }
 
     tuple<tuple<string, string>, 
@@ -676,6 +677,7 @@ TORCH_LIBRARY_FRAGMENT(libtorch_tp_jit, m) {
             return 0;
         })
         .def_readonly("L3_dim", &TorchJITConv::L3_dim)
+        .def_readonly("irrep_dtype", &TorchJITConv::irrep_dtype)
         .def("__eq__", [](const c10::IValue & self, const c10::IValue& other) -> bool {
             return self.is(other); 
         })
