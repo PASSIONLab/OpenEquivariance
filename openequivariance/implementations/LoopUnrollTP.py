@@ -183,8 +183,11 @@ class LoopUnrollTP(TensorProductBase):
             def backward_rawptr(*args, **kwargs):
                 pass
 
-            def get_L3_dim(self):
+            def L3_dim_getter(self):
                 return self.kernel_dims["L3_dim"]
+
+            def irrep_dtype_getter(self):
+                return self.kernel_dims["irrep_dtype"]
 
         @torch.library.register_fake("libtorch_tp_jit::jit_tp_forward")
         def fake_forward(jit, L1_in, L2_in, W):
