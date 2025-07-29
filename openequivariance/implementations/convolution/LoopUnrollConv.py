@@ -296,6 +296,12 @@ class LoopUnrollConv(ConvolutionBase):
             def double_backward_rawptrs(*args, **kwargs):
                 pass
 
+            def L3_dim_getter(self):
+                return self.kernel_dims["L3_dim"]
+
+            def irrep_dtype_getter(self):
+                return self.kernel_dims["irrep_dtype"]
+
         @torch.library.register_fake("libtorch_tp_jit::jit_conv_forward")
         def fake_forward(
             jit, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm
