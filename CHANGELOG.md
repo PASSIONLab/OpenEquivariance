@@ -1,5 +1,38 @@
 ## Latest Changes
 
+### v0.4.0 (2025-08-14)
+This release adds a benchmark against
+FlashTP, exposes weight reordering functions
+for e3nn compatibility, adds input validation,
+and provides rudimentary support for PyTorch
+automatic mixed precision (AMP). Our fused,
+JIT-compiled kernels exhibit up to 2x speedup
+over FlashTP!
+
+**Added**:
+1. Both `TensorProduct` and `TensorProductConv`
+now have the methods `reoder_weights_from_e3nn`
+and `reorder_weights_to_e3nn`. These convert
+the buffer of trainable weights from / to e3nn's
+canonical ordering. See the API page for usage
+details.
+2. If you have FlashTP installed, see our 
+documentation ("Tests and Benchmarks" page) 
+to benchmark FlashTP against OpenEquivariance. 
+3. Tensor product inputs with incorrect sizes or 
+datatypes now trigger clear errors in advance of
+execution.
+4. OpenEquivariance now has some support for
+automatic mixed precision (AMP), but only if 
+`TensorProduct` / `TensorProductConv` objects 
+are constructed with `float32` precision for
+both `irrep_dtype` and `weight_dtype`.
+
+**Fixed / Enhanced**:
+1. Added additional fake functions to remove 
+warnings from TorchBind.
+2. Removed bloat from benchmarking code. 
+
 ### v0.3.0 (2025-06-22)
 This release includes bugfixes and new opaque operations that
 compose with `torch.compile` 

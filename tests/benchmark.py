@@ -38,6 +38,7 @@ from openequivariance.implementations.convolution.TensorProductConv import (
 )
 
 from openequivariance.implementations.convolution.CUEConv import CUEConv, CUEConvFused
+from openequivariance.implementations.convolution.FlashTPConv import FlashTPConv
 from openequivariance.benchmark.ConvBenchmarkSuite import ConvBenchmarkSuite, load_graph
 
 from openequivariance.benchmark.problems import (
@@ -54,11 +55,20 @@ logger = getLogger()
 CTPP = ChannelwiseTPP
 FCTPP = FullyConnectedTPProblem
 
-implementation_map = {
+implementation_map_tp = {
     "e3nn": E3NNTensorProductCompiledMaxAutotuneCUDAGraphs,
     "e3nn_uncompiled": E3NNTensorProduct,
     "cue": CUETensorProduct,
     "oeq": TensorProduct,
+}
+
+implementation_map_conv = {
+    "cue_unfused": CUEConv,
+    "oeq_scattersum": TensorProductConvScatterSum,
+    "flashtp": FlashTPConv,
+    "cue_fused": CUEConvFused,
+    "oeq_det": TensorProductConvDeterministic,
+    "oeq_atomic": TensorProductConvAtomic,
 }
 
 datatype_map = {"float32": np.float32, "float64": np.float64}
@@ -87,7 +97,7 @@ def benchmark_uvu(params):
         problem.weight_dtype = np.float64
     problems = mace_problems() + nequip_problems() + float64_problems
 
-    implementations = [implementation_map[impl] for impl in params.implementations]
+    implementations = [implementation_map_tp[impl] for impl in params.implementations]
     directions = params.directions
 
     tests = [
@@ -289,11 +299,7 @@ def benchmark_convolution(params):
         bench = ConvBenchmarkSuite(configs, test_name="convolution")
 
         implementations = [
-            TensorProductConvScatterSum,
-            CUEConv,
-            CUEConvFused,
-            TensorProductConvDeterministic,
-            TensorProductConvAtomic,
+            implementation_map_conv[impl] for impl in params.implementations
         ]
 
         if params.limited_memory:
@@ -496,6 +502,16 @@ if __name__ == "__main__":
         help="Disable tests requiring large amounts of memory.",
     )
     parser_conv.add_argument("--plot", action="store_true", help="Plot the results.")
+    parser_conv.add_argument(
+        "--implementations",
+        "-i",
+        type=str,
+        nargs="+",
+        default=["cue_unfused", "oeq_scattersum", "cue_fused", "oeq_atomic", "oeq_det"],
+        help="Implementations to benchmark",
+        choices=list(implementation_map_conv.keys()),
+    )
+
     parser_conv.set_defaults(func=benchmark_convolution)
 
     parser_uvw = subparsers.add_parser(
