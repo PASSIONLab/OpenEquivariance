@@ -183,8 +183,11 @@ class LoopUnrollTP(TensorProductBase):
             def backward_rawptr(*args, **kwargs):
                 pass
 
-            def get_L3_dim(self):
+            def L3_dim_getter(self):
                 return self.kernel_dims["L3_dim"]
+
+            def irrep_dtype_getter(self):
+                return self.kernel_dims["irrep_dtype"]
 
         @torch.library.register_fake("libtorch_tp_jit::jit_tp_forward")
         def fake_forward(jit, L1_in, L2_in, W):
@@ -230,6 +233,21 @@ class LoopUnrollTP(TensorProductBase):
             "libtorch_tp_jit::jit_tp_backward",
             double_backward,
             setup_context=setup_context_double_backward,
+        )
+
+    @classmethod
+    def register_autocast(cls):
+        global torch
+        import torch
+
+        torch.library.register_autocast(
+            "libtorch_tp_jit::jit_tp_forward", "cuda", torch.float32
+        )
+        torch.library.register_autocast(
+            "libtorch_tp_jit::jit_tp_backward", "cuda", torch.float32
+        )
+        torch.library.register_autocast(
+            "libtorch_tp_jit::jit_tp_double_backward", "cuda", torch.float32
         )
 
     @staticmethod
@@ -290,3 +308,4 @@ class LoopUnrollTP(TensorProductBase):
 if extlib.TORCH_COMPILE:
     LoopUnrollTP.register_torch_fakes()
     LoopUnrollTP.register_autograd()
+    LoopUnrollTP.register_autocast()
