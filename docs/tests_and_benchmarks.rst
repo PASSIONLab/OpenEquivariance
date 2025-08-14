@@ -72,9 +72,10 @@ We recently added a benchmark against
 on your system, install FlashTP via ``pip`` and run 
 
 .. code-block:: bash
+
     python tests/benchmark.py -o outputs/conv conv --plot --data data/molecular_structures -i cue_unfused oeq_scattersum flashtp cue_fused oeq_det oeq_atomic
 
-OpenEquivariance exhibits up to 2x speedup over their fused kernels. 
+OpenEquivariance exhibits up to 2x speedup over FlashTP's fused kernels. 
 
 List of GPUs Tested
 --------------------------------
