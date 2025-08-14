@@ -67,6 +67,15 @@ For GPUs besides the NVIDIA A100, the roofline slope / peak will be incorrect.
 The plots for the convolution fusion experiments also require a GPU 
 with a minimum of 40GB of memory. 
 
+We recently added a benchmark against
+`FlashTP <https://github.com/SNU-ARC/flashTP>`_. To replicate it
+on your system, install FlashTP via ``pip`` and run 
+
+.. code-block:: bash
+    python tests/benchmark.py -o outputs/conv conv --plot --data data/molecular_structures -i cue_unfused oeq_scattersum flashtp cue_fused oeq_det oeq_atomic
+
+OpenEquivariance exhibits up to 2x speedup over their fused kernels. 
+
 List of GPUs Tested
 --------------------------------
 OpenEquivariance has been tested successfully the following GPUs. Submit a pull 
