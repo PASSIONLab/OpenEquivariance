@@ -464,9 +464,11 @@ torch::Tensor jit_conv_forward(
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
-    if (k.deterministic)
+    if (k.deterministic){
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
-
+    } else {
+        at::globalContext().alertNotDeterministic("OpenEquivariance_conv_atomic_forward");
+    }
     if (k.shared_weights)
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
     else
@@ -519,8 +521,11 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
-    if (k.deterministic) 
+    if (k.deterministic){
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
+    } else {
+         at::globalContext().alertNotDeterministic("OpenEquivariance_conv_atomic_backward");
+    }
     
     if (k.shared_weights)
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
@@ -587,8 +592,11 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_doubl
     check_tensor(rows, {nnz}, k.idx_dtype, "rows"); 
     check_tensor(cols, {nnz},  k.idx_dtype, "cols"); 
 
-    if (k.deterministic)
+    if (k.deterministic) {
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
+    } else {
+        at::globalContext().alertNotDeterministic("OpenEquivariance_conv_atomic_double_backward");
+    }
 
     if (k.shared_weights) {
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
