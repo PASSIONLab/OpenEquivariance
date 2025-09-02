@@ -4,6 +4,7 @@ import os
 import warnings
 import sysconfig
 from pathlib import Path
+import importlib
 
 from openequivariance.benchmark.logging_utils import getLogger
 
@@ -119,7 +120,10 @@ else:
             extra_cflags=extra_cflags,
             extra_include_paths=include_dirs,
             extra_ldflags=extra_link_args,
+            is_python_module=True,
         )
+        if "generic_module" not in sys.modules:
+            sys.modules["generic_module"] = generic_module
 
     if not TORCH_COMPILE:
         warnings.warn(
