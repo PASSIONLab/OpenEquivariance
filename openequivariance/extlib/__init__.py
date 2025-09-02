@@ -120,6 +120,8 @@ else:
             extra_include_paths=include_dirs,
             extra_ldflags=extra_link_args,
         )
+        if "generic_module" not in sys.modules:
+            sys.modules["generic_module"] = generic_module
 
     if not TORCH_COMPILE:
         warnings.warn(
