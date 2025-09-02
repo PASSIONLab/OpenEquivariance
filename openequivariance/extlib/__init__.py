@@ -4,7 +4,7 @@ import os
 import warnings
 import sysconfig
 from pathlib import Path
-import importlib
+import sys 
 
 from openequivariance.benchmark.logging_utils import getLogger
 
