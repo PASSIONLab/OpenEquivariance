@@ -22,7 +22,13 @@ Installation is one easy command, followed by import verification:
 
 The second line triggers a build of the C++ extension we use to compile
 kernels, which can take a couple of minutes. Subsequent imports are
-much faster since this extension is cached. 
+much faster since this extension is cached.
+
+To get the nightly build, run
+
+.. code-block:: bash 
+
+    pip install git+https://github.com/PASSIONLab/OpenEquivariance 
 
 
 Compiling the Integrated PyTorch Extension
