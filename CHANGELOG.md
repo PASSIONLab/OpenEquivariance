@@ -1,5 +1,9 @@
 ## Latest Changes
 
+### v0.4.1 (2025-09-04)
+Minor update, fixes a bug loading JIT-compiled modules
+with PyTorch 2.9.
+
 ### v0.4.0 (2025-08-14)
 This release adds a benchmark against
 FlashTP, exposes weight reordering functions
