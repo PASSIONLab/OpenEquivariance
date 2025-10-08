@@ -150,6 +150,16 @@ def nequip_problems():
         ]
     ]
 
+# https://github.com/PASSIONLab/OpenEquivariance/discussions/157#discussioncomment-14279135
+def nequix_problems():
+    return [
+        CTPP(
+            "128x0e + 64x1o + 32x2e + 32x3o",
+            "0e + 1o + 2e + 3o",
+            "128x0e + 64x1o + 32x2e + 32x3o",
+            "nequix"
+        )
+    ]
 
 def e3tools_problems():
     return [
