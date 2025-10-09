@@ -6,6 +6,7 @@
 #include <string>
 #include <iostream>
 #include <vector>
+#include <algorithm> 
 
 using namespace std;
 using Stream = cudaStream_t;
@@ -160,6 +161,8 @@ private:
 
     CUlibrary library;
 
+    vector<int> supported_archs; 
+
     vector<string> kernel_names;
     vector<CUkernel> kernels;
 
@@ -167,6 +170,15 @@ public:
     string kernel_plaintext;
     CUJITKernel(string plaintext) :
         kernel_plaintext(plaintext) {
+        
+        int num_supported_archs; 
+        NVRTC_SAFE_CALL(
+        nvrtcGetNumSupportedArchs(&num_supported_archs));
+        
+        supported_archs.resize(num_supported_archs); 
+        NVRTC_SAFE_CALL(
+        nvrtcGetSupportedArchs(supported_archs.data())); 
+        
 
         NVRTC_SAFE_CALL(
         nvrtcCreateProgram( &prog,                     // prog
@@ -194,6 +206,21 @@ public:
 
         if(kernel_names_i.size() != template_param_list.size()) {
             throw std::logic_error("Kernel names and template parameters must have the same size!");
+        }
+
+        int device_arch = cu_major * 10 + cu_minor;
+        if (std::find(supported_archs.begin(), supported_archs.end(), device_arch) == supported_archs.end()){
+            int nvrtc_version_major, nvrtc_version_minor; 
+            NVRTC_SAFE_CALL(
+            nvrtcVersion(&nvrtc_version_major, &nvrtc_version_minor)); 
+
+            throw std::runtime_error("NVRTC version " 
+                + std::to_string(nvrtc_version_major) 
+                + "." 
+                + std::to_string(nvrtc_version_minor) 
+                + " does not support device architecture " 
+                + std::to_string(device_arch)
+        );
         }
 
         for(unsigned int kernel = 0; kernel < kernel_names_i.size(); kernel++) {
