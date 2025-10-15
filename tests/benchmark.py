@@ -93,8 +93,8 @@ roofline_configs = [
 
 def benchmark_uvu(params):
     def get_problems():
-        return  mace_problems() + nequip_problems() + nequix_problems()
-    
+        return mace_problems() + nequip_problems() + nequix_problems()
+
     float64_problems = get_problems()
     for problem in float64_problems:
         problem.irrep_dtype = np.float64
