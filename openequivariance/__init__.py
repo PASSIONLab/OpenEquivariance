@@ -2,11 +2,11 @@
 import sys
 import torch
 import numpy as np
-if torch.cuda.is_available():
-    try:
-        import openequivariance.extlib
-    except Exception as e:
-        raise ImportError(f"Unable to load OpenEquivariance extension library:\n{e}")
+
+try:
+    import openequivariance.extlib
+except Exception as e:
+    raise ImportError(f"Unable to load OpenEquivariance extension library:\n{e}")
 from pathlib import Path
 from importlib.metadata import version
 
