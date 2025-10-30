@@ -5,12 +5,16 @@ import warnings
 import sysconfig
 from pathlib import Path
 
+global torch
+import torch
+
 from openequivariance.benchmark.logging_utils import getLogger
 
 oeq_root = str(Path(__file__).parent.parent)
 
 build_ext = True
 TORCH_COMPILE = True
+TORCH_CUDA_AVAILABLE = torch.cuda.is_available()
 torch_module, generic_module = None, None
 postprocess_kernel = lambda kernel: kernel  # noqa : E731
 
@@ -38,11 +42,8 @@ if not build_ext:
     import openequivariance.extlib.generic_module
 
     generic_module = openequivariance.extlib.generic_module
-else:
+elif TORCH_CUDA_AVAILABLE:
     from torch.utils.cpp_extension import library_paths, include_paths
-
-    global torch
-    import torch
 
     extra_cflags = ["-O3"]
     generic_sources = ["generic_module.cpp"]
@@ -128,13 +129,44 @@ else:
             "Could not compile integrated PyTorch wrapper. Falling back to Pybind11"
             + f", but JITScript, compile fullgraph, and export will fail.\n {torch_compile_exception}"
         )
+else:
+    TORCH_COMPILE = False
 
-from generic_module import (
-    JITTPImpl,
-    JITConvImpl,
-    GroupMM_F32,
-    GroupMM_F64,
-    DeviceProp,
-    DeviceBuffer,
-    GPUTimer,
-)
+def _raise_import_error_helper(import_target: str):
+    if not TORCH_CUDA_AVAILABLE:
+        raise ImportError(
+            f"Could not import {import_target}: OpenEquivariance's torch extension was not built because torch.cuda.is_available() is false"
+        )
+
+
+if TORCH_CUDA_AVAILABLE:
+    from generic_module import (
+        JITTPImpl,
+        JITConvImpl,
+        GroupMM_F32,
+        GroupMM_F64,
+        DeviceProp,
+        DeviceBuffer,
+        GPUTimer,
+    )
+else:
+    def JITTPImpl(*args, **kwargs):
+        _raise_import_error_helper("JITTPImpl")
+
+    def JITConvImpl(*args, **kwargs):
+        _raise_import_error_helper("JITConvImpl")
+
+    def GroupMM_F32(*args, **kwargs):
+        _raise_import_error_helper("GroupMM_F32")
+
+    def GroupMM_F64(*args, **kwargs):
+        _raise_import_error_helper("GroupMM_F64")
+
+    def DeviceProp(*args, **kwargs):
+        _raise_import_error_helper("DeviceProp")
+
+    def DeviceBuffer(*args, **kwargs):
+        _raise_import_error_helper("DeviceBuffer")
+
+    def GPUTimer(*args, **kwargs):
+        _raise_import_error_helper("GPUTimer")
