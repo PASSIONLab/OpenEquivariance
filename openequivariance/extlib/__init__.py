@@ -14,7 +14,7 @@ oeq_root = str(Path(__file__).parent.parent)
 
 build_ext = True
 TORCH_COMPILE = True
-TORCH_CUDA_AVAILABLE = torch.cuda.is_available()
+TORCH_VERSION_CUDA_OR_HIP = torch.version.cuda or torch.version.hip
 torch_module, generic_module = None, None
 postprocess_kernel = lambda kernel: kernel  # noqa : E731
 
@@ -42,7 +42,7 @@ if not build_ext:
     import openequivariance.extlib.generic_module
 
     generic_module = openequivariance.extlib.generic_module
-elif TORCH_CUDA_AVAILABLE:
+elif TORCH_VERSION_CUDA_OR_HIP:
     from torch.utils.cpp_extension import library_paths, include_paths
 
     extra_cflags = ["-O3"]
@@ -134,13 +134,13 @@ else:
 
 
 def _raise_import_error_helper(import_target: str):
-    if not TORCH_CUDA_AVAILABLE:
+    if not TORCH_VERSION_CUDA_OR_HIP:
         raise ImportError(
-            f"Could not import {import_target}: OpenEquivariance's torch extension was not built because torch.cuda.is_available() is false"
+            f"Could not import {import_target}: OpenEquivariance's torch extension was not built because torch.version.cuda || torch.version.hip is false"
         )
 
 
-if TORCH_CUDA_AVAILABLE:
+if TORCH_VERSION_CUDA_OR_HIP:
     from generic_module import (
         JITTPImpl,
         JITConvImpl,
