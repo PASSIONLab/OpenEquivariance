@@ -132,6 +132,7 @@ elif TORCH_CUDA_AVAILABLE:
 else:
     TORCH_COMPILE = False
 
+
 def _raise_import_error_helper(import_target: str):
     if not TORCH_CUDA_AVAILABLE:
         raise ImportError(
@@ -150,6 +151,7 @@ if TORCH_CUDA_AVAILABLE:
         GPUTimer,
     )
 else:
+
     def JITTPImpl(*args, **kwargs):
         _raise_import_error_helper("JITTPImpl")
 
