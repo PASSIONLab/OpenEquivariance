@@ -26,8 +26,7 @@ public:
             beta(0.0) { 
         stat = cublasCreate(&handle);
         if (stat != CUBLAS_STATUS_SUCCESS) {
-            throw std::log
-            ic_error("CUBLAS initialization failed");
+            throw std::logic_error("CUBLAS initialization failed");
         }
     }
 
