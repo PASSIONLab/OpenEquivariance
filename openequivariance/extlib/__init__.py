@@ -3,6 +3,8 @@ import sys
 import os
 import warnings
 import sysconfig
+import shutil
+from functools import lru_cache
 from pathlib import Path
 
 global torch
@@ -14,7 +16,30 @@ oeq_root = str(Path(__file__).parent.parent)
 
 build_ext = True
 TORCH_COMPILE = True
-TORCH_VERSION_CUDA_OR_HIP = torch.version.cuda or torch.version.hip
+
+
+@lru_cache(maxsize=1)
+def _compile_torch_cuda_extension():
+    return torch.version.cuda and _nvcc_present()
+
+
+def _nvcc_present():
+    return shutil.which("nvcc") is not None
+
+
+@lru_cache(maxsize=1)
+def _compile_torch_hip_extension():
+    return torch.version.hip and _hipcc_present()
+
+
+def _hipcc_present():
+    return shutil.which("hipcc") is not None
+
+
+COMPILE_TORCH_CUDA_EXTENSION = _compile_torch_cuda_extension()
+COMPILE_TORCH_HIP_EXTENSION = _compile_torch_hip_extension()
+
+
 torch_module, generic_module = None, None
 postprocess_kernel = lambda kernel: kernel  # noqa : E731
 
@@ -42,7 +67,7 @@ if not build_ext:
     import openequivariance.extlib.generic_module
 
     generic_module = openequivariance.extlib.generic_module
-elif TORCH_VERSION_CUDA_OR_HIP:
+elif COMPILE_TORCH_CUDA_EXTENSION or COMPILE_TORCH_HIP_EXTENSION:
     from torch.utils.cpp_extension import library_paths, include_paths
 
     extra_cflags = ["-O3"]
@@ -134,13 +159,21 @@ else:
 
 
 def _raise_import_error_helper(import_target: str):
-    if not TORCH_VERSION_CUDA_OR_HIP:
+    if torch.version.cuda:
         raise ImportError(
-            f"Could not import {import_target}: OpenEquivariance's torch extension was not built because torch.version.cuda || torch.version.hip is false"
+            f"Could not import {import_target}: OpenEquivariance's torch extension was not built because nvcc was not found"
+        )
+    elif torch.version.hip:
+        raise ImportError(
+            f"Could not import {import_target}: OpenEquivariance's torch extension was not built because hipcc was not found"
+        )
+    else:
+        raise ImportError(
+            f"Could not import {import_target}: OpenEquivariance's torch extension was not built because torch.version.cuda || torch.version.hip was False"
         )
 
 
-if TORCH_VERSION_CUDA_OR_HIP:
+if COMPILE_TORCH_CUDA_EXTENSION or COMPILE_TORCH_HIP_EXTENSION:
     from generic_module import (
         JITTPImpl,
         JITConvImpl,
