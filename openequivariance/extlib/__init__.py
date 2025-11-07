@@ -12,9 +12,17 @@ from openequivariance.benchmark.logging_utils import getLogger
 
 oeq_root = str(Path(__file__).parent.parent)
 
-TORCH_COMPILE = True
 BUILT_EXTENSION = False
 BUILT_EXTENSION_ERROR = None
+
+TORCH_COMPILE = False
+TORCH_COMPILE_ERROR = None
+
+LINKED_LIBPYTHON = False
+LINKED_LIBPYTHON_ERROR = None
+
+torch_module, generic_module = None, None
+postprocess_kernel = lambda kernel: kernel  # noqa : E731
 
 
 @lru_cache(maxsize=1)
@@ -27,15 +35,6 @@ def _compile_torch_hip_extension():
     return torch.version.hip and ("HIP_HOME" in os.environ)
 
 
-COMPILE_TORCH_CUDA_EXTENSION = _compile_torch_cuda_extension()
-COMPILE_TORCH_HIP_EXTENSION = _compile_torch_hip_extension()
-
-
-torch_module, generic_module = None, None
-postprocess_kernel = lambda kernel: kernel  # noqa : E731
-
-LINKED_LIBPYTHON = False
-LINKED_LIBPYTHON_ERROR = None
 try:
     python_lib_dir = sysconfig.get_config_var("LIBDIR")
     major, minor = sys.version_info.major, sys.version_info.minor
@@ -49,16 +48,15 @@ try:
         )
 
     LINKED_LIBPYTHON = True
-
 except Exception as e:
     LINKED_LIBPYTHON_ERROR = f"Error linking libpython:\n{e}\nSysconfig variables:\n{sysconfig.get_config_vars()}"
 
-generic_module = None
+
 if BUILT_EXTENSION:
     import openequivariance.extlib.generic_module
-
+    
     generic_module = openequivariance.extlib.generic_module
-elif COMPILE_TORCH_CUDA_EXTENSION or COMPILE_TORCH_HIP_EXTENSION:
+elif _compile_torch_cuda_extension() or _compile_torch_hip_extension():
     try:
         from torch.utils.cpp_extension import library_paths, include_paths
 
@@ -111,7 +109,6 @@ elif COMPILE_TORCH_CUDA_EXTENSION or COMPILE_TORCH_HIP_EXTENSION:
             oeq_root + "/extension/" + d for d in include_dirs
         ] + include_paths("cuda")
 
-        torch_compile_exception = None
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
@@ -124,11 +121,11 @@ elif COMPILE_TORCH_CUDA_EXTENSION or COMPILE_TORCH_HIP_EXTENSION:
                     extra_ldflags=extra_link_args,
                 )
                 torch.ops.load_library(torch_module.__file__)
+                TORCH_COMPILE = True
             except Exception as e:
                 # If compiling torch fails (e.g. low gcc version), we should fall back to the
                 # version that takes integer pointers as args (but is untraceable to PyTorch JIT / export).
-                TORCH_COMPILE = False
-                torch_compile_exception = e
+                TORCH_COMPILE_ERROR = e
 
             generic_module = torch.utils.cpp_extension.load(
                 "generic_module",
@@ -143,7 +140,7 @@ elif COMPILE_TORCH_CUDA_EXTENSION or COMPILE_TORCH_HIP_EXTENSION:
         if not TORCH_COMPILE:
             warnings.warn(
                 "Could not compile integrated PyTorch wrapper. Falling back to Pybind11"
-                + f", but JITScript, compile fullgraph, and export will fail.\n {torch_compile_exception}"
+                + f", but JITScript, compile fullgraph, and export will fail.\n {TORCH_COMPILE_ERROR}"
             )
         BUILT_EXTENSION = True
     except Exception as e:
