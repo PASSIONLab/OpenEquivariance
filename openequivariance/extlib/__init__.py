@@ -54,7 +54,7 @@ except Exception as e:
 
 if BUILT_EXTENSION:
     import openequivariance.extlib.generic_module
-    
+
     generic_module = openequivariance.extlib.generic_module
 elif _compile_torch_cuda_extension() or _compile_torch_hip_extension():
     try:
