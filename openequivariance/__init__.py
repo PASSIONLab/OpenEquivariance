@@ -2,13 +2,17 @@
 import sys
 import torch
 import numpy as np
-
-try:
-    import openequivariance.extlib
-except Exception as e:
-    raise ImportError(f"Unable to load OpenEquivariance extension library:\n{e}")
 from pathlib import Path
 from importlib.metadata import version
+
+import openequivariance.extlib
+
+from openequivariance.extlib import (
+    LINKED_LIBPYTHON,
+    LINKED_LIBPYTHON_ERROR,
+    BUILT_EXTENSION,
+    BUILT_EXTENSION_ERROR,
+)
 
 from openequivariance.implementations.e3nn_lite import (
     TPProblem,
@@ -62,9 +66,6 @@ torch.serialization.add_safe_globals(
         np.float64,
     ]
 )
-
-LINKED_LIBPYTHON = openequivariance.extlib.LINKED_LIBPYTHON
-LINKED_LIBPYTHON_ERROR = openequivariance.extlib.LINKED_LIBPYTHON_ERROR
 
 __all__ = [
     "TPProblem",
