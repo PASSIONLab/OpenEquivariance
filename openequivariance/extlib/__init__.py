@@ -3,7 +3,6 @@ import sys
 import os
 import warnings
 import sysconfig
-from functools import lru_cache
 from pathlib import Path
 
 import torch
@@ -25,12 +24,10 @@ torch_module, generic_module = None, None
 postprocess_kernel = lambda kernel: kernel  # noqa : E731
 
 
-@lru_cache(maxsize=1)
 def _compile_torch_cuda_extension():
     return torch.version.cuda and ("CUDA_HOME" in os.environ)
 
 
-@lru_cache(maxsize=1)
 def _compile_torch_hip_extension():
     return torch.version.hip and ("HIP_HOME" in os.environ)
 
