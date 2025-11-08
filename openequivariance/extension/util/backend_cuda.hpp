@@ -91,8 +91,7 @@ public:
         int* ptr = (int*) (CUDA_Allocator::gpu_alloc(element_count * sizeof(int)));
         CUDA_ERRCHK(cudaMemset(ptr, 42, element_count * sizeof(int)))
         CUDA_Allocator::gpu_free(ptr);
-        cudaDeviceSy
-        nchronize();
+        cudaDeviceSynchronize();
     }
     
     ~GPUTimer() {
