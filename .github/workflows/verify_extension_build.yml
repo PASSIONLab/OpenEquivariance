@@ -33,4 +33,4 @@ jobs:
 
     - name: Test extension build via import 
       run: |
-        pytest tests/import_test.py -k test_import
+        pytest tests/import_test.py -k test_extension_built
