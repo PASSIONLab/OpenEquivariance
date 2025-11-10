@@ -24,14 +24,6 @@ torch_module, generic_module = None, None
 postprocess_kernel = lambda kernel: kernel  # noqa : E731
 
 
-def _compile_torch_cuda_extension():
-    return torch.version.cuda and ("CUDA_HOME" in os.environ)
-
-
-def _compile_torch_hip_extension():
-    return torch.version.hip and ("HIP_HOME" in os.environ)
-
-
 try:
     python_lib_dir = sysconfig.get_config_var("LIBDIR")
     major, minor = sys.version_info.major, sys.version_info.minor
@@ -53,7 +45,7 @@ if BUILT_EXTENSION:
     import openequivariance.extlib.generic_module
 
     generic_module = openequivariance.extlib.generic_module
-elif _compile_torch_cuda_extension() or _compile_torch_hip_extension():
+elif torch.version.cuda or torch.version.hip:
     try:
         from torch.utils.cpp_extension import library_paths, include_paths
 
@@ -142,6 +134,8 @@ elif _compile_torch_cuda_extension() or _compile_torch_hip_extension():
         BUILT_EXTENSION = True
     except Exception as e:
         BUILT_EXTENSION_ERROR = f"Error building OpenEquivariance Extension: {e}"
+else:
+    BUILT_EXTENSION_ERROR = "OpenEquivariance extension build not attempted"
 
 
 def _raise_import_error_helper(import_target: str):
