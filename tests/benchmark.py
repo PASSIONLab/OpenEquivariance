@@ -94,7 +94,12 @@ roofline_configs = [
 
 def benchmark_uvu(params):
     def get_problems():
-        return mace_problems() + nequip_problems() + nequix_problems() + seven_net_problems()
+        return (
+            mace_problems()
+            + nequip_problems()
+            + nequix_problems()
+            + seven_net_problems()
+        )
 
     float64_problems = get_problems()
     for problem in float64_problems:
@@ -285,8 +290,14 @@ def benchmark_convolution(params):
     graphs = download_graphs(params, filenames)
 
     if not params.disable_bench:
+
         def get_problems():
-            return mace_problems() + nequip_problems() + nequix_problems() + seven_net_problems()
+            return (
+                mace_problems()
+                + nequip_problems()
+                + nequix_problems()
+                + seven_net_problems()
+            )
 
         float64_problems = get_problems()
         for problem in float64_problems:
