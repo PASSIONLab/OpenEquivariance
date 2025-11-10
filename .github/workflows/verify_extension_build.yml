@@ -33,6 +33,6 @@ jobs:
 
     - name: Test extension build via import 
       run: |
-        pytest \ 
+        pytest \
           tests/import_test.py::test_extension_built \
           tests/import_test.py::test_torch_extension_built 
