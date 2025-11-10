@@ -416,6 +416,69 @@ def set_grid(ax):
     ax.grid(True)
 
 
+def generate_speedup_table(
+    data_dict,
+    directions,
+    implementations,
+    dtype_configs,
+    filter_func=None,
+):
+    """
+    Generate a speedup comparison table for benchmarking results.
+
+    Args:
+        data_dict: Dictionary with structure {direction: {dtype: {config: {impl: value}}}}
+        directions: List of direction labels (e.g., ["forward", "backward"])
+        implementations: List of implementation labels to compare against "ours" (e.g., ["e3nn", "cuE"])
+        dtype_configs: List of (dtype_label, dtype_data_dict) tuples (e.g., [("f32", dataf32), ("f64", dataf64)])
+        filter_func: Optional function to filter measurements, takes (label, measurement) and returns bool
+
+    Returns:
+        List of table rows, where each row is [direction, impl, dtype, min, mean, median, max]
+    """
+    speedup_table = []
+    for direction in directions:
+        for impl in implementations:
+            for dtype_label, dtype_set in dtype_configs:
+                speedups = []
+                for label, measurement in dtype_set[direction].items():
+                    if impl in measurement:
+                        if filter_func is None or filter_func(label, measurement):
+                            speedups.append(measurement["ours"] / measurement[impl])
+
+                if speedups:
+                    stats = (
+                        np.min(speedups),
+                        np.mean(speedups),
+                        np.median(speedups),
+                        np.max(speedups),
+                    )
+                    stats = [f"{stat:.2f}" for stat in stats]
+
+                    dir_print = direction
+                    if direction == "forward":
+                        dir_print += "  "
+                    result = [dir_print, impl, dtype_label] + stats
+                    speedup_table.append(result)
+
+    return speedup_table
+
+
+def print_speedup_table(speedup_table, title=None):
+    """
+    Print a speedup table with headers.
+
+    Args:
+        speedup_table: List of table rows from generate_speedup_table
+        title: Optional title to print before the table
+    """
+    if title:
+        print(title)
+    print("\t\t".join(["Direction", "Base", "dtype", "min", "mean", "med", "max"]))
+    for row in speedup_table:
+        print("\t\t".join(row))
+
+
 __all__ = [
     "Project",
     "impl_to_project_func",
@@ -424,12 +487,16 @@ __all__ = [
     "calculate_tp_per_sec",
     "sort_impls_by_display_order",
     "load_benchmarks",
-    "filter",
+    "filter_experiments",
     "grouped_barchart",
     "barchart",
     "roofline_plot",
+    "generate_speedup_table",
+    "print_speedup_table",
+    "set_grid",
     "labelmap",
     "colormap",
+    "hatchmap",
     "directions",
     "dtypes",
     "dtype_labelmap",

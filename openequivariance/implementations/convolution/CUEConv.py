@@ -1,12 +1,11 @@
 import numpy as np
-import itertools
-from typing import Iterator
 
 from openequivariance.implementations.CUETensorProduct import CUETensorProduct
 from openequivariance.implementations.convolution.ConvolutionBase import (
     ConvolutionBase,
     scatter_add_wrapper,
 )
+from openequivariance.implementations.cue_utils import create_O3_e3nn_class
 
 
 class CUEConv(ConvolutionBase):
@@ -34,7 +33,6 @@ class CUEConvFused(ConvolutionBase):
 
         global torch
         import torch
-        import e3nn.o3 as o3
 
         np_to_torch_dtype = {np.float32: torch.float32, np.float64: torch.float64}
 
@@ -43,35 +41,7 @@ class CUEConvFused(ConvolutionBase):
             TensorProductUniform4x1dIndexed,
         )
 
-        class O3_e3nn(cue.O3):
-            def __mul__(  # pylint: disable=no-self-argument
-                rep1: "O3_e3nn", rep2: "O3_e3nn"
-            ) -> Iterator["O3_e3nn"]:
-                return [O3_e3nn(l=ir.l, p=ir.p) for ir in cue.O3.__mul__(rep1, rep2)]
-
-            @classmethod
-            def clebsch_gordan(
-                cls, rep1: "O3_e3nn", rep2: "O3_e3nn", rep3: "O3_e3nn"
-            ) -> np.ndarray:
-                rep1, rep2, rep3 = cls._from(rep1), cls._from(rep2), cls._from(rep3)
-
-                if rep1.p * rep2.p == rep3.p:
-                    return o3.wigner_3j(rep1.l, rep2.l, rep3.l).numpy()[None] * np.sqrt(
-                        rep3.dim
-                    )
-                return np.zeros((0, rep1.dim, rep2.dim, rep3.dim))
-
-            def __lt__(  # pylint: disable=no-self-argument
-                rep1: "O3_e3nn", rep2: "O3_e3nn"
-            ) -> bool:
-                rep2 = rep1._from(rep2)
-                return (rep1.l, rep1.p) < (rep2.l, rep2.p)
-
-            @classmethod
-            def iterator(cls) -> Iterator["O3_e3nn"]:
-                for l in itertools.count(0):
-                    yield O3_e3nn(l=l, p=1 * (-1) ** l)
-                    yield O3_e3nn(l=l, p=-1 * (-1) ** l)
+        O3_e3nn = create_O3_e3nn_class()
 
         descriptor = (
             cue.descriptors.channelwise_tensor_product(

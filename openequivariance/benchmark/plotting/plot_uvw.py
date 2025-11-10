@@ -1,4 +1,3 @@
-import numpy as np
 import matplotlib.pyplot as plt
 import pathlib
 from openequivariance.benchmark.plotting.plotting_utils import (
@@ -7,6 +6,8 @@ from openequivariance.benchmark.plotting.plotting_utils import (
     labelmap,
     grouped_barchart,
     calculate_tp_per_sec,
+    generate_speedup_table,
+    print_speedup_table,
     load_benchmarks,
     filter_experiments,
 )
@@ -129,30 +130,14 @@ def plot_uvw(data_folder):
     fig.tight_layout()
     fig.savefig(str(data_folder / "uvw_throughput_comparison.pdf"))
 
-    speedup_table = []
-    for direction in ["forward", "backward"]:
-        for impl in ["e3nn", "cuE"]:
-            for dtype_label, dtype_set in [("f32", dataf32), ("f64", dataf64)]:
-                speedups = [
-                    measurement["ours"] / measurement[impl]
-                    for label, measurement in dtype_set[direction].items()
-                    if impl in measurement and "DiffDock" in label
-                ]
-                stats = (
-                    np.min(speedups),
-                    np.mean(speedups),
-                    np.median(speedups),
-                    np.max(speedups),
-                )
-                stats = [f"{stat:.2f}" for stat in stats]
-
-                dir_print = direction
-                if direction == "forward":
-                    dir_print += "  "
-                result = [dir_print, impl, dtype_label] + stats
-                speedup_table.append(result)
-
-    print("DiffDock")
-    print("\t\t".join(["Direction", "Base", "dtype", "min", "mean", "med", "max"]))
-    for row in speedup_table:
-        print("\t\t".join(row))
+    speedup_table = generate_speedup_table(
+        data_dict={
+            "forward": dataf32,
+            "backward": dataf32,
+        },  # Not used, we iterate differently
+        directions=["forward", "backward"],
+        implementations=["e3nn", "cuE"],
+        dtype_configs=[("f32", dataf32), ("f64", dataf64)],
+        filter_func=lambda label, measurement: "DiffDock" in label,
+    )
+    print_speedup_table(speedup_table, title="DiffDock")

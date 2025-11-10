@@ -1,4 +1,3 @@
-import numpy as np
 import matplotlib.pyplot as plt
 import pathlib
 from openequivariance.benchmark.plotting.plotting_utils import (
@@ -6,6 +5,9 @@ from openequivariance.benchmark.plotting.plotting_utils import (
     colormap,
     labelmap,
     grouped_barchart,
+    calculate_tp_per_sec,
+    generate_speedup_table,
+    print_speedup_table,
     load_benchmarks,
     filter_experiments,
 )
@@ -27,11 +29,6 @@ def plot_uvu(data_folder):
     for i, implementation in enumerate(implementations):
         if implementation == "E3NNTensorProductCompiledMaxAutotuneCUDAGraphs":
             implementations[i] = "E3NNTensorProduct"
-
-    def calculate_tp_per_sec(exp):
-        return exp["benchmark results"]["batch_size"] / (
-            np.mean(exp["benchmark results"]["time_millis"]) * 0.001
-        )
 
     dataf32 = {"forward": {}, "backward": {}}
     for i, desc in enumerate(configs):
@@ -141,29 +138,13 @@ def plot_uvu(data_folder):
     fig.tight_layout()
     fig.savefig(str(data_folder / "throughput_comparison.pdf"))
 
-    speedup_table = []
-    for direction in ["forward", "backward"]:
-        for impl in ["e3nn", "cuE"]:
-            for dtype_label, dtype_set in [("f32", dataf32), ("f64", dataf64)]:
-                speedups = [
-                    measurement["ours"] / measurement[impl]
-                    for _, measurement in dtype_set[direction].items()
-                    if impl in measurement
-                ]
-                stats = (
-                    np.min(speedups),
-                    np.mean(speedups),
-                    np.median(speedups),
-                    np.max(speedups),
-                )
-                stats = [f"{stat:.2f}" for stat in stats]
-
-                dir_print = direction
-                if direction == "forward":
-                    dir_print += "  "
-                result = [dir_print, impl, dtype_label] + stats
-                speedup_table.append(result)
-
-    print("\t\t".join(["Direction", "Base", "dtype", "min", "mean", "med", "max"]))
-    for row in speedup_table:
-        print("\t\t".join(row))
+    speedup_table = generate_speedup_table(
+        data_dict={
+            "forward": dataf32,
+            "backward": dataf32,
+        },  # Not used, we iterate differently
+        directions=["forward", "backward"],
+        implementations=["e3nn", "cuE"],
+        dtype_configs=[("f32", dataf32), ("f64", dataf64)],
+    )
+    print_speedup_table(speedup_table)
