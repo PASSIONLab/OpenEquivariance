@@ -25,11 +25,11 @@ postprocess_kernel = lambda kernel: kernel  # noqa : E731
 
 
 def _compile_torch_cuda_extension():
-    return torch.version.cuda and ("CUDA_HOME" in os.environ)
+    return torch.version.cuda 
 
 
 def _compile_torch_hip_extension():
-    return torch.version.hip and ("HIP_HOME" in os.environ)
+    return torch.version.hip 
 
 
 try:
@@ -136,6 +136,7 @@ elif _compile_torch_cuda_extension() or _compile_torch_hip_extension():
                 + f", but JITScript, compile fullgraph, and export will fail.\n {TORCH_COMPILE_ERROR}"
             )
         BUILT_EXTENSION = True
+        print("REACHED 3!")
     except Exception as e:
         BUILT_EXTENSION_ERROR = f"Error building OpenEquivariance Extension: {e}"
 
