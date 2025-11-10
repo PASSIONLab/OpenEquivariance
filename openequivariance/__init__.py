@@ -12,6 +12,8 @@ from openequivariance.extlib import (
     LINKED_LIBPYTHON_ERROR,
     BUILT_EXTENSION,
     BUILT_EXTENSION_ERROR,
+    TORCH_COMPILE,
+    TORCH_COMPILE_ERROR,
 )
 
 from openequivariance.implementations.e3nn_lite import (

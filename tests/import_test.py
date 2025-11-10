@@ -14,3 +14,10 @@ def test_extension_built():
 
     assert BUILT_EXTENSION_ERROR is None
     assert BUILT_EXTENSION
+
+
+def test_torch_extension_built():
+    from openequivariance import TORCH_COMPILE, TORCH_COMPILE_ERROR
+
+    assert TORCH_COMPILE_ERROR is None
+    assert TORCH_COMPILE
