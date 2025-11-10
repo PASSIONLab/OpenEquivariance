@@ -74,15 +74,11 @@ elif _compile_torch_cuda_extension() or _compile_torch_hip_extension():
             )
         if torch.version.cuda:
             extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc"])
-
-            try:
-                torch_libs, cuda_libs = library_paths("cuda")
-                extra_link_args.append("-Wl,-rpath," + torch_libs)
-                extra_link_args.append("-L" + cuda_libs)
-                if os.path.exists(cuda_libs + "/stubs"):
-                    extra_link_args.append("-L" + cuda_libs + "/stubs")
-            except Exception as e:
-                getLogger().info(str(e))
+            torch_libs, cuda_libs = library_paths("cuda")
+            extra_link_args.append("-Wl,-rpath," + torch_libs)
+            extra_link_args.append("-L" + cuda_libs)
+            if os.path.exists(cuda_libs + "/stubs"):
+                extra_link_args.append("-L" + cuda_libs + "/stubs")
 
             extra_cflags.append("-DCUDA_BACKEND")
         elif torch.version.hip:
