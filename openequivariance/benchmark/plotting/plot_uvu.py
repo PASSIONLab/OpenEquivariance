@@ -118,7 +118,6 @@ def plot_uvu(data_folder):
     for i in range(2):
         for j in range(2):
             set_grid(axs[i][j])
-            set_grid(axs[i][j])
 
     axs[0][0].set_ylabel("Forward")
     axs[1][0].set_ylabel("Backward")

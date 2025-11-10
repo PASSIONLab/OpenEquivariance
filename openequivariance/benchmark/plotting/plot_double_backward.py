@@ -90,7 +90,6 @@ def plot_double_backward(data_folder):
 
     for i in range(2):
         set_grid(axs[i])
-        set_grid(axs[i])
 
     axs[0].set_xlabel("float32")
     axs[1].set_xlabel("float64")
