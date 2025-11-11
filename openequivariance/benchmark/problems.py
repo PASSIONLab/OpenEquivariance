@@ -151,6 +151,54 @@ def nequip_problems():
     ]
 
 
+# https://github.com/atomicarchitects/nequix/blob/main/configs/nequix-mp-1.yml
+def nequix_problems():
+    return [
+        CTPP(
+            "89x0e",
+            "1x0e+1x1o+1x2e+1x3o",
+            "89x0e+89x1o+89x2e+89x3o",
+            "nequix-mp-1-first_layer",
+        ),
+        CTPP(
+            "128x0e+64x1o+32x2e+32x3o",
+            "1x0e+1x1o+1x2e+1x3o",
+            "128x0e+128x1o+128x2e+128x3o+64x1o+64x0e+64x2e+64x1o+64x3o+64x2e+32x2e+32x1o+32x3o+32x0e+32x2e+32x1o+32x3o+32x3o+32x2e+32x1o+32x3o+32x0e+32x2e",
+            "nequix-mp-1-main_layers",
+        ),
+        CTPP(
+            "128x0e+64x1o+32x2e+32x3o",
+            "1x0e+1x1o+1x2e+1x3o",
+            "128x0e+64x0e+32x0e+32x0e",
+            "nequix-mp-1-last_layer",
+        ),
+    ]
+
+
+# https://github.com/MDIL-SNU/SevenNet/tree/main/sevenn/pretrained_potentials/SevenNet_l3i5
+def seven_net_problems():
+    return [
+        CTPP(
+            "128x0e",
+            "1x0e+1x1e+1x2e+1x3e",
+            "128x0e+128x1e+128x2e+128x3e",
+            "SevenNet_l3i5-first-layer",
+        ),
+        CTPP(
+            "128x0e+64x1e+32x2e+32x3e",
+            "1x0e+1x1e+1x2e+1x3e",
+            "128x0e+64x0e+32x0e+32x0e+128x1e+64x1e+64x1e+64x1e+32x1e+32x1e+32x1e+32x1e+32x1e+128x2e+64x2e+64x2e+64x2e+32x2e+32x2e+32x2e+32x2e+32x2e+32x2e+32x2e+128x3e+64x3e+64x3e+32x3e+32x3e+32x3e+32x3e+32x3e+32x3e+32x3e",
+            "SevenNet_l3i5-main-layers",
+        ),
+        CTPP(
+            "128x0e+64x1e+32x2e+32x3e",
+            "1x0e+1x1e+1x2e+1x3e",
+            "128x0e+64x0e+32x0e+32x0e",
+            "SevenNet_l3i5-last-layer",
+        ),
+    ]
+
+
 def e3tools_problems():
     return [
         FCTPP(in1, in2, out, label=label, shared_weights=sw, internal_weights=iw)
