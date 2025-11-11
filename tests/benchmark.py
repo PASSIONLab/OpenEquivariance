@@ -46,8 +46,6 @@ from openequivariance.benchmark.problems import (
     diffdock_problems,
     mace_problems,
     nequip_problems,
-    nequix_problems,
-    seven_net_problems,
 )
 
 from torch._functorch import config
@@ -93,19 +91,11 @@ roofline_configs = [
 
 
 def benchmark_uvu(params):
-    def get_problems():
-        return (
-            mace_problems()
-            + nequip_problems()
-            + nequix_problems()
-            + seven_net_problems()
-        )
-
-    float64_problems = get_problems()
+    float64_problems = mace_problems() + nequip_problems()
     for problem in float64_problems:
         problem.irrep_dtype = np.float64
         problem.weight_dtype = np.float64
-    problems = get_problems() + float64_problems
+    problems = mace_problems() + nequip_problems() + float64_problems
 
     implementations = [implementation_map_tp[impl] for impl in params.implementations]
     directions = params.directions
@@ -290,20 +280,21 @@ def benchmark_convolution(params):
     graphs = download_graphs(params, filenames)
 
     if not params.disable_bench:
+        configs = [
+            ChannelwiseTPP(
+                "128x0e+128x1o+128x2e",
+                "1x0e+1x1o+1x2e+1x3o",
+                "128x0e+128x1o+128x2e+128x3o",
+            ),
+            ChannelwiseTPP(
+                "128x0e+128x1o+128x2e",
+                "1x0e+1x1o+1x2e+1x3o",
+                "128x0e+128x1o+128x2e+128x3o",
+            ),
+        ]  # MACE-large
 
-        def get_problems():
-            return (
-                mace_problems()
-                + nequip_problems()
-                + nequix_problems()
-                + seven_net_problems()
-            )
-
-        float64_problems = get_problems()
-        for problem in float64_problems:
-            problem.irrep_dtype = np.float64
-            problem.weight_dtype = np.float64
-        configs = get_problems() + float64_problems
+        configs[1].irrep_dtype = np.float64
+        configs[1].weight_dtype = np.float64
 
         bench = ConvBenchmarkSuite(configs, test_name="convolution")
 
