@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15...3.30)
-project(OEQ_JAX LANGUAGES CXX CUDA) # TODO: Add HIP support
+project(oeq_jax_extension LANGUAGES CXX CUDA) # TODO: Add HIP support
 
 find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development.Module)
 
@@ -27,12 +27,13 @@ set(OEQ_JAX_HEADERS
     tensorproducts.hpp
     util/backend_cuda.hpp
     util/backend_hip.hpp
-    buffer.hpp
+    util/buffer.hpp
 )
 
-nanobind_add_module(OEQ_JAX NB_STATIC ${OEQ_JAX_SOURCES} ${OEQ_JAX_HEADERS})
+nanobind_add_module(oeq_jax_extension NB_STATIC ${OEQ_JAX_SOURCES} ${OEQ_JAX_HEADERS})
 
-target_include_directories(OEQ_JAX PUBLIC ${XLA_DIR})
-set_target_properties(OEQ_JAX PROPERTIES CUDA_STANDARD 17 POSITION_INDEPENDENT_CODE ON)
+target_include_directories(oeq_jax_extension PUBLIC ${XLA_DIR})
+set_target_properties(oeq_jax_extension PROPERTIES CUDA_STANDARD 17 POSITION_INDEPENDENT_CODE ON)
+target_compile_options(oeq_jax_extension PRIVATE -Wno-attributes -Wno-return-type)
 
-install(TARGETS OEQ_JAX LIBRARY DESTINATION lib)
+install(TARGETS oeq_jax_extension LIBRARY DESTINATION lib)

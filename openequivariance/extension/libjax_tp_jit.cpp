@@ -18,6 +18,7 @@ limitations under the License.
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <iostream>
 
 #include "nanobind/nanobind.h"
 #include "xla/ffi/api/ffi.h"
@@ -25,17 +26,7 @@ limitations under the License.
 namespace nb = nanobind;
 namespace ffi = xla::ffi;
 
-// ----------
-// Attributes
-// ----------
-//
-// An example demonstrating the different ways that attributes can be passed to
-// the FFI.
-//
-// For example, we can pass arrays, variadic attributes, and user-defined types.
-// Full support of user-defined types isn't yet supported by XLA, so that
-// example will be added in the future.
-
+/*
 ffi::Error ArrayAttrImpl(ffi::Span<const int32_t> array,
                          ffi::ResultBufferR0<ffi::S32> res) {
   int64_t total = 0;
@@ -68,25 +59,17 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(DictionaryAttr, DictionaryAttrImpl,
                                   .Attrs()
                                   .Ret<ffi::BufferR0<ffi::S32>>()
                                   .Ret<ffi::BufferR0<ffi::S32>>());
+*/
 
-// -------
-// Counter
-// -------
-//
-// An example demonstrating how an FFI call can maintain "state" between calls
-//
-// In this case, the ``Counter`` call simply accumulates the number of times it
-// was executed, but this pattern can also be used for more advanced use cases.
-// For example, this pattern is used in jaxlib for:
-//
-// 1. The GPU solver linear algebra kernels which require an expensive "handler"
-//    initialization, and
-// 2. The ``triton_call`` function which caches the compiled triton modules
-//    after their first use.
-
-ffi::Error CounterImpl(std::string_view key, ffi::ResultBufferR0<ffi::S32> out) {
+ffi::Error tp_forward_impl(std::string_view kernel, 
+  ffi::Dictionary forward_config, 
+  ffi::ResultBufferR0<ffi::S32> out) {
   static std::mutex mutex;
   static auto &cache = *new std::unordered_map<std::string_view, int32_t>();
+
+  auto value = forward_config.get<int64_t>("example_key").value();
+  std::cout << value << std::endl;
+
   {
     const std::lock_guard<std::mutex> lock(mutex);
     /*auto it = cache.find(key);
@@ -101,46 +84,16 @@ ffi::Error CounterImpl(std::string_view key, ffi::ResultBufferR0<ffi::S32> out) 
 }
 
 XLA_FFI_DEFINE_HANDLER_SYMBOL(
-    Counter, CounterImpl,
-    ffi::Ffi::Bind().Attr<std::string_view>("key").Ret<ffi::BufferR0<ffi::S32>>());
+    tp_forward, tp_forward_impl,
+    ffi::Ffi::Bind()
+      .Attr<std::string_view>("kernel")
+      .Attr<ffi::Dictionary>("forward_config")
+      .Ret<ffi::BufferR0<ffi::S32>>());
 
-// --------
-// Aliasing
-// --------
-//
-// This example demonstrates how input-output aliasing works. The handler
-// doesn't do anything except to check that the input and output pointers
-// address the same data.
-
-ffi::Error AliasingImpl(ffi::AnyBuffer input,
-                        ffi::Result<ffi::AnyBuffer> output) {
-  if (input.element_type() != output->element_type() ||
-      input.element_count() != output->element_count()) {
-    return ffi::Error::InvalidArgument(
-        "The input and output data types and sizes must match.");
-  }
-  if (input.untyped_data() != output->untyped_data()) {
-    return ffi::Error::InvalidArgument(
-        "When aliased, the input and output buffers should point to the same "
-        "data.");
-  }
-  return ffi::Error::Success();
-}
-
-XLA_FFI_DEFINE_HANDLER_SYMBOL(
-    Aliasing, AliasingImpl,
-    ffi::Ffi::Bind().Arg<ffi::AnyBuffer>().Ret<ffi::AnyBuffer>());
-
-// Boilerplate for exposing handlers to Python
-NB_MODULE(_cpu_examples, m) {
+NB_MODULE(oeq_jax_extension, m) {
   m.def("registrations", []() {
     nb::dict registrations;
-    registrations["array_attr"] =
-        nb::capsule(reinterpret_cast<void *>(ArrayAttr));
-    registrations["dictionary_attr"] =
-        nb::capsule(reinterpret_cast<void *>(DictionaryAttr));
-    registrations["counter"] = nb::capsule(reinterpret_cast<void *>(Counter));
-    registrations["aliasing"] = nb::capsule(reinterpret_cast<void *>(Aliasing));
+    registrations["tp_forward"] = nb::capsule(reinterpret_cast<void *>(tp_forward));
     return registrations;
   });
 }
