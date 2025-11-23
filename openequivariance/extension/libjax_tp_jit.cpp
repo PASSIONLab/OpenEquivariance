@@ -65,9 +65,8 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(DictionaryAttr, DictionaryAttrImpl,
 
 ffi::Error tp_forward_impl(
   cudaStream_t stream, 
-  std::string_view kernel, 
-  ffi::Dictionary forward_config, 
-  ffi::ResultBufferR0<ffi::S32> out) {
+  std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
+  int64_t hash, ffi::ResultBufferR0<ffi::S32> out) {
   static std::mutex mutex;
   static auto &cache = *new std::unordered_map<std::string_view, int32_t>();
 
@@ -90,8 +89,8 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
     tp_forward, tp_forward_impl,
     ffi::Ffi::Bind()
       .Ctx<ffi::PlatformStream<cudaStream_t>>()
-      .Attr<std::string_view>("kernel")
-      .Attr<ffi::Dictionary>("forward_config")
+      .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
+      .Attr<int64_t>("hash")
       .Ret<ffi::BufferR0<ffi::S32>>(),
       {xla::ffi::Traits::kCmdBufferCompatible});  // cudaGraph enabled
 
