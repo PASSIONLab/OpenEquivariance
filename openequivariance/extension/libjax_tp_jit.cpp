@@ -1,21 +1,7 @@
-/* Copyright 2024 The JAX Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-==============================================================================*/
-
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <memory>
 #include <string_view>
 #include <unordered_map>
 #include <iostream>
@@ -25,64 +11,88 @@ limitations under the License.
 #include "nanobind/nanobind.h"
 #include "xla/ffi/api/ffi.h"
 
+#define CUDA_BACKEND // Stick to CUDA for now 
+
+#ifdef CUDA_BACKEND
+    #include "util/backend_cuda.hpp"
+    #include "group_mm_cuda.hpp"
+    using JITKernel = CUJITKernel;
+    using GPU_Allocator = CUDA_Allocator;
+
+    template<typename T>
+    using GroupMM = GroupMMCUDA<T>; 
+#endif
+
+#include "tensorproducts.hpp"
+
 namespace nb = nanobind;
 namespace ffi = xla::ffi;
 
-/*
-ffi::Error ArrayAttrImpl(ffi::Span<const int32_t> array,
-                         ffi::ResultBufferR0<ffi::S32> res) {
-  int64_t total = 0;
-  for (int32_t x : array) {
-    total += x;
-  }
-  res->typed_data()[0] = total;
-  return ffi::Error::Success();
+std::unordered_map<int64_t, std::unique_ptr<JITTPImpl<JITKernel>>> kernel_cache;
+std::mutex mut;
+
+std::unordered_map<string, int64_t> parse_launch_config(ffi::Dictionary dict) {
+    std::unordered_map<string, int64_t> result;
+    result["num_blocks"] = dict.get<int64_t>("num_blocks").value();
+    result["num_threads"] = dict.get<int64_t>("num_threads").value();
+    result["warp_size"] = dict.get<int64_t>("warp_size").value();
+    result["smem"] = dict.get<int64_t>("smem").value();
+    return result;
 }
 
-XLA_FFI_DEFINE_HANDLER_SYMBOL(ArrayAttr, ArrayAttrImpl,
-                              ffi::Ffi::Bind()
-                                  .Attr<ffi::Span<const int32_t>>("array")
-                                  .Ret<ffi::BufferR0<ffi::S32>>());
-
-ffi::Error DictionaryAttrImpl(ffi::Dictionary attrs,
-                              ffi::ResultBufferR0<ffi::S32> secret,
-                              ffi::ResultBufferR0<ffi::S32> count) {
-  auto maybe_secret = attrs.get<int64_t>("secret");
-  if (maybe_secret.has_error()) {
-    return maybe_secret.error();
-  }
-  secret->typed_data()[0] = maybe_secret.value();
-  count->typed_data()[0] = attrs.size();
-  return ffi::Error::Success();
+std::unordered_map<string, int64_t> parse_kernel_prop(ffi::Dictionary dict) { 
+    std::unordered_map<string, int64_t> result;
+    result["L1_dim"] = dict.get<int64_t>("L1_dim").value();
+    result["L2_dim"] = dict.get<int64_t>("L2_dim").value();
+    result["L3_dim"] = dict.get<int64_t>("L3_dim").value();
+    result["weight_numel"] = dict.get<int64_t>("weight_numel").value();
+    result["shared_weights"] = dict.get<int64_t>("shared_weights").value();
+    result["opt_level"] = dict.get<int64_t>("opt_level").value();
+    result["irrep_dtype"] = dict.get<int64_t>("irrep_dtype").value();
+    result["weight_dtype"] = dict.get<int64_t>("weight_dtype").value();
+    return result;
 }
 
-XLA_FFI_DEFINE_HANDLER_SYMBOL(DictionaryAttr, DictionaryAttrImpl,
-                              ffi::Ffi::Bind()
-                                  .Attrs()
-                                  .Ret<ffi::BufferR0<ffi::S32>>()
-                                  .Ret<ffi::BufferR0<ffi::S32>>());
-*/
+JITTPImpl<JITKernel>* compile_kernel_with_caching(std::string_view kernel,
+                    ffi::Dictionary forward_config, 
+                    ffi::Dictionary backward_config, 
+                    ffi::Dictionary double_backward_config, 
+                    ffi::Dictionary kernel_prop,
+                    int64_t hash) {
+    
+    JITTPImpl<JITKernel>* result = nullptr;
+    {
+        const std::lock_guard<std::mutex> lock(mut);
+        auto it = kernel_cache.find(hash); 
+        if (it != kernel_cache.end()) {
+            result = it->second.get(); 
+        }
+        else {
+            auto jit_tp_impl = std::make_unique<JITTPImpl<JITKernel>>(
+                std::string(kernel),
+                parse_launch_config(forward_config),
+                parse_launch_config(backward_config),
+                parse_launch_config(double_backward_config),
+                parse_kernel_prop(kernel_prop));
+            result = jit_tp_impl.get();
+            kernel_cache.insert({hash, std::move(jit_tp_impl)});
+        }
+    }
+    return result;
+}
 
 ffi::Error tp_forward_impl(
-  cudaStream_t stream, 
-  std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
-  int64_t hash, ffi::ResultBufferR0<ffi::S32> out) {
-  static std::mutex mutex;
-  static auto &cache = *new std::unordered_map<std::string_view, int32_t>();
+        cudaStream_t stream, 
+        std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
+        int64_t hash, ffi::ResultBufferR0<ffi::S32> out) {
+    
+    JITTPImpl<JITKernel>* jit_kernel = compile_kernel_with_caching(
+        kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash);
 
-  auto value = forward_config.get<int64_t>("example_key").value();
-  std::cout << value << std::endl;
-  {
-    const std::lock_guard<std::mutex> lock(mutex);
-    /*auto it = cache.find(key);
-    if (it != cache.end()) {
-      out->typed_data()[0] = ++it->second;
-    } else {
-      cache.insert({key, 0});
-      out->typed_data()[0] = 0;
-    }*/
-  }
-  return ffi::Error::Success();
+    std::cout << "SUCCESSFULLY COMPILED KERNEL!" << std::endl;
+    // TODO: Launch the forward kernel here
+
+    return ffi::Error::Success();
 }
 
 XLA_FFI_DEFINE_HANDLER_SYMBOL(
