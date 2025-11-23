@@ -19,6 +19,8 @@ limitations under the License.
 #include <string_view>
 #include <unordered_map>
 #include <iostream>
+#include <cuda.h>
+#include <cuda_runtime.h>
 
 #include "nanobind/nanobind.h"
 #include "xla/ffi/api/ffi.h"
@@ -61,7 +63,9 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(DictionaryAttr, DictionaryAttrImpl,
                                   .Ret<ffi::BufferR0<ffi::S32>>());
 */
 
-ffi::Error tp_forward_impl(std::string_view kernel, 
+ffi::Error tp_forward_impl(
+  cudaStream_t stream, 
+  std::string_view kernel, 
   ffi::Dictionary forward_config, 
   ffi::ResultBufferR0<ffi::S32> out) {
   static std::mutex mutex;
@@ -69,7 +73,6 @@ ffi::Error tp_forward_impl(std::string_view kernel,
 
   auto value = forward_config.get<int64_t>("example_key").value();
   std::cout << value << std::endl;
-
   {
     const std::lock_guard<std::mutex> lock(mutex);
     /*auto it = cache.find(key);
@@ -86,9 +89,11 @@ ffi::Error tp_forward_impl(std::string_view kernel,
 XLA_FFI_DEFINE_HANDLER_SYMBOL(
     tp_forward, tp_forward_impl,
     ffi::Ffi::Bind()
+      .Ctx<ffi::PlatformStream<cudaStream_t>>()
       .Attr<std::string_view>("kernel")
       .Attr<ffi::Dictionary>("forward_config")
-      .Ret<ffi::BufferR0<ffi::S32>>());
+      .Ret<ffi::BufferR0<ffi::S32>>(),
+      {xla::ffi::Traits::kCmdBufferCompatible});  // cudaGraph enabled
 
 NB_MODULE(oeq_jax_extension, m) {
   m.def("registrations", []() {
