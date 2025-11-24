@@ -1,6 +1,6 @@
 import numpy as np
 
-import openequivariance.extlib as extlib
+import openequivariance.impl_torch.extlib as extlib
 from openequivariance.templates.jinja_utils import get_jinja_environment
 from openequivariance.core.ComputationSchedule import ComputationSchedule
 

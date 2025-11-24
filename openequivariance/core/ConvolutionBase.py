@@ -1,6 +1,6 @@
 import copy
 import numpy as np
-from openequivariance.extlib import DeviceBuffer
+from openequivariance.impl_torch.extlib import DeviceBuffer
 from openequivariance.benchmark.random_buffer_utils import (
     get_random_buffers_forward_conv,
     get_random_buffers_backward_conv,
@@ -240,7 +240,7 @@ class ConvolutionBase:
         high_precision_ref=False,
     ):
         if reference_implementation is None:
-            from openequivariance.torch.E3NNConv import E3NNConv
+            from openequivariance.impl_torch.E3NNConv import E3NNConv
 
             reference_implementation = E3NNConv
 
@@ -484,7 +484,7 @@ class ConvolutionBase:
         high_precision_ref=False,
     ):
         if reference_implementation is None:
-            from openequivariance.torch.E3NNConv import E3NNConv
+            from openequivariance.impl_torch.E3NNConv import E3NNConv
 
             reference_implementation = E3NNConv
 
@@ -572,7 +572,7 @@ class ConvolutionBase:
         dummy_grad_value = rng.standard_normal(1)[0]
 
         if reference_implementation is None:
-            from openequivariance.torch.E3NNConv import E3NNConv
+            from openequivariance.impl_torch.E3NNConv import E3NNConv
             reference_implementation = E3NNConv
 
         reference_problem = self.config

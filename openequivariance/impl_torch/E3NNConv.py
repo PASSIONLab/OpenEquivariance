@@ -4,7 +4,7 @@ from openequivariance.core.ConvolutionBase import (
     ConvolutionBase,
     scatter_add_wrapper,
 )
-from openequivariance.torch.E3NNTensorProduct import E3NNTensorProduct
+from openequivariance.impl_torch.E3NNTensorProduct import E3NNTensorProduct
 
 
 class E3NNConv(ConvolutionBase):

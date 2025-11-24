@@ -1,4 +1,3 @@
-include openequivariance/extlib/*.so
 include openequivariance/extlib/*.empty
 
 include openequivariance/templates/*.cuh

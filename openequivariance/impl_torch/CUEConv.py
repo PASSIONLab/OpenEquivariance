@@ -2,7 +2,7 @@ import numpy as np
 import itertools
 from typing import Iterator
 
-from openequivariance.torch.CUETensorProduct import CUETensorProduct
+from openequivariance.impl_torch.CUETensorProduct import CUETensorProduct
 from openequivariance.core.ConvolutionBase import (
     ConvolutionBase,
     scatter_add_wrapper,

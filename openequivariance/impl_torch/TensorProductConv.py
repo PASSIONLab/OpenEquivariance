@@ -3,13 +3,13 @@ from typing import Optional, List
 import numpy as np
 import torch
 
-from openequivariance import extlib
+from openequivariance.impl_torch import extlib
 from openequivariance.core.ConvolutionBase import (
     ConvolutionBase,
     scatter_add_wrapper,
 )
 from openequivariance.core.LoopUnrollConv import LoopUnrollConv
-from openequivariance.torch.TensorProduct import TensorProduct
+from openequivariance.impl_torch.TensorProduct import TensorProduct
 from openequivariance import TPProblem
 from openequivariance.core.utils import torch_to_oeq_dtype
 

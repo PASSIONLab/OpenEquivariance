@@ -10,7 +10,7 @@ import torch
 
 from openequivariance.benchmark.logging_utils import getLogger
 
-oeq_root = str(Path(__file__).parent.parent)
+oeq_root = str(Path(__file__).parent.parent.parent)
 
 build_ext = True
 TORCH_COMPILE = True
@@ -39,9 +39,9 @@ except Exception as e:
 
 generic_module = None
 if not build_ext:
-    import openequivariance.extlib.generic_module
+    import openequivariance.impl_torch.extlib.generic_module
+    generic_module = openequivariance.impl_torch.extlib.generic_module
 
-    generic_module = openequivariance.extlib.generic_module
 elif TORCH_VERSION_CUDA_OR_HIP:
     from torch.utils.cpp_extension import library_paths, include_paths
 

@@ -3,7 +3,7 @@ import numpy as np
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.core.utils import benchmark
-from openequivariance.extlib import DeviceBuffer
+from openequivariance.impl_torch.extlib import DeviceBuffer
 
 logger = getLogger()
 

@@ -1,6 +1,6 @@
 from openequivariance.core.LoopUnrollTP import LoopUnrollTP
 from openequivariance import TPProblem
-from openequivariance import extlib
+from openequivariance.impl_torch import extlib
 import torch
 import typing
 from openequivariance.core.utils import torch_to_oeq_dtype

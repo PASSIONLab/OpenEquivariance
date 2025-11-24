@@ -13,8 +13,8 @@ from openequivariance.core.e3nn_lite import (
     _MulIr,
     Instruction,
 )
-from openequivariance.torch.TensorProduct import TensorProduct
-from openequivariance.torch.TensorProductConv import (
+from openequivariance.impl_torch.TensorProduct import TensorProduct
+from openequivariance.impl_torch.TensorProductConv import (
     TensorProductConv,
 )
 from openequivariance.core.utils import torch_to_oeq_dtype
@@ -42,7 +42,7 @@ def torch_ext_so_path():
     :returns: Path to a ``.so`` file that must be linked to use OpenEquivariance
               from the PyTorch C++ Interface.
     """
-    return openequivariance.extlib.torch_module.__file__
+    return openequivariance.impl_torch.extlib.torch_module.__file__
 
 
 torch.serialization.add_safe_globals(

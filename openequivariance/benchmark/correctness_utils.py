@@ -2,7 +2,7 @@ from typing import Optional, Union
 
 from openequivariance.core.TensorProductBase import TensorProductBase
 from openequivariance.core.e3nn_lite import TPProblem
-from openequivariance.torch.CUETensorProduct import CUETensorProduct
+from openequivariance.impl_torch.CUETensorProduct import CUETensorProduct
 from openequivariance.benchmark.random_buffer_utils import (
     get_random_buffers_forward,
     get_random_buffers_backward,
@@ -71,7 +71,7 @@ def correctness_forward(
     prng_seed: int,
 ) -> dict:
     if reference_implementation is None:
-        from openequivariance.torch.E3NNTensorProduct import E3NNTensorProduct
+        from openequivariance.impl_torch.E3NNTensorProduct import E3NNTensorProduct
 
         reference_implementation = E3NNTensorProduct
 
@@ -115,7 +115,7 @@ def correctness_backward(
     prng_seed: int,
 ) -> dict:
     if reference_implementation is None:
-        from openequivariance.torch.E3NNTensorProduct import E3NNTensorProduct
+        from openequivariance.impl_torch.E3NNTensorProduct import E3NNTensorProduct
 
         reference_implementation = E3NNTensorProduct
 
@@ -201,7 +201,7 @@ def correctness_double_backward(
     dummy_grad = rng.standard_normal(1)[0]
 
     if reference_implementation is None:
-        from openequivariance.torch.E3NNTensorProduct import E3NNTensorProduct
+        from openequivariance.impl_torch.E3NNTensorProduct import E3NNTensorProduct
 
         reference_implementation = E3NNTensorProduct
 

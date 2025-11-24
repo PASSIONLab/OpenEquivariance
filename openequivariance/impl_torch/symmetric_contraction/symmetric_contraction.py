@@ -1,7 +1,7 @@
 # ruff: noqa : E402
 import torch
 
-from openequivariance.extlib import GroupMM_F32, GroupMM_F64
+from openequivariance.impl_torch.extlib import GroupMM_F32, GroupMM_F64
 
 
 class GroupMM:

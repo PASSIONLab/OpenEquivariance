@@ -31,9 +31,9 @@ trying our code. OpenEquivariance cannot accelerate all tensor products; see
     :members:
     :undoc-members:
 
-.. autofunction:: openequivariance.torch_to_oeq_dtype
+.. autofunction:: openequivariance.impl_torch_to_oeq_dtype
 
-.. autofunction:: openequivariance.torch_ext_so_path
+.. autofunction:: openequivariance.impl_torch_ext_so_path
 
 API Identical to e3nn
 ---------------------
