@@ -8,10 +8,10 @@ from dataclasses import dataclass
 
 import openequivariance as oeq
 from openequivariance.extlib import DeviceProp
-from openequivariance.implementations.TensorProductBase import TensorProductBase
+from openequivariance.core.TensorProductBase import TensorProductBase
 
 from openequivariance.benchmark.logging_utils import getLogger, bcolors
-from openequivariance.implementations.e3nn_lite import TPProblem
+from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.benchmark.correctness_utils import (
     correctness_forward,
     correctness_backward,

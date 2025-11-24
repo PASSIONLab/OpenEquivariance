@@ -7,7 +7,7 @@ import numpy as np
 
 import openequivariance as oeq
 from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance.implementations.convolution.ConvolutionBase import CoordGraph
+from openequivariance.core.ConvolutionBase import CoordGraph
 
 logger = getLogger()
 

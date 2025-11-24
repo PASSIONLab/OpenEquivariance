@@ -1,8 +1,8 @@
 import numpy as np
 
-from openequivariance.implementations.e3nn_lite import TPProblem
+from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance.implementations.utils import benchmark
+from openequivariance.core.utils import benchmark
 from openequivariance.extlib import DeviceBuffer
 
 logger = getLogger()

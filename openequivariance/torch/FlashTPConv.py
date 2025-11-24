@@ -4,8 +4,8 @@ __all__ = [
 
 import torch
 import numpy as np
-from openequivariance.implementations.convolution.ConvolutionBase import ConvolutionBase
-from openequivariance.implementations.utils import oeq_to_torch_dtype
+from openequivariance.core.ConvolutionBase import ConvolutionBase
+from openequivariance.core.utils import oeq_to_torch_dtype
 
 
 class FlashTPConv(ConvolutionBase):

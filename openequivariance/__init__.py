@@ -3,25 +3,21 @@ import sys
 import torch
 import numpy as np
 
-try:
-    import openequivariance.extlib
-except Exception as e:
-    raise ImportError(f"Unable to load OpenEquivariance extension library:\n{e}")
 from pathlib import Path
 from importlib.metadata import version
 
-from openequivariance.implementations.e3nn_lite import (
+from openequivariance.core.e3nn_lite import (
     TPProblem,
     Irrep,
     Irreps,
     _MulIr,
     Instruction,
 )
-from openequivariance.implementations.TensorProduct import TensorProduct
-from openequivariance.implementations.convolution.TensorProductConv import (
+from openequivariance.torch.TensorProduct import TensorProduct
+from openequivariance.torch.TensorProductConv import (
     TensorProductConv,
 )
-from openequivariance.implementations.utils import torch_to_oeq_dtype
+from openequivariance.core.utils import torch_to_oeq_dtype
 
 __version__ = None
 try:
@@ -62,9 +58,6 @@ torch.serialization.add_safe_globals(
         np.float64,
     ]
 )
-
-LINKED_LIBPYTHON = openequivariance.extlib.LINKED_LIBPYTHON
-LINKED_LIBPYTHON_ERROR = openequivariance.extlib.LINKED_LIBPYTHON_ERROR
 
 __all__ = [
     "TPProblem",

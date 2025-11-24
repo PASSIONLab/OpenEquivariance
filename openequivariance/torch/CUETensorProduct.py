@@ -4,15 +4,15 @@ import os
 import itertools
 from typing import Iterator
 
-from openequivariance.implementations.TensorProductBase import TensorProductBase
-from openequivariance.implementations.e3nn_lite import TPProblem
+from openequivariance.core.TensorProductBase import TensorProductBase
+from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.benchmark.tpp_creation_utils import (
     ChannelwiseTPP,
     FullyConnectedTPProblem,
     SingleInstruction,
 )
-from openequivariance.implementations.utils import count_cg_non_zero
+from openequivariance.core.utils import count_cg_non_zero
 
 os.environ["CUEQUIVARIANCE_OPS_USE_JIT"] = "1"
 

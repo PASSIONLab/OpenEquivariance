@@ -10,10 +10,10 @@ from openequivariance.benchmark.perf_metrics_utils import (
     calculate_minimum_memory_streamed_forward,
     calculate_minimum_memory_streamed_backward,
 )
-from openequivariance.implementations.utils import calculate_total_nnz
-from openequivariance.implementations.TensorProductBase import TensorProductBase
-from openequivariance.implementations.e3nn_lite import TPProblem
-from openequivariance.implementations.CUETensorProduct import CUETensorProduct
+from openequivariance.core.utils import calculate_total_nnz
+from openequivariance.core.TensorProductBase import TensorProductBase
+from openequivariance.core.e3nn_lite import TPProblem
+from openequivariance.torch.CUETensorProduct import CUETensorProduct
 from openequivariance.benchmark.logging_utils import getLogger, bcolors
 
 logger = getLogger()

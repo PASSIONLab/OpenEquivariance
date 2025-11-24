@@ -2,12 +2,11 @@ import numpy as np
 import itertools
 from typing import Iterator
 
-from openequivariance.implementations.CUETensorProduct import CUETensorProduct
-from openequivariance.implementations.convolution.ConvolutionBase import (
+from openequivariance.torch.CUETensorProduct import CUETensorProduct
+from openequivariance.core.ConvolutionBase import (
     ConvolutionBase,
     scatter_add_wrapper,
 )
-
 
 class CUEConv(ConvolutionBase):
     def __init__(self, config, *, idx_dtype=np.int64, torch_op=True):

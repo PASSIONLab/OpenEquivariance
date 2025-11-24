@@ -1,10 +1,10 @@
 import numpy as np
 
-from openequivariance.implementations.convolution.ConvolutionBase import (
+from openequivariance.core.ConvolutionBase import (
     ConvolutionBase,
     scatter_add_wrapper,
 )
-from openequivariance.implementations.E3NNTensorProduct import E3NNTensorProduct
+from openequivariance.torch.E3NNTensorProduct import E3NNTensorProduct
 
 
 class E3NNConv(ConvolutionBase):

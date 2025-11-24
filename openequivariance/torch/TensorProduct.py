@@ -1,9 +1,9 @@
-from openequivariance.implementations.LoopUnrollTP import LoopUnrollTP
+from openequivariance.core.LoopUnrollTP import LoopUnrollTP
 from openequivariance import TPProblem
 from openequivariance import extlib
 import torch
 import typing
-from openequivariance.implementations.utils import torch_to_oeq_dtype
+from openequivariance.core.utils import torch_to_oeq_dtype
 
 
 class TensorProduct(torch.nn.Module, LoopUnrollTP):

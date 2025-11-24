@@ -3,7 +3,7 @@ import math
 
 import numpy as np
 
-from openequivariance.implementations.e3nn_lite import Instruction, TPProblem, wigner_3j
+from openequivariance.core.e3nn_lite import Instruction, TPProblem, wigner_3j
 
 import json
 import tempfile

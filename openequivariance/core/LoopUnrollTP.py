@@ -2,12 +2,12 @@ import numpy as np
 
 import openequivariance.extlib as extlib
 from openequivariance.templates.jinja_utils import get_jinja_environment
-from openequivariance.implementations.ComputationSchedule import ComputationSchedule
+from openequivariance.core.ComputationSchedule import ComputationSchedule
 
-from openequivariance.implementations.dtype_enum import dtype_to_enum
-from openequivariance.implementations.TensorProductBase import TensorProductBase
+from openequivariance.core.dtype_enum import dtype_to_enum
+from openequivariance.core.TensorProductBase import TensorProductBase
 from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance.implementations.utils import (
+from openequivariance.core.utils import (
     filter_and_analyze_problem,
     count_cg_non_zero,
 )

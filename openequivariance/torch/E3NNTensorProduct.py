@@ -9,8 +9,8 @@ import os
 import pathlib
 import numpy as np
 
-from openequivariance.implementations.TensorProductBase import TensorProductBase
-from openequivariance.implementations.e3nn_lite import TPProblem
+from openequivariance.core.TensorProductBase import TensorProductBase
+from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.benchmark.logging_utils import getLogger
 
 TORCH_COMPILE_AUTOTUNING_DIR = pathlib.Path("triton_autotuning")

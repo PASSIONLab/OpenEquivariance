@@ -1,6 +1,6 @@
 import numpy as np
 
-from openequivariance.implementations.e3nn_lite import TPProblem
+from openequivariance.core.e3nn_lite import TPProblem
 
 
 def get_random_buffers_forward(

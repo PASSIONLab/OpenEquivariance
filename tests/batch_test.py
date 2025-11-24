@@ -3,7 +3,7 @@ from pytest_check import check
 
 import numpy as np
 import openequivariance as oeq
-from openequivariance.implementations.TensorProduct import TensorProduct
+from openequivariance.core.TensorProduct import TensorProduct
 from openequivariance.benchmark.correctness_utils import (
     correctness_forward,
     correctness_backward,

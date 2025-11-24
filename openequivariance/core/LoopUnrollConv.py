@@ -1,12 +1,12 @@
 import numpy as np
 
-from openequivariance.implementations.convolution.ConvolutionBase import ConvolutionBase
-from openequivariance.implementations.ComputationSchedule import (
+from openequivariance.core.ConvolutionBase import ConvolutionBase
+from openequivariance.core.ComputationSchedule import (
     ComputationSchedule,
     SMEMCapacityException,
 )
 
-from openequivariance.implementations.dtype_enum import (
+from openequivariance.core.dtype_enum import (
     dtype_to_enum,
     enum_to_torch_dtype,
 )
@@ -14,7 +14,7 @@ from openequivariance.templates.jinja_utils import get_jinja_environment
 from openequivariance import extlib
 from openequivariance.extlib import JITConvImpl, postprocess_kernel, DeviceProp
 
-from openequivariance.implementations.utils import filter_and_analyze_problem
+from openequivariance.core.utils import filter_and_analyze_problem
 from openequivariance.benchmark.logging_utils import getLogger
 
 logger = getLogger()

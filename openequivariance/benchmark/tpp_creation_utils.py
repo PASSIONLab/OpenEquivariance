@@ -1,7 +1,7 @@
 import numpy as np
 
 from typing import Iterator, Optional
-from openequivariance.implementations.e3nn_lite import Irrep, Irreps, TPProblem
+from openequivariance.core.e3nn_lite import Irrep, Irreps, TPProblem
 
 """
 This was taken from 

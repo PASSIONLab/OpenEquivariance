@@ -1,11 +1,11 @@
 import math
 
-from openequivariance.implementations.utils import (
+from openequivariance.core.utils import (
     count_cg_non_zero,
     sparse_outer_product_work,
 )
 
-from openequivariance.implementations.e3nn_lite import TPProblem, wigner_3j
+from openequivariance.core.e3nn_lite import TPProblem, wigner_3j
 from openequivariance.benchmark.logging_utils import getLogger
 import numpy as np
 
