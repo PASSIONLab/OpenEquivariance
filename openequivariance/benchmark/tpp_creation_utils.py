@@ -5,10 +5,8 @@ from openequivariance.implementations.e3nn_lite import Irrep, Irreps, TPProblem
 
 """
 This was taken from 
-
 https://github.com/e3nn/e3nn/blob/0.5.4/e3nn/o3/_tensor_product/_sub.py
-
-And adopted to create TPP's to avoid torch dependence
+Adapted to create TPPs to avoid torch dependence.
 """
 
 
