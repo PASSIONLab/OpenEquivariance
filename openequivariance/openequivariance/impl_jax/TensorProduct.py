@@ -3,25 +3,27 @@ import numpy as np
 import jax
 import openequivariance_extjax as oeq_extjax 
 import hashlib
-from openequivariance.core.e3nn_lite import TPProblem
+#from openequivariance.core.e3nn_lite import TPProblem
 
 for name, target in oeq_extjax.registrations().items():
+    print(name, target)
     jax.ffi.register_ffi_target(name, target, platform="CUDA")
 
 def hash_attributes(attrs):
     m = hashlib.sha256()
+
     for key in sorted(attrs.keys()):
         m.update(attrs[key].__repr__().encode("utf-8"))
 
-    hash = int(m.hexdigest()[-16:], 16)
+    hash = int(m.hexdigest()[:16], 16) >> 1
     attrs["hash"] = hash
 
 class TensorProduct:
-    def __init__(self, problem: TPProblem):
+    def __init__(self, problem):
         self.problem = problem
 
         self.kernel = "BLAH" 
-        self.forward_config = {"example_key": 42}
+        self.forward_config = {"num_blocks": 42, "num_threads": 256, "smem": 8192 }
         self.backward_config = {}
         self.double_backward_config = {}
         self.kernel_prop = {}

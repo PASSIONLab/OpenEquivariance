@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.15...3.30)
-project(${SKBUILD_PROJECT_NAME} LANGUAGES CXX CUDA) # TODO: Add HIP support
+project(${SKBUILD_PROJECT_NAME} LANGUAGES CXX) # TODO: Add HIP support
 
 find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development.Module)
+find_package(CUDAToolkit REQUIRED)
 
 execute_process(
   COMMAND "${Python_EXECUTABLE}" "-c"
@@ -42,4 +43,18 @@ nanobind_add_module(openequivariance_extjax NB_STATIC ${OEQ_JAX_SOURCES} ${OEQ_J
 target_include_directories(openequivariance_extjax PUBLIC ${XLA_DIR} ${HEADER_DIR})
 set_target_properties(openequivariance_extjax PROPERTIES CUDA_STANDARD 17 POSITION_INDEPENDENT_CODE ON)
 target_compile_options(openequivariance_extjax PRIVATE -Wno-attributes -Wno-return-type)
+
+get_target_property(CUDA_LIB_DIR CUDA::nvrtc IMPORTED_LOCATION)
+get_filename_component(CUDA_LIB_DIR ${CUDA_LIB_DIR} DIRECTORY)
+
+set_target_properties(openequivariance_extjax PROPERTIES
+    BUILD_RPATH "${CUDA_LIB_DIR}"
+    INSTALL_RPATH "${CUDA_LIB_DIR}"
+)
+
+target_link_libraries(openequivariance_extjax PRIVATE 
+    CUDA::cudart
+    CUDA::cuda_driver
+    CUDA::nvrtc)
+
 install(TARGETS openequivariance_extjax LIBRARY DESTINATION .)

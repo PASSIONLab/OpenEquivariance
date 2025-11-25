@@ -68,14 +68,17 @@ JITTPImpl<JITKernel>* compile_kernel_with_caching(std::string_view kernel,
             result = it->second.get(); 
         }
         else { 
-            auto jit_tp_impl = std::make_unique<JITTPImpl<JITKernel>>(
+            auto result = parse_ffi_dict(forward_config, launch_config_keys);
+
+            cout << result["smem"] << endl;
+            /*auto jit_tp_impl = std::make_unique<JITTPImpl<JITKernel>>(
                 std::string(kernel),
                 parse_ffi_dict(forward_config, launch_config_keys),
                 parse_ffi_dict(backward_config, launch_config_keys),
                 parse_ffi_dict(double_backward_config, launch_config_keys),
                 parse_ffi_dict(kernel_prop, kernel_prop_keys));
             result = jit_tp_impl.get();
-            kernel_cache.insert({hash, std::move(jit_tp_impl)});
+            kernel_cache.insert({hash, std::move(jit_tp_impl)});*/
         }
     }
     return result;
