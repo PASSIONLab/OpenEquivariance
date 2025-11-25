@@ -1,9 +1,13 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
+requires = [
+    "setuptools-scm", 
+    "scikit-build-core", 
+    "nanobind"
+]
+build-backend = "scikit_build_core.build"
 
 [project]
-name = "openequivariance"
+name = "openequivariance_extjax"
 dynamic = ["version"]
 authors = [
   { name="Austin Glover" },
@@ -11,18 +15,14 @@ authors = [
   { name="Aydin Buluc" },
   { name="James Demmel" }
 ]
-description = "A fast GPU JIT kernel generator for the Clebsch-Gordon Tensor Product"
+description = "JAX C++ Extension for OpenEquivariance"
 requires-python = ">=3.10"
-dependencies = [
-  "setuptools",
-  "ninja",
-  "jinja2",
-  "numpy"
-]
+
+dependencies = []
 readme = "../README.md"
 
-license = "BSD-3-Clause"
-license-files = ["LICENSE"]
+#license = "BSD-3-Clause"
+#license-files = ["../LICENSE"]
 
 classifiers = [
   "Programming Language :: Python :: 3",
@@ -37,39 +37,6 @@ homepage = "https://passionlab.github.io/OpenEquivariance/"
 source = "https://github.com/PASSIONLab/OpenEquivariance"
 issues = "https://github.com/PASSIONLab/OpenEquivariance/issues"
 
-
-[project.optional-dependencies]
-bench = [
-  "matplotlib",
-  "tqdm",
-  "e3nn",
-  "cuequivariance",
-  "cuequivariance-torch",
-  "cuequivariance-ops-torch-cu12",
-]
-
-jax = [
-  "jax[cuda12]",
-  "nanobind",
-  "scikit-build-core"
-]
-
-dev = [
-  "e3nn",
-  "pre-commit",
-  "ruff",
-  "pytest",
-  "pytest-check",
-  "pytest-subtests",
-  "torch_geometric",
-  "cmake",
-  "furo",
-  "sphinx",
-  "sphinx-autobuild"
-]
-
-[tool.setuptools.packages.find]
-include = ["openequivariance*"]
 
 [tool.setuptools_scm]
 root = ".."

@@ -45,6 +45,12 @@ def torch_ext_so_path():
     return openequivariance.impl_torch.extlib.torch_module.__file__
 
 
+def extension_source_path():
+    """
+    :returns: Path to the source code of the C++ extension.
+    """
+    return str(Path(__file__).parent / "extension")
+
 torch.serialization.add_safe_globals(
     [
         TensorProduct,
