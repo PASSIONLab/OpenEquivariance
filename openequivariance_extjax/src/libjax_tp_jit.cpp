@@ -104,7 +104,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
       .Ret<ffi::BufferR0<ffi::S32>>(),
       {xla::ffi::Traits::kCmdBufferCompatible});  // cudaGraph enabled
 
-NB_MODULE(oeq_jax_extension, m) {
+NB_MODULE(openequivariance_extjax, m) {
   m.def("registrations", []() {
     nb::dict registrations;
     registrations["tp_forward"] = nb::capsule(reinterpret_cast<void *>(tp_forward));
