@@ -34,7 +34,7 @@ def _check_package_editable():
     return json.loads(direct_url).get("dir_info", {}).get("editable", False)
 
 
-_editable_install_output_path = Path(__file__).parent.parent / "outputs"
+_editable_install_output_path = Path(__file__).parent.parent.parent / "outputs"
 
 
 def torch_ext_so_path():
