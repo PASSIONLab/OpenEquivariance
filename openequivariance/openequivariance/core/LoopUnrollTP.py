@@ -11,7 +11,7 @@ from openequivariance.core.utils import (
 )
 
 class LoopUnrollTP(TensorProductBase):
-    def __init__(self, config, dp, postprocess_kernel, torch_op=True):
+    def __init__(self, config, dp, postprocess_kernel, torch_op):
         super().__init__(config, torch_op=torch_op)
 
         env = get_jinja_environment()

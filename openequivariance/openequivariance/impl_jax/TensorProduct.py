@@ -1,13 +1,10 @@
 import numpy as np
 
 import jax
-import openequivariance_extjax as oeq_extjax 
+from openequivariance.impl_jax import extlib
 import hashlib
-#from openequivariance.core.e3nn_lite import TPProblem
-
-for name, target in oeq_extjax.registrations().items():
-    print(name, target)
-    jax.ffi.register_ffi_target(name, target, platform="CUDA")
+from openequivariance.core.e3nn_lite import TPProblem, Irreps
+from openequivariance.core.LoopUnrollTP import LoopUnrollTP
 
 def hash_attributes(attrs):
     m = hashlib.sha256()
@@ -18,21 +15,17 @@ def hash_attributes(attrs):
     hash = int(m.hexdigest()[:16], 16) >> 1
     attrs["hash"] = hash
 
-class TensorProduct:
-    def __init__(self, problem):
-        self.problem = problem
+class TensorProduct(LoopUnrollTP):
+    def __init__(self, config):
+        dp = extlib.DeviceProp(0)
+        super().__init__(config, dp, extlib.postprocess_kernel, torch_op=False)
 
-        self.kernel = "BLAH" 
-        self.forward_config = {"num_blocks": 42, "num_threads": 256, "smem": 8192 }
-        self.backward_config = {}
-        self.double_backward_config = {}
-        self.kernel_prop = {}
         self.attrs = {
-            "kernel": self.kernel,
-            "forward_config": self.forward_config,
-            "backward_config": self.backward_config,
-            "double_backward_config": self.double_backward_config,
-            "kernel_prop": self.kernel_prop
+            "kernel": self.jit_kernel,
+            "forward_config": vars(self.forward_schedule.launch_config),
+            "backward_config": vars(self.backward_schedule.launch_config),
+            "double_backward_config": vars(self.double_backward_schedule.launch_config),
+            "kernel_prop": self.kernelProp
         }
         hash_attributes(self.attrs)
 
@@ -44,6 +37,9 @@ class TensorProduct:
 
 
 if __name__ == "__main__":
-    tp_problem = None 
-    tensor_product = TensorProduct(tp_problem)
+    tp_problem = None
+    X_ir, Y_ir, Z_ir = Irreps("1x2e"), Irreps("1x3e"), Irreps("1x2e") 
+    instructions=[(0, 0, 0, "uvu", True)]
+    problem = TPProblem(X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False)
+    tensor_product = TensorProduct(problem)
     print("COMPLETE!")

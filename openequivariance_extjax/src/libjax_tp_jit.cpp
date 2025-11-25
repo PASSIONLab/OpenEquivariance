@@ -108,9 +108,30 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
       {xla::ffi::Traits::kCmdBufferCompatible});  // cudaGraph enabled
 
 NB_MODULE(openequivariance_extjax, m) {
-  m.def("registrations", []() {
-    nb::dict registrations;
-    registrations["tp_forward"] = nb::capsule(reinterpret_cast<void *>(tp_forward));
-    return registrations;
-  });
+    m.def("registrations", []() {
+        nb::dict registrations;
+        registrations["tp_forward"] = nb::capsule(reinterpret_cast<void *>(tp_forward));
+        return registrations;
+    });
+
+    nb::class_<DeviceProp>(m, "DeviceProp")
+        .def(nb::init<int>())
+        .def_ro("name", &DeviceProp::name)
+        .def_ro("warpsize", &DeviceProp::warpsize)
+        .def_ro("major", &DeviceProp::major)
+        .def_ro("minor", &DeviceProp::minor)
+        .def_ro("multiprocessorCount", &DeviceProp::multiprocessorCount)
+        .def_ro("maxSharedMemPerBlock", &DeviceProp::maxSharedMemPerBlock); 
+
+    nb::class_<GPUTimer>(m, "GPUTimer")
+        .def(nb::init<>())
+        .def("start", &GPUTimer::start)
+        .def("stop_clock_get_elapsed", &GPUTimer::stop_clock_get_elapsed)
+        .def("clear_L2_cache", &GPUTimer::clear_L2_cache);
+
+    /*nb::class_<PyDeviceBuffer<GPU_Allocator>>(m, "DeviceBuffer")
+        .def(nb::init<uint64_t>())
+        .def(nb::init<nb::buffer>())
+        .def("copy_to_host", &PyDeviceBuffer<GPU_Allocator>::copy_to_host)
+        .def("data_ptr", &PyDeviceBuffer<GPU_Allocator>::data_ptr);*/
 }
