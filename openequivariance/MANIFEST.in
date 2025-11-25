@@ -1,6 +1,4 @@
-include openequivariance/extlib/*.empty
-
-include openequivariance/templates/*.cuh
+include templates/*.cuh
 include openequivariance/templates/*.jinja
 
 include openequivariance/extension/*

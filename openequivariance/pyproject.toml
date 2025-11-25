@@ -64,10 +64,10 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["openequivariance*"]
+include = ["."]
 
 [tool.setuptools_scm]
-# Presence of this section necessary, even if empty 
+root = ".."
 
 [tool.pytest.ini_options]
 addopts = [
