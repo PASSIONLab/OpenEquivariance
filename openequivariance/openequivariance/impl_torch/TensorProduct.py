@@ -4,7 +4,9 @@ from openequivariance.impl_torch import extlib
 import torch
 import typing
 from openequivariance.core.utils import torch_to_oeq_dtype
+from openequivariance.benchmark.logging_utils import getLogger
 
+logger = getLogger()
 
 class TensorProduct(torch.nn.Module, LoopUnrollTP):
     r"""
@@ -29,9 +31,28 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
         self._init_class()
 
     def _init_class(self):
+        dp = extlib.DeviceProp(0)
         LoopUnrollTP.__init__(
-            self, self.input_args["problem"], self.input_args["torch_op"]
+            self, self.input_args["problem"], dp, extlib.postprocess_kernel, self.input_args["torch_op"]
         )
+
+        internal_cls = None
+        if extlib.TORCH_COMPILE:
+            internal_cls = torch.classes.libtorch_tp_jit.TorchJITProduct
+        else:
+            internal_cls = extlib.JITTPImpl
+
+        logger.info("Starting kernel compiler...")
+        self.internal = internal_cls(
+            self.jit_kernel,
+            vars(self.forward_schedule.launch_config),
+            vars(self.backward_schedule.launch_config),
+            vars(self.double_backward_schedule.launch_config),
+            self.kernelProp
+        )
+        logger.info("Kernel compiled!")
+        logger.info(f"Kernel File Size: {len(self.jit_kernel) // 1024} KB")
+
         self.weight_numel = self.input_args["problem"].weight_numel
         self._setup_notorchbind()
         if (not extlib.TORCH_COMPILE) or self.input_args["use_opaque"]:
@@ -63,9 +84,11 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
         self.input_args = state
         self._init_class()
 
-    @staticmethod
-    def name():
-        return LoopUnrollTP.name()
+    def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
+        return self.forward_schedule.reorder_weights_from_e3nn(weights, has_batch_dim)
+
+    def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
+        return self.forward_schedule.reorder_weights_to_e3nn(weights, has_batch_dim)
 
     def forward(
         self, x: torch.Tensor, y: torch.Tensor, W: torch.Tensor
@@ -198,3 +221,125 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
         backward_helper.register_autograd(
             double_backward, setup_context=setup_context_double_backward
         )
+
+    @classmethod
+    def register_torch_fakes(cls):
+        @torch._library.register_fake_class("libtorch_tp_jit::TorchJITProduct")
+        class TorchJITProduct:
+            def __init__(
+                self,
+                kernel_plaintext: str,
+                fwd_config: dict[str, int],
+                bwd_config: dict[str, int],
+                dbl_bwd_config: dict[str, int],
+                kernel_dims: dict[str, int],
+            ) -> None:
+                (
+                    self.kernel_plaintext,
+                    self.fwd_config,
+                    self.bwd_config,
+                    self.dbl_bwd_config,
+                    self.kernel_dims,
+                ) = (
+                    kernel_plaintext,
+                    fwd_config,
+                    bwd_config,
+                    dbl_bwd_config,
+                    kernel_dims,
+                )
+
+            @classmethod
+            def __obj_unflatten__(cls, flattened_product):
+                return cls(**dict(flattened_product))
+
+            def __len__(self):
+                return 0
+
+            def __setstate__(self, state):
+                self.kernel_plaintext = state["kernel_plaintext"]
+                self.fwd_config = state["fwd_config"]
+                self.bwd_config = state["bwd_config"]
+                self.dbl_bwd_config = state["dbl_bwd_config"]
+                self.kernel_dims = state["kernel_dims"]
+
+            def exec_tensor_product_rawptr(*args, **kwargs):
+                pass
+
+            def backward_rawptr(*args, **kwargs):
+                pass
+
+            def L3_dim_getter(self):
+                return self.kernel_dims["L3_dim"]
+
+            def irrep_dtype_getter(self):
+                return self.kernel_dims["irrep_dtype"]
+
+        @torch.library.register_fake("libtorch_tp_jit::jit_tp_forward")
+        def fake_forward(jit, L1_in, L2_in, W):
+            L3_dim = None
+            if hasattr(jit, "wrapped_obj"):
+                L3_dim = jit.wrapped_obj.kernel_dims["L3_dim"]
+            else:
+                L3_dim = jit.L3_dim
+
+            return L1_in.new_empty(L1_in.shape[0], L3_dim)
+
+        @torch.library.register_fake("libtorch_tp_jit::jit_tp_backward")
+        def fake_backward(jit, L1_in, L2_in, W, L3_grad):
+            return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W)
+
+    @classmethod
+    def register_autograd(cls):
+        backward_op = torch.ops.libtorch_tp_jit.jit_tp_backward
+
+        def setup_context(ctx, inputs, output):
+            ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights = inputs
+
+        def backward(ctx, grad_output):
+            L1_grad, L2_grad, W_grad = backward_op(
+                ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, grad_output
+            )
+            return None, L1_grad, L2_grad, W_grad
+
+        torch.library.register_autograd(
+            "libtorch_tp_jit::jit_tp_forward", backward, setup_context=setup_context
+        )
+
+        def setup_context_double_backward(ctx, inputs, output):
+            ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad = inputs
+
+        def double_backward(ctx, E, F, G):
+            result = torch.ops.libtorch_tp_jit.jit_tp_double_backward(
+                ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad, E, F, G
+            )
+            return None, result[0], result[1], result[2], result[3]
+
+        torch.library.register_autograd(
+            "libtorch_tp_jit::jit_tp_backward",
+            double_backward,
+            setup_context=setup_context_double_backward,
+        )
+
+    @classmethod
+    def register_autocast(cls):
+        global torch
+        import torch
+
+        torch.library.register_autocast(
+            "libtorch_tp_jit::jit_tp_forward", "cuda", torch.float32
+        )
+        torch.library.register_autocast(
+            "libtorch_tp_jit::jit_tp_backward", "cuda", torch.float32
+        )
+        torch.library.register_autocast(
+            "libtorch_tp_jit::jit_tp_double_backward", "cuda", torch.float32
+        )
+
+    @staticmethod
+    def name():
+        return "LoopUnrollTP"
+
+if extlib.TORCH_COMPILE:
+    TensorProduct.register_torch_fakes()
+    TensorProduct.register_autograd()
+    TensorProduct.register_autocast()

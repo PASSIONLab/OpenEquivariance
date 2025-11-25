@@ -1,27 +1,21 @@
 import numpy as np
 
-import openequivariance.impl_torch.extlib as extlib
 from openequivariance.templates.jinja_utils import get_jinja_environment
 from openequivariance.core.ComputationSchedule import ComputationSchedule
-
-from openequivariance.core.dtype_enum import dtype_to_enum
 from openequivariance.core.TensorProductBase import TensorProductBase
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.dtype_enum import dtype_to_enum
+
 from openequivariance.core.utils import (
     filter_and_analyze_problem,
     count_cg_non_zero,
 )
 
-logger = getLogger()
-
-
 class LoopUnrollTP(TensorProductBase):
-    def __init__(self, config, torch_op=True):
+    def __init__(self, config, dp, postprocess_kernel, torch_op=True):
         super().__init__(config, torch_op=torch_op)
 
         env = get_jinja_environment()
         template = env.get_template("loop_unroll_batch.cuh")
-        dp = extlib.DeviceProp(0)
 
         analysis = filter_and_analyze_problem(config)
         self.is_uvw = analysis["is_uvw"]
@@ -88,7 +82,7 @@ class LoopUnrollTP(TensorProductBase):
                             "Tensor product schedule generation failed, shared memory inadequate!"
                         )
 
-        self.jit_kernel = extlib.postprocess_kernel(
+        self.jit_kernel = postprocess_kernel(
             template.render(
                 forward_schedule=self.forward_schedule,
                 backward_schedule=self.backward_schedule,
@@ -96,163 +90,17 @@ class LoopUnrollTP(TensorProductBase):
             )
         )
 
-        # with open("scratch.txt", "w") as f:
-        #    f.write(self.jit_kernel)
+        self.kernelProp = {
+            "L1_dim": self.L1.dim,
+            "L2_dim": self.L2.dim,
+            "L3_dim": self.L3.dim,
+            "weight_numel": self.config.weight_numel,
+            "shared_weights": int(self.config.shared_weights),
+            "opt_level": 3,
+            "irrep_dtype": dtype_to_enum[self.config.irrep_dtype],
+            "weight_dtype": dtype_to_enum[self.config.weight_dtype],
+        }
 
-        internal_cls = None
-        if self.torch_op and extlib.TORCH_COMPILE:
-            global torch
-            import torch
-
-            internal_cls = torch.classes.libtorch_tp_jit.TorchJITProduct
-        else:
-            internal_cls = extlib.JITTPImpl
-
-        logger.info("Starting kernel compiler...")
-        self.internal = internal_cls(
-            self.jit_kernel,
-            vars(self.forward_schedule.launch_config),
-            vars(self.backward_schedule.launch_config),
-            vars(self.double_backward_schedule.launch_config),
-            {
-                "L1_dim": self.L1.dim,
-                "L2_dim": self.L2.dim,
-                "L3_dim": self.L3.dim,
-                "weight_numel": self.config.weight_numel,
-                "shared_weights": int(self.config.shared_weights),
-                "opt_level": 3,
-                "irrep_dtype": dtype_to_enum[self.config.irrep_dtype],
-                "weight_dtype": dtype_to_enum[self.config.weight_dtype],
-            },
-        )
-        logger.info("Kernel compiled!")
-        logger.info(f"Kernel File Size: {len(self.jit_kernel) // 1024} KB")
-
-    def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
-        return self.forward_schedule.reorder_weights_from_e3nn(weights, has_batch_dim)
-
-    def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
-        return self.forward_schedule.reorder_weights_to_e3nn(weights, has_batch_dim)
-
-    @classmethod
-    def register_torch_fakes(cls):
-        global torch
-        import torch
-
-        @torch._library.register_fake_class("libtorch_tp_jit::TorchJITProduct")
-        class TorchJITProduct:
-            def __init__(
-                self,
-                kernel_plaintext: str,
-                fwd_config: dict[str, int],
-                bwd_config: dict[str, int],
-                dbl_bwd_config: dict[str, int],
-                kernel_dims: dict[str, int],
-            ) -> None:
-                (
-                    self.kernel_plaintext,
-                    self.fwd_config,
-                    self.bwd_config,
-                    self.dbl_bwd_config,
-                    self.kernel_dims,
-                ) = (
-                    kernel_plaintext,
-                    fwd_config,
-                    bwd_config,
-                    dbl_bwd_config,
-                    kernel_dims,
-                )
-
-            @classmethod
-            def __obj_unflatten__(cls, flattened_product):
-                return cls(**dict(flattened_product))
-
-            def __len__(self):
-                return 0
-
-            def __setstate__(self, state):
-                self.kernel_plaintext = state["kernel_plaintext"]
-                self.fwd_config = state["fwd_config"]
-                self.bwd_config = state["bwd_config"]
-                self.dbl_bwd_config = state["dbl_bwd_config"]
-                self.kernel_dims = state["kernel_dims"]
-
-            def exec_tensor_product_rawptr(*args, **kwargs):
-                pass
-
-            def backward_rawptr(*args, **kwargs):
-                pass
-
-            def L3_dim_getter(self):
-                return self.kernel_dims["L3_dim"]
-
-            def irrep_dtype_getter(self):
-                return self.kernel_dims["irrep_dtype"]
-
-        @torch.library.register_fake("libtorch_tp_jit::jit_tp_forward")
-        def fake_forward(jit, L1_in, L2_in, W):
-            L3_dim = None
-            if hasattr(jit, "wrapped_obj"):
-                L3_dim = jit.wrapped_obj.kernel_dims["L3_dim"]
-            else:
-                L3_dim = jit.L3_dim
-
-            return L1_in.new_empty(L1_in.shape[0], L3_dim)
-
-        @torch.library.register_fake("libtorch_tp_jit::jit_tp_backward")
-        def fake_backward(jit, L1_in, L2_in, W, L3_grad):
-            return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W)
-
-    @classmethod
-    def register_autograd(cls):
-        backward_op = torch.ops.libtorch_tp_jit.jit_tp_backward
-
-        def setup_context(ctx, inputs, output):
-            ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights = inputs
-
-        def backward(ctx, grad_output):
-            L1_grad, L2_grad, W_grad = backward_op(
-                ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, grad_output
-            )
-            return None, L1_grad, L2_grad, W_grad
-
-        torch.library.register_autograd(
-            "libtorch_tp_jit::jit_tp_forward", backward, setup_context=setup_context
-        )
-
-        def setup_context_double_backward(ctx, inputs, output):
-            ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad = inputs
-
-        def double_backward(ctx, E, F, G):
-            result = torch.ops.libtorch_tp_jit.jit_tp_double_backward(
-                ctx.jit, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad, E, F, G
-            )
-            return None, result[0], result[1], result[2], result[3]
-
-        torch.library.register_autograd(
-            "libtorch_tp_jit::jit_tp_backward",
-            double_backward,
-            setup_context=setup_context_double_backward,
-        )
-
-    @classmethod
-    def register_autocast(cls):
-        global torch
-        import torch
-
-        torch.library.register_autocast(
-            "libtorch_tp_jit::jit_tp_forward", "cuda", torch.float32
-        )
-        torch.library.register_autocast(
-            "libtorch_tp_jit::jit_tp_backward", "cuda", torch.float32
-        )
-        torch.library.register_autocast(
-            "libtorch_tp_jit::jit_tp_double_backward", "cuda", torch.float32
-        )
-
-    @staticmethod
-    def name():
-        return "LoopUnrollTP"
 
     def calculate_flops_forward(self, batch_size: int) -> dict:
         if self.is_uvw:
@@ -303,9 +151,3 @@ class LoopUnrollTP(TensorProductBase):
             flop_count["backward"] *= 9 * batch_size
             flop_count["total"] = sum(flop_count.values())
             return flop_count
-
-
-if extlib.TORCH_COMPILE:
-    LoopUnrollTP.register_torch_fakes()
-    LoopUnrollTP.register_autograd()
-    LoopUnrollTP.register_autocast()
