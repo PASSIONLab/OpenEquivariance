@@ -19,7 +19,7 @@ dependencies = [
   "jinja2",
   "numpy"
 ]
-readme = "../README.md"
+readme = "README.md"
 
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
