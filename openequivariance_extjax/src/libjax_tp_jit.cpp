@@ -57,7 +57,8 @@ struct KernelProp {
 
     KernelProp() {}
 
-    KernelProp(Map_t &kernel_dims, bool is_convolution):
+    KernelProp(
+        std::unordered_map<string, int64_t> &kernel_dims, bool is_convolution):
             L1_dim(kernel_dims.at("L1_dim")),
             L2_dim(kernel_dims.at("L2_dim")),    
             L3_dim(kernel_dims.at("L3_dim")),
@@ -78,7 +79,7 @@ std::unordered_map<int64_t,
     std::pair<
         std::unique_ptr<JITTPImpl<JITKernel>>,
         KernelProp
-    > kernel_cache;
+    >> kernel_cache;
 std::mutex mut;
 
 std::vector<std::string> launch_config_keys = {
@@ -116,20 +117,20 @@ std::pair<JITTPImpl<JITKernel>*, KernelProp>
         const std::lock_guard<std::mutex> lock(mut);
         auto it = kernel_cache.find(hash); 
         if (it == kernel_cache.end()) {
-            auto kernel_prop = parse_ffi_dict(kernel_prop, kernel_prop_keys);
+            auto kernel_prop_map = parse_ffi_dict(kernel_prop, kernel_prop_keys);
             auto jit_tp_impl = std::make_unique<JITTPImpl<JITKernel>>(
                 std::string(kernel),
                 parse_ffi_dict(forward_config, launch_config_keys),
                 parse_ffi_dict(backward_config, launch_config_keys),
                 parse_ffi_dict(double_backward_config, launch_config_keys),
-                kernel_prop);
+                kernel_prop_map);
             kernel_cache.insert({hash,
                 std::make_pair(std::move(jit_tp_impl), 
-                KernelProp(kernel_prop, is_convolution))});
+                KernelProp(kernel_prop_map, is_convolution))});
             it = kernel_cache.find(hash);
         }
+        return {it->second.first.get(), it->second.second};
     }
-    return {it->second.first.get(), it->second.second};
 }
 
 
@@ -148,11 +149,11 @@ inline void check_tensor(const ffi::AnyBuffer &buffer,
     }
 
     for (size_t i = 0; i < dims.size(); i++) {
-        if (dims[i] != expected_shape[i]) {
+        if (dims[i] != expected_shape.begin()[i]) {
             throw std::logic_error("Shape mismatch for tensor '"
                 + tensor_name 
                 + "'. Expected dimension " 
-                + std::to_string(expected_shape[i]) 
+                + std::to_string(expected_shape.begin()[i]) 
                 + " at index " 
                 + std::to_string(i) 
                 + ", got " 
@@ -176,7 +177,7 @@ ffi::Error tp_forward_impl(
    
     auto [jit_kernel, k] = compile_kernel_with_caching(
         kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, false);
-    const int64_t num_batch = L1_in.dimensions[0];
+    const int64_t num_batch = L1_in.dimensions()[0];
 
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_in"); 
@@ -188,7 +189,6 @@ ffi::Error tp_forward_impl(
 
     // TODO: Launch the forward kernel here
 
-
     return ffi::Error::Success();
 }
 
@@ -198,11 +198,10 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
-        .Arg<ffi::Result<ffi::AnyBuffer>>()
+        .Ret<ffi::AnyBuffer>()
         .Ctx<ffi::PlatformStream<cudaStream_t>>()
         .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
-        .Attr<int64_t>("hash")
-        .Ret<ffi::BufferR0<ffi::S32>>(),
+        .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});  // cudaGraph enabled
 
 NB_MODULE(openequivariance_extjax, m) {

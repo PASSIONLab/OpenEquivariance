@@ -28,20 +28,36 @@ class TensorProduct(LoopUnrollTP):
             "kernel_prop": self.kernelProp
         }
         hash_attributes(self.attrs)
-
-        self.forward_call = jax.ffi.ffi_call(
-            "tp_forward", 
-            jax.ShapeDtypeStruct((), jax.numpy.int32))
+ 
+        self.weight_numel = config.weight_numel
+        self.L3_dim = self.config.irreps_out.dim
 
     def forward(self, X, Y, W):
-        self.forward_call(X, Y, W, **self.attrs)
+        forward_call = jax.ffi.ffi_call("tp_forward", 
+            jax.ShapeDtypeStruct((X.shape[0], self.L3_dim), self.config.irrep_dtype))
+        return forward_call(X, Y, W, **self.attrs)
 
 
 if __name__ == "__main__":
     tp_problem = None
     X_ir, Y_ir, Z_ir = Irreps("1x2e"), Irreps("1x3e"), Irreps("1x2e") 
     instructions=[(0, 0, 0, "uvu", True)]
-    problem = TPProblem(X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False)
+    problem = TPProblem(X_ir, Y_ir, Z_ir, 
+                        instructions, 
+                        shared_weights=False, 
+                        internal_weights=False)
     tensor_product = TensorProduct(problem)
 
+    batch_size = 1000
+    #X = torch.rand(batch_size, X_ir.dim, device='cuda', generator=gen)
+    #Y = torch.rand(batch_size, Y_ir.dim, device='cuda', generator=gen)
+    #W = torch.rand(batch_size, tp_e3nn.weight_numel, device='cuda', generator=gen)
+
+    # Convert the above to JAX Arrays
+    X = jax.random.uniform(jax.random.PRNGKey(0), (batch_size, X_ir.dim), dtype=jax.numpy.float32)
+    Y = jax.random.uniform(jax.random.PRNGKey(1), (batch_size, Y_ir.dim), dtype=jax.numpy.float32)
+    W = jax.random.uniform(jax.random.PRNGKey(2), (batch_size, tensor_product.weight_numel), dtype=jax.numpy.float32)
+
+    Z = tensor_product.forward(X, Y, W)
     print("COMPLETE!")
+    print(Z)
