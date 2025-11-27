@@ -1,6 +1,8 @@
 import numpy as np
 
 import jax
+
+from functools import partial
 from openequivariance.impl_jax import extlib
 import hashlib
 from openequivariance.core.e3nn_lite import TPProblem, Irreps
@@ -15,13 +17,25 @@ def hash_attributes(attrs):
     hash = int(m.hexdigest()[:16], 16) >> 1
     attrs["hash"] = hash
 
-
+@partial(jax.custom_vjp, nondiff_argnums=(3,4,5))
 def forward(X, Y, W, L3_dim, irrep_dtype, attrs):
     forward_call = jax.ffi.ffi_call("tp_forward", 
         jax.ShapeDtypeStruct((X.shape[0], L3_dim), irrep_dtype))
     return forward_call(X, Y, W, **attrs)
 
-#def backward()
+def forward_with_inputs(X, Y, W, L3_dim, irrep_dtype, attrs):
+    return forward(X, Y, W, L3_dim, irrep_dtype, attrs), (X, Y, W) 
+
+def backward(attrs, irrep_dtype, L3_dim, inputs, dZ):
+    backward_call = jax.ffi.ffi_call("tp_backward",
+        (
+            jax.ShapeDtypeStruct(inputs[0].shape, irrep_dtype),
+            jax.ShapeDtypeStruct(inputs[1].shape, irrep_dtype),
+            jax.ShapeDtypeStruct(inputs[2].shape, irrep_dtype),
+        ))
+    return backward_call(*inputs, dZ, **attrs) 
+
+forward.defvjp(forward_with_inputs, backward)
 
 class TensorProduct(LoopUnrollTP):
     def __init__(self, config):
