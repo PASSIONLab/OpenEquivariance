@@ -32,8 +32,9 @@ class TensorProduct(LoopUnrollTP):
         self.forward_call = jax.ffi.ffi_call(
             "tp_forward", 
             jax.ShapeDtypeStruct((), jax.numpy.int32))
-        
-        self.forward_call(**self.attrs)
+
+    def forward(self, X, Y, W):
+        self.forward_call(X, Y, W, **self.attrs)
 
 
 if __name__ == "__main__":
@@ -42,4 +43,5 @@ if __name__ == "__main__":
     instructions=[(0, 0, 0, "uvu", True)]
     problem = TPProblem(X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False)
     tensor_product = TensorProduct(problem)
+
     print("COMPLETE!")

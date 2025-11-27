@@ -5,7 +5,6 @@ def postprocess_kernel(kernel):
 
 import openequivariance_extjax as oeq_extjax 
 for name, target in oeq_extjax.registrations().items():
-    print(name, target)
     jax.ffi.register_ffi_target(name, target, platform="CUDA")
 
 GPUTimer = oeq_extjax.GPUTimer
