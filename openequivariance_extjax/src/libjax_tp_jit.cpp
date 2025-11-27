@@ -42,7 +42,24 @@ xla::ffi::DataType enum_to_xla_dtype(int64_t i){
             return xla::ffi::DataType::U8;
     }
     throw logic_error("Unsupported tensor datatype!");
-} 
+}
+
+inline void* data_ptr(ffi::AnyBuffer &buffer) {
+    if(buffer.element_type() == xla::ffi::DataType::F32) 
+        return reinterpret_cast<void*>(buffer.typed_data<float>());
+    else if(buffer.element_type() == xla::ffi::DataType::F64)
+        return reinterpret_cast<void*>(buffer.typed_data<double>());
+    else if(buffer.element_type() == xla::ffi::DataType::S64) 
+        return reinterpret_cast<void*>(buffer.typed_data<int64_t>());
+    else if(buffer.element_type() == xla::ffi::DataType::U8) 
+        return reinterpret_cast<void*>(buffer.typed_data<uint8_t>());
+    else
+        throw logic_error("Unsupported tensor datatype!");
+}
+
+inline void* data_ptr(ffi::Result<ffi::AnyBuffer> &buffer) {
+    return data_ptr(*buffer);
+}
 
 struct KernelProp {
     int64_t L1_dim, L2_dim, L3_dim, weight_numel;
@@ -187,7 +204,13 @@ ffi::Error tp_forward_impl(
     else 
         check_tensor(W, {num_batch, k.weight_numel}, k.weight_dtype, "W");
 
-    // TODO: Launch the forward kernel here
+    jit_kernel->exec_tensor_product(
+            num_batch,
+            data_ptr(L1_in),
+            data_ptr(L2_in),
+            data_ptr(L3_out),
+            data_ptr(W),
+            stream);
 
     return ffi::Error::Success();
 }
