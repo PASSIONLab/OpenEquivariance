@@ -15,6 +15,14 @@ def hash_attributes(attrs):
     hash = int(m.hexdigest()[:16], 16) >> 1
     attrs["hash"] = hash
 
+
+def forward(X, Y, W, L3_dim, irrep_dtype, attrs):
+    forward_call = jax.ffi.ffi_call("tp_forward", 
+        jax.ShapeDtypeStruct((X.shape[0], L3_dim), irrep_dtype))
+    return forward_call(X, Y, W, **attrs)
+
+#def backward()
+
 class TensorProduct(LoopUnrollTP):
     def __init__(self, config):
         dp = extlib.DeviceProp(0)
@@ -33,10 +41,7 @@ class TensorProduct(LoopUnrollTP):
         self.L3_dim = self.config.irreps_out.dim
 
     def forward(self, X, Y, W):
-        forward_call = jax.ffi.ffi_call("tp_forward", 
-            jax.ShapeDtypeStruct((X.shape[0], self.L3_dim), self.config.irrep_dtype))
-        return forward_call(X, Y, W, **self.attrs)
-
+        return forward(X, Y, W, self.L3_dim, self.config.irrep_dtype, self.attrs)
 
 if __name__ == "__main__":
     tp_problem = None
@@ -47,11 +52,7 @@ if __name__ == "__main__":
                         shared_weights=False, 
                         internal_weights=False)
     tensor_product = TensorProduct(problem)
-
     batch_size = 1000
-    #X = torch.rand(batch_size, X_ir.dim, device='cuda', generator=gen)
-    #Y = torch.rand(batch_size, Y_ir.dim, device='cuda', generator=gen)
-    #W = torch.rand(batch_size, tp_e3nn.weight_numel, device='cuda', generator=gen)
 
     # Convert the above to JAX Arrays
     X = jax.random.uniform(jax.random.PRNGKey(0), (batch_size, X_ir.dim), dtype=jax.numpy.float32)

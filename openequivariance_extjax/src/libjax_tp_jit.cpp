@@ -247,7 +247,7 @@ ffi::Error tp_backward_impl(
         // Need to zero out W_grad
     } 
 
-    jit_kernel->exec_tensor_product_backward(
+    jit_kernel->backward(
             num_batch,
             data_ptr(L1_in),
             data_ptr(L1_grad),
