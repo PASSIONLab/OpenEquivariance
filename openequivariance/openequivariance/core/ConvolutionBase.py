@@ -1,6 +1,5 @@
 import copy
 import numpy as np
-from openequivariance.impl_torch.extlib import DeviceBuffer
 from openequivariance.benchmark.random_buffer_utils import (
     get_random_buffers_forward_conv,
     get_random_buffers_backward_conv,
@@ -129,17 +128,6 @@ class ConvolutionBase:
         See :py:func:`oeq.TensorProduct.reorder_weights_to_e3nn`.
         """
         return weights
-
-    def allocate_workspace(self, size_bytes):
-        self.workspace_size = size_bytes
-        if self.torch_op:
-            self.workspace_buffer = torch.zeros(
-                size_bytes, dtype=torch.uint8, device="cuda"
-            )
-        else:
-            self.workspace_buffer = DeviceBuffer(size_bytes)
-        self.workspace_ptr = self.workspace_buffer.data_ptr()
-        logger.info(f"Convolution requires {size_bytes // 1000000}MB of workspace.")
 
     @staticmethod
     def name():

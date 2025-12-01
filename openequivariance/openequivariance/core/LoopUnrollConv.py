@@ -6,24 +6,15 @@ from openequivariance.core.ComputationSchedule import (
     SMEMCapacityException,
 )
 
-from openequivariance.core.dtype_enum import (
-    dtype_to_enum,
-    enum_to_torch_dtype,
-)
+from openequivariance.core.dtype_enum import dtype_to_enum
 from openequivariance.templates.jinja_utils import get_jinja_environment
-import openequivariance.impl_torch.extlib as extlib
-from openequivariance.impl_torch.extlib import JITConvImpl, postprocess_kernel, DeviceProp
-
 from openequivariance.core.utils import filter_and_analyze_problem
-from openequivariance.benchmark.logging_utils import getLogger
-
-logger = getLogger()
-
 
 class LoopUnrollConv(ConvolutionBase):
     def __init__(
         self,
         config,
+        dp, postprocess_kernel,
         *,
         idx_dtype: type[np.generic] = np.int64,
         torch_op: bool = False,
@@ -39,7 +30,6 @@ class LoopUnrollConv(ConvolutionBase):
 
         env = get_jinja_environment()
         template = env.get_template("loop_unroll_conv_atomic.cuh")
-        dp = DeviceProp(0)
 
         analysis = filter_and_analyze_problem(config)
         self.is_uvw = analysis["is_uvw"]
@@ -141,10 +131,10 @@ class LoopUnrollConv(ConvolutionBase):
         self.backward_workspace_offset = None
         self.double_backwardB_offset = None
 
-        workspace_size = 1
+        self.workspace_size = 1
         if deterministic:
             destination_index_bytes = 32  # Add extra to account for padding
-            workspace_size = max(
+            self.workspace_size = max(
                 (
                     self.forward_schedule.L3.dim * np.dtype(config.irrep_dtype).itemsize
                     + destination_index_bytes
@@ -186,7 +176,19 @@ class LoopUnrollConv(ConvolutionBase):
             )
             self.double_backwardB_offset = (self.double_backwardB_offset + 7) // 8 * 8
 
-        self.allocate_workspace(workspace_size)
+        self.kernel_prop = {
+            "L1_dim": self.L1.dim,
+            "L2_dim": self.L2.dim,
+            "L3_dim": self.L3.dim,
+            "weight_numel": self.config.weight_numel,
+            "workspace_size": self.workspace_size,
+            "opt_level": 3,
+            "shared_weights": int(config.shared_weights),
+            "deterministic": int(self.deterministic),
+            "irrep_dtype": dtype_to_enum[self.config.irrep_dtype],
+            "weight_dtype": dtype_to_enum[self.config.weight_dtype],
+            "idx_dtype": dtype_to_enum[self.idx_dtype],
+        }
 
         self.jit_kernel = template.render(
             forward_schedule=self.forward_schedule,
@@ -199,255 +201,5 @@ class LoopUnrollConv(ConvolutionBase):
         )
         self.jit_kernel = postprocess_kernel(self.jit_kernel)
 
-        if self.torch_op and extlib.TORCH_COMPILE:
-            global torch
-            import torch
-
-            internal_cls = torch.classes.libtorch_tp_jit.TorchJITConv
-        else:
-            internal_cls = JITConvImpl
-
-        logger.info("Starting kernel compiler...")
-        self.internal = internal_cls(
-            self.jit_kernel,
-            vars(self.forward_schedule.launch_config),
-            vars(self.backward_schedule.launch_config),
-            vars(self.double_backward_schedule.launch_config),
-            {
-                "L1_dim": self.L1.dim,
-                "L2_dim": self.L2.dim,
-                "L3_dim": self.L3.dim,
-                "weight_numel": self.config.weight_numel,
-                "workspace_size": self.workspace_size,
-                "opt_level": 3,
-                "shared_weights": int(config.shared_weights),
-                "deterministic": int(self.deterministic),
-                "irrep_dtype": dtype_to_enum[self.config.irrep_dtype],
-                "weight_dtype": dtype_to_enum[self.config.weight_dtype],
-                "idx_dtype": dtype_to_enum[self.idx_dtype],
-            },
-        )
-        logger.info("Kernel compiled!")
-
         # with open("scratch.txt", "w") as f:
         #    f.write(self.jit_kernel)
-
-    def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
-        return self.forward_schedule.reorder_weights_from_e3nn(weights, has_batch_dim)
-
-    def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
-        return self.forward_schedule.reorder_weights_to_e3nn(weights, has_batch_dim)
-
-    @staticmethod
-    def name():
-        return "LoopUnrollConv"
-
-    @classmethod
-    def register_torch_fakes(cls):
-        global torch
-        import torch
-
-        @torch._library.register_fake_class("libtorch_tp_jit::TorchJITConv")
-        class TorchJITConv:
-            def __init__(
-                self,
-                kernel_plaintext: str,
-                fwd_config: dict[str, int],
-                bwd_config: dict[str, int],
-                dbl_bwd_config: dict[str, int],
-                kernel_dims: dict[str, int],
-            ) -> None:
-                (
-                    self.kernel_plaintext,
-                    self.fwd_config,
-                    self.bwd_config,
-                    self.dbl_bwd_config,
-                    self.kernel_dims,
-                ) = (
-                    kernel_plaintext,
-                    fwd_config,
-                    bwd_config,
-                    dbl_bwd_config,
-                    kernel_dims,
-                )
-
-            @classmethod
-            def __obj_unflatten__(cls, flattened_product):
-                return cls(**dict(flattened_product))
-
-            def __len__(self):
-                return 0
-
-            def __setstate__(self, state):
-                (
-                    self.kernel_plaintext,
-                    self.fwd_config,
-                    self.bwd_config,
-                    self.dbl_bwd_config,
-                    self.kernel_dims,
-                ) = state
-
-            def exec_conv_rawptrs(*args, **kwargs):
-                pass
-
-            def backward_rawptrs(*args, **kwargs):
-                pass
-
-            def double_backward_rawptrs(*args, **kwargs):
-                pass
-
-            def L3_dim_getter(self):
-                return self.kernel_dims["L3_dim"]
-
-            def irrep_dtype_getter(self):
-                return self.kernel_dims["irrep_dtype"]
-
-        @torch.library.register_fake("libtorch_tp_jit::jit_conv_forward")
-        def fake_forward(
-            jit, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm
-        ):
-            L3_dim, irrep_dtype = None, None
-            if hasattr(jit, "wrapped_obj"):
-                L3_dim = jit.wrapped_obj.kernel_dims["L3_dim"]
-                irrep_dtype = jit.wrapped_obj.kernel_dims["irrep_dtype"]
-            else:
-                L3_dim = jit.L3_dim
-                irrep_dtype = jit.irrep_dtype
-
-            return torch.empty(
-                L1_in.shape[0],
-                L3_dim,
-                device="cuda",
-                dtype=enum_to_torch_dtype[irrep_dtype],
-            )
-
-        @torch.library.register_fake("libtorch_tp_jit::jit_conv_backward")
-        def fake_backward(
-            jit, L1_in, L2_in, W, L3_grad, rows, cols, workspace_buffer, sender_perm
-        ):
-            return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W)
-
-        @torch.library.register_fake("libtorch_tp_jit::jit_conv_double_backward")
-        def fake_double_backward(
-            jit,
-            L1_in,
-            L2_in,
-            W,
-            L3_grad,
-            L1_dgrad,
-            L2_dgrad,
-            w_dgrad,
-            rows,
-            cols,
-            workspace_buffer,
-            transpose_perm=None,
-        ):
-            return [
-                L1_in.new_empty(*L1_in.shape),
-                L2_in.new_empty(*L2_in.shape),
-                W.new_empty(*W.shape),
-                L3_grad.new_empty(*L3_grad.shape),
-            ]
-
-    @classmethod
-    def register_autograd(cls):
-        backward_op = torch.ops.libtorch_tp_jit.jit_conv_backward
-        double_backward_op = torch.ops.libtorch_tp_jit.jit_conv_double_backward
-
-        def setup_context(ctx, inputs, output):
-            (
-                ctx.jit,
-                ctx.L1_in,
-                ctx.L2_in,
-                ctx.W,
-                ctx.rows,
-                ctx.cols,
-                ctx.workspace_buffer,
-                ctx.sender_perm,
-            ) = inputs
-
-        def backward(ctx, grad_output):
-            L1_grad, L2_grad, W_grad = backward_op(
-                ctx.jit,
-                ctx.L1_in,
-                ctx.L2_in,
-                ctx.W,
-                grad_output,
-                ctx.rows,
-                ctx.cols,
-                ctx.workspace_buffer,
-                ctx.sender_perm,
-            )
-            return None, L1_grad, L2_grad, W_grad, None, None, None, None
-
-        torch.library.register_autograd(
-            "libtorch_tp_jit::jit_conv_forward", backward, setup_context=setup_context
-        )
-
-        def setup_context_double_backward(ctx, inputs, output):
-            (
-                ctx.jit,
-                ctx.L1_in,
-                ctx.L2_in,
-                ctx.W,
-                ctx.grad_output,
-                ctx.rows,
-                ctx.cols,
-                ctx.workspace_buffer,
-                ctx.sender_perm,
-            ) = inputs
-            ctx.inputs = inputs
-
-        def double_backward(ctx, E, F, G):
-            result = double_backward_op(
-                ctx.jit,
-                ctx.L1_in,
-                ctx.L2_in,
-                ctx.W,
-                ctx.grad_output,
-                E,
-                F,
-                G,
-                ctx.rows,
-                ctx.cols,
-                ctx.workspace_buffer,
-                ctx.sender_perm,
-            )
-            return (
-                None,
-                result[0],
-                result[1],
-                result[2],
-                result[3],
-                None,
-                None,
-                None,
-                None,
-            )
-
-        torch.library.register_autograd(
-            "libtorch_tp_jit::jit_conv_backward",
-            double_backward,
-            setup_context=setup_context_double_backward,
-        )
-
-    @classmethod
-    def register_autocast(cls):
-        global torch
-        import torch
-
-        torch.library.register_autocast(
-            "libtorch_tp_jit::jit_conv_forward", "cuda", torch.float32
-        )
-        torch.library.register_autocast(
-            "libtorch_tp_jit::jit_conv_backward", "cuda", torch.float32
-        )
-        torch.library.register_autocast(
-            "libtorch_tp_jit::jit_conv_double_backward", "cuda", torch.float32
-        )
-
-
-if extlib.TORCH_COMPILE:
-    LoopUnrollConv.register_torch_fakes()
-    LoopUnrollConv.register_autograd()
-    LoopUnrollConv.register_autocast()
