@@ -9,6 +9,7 @@ from openequivariance.benchmark.logging_utils import getLogger, bcolors
 from openequivariance.benchmark.correctness_utils import check_similiarity
 from openequivariance.core.e3nn_lite import wigner_3j
 from openequivariance.core.utils import benchmark
+from openequivariance.impl_torch.extlib import DeviceBuffer
 
 logger = getLogger()
 
