@@ -7,6 +7,7 @@ from openequivariance.impl_jax import extlib
 import hashlib
 from openequivariance.core.e3nn_lite import TPProblem, Irreps
 from openequivariance.core.LoopUnrollTP import LoopUnrollTP
+import jax.numpy as jnp
 
 def hash_attributes(attrs):
     m = hashlib.sha256()
@@ -26,13 +27,14 @@ def forward(X, Y, W, L3_dim, irrep_dtype, attrs):
 def forward_with_inputs(X, Y, W, L3_dim, irrep_dtype, attrs):
     return forward(X, Y, W, L3_dim, irrep_dtype, attrs), (X, Y, W) 
 
-def backward(attrs, irrep_dtype, L3_dim, inputs, dZ):
+def backward(L3_dim, irrep_dtype, attrs, inputs, dZ):
     backward_call = jax.ffi.ffi_call("tp_backward",
         (
             jax.ShapeDtypeStruct(inputs[0].shape, irrep_dtype),
             jax.ShapeDtypeStruct(inputs[1].shape, irrep_dtype),
             jax.ShapeDtypeStruct(inputs[2].shape, irrep_dtype),
         ))
+
     return backward_call(*inputs, dZ, **attrs) 
 
 forward.defvjp(forward_with_inputs, backward)
@@ -66,7 +68,7 @@ if __name__ == "__main__":
                         shared_weights=False, 
                         internal_weights=False)
     tensor_product = TensorProduct(problem)
-    batch_size = 1000
+    batch_size = 1
 
     # Convert the above to JAX Arrays
     X = jax.random.uniform(jax.random.PRNGKey(0), (batch_size, X_ir.dim), dtype=jax.numpy.float32)
@@ -74,5 +76,11 @@ if __name__ == "__main__":
     W = jax.random.uniform(jax.random.PRNGKey(2), (batch_size, tensor_product.weight_numel), dtype=jax.numpy.float32)
 
     Z = tensor_product.forward(X, Y, W)
+
+    # Test via jax vjp
+
+    ctZ = jnp.ones_like(Z)
+    result = jax.vjp(lambda x, y, w: tensor_product.forward(x, y, w), X, Y, W)[1](ctZ)
+
+    print(result)
     print("COMPLETE!")
-    print(Z)
