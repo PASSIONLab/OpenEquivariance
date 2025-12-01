@@ -27,6 +27,7 @@ namespace ffi = xla::ffi;
 #endif
 
 #include "tensorproducts.hpp"
+#include "convolution.hpp"
 
 xla::ffi::DataType enum_to_xla_dtype(int64_t i){
     switch(i) {
@@ -122,7 +123,13 @@ std::unordered_map<int64_t,
     std::pair<
         std::unique_ptr<JITTPImpl<JITKernel>>,
         KernelProp
-    >> kernel_cache;
+    >> tp_cache;
+
+std::unordered_map<int64_t,
+    std::pair<
+        std::unique_ptr<JITConvImpl<JITKernel>>,
+        KernelProp
+    >> conv_cache;
 std::mutex mut;
 
 std::vector<std::string> launch_config_keys = {
@@ -148,7 +155,7 @@ std::unordered_map<string, int64_t> parse_ffi_dict(ffi::Dictionary &dict, const 
 }
 
 std::pair<JITTPImpl<JITKernel>*, KernelProp> 
-    compile_kernel_with_caching(std::string_view kernel,
+    compile_tp_with_caching(std::string_view kernel,
                     ffi::Dictionary forward_config, 
                     ffi::Dictionary backward_config, 
                     ffi::Dictionary double_backward_config, 
@@ -158,8 +165,8 @@ std::pair<JITTPImpl<JITKernel>*, KernelProp>
     
     {
         const std::lock_guard<std::mutex> lock(mut);
-        auto it = kernel_cache.find(hash); 
-        if (it == kernel_cache.end()) {
+        auto it = tp_cache.find(hash); 
+        if (it == tp_cache.end()) {
             auto kernel_prop_map = parse_ffi_dict(kernel_prop, kernel_prop_keys);
             auto jit_tp_impl = std::make_unique<JITTPImpl<JITKernel>>(
                 std::string(kernel),
@@ -167,15 +174,43 @@ std::pair<JITTPImpl<JITKernel>*, KernelProp>
                 parse_ffi_dict(backward_config, launch_config_keys),
                 parse_ffi_dict(double_backward_config, launch_config_keys),
                 kernel_prop_map);
-            kernel_cache.insert({hash,
+            tp_cache.insert({hash,
                 std::make_pair(std::move(jit_tp_impl), 
                 KernelProp(kernel_prop_map, is_convolution))});
-            it = kernel_cache.find(hash);
+            it = tp_cache.find(hash);
         }
         return {it->second.first.get(), it->second.second};
     }
 }
 
+std::pair<JITConvImpl<JITKernel>*, KernelProp> 
+    compile_conv_with_caching(std::string_view kernel,
+                    ffi::Dictionary forward_config, 
+                    ffi::Dictionary backward_config, 
+                    ffi::Dictionary double_backward_config, 
+                    ffi::Dictionary kernel_prop,
+                    int64_t hash,
+                    bool is_convolution) {
+    
+    {
+        const std::lock_guard<std::mutex> lock(mut);
+        auto it = conv_cache.find(hash); 
+        if (it == conv_cache.end()) {
+            auto kernel_prop_map = parse_ffi_dict(kernel_prop, kernel_prop_keys);
+            auto jit_conv_impl = std::make_unique<JITConvImpl<JITKernel>>(
+                std::string(kernel),
+                parse_ffi_dict(forward_config, launch_config_keys),
+                parse_ffi_dict(backward_config, launch_config_keys),
+                parse_ffi_dict(double_backward_config, launch_config_keys),
+                kernel_prop_map);
+            conv_cache.insert({hash,
+                std::make_pair(std::move(jit_conv_impl), 
+                KernelProp(kernel_prop_map, is_convolution))});
+            it = conv_cache.find(hash);
+        }
+        return {it->second.first.get(), it->second.second};
+    }
+}
 
 inline void check_tensor(const ffi::AnyBuffer &buffer, 
                             std::initializer_list<int64_t> expected_shape,
@@ -209,6 +244,7 @@ inline void check_tensor(const ffi::AnyBuffer &buffer,
     }
 }
 
+// --------------------- Tensor Products --------------------------
 ffi::Error tp_forward_impl(
         ffi::AnyBuffer L1_in,
         ffi::AnyBuffer L2_in,
@@ -218,7 +254,7 @@ ffi::Error tp_forward_impl(
         std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
         int64_t hash) {
    
-    auto [jit_kernel, k] = compile_kernel_with_caching(
+    auto [jit_kernel, k] = compile_tp_with_caching(
         kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, false);
     const int64_t num_batch = L1_in.dimensions()[0];
 
@@ -253,7 +289,7 @@ ffi::Error tp_backward_impl(
         std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
         int64_t hash) {
     
-    auto [jit_kernel, k] = compile_kernel_with_caching(
+    auto [jit_kernel, k] = compile_tp_with_caching(
         kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, false);
     const int64_t num_batch = L1_in.dimensions()[0];
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
@@ -303,7 +339,7 @@ ffi::Error tp_double_backward_impl(
         std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
         int64_t hash) {
     
-    auto [jit_kernel, k] = compile_kernel_with_caching(
+    auto [jit_kernel, k] = compile_tp_with_caching(
         kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, false);
     const int64_t num_batch = L1_in.dimensions()[0];
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
@@ -387,12 +423,78 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});
 
+// --------------------- Convolution --------------------------
+ffi::Error conv_forward_impl(
+        ffi::AnyBuffer L1_in,
+        ffi::AnyBuffer L2_in,
+        ffi::AnyBuffer W,
+        ffi::AnyBuffer rows,
+        ffi::AnyBuffer cols,
+        ffi::AnyBuffer workspace,
+        ffi::AnyBuffer transpose_perm,
+        ffi::Result<ffi::AnyBuffer> L3_out,
+        cudaStream_t stream, 
+        std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
+        int64_t hash) {
+   
+    auto [jit_kernel, k] = compile_conv_with_caching(
+        kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, true);
+    const int64_t nnz = rows.dimensions()[0];
+    const int64_t node_count = L1_in.dimensions()[0];
+
+    check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
+    check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
+    check_tensor(workspace, {k.workspace_size}, k.workspace_dtype, "workspace");
+    check_tensor(rows, {nnz}, k.idx_dtype, "rows");
+    check_tensor(cols, {nnz}, k.idx_dtype, "cols");
+
+    if (k.deterministic){
+        check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
+    }
+
+    if (k.shared_weights)
+        check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
+    else 
+        check_tensor(W, {nnz, k.weight_numel}, k.weight_dtype, "W");
+
+    jit_kernel->exec_conv(
+            data_ptr(L1_in),
+            data_ptr(L2_in),
+            data_ptr(W),
+            data_ptr(L3_out),
+            data_ptr(rows),
+            data_ptr(cols),
+            nnz, node_count,
+            data_ptr(workspace),
+            stream);
+
+    return ffi::Error::Success();
+}
+
+XLA_FFI_DEFINE_HANDLER_SYMBOL(
+    conv_forward, conv_forward_impl,
+    ffi::Ffi::Bind()
+        .Arg<ffi::AnyBuffer>()
+        .Arg<ffi::AnyBuffer>()
+        .Arg<ffi::AnyBuffer>()
+        .Arg<ffi::AnyBuffer>()
+        .Arg<ffi::AnyBuffer>()
+        .Arg<ffi::AnyBuffer>()
+        .Arg<ffi::AnyBuffer>()
+        .Ret<ffi::AnyBuffer>()
+        .Ctx<ffi::PlatformStream<cudaStream_t>>()
+        .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
+        .Attr<int64_t>("hash"),
+        {xla::ffi::Traits::kCmdBufferCompatible});
+
 NB_MODULE(openequivariance_extjax, m) {
     m.def("registrations", []() {
         nb::dict registrations;
         registrations["tp_forward"] = nb::capsule(reinterpret_cast<void *>(tp_forward));
         registrations["tp_backward"] = nb::capsule(reinterpret_cast<void *>(tp_backward));
         registrations["tp_double_backward"] = nb::capsule(reinterpret_cast<void *>(tp_double_backward));
+
+        registrations["conv_forward"] = nb::capsule(reinterpret_cast<void *>(conv_forward));
         return registrations;
     });
 
