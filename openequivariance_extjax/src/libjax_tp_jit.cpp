@@ -286,6 +286,61 @@ ffi::Error tp_backward_impl(
     return ffi::Error::Success();
 }
 
+
+ffi::Error tp_double_backward_impl(
+        ffi::AnyBuffer L1_in,
+        ffi::AnyBuffer L2_in,
+        ffi::AnyBuffer W,
+        ffi::AnyBuffer L3_grad,
+        ffi::AnyBuffer L1_dgrad,
+        ffi::AnyBuffer L2_dgrad,
+        ffi::AnyBuffer W_dgrad,
+        ffi::Result<ffi::AnyBuffer> L1_grad,
+        ffi::Result<ffi::AnyBuffer> L2_grad,
+        ffi::Result<ffi::AnyBuffer> W_grad,
+        ffi::Result<ffi::AnyBuffer> L3_dgrad,
+        cudaStream_t stream, 
+        std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
+        int64_t hash) {
+    
+    auto [jit_kernel, k] = compile_kernel_with_caching(
+        kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, false);
+    const int64_t num_batch = L1_in.dimensions()[0];
+    check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
+    check_tensor(L2_in, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_in");
+    check_tensor(L3_grad, {num_batch, k.L3_dim}, k.irrep_dtype, "L3_grad");
+    check_tensor(L1_dgrad, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_dgrad");
+    check_tensor(L2_dgrad, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_dgrad");
+
+    if (k.shared_weights){
+        check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
+        check_tensor(W_dgrad, {k.weight_numel}, k.weight_dtype, "W_dgrad");
+    } else {
+        check_tensor(W, {num_batch, k.weight_numel}, k.weight_dtype, "W");
+        check_tensor(W_dgrad, {num_batch, k.weight_numel}, k.weight_dtype, "W_dgrad");
+    }
+
+    if (k.shared_weights) {
+        zero_buffer(*W_grad);
+    } 
+
+    jit_kernel->double_backward(
+            num_batch,
+            data_ptr(L1_in),
+            data_ptr(L2_in),
+            data_ptr(W),
+            data_ptr(L3_grad),
+            data_ptr(L1_dgrad),
+            data_ptr(L2_dgrad),
+            data_ptr(W_dgrad),
+            data_ptr(L1_grad),
+            data_ptr(L2_grad),
+            data_ptr(W_grad),
+            data_ptr(L3_dgrad),
+            stream);
+    return ffi::Error::Success();
+}
+
 XLA_FFI_DEFINE_HANDLER_SYMBOL(
     tp_forward, tp_forward_impl,
     ffi::Ffi::Bind()
@@ -311,13 +366,33 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Ctx<ffi::PlatformStream<cudaStream_t>>()
         .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
         .Attr<int64_t>("hash"),
-        {xla::ffi::Traits::kCmdBufferCompatible});  // cudaGraph enabled
+        {xla::ffi::Traits::kCmdBufferCompatible});
+
+XLA_FFI_DEFINE_HANDLER_SYMBOL(
+    tp_double_backward, tp_double_backward_impl,
+    ffi::Ffi::Bind()
+        .Arg<ffi::AnyBuffer>()
+        .Arg<ffi::AnyBuffer>()
+        .Arg<ffi::AnyBuffer>()
+        .Arg<ffi::AnyBuffer>()
+        .Arg<ffi::AnyBuffer>()
+        .Arg<ffi::AnyBuffer>()
+        .Arg<ffi::AnyBuffer>()
+        .Ret<ffi::AnyBuffer>()
+        .Ret<ffi::AnyBuffer>()
+        .Ret<ffi::AnyBuffer>()
+        .Ret<ffi::AnyBuffer>()
+        .Ctx<ffi::PlatformStream<cudaStream_t>>()
+        .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
+        .Attr<int64_t>("hash"),
+        {xla::ffi::Traits::kCmdBufferCompatible});
 
 NB_MODULE(openequivariance_extjax, m) {
     m.def("registrations", []() {
         nb::dict registrations;
         registrations["tp_forward"] = nb::capsule(reinterpret_cast<void *>(tp_forward));
         registrations["tp_backward"] = nb::capsule(reinterpret_cast<void *>(tp_backward));
+        registrations["tp_double_backward"] = nb::capsule(reinterpret_cast<void *>(tp_double_backward));
         return registrations;
     });
 
