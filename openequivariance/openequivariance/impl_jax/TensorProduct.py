@@ -77,6 +77,12 @@ class TensorProduct(LoopUnrollTP):
     def forward(self, X, Y, W):
         return forward(X, Y, W, self.L3_dim, self.config.irrep_dtype, self.attrs)
 
+
+def jax_to_torch(x):
+    import numpy as np
+    import torch
+    return torch.tensor(np.asarray(x), requires_grad=True)
+
 if __name__ == "__main__":
     tp_problem = None
     X_ir, Y_ir, Z_ir = Irreps("1x2e"), Irreps("1x3e"), Irreps("1x2e") 
@@ -86,7 +92,7 @@ if __name__ == "__main__":
                         shared_weights=False, 
                         internal_weights=False)
     tensor_product = TensorProduct(problem)
-    batch_size = 1
+    batch_size = 100
 
     X = jax.random.uniform(jax.random.PRNGKey(0), (batch_size, X_ir.dim), dtype=jax.numpy.float32)
     Y = jax.random.uniform(jax.random.PRNGKey(1), (batch_size, Y_ir.dim), dtype=jax.numpy.float32)
@@ -94,20 +100,35 @@ if __name__ == "__main__":
     Z = tensor_product.forward(X, Y, W)
 
     # Test forward jax vjp 
-    ctZ = jnp.ones_like(Z)
+    ctZ = jax.random.uniform(jax.random.PRNGKey(3), Z.shape, dtype=jax.numpy.float32)
     result = jax.vjp(lambda x, y, w: tensor_product.forward(x, y, w), X, Y, W)[1](ctZ)
 
-    print(result)
     print("COMPLETED FORWARD PASS!")
 
-    # Test the double backward pass
-    ddX = jnp.ones_like(X)
-    ddY = jnp.ones_like(Y)
-    ddW = jnp.ones_like(W)
+    ddX = jax.random.uniform(jax.random.PRNGKey(4), X.shape, dtype=jax.numpy.float32)
+    ddY = jax.random.uniform(jax.random.PRNGKey(5), Y.shape, dtype=jax.numpy.float32)
+    ddW = jax.random.uniform(jax.random.PRNGKey(6), W.shape, dtype=jax.numpy.float32)
+
     result_double_backward = jax.vjp(
         lambda x, y, w: jax.vjp(lambda a, b, c: tensor_product.forward(a, b, c), x, y, w)[1](ctZ),
         X, Y, W
     )[1]((ddX, ddY, ddW))
 
-    print(result_double_backward)
-    print("COMPLETED DOUBLE BACKWARD PASS!") 
+    print("COMPLETED DOUBLE BACKWARD PASS!")
+
+    from e3nn import o3 
+    e3nn_tp = o3.TensorProduct(X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False)
+    print(jax_to_torch(W).shape)
+
+    X_t = jax_to_torch(X)
+    Y_t = jax_to_torch(Y)
+    W_t = jax_to_torch(W)
+    Z_t = jax_to_torch(Z)
+    Z_e3nn = e3nn_tp(X_t, Y_t, W_t)
+    print("E3NN RESULT:", (Z_e3nn - Z_t).norm())
+
+    Z_e3nn.backward(jax_to_torch(ctZ))
+    #^^^ Print the norms of the differences in gradients instead
+    print("E3NN GRADS NORM:", (jax_to_torch(result[0]) - X_t.grad).norm(), 
+          (jax_to_torch(result[1]) - Y_t.grad).norm(), 
+          (jax_to_torch(result[2]) - W_t.grad).norm())
