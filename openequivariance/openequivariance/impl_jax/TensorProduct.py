@@ -41,7 +41,7 @@ def backward(X, Y, W, dZ, irrep_dtype, attrs):
 def backward_with_inputs(X, Y, W, dZ, irrep_dtype, attrs):
     return backward(X, Y, W, dZ, irrep_dtype, attrs), (X, Y, W, dZ)
 
-def double_backward(irrep_dtype, attrs, inputs, ddX, ddY, ddW):
+def double_backward(irrep_dtype, attrs, inputs, derivatives):
     double_backward_call = jax.ffi.ffi_call("tp_double_backward",
         (
             jax.ShapeDtypeStruct(inputs[0].shape, irrep_dtype),
@@ -49,14 +49,13 @@ def double_backward(irrep_dtype, attrs, inputs, ddX, ddY, ddW):
             jax.ShapeDtypeStruct(inputs[2].shape, irrep_dtype),
             jax.ShapeDtypeStruct(inputs[3].shape, irrep_dtype),
         ))
-
-    return double_backward_call(*inputs, ddX, ddY, ddW, **attrs)
+    return double_backward_call(*inputs, *derivatives, **attrs)
 
 def backward_autograd(L3_dim, irrep_dtype, attrs, inputs, dZ):
     return backward(inputs[0], inputs[1], inputs[2], dZ, irrep_dtype, attrs) 
 
 forward.defvjp(forward_with_inputs, backward_autograd)
-backward.defvjp(backward_with_inputs, backward_autograd)
+backward.defvjp(backward_with_inputs, double_backward)
 
 class TensorProduct(LoopUnrollTP):
     def __init__(self, config):
@@ -89,17 +88,26 @@ if __name__ == "__main__":
     tensor_product = TensorProduct(problem)
     batch_size = 1
 
-    # Convert the above to JAX Arrays
     X = jax.random.uniform(jax.random.PRNGKey(0), (batch_size, X_ir.dim), dtype=jax.numpy.float32)
     Y = jax.random.uniform(jax.random.PRNGKey(1), (batch_size, Y_ir.dim), dtype=jax.numpy.float32)
     W = jax.random.uniform(jax.random.PRNGKey(2), (batch_size, tensor_product.weight_numel), dtype=jax.numpy.float32)
-
     Z = tensor_product.forward(X, Y, W)
 
-    # Test via jax vjp
-
+    # Test forward jax vjp 
     ctZ = jnp.ones_like(Z)
     result = jax.vjp(lambda x, y, w: tensor_product.forward(x, y, w), X, Y, W)[1](ctZ)
 
     print(result)
-    print("COMPLETE!")
+    print("COMPLETED FORWARD PASS!")
+
+    # Test the double backward pass
+    ddX = jnp.ones_like(X)
+    ddY = jnp.ones_like(Y)
+    ddW = jnp.ones_like(W)
+    result_double_backward = jax.vjp(
+        lambda x, y, w: jax.vjp(lambda a, b, c: tensor_product.forward(a, b, c), x, y, w)[1](ctZ),
+        X, Y, W
+    )[1]((ddX, ddY, ddW))
+
+    print(result_double_backward)
+    print("COMPLETED DOUBLE BACKWARD PASS!") 
