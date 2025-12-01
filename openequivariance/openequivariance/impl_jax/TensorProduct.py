@@ -25,19 +25,38 @@ def forward(X, Y, W, L3_dim, irrep_dtype, attrs):
     return forward_call(X, Y, W, **attrs)
 
 def forward_with_inputs(X, Y, W, L3_dim, irrep_dtype, attrs):
-    return forward(X, Y, W, L3_dim, irrep_dtype, attrs), (X, Y, W) 
+    return forward(X, Y, W, L3_dim, irrep_dtype, attrs), (X, Y, W)
 
-def backward(L3_dim, irrep_dtype, attrs, inputs, dZ):
+@partial(jax.custom_vjp, nondiff_argnums=(4,5))
+def backward(X, Y, W, dZ, irrep_dtype, attrs):
     backward_call = jax.ffi.ffi_call("tp_backward",
+        (
+            jax.ShapeDtypeStruct(X.shape, irrep_dtype),
+            jax.ShapeDtypeStruct(Y.shape, irrep_dtype),
+            jax.ShapeDtypeStruct(W.shape, irrep_dtype),
+        ))
+
+    return backward_call(X, Y, W, dZ, **attrs)
+
+def backward_with_inputs(X, Y, W, dZ, irrep_dtype, attrs):
+    return backward(X, Y, W, dZ, irrep_dtype, attrs), (X, Y, W, dZ)
+
+def double_backward(irrep_dtype, attrs, inputs, ddX, ddY, ddW):
+    double_backward_call = jax.ffi.ffi_call("tp_double_backward",
         (
             jax.ShapeDtypeStruct(inputs[0].shape, irrep_dtype),
             jax.ShapeDtypeStruct(inputs[1].shape, irrep_dtype),
             jax.ShapeDtypeStruct(inputs[2].shape, irrep_dtype),
+            jax.ShapeDtypeStruct(inputs[3].shape, irrep_dtype),
         ))
 
-    return backward_call(*inputs, dZ, **attrs) 
+    return double_backward_call(*inputs, ddX, ddY, ddW, **attrs)
 
-forward.defvjp(forward_with_inputs, backward)
+def backward_autograd(L3_dim, irrep_dtype, attrs, inputs, dZ):
+    return backward(inputs[0], inputs[1], inputs[2], dZ, irrep_dtype, attrs) 
+
+forward.defvjp(forward_with_inputs, backward_autograd)
+backward.defvjp(backward_with_inputs, backward_autograd)
 
 class TensorProduct(LoopUnrollTP):
     def __init__(self, config):
