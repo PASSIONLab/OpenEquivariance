@@ -69,6 +69,12 @@ class TensorProduct(LoopUnrollTP):
     def forward(self, X: jax.ndarray, Y: jax.ndarray, W: jax.ndarray) -> jax.ndarray:
         return forward(X, Y, W, self.L3_dim, self.config.irrep_dtype, self.attrs)
 
+    def __call__(self,
+            X: jax.numpy.ndarray, 
+            Y: jax.numpy.ndarray, 
+            W: jax.numpy.ndarray) -> jax.numpy.ndarray:
+        return self.forward(X, Y, W)
+
 
 def jax_to_torch(x):
     import numpy as np

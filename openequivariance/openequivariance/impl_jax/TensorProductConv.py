@@ -55,7 +55,7 @@ class TensorProductConv(LoopUnrollConv):
         super().__init__(
             config,
             dp, extlib.postprocess_kernel,
-            idx_dtype=np.int32, # Note: this is distinct from PyTorch 
+            idx_dtype=np.int32, # N.B. this is distinct from the PyTorch version 
             torch_op=False,
             deterministic=deterministic,
             kahan=kahan
@@ -99,6 +99,15 @@ class TensorProductConv(LoopUnrollConv):
             self.L3_dim, 
             self.config.irrep_dtype, 
             self.attrs)
+    
+    def __call__(self,
+            X: jax.numpy.ndarray, 
+            Y: jax.numpy.ndarray, 
+            W: jax.numpy.ndarray, 
+            rows: jax.numpy.ndarray, 
+            cols: jax.numpy.ndarray, 
+            sender_perm: Optional[jax.numpy.ndarray] = None) -> jax.numpy.ndarray:
+        return self.forward(X, Y, W, rows, cols, sender_perm)
 
 if __name__=="__main__":
     X_ir, Y_ir, Z_ir = Irreps("1x2e"), Irreps("1x3e"), Irreps("1x2e") 
