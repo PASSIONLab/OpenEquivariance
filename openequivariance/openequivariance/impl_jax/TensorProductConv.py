@@ -13,6 +13,15 @@ import jax.numpy as jnp
 from openequivariance.benchmark.logging_utils import getLogger
 logger = getLogger()
 
+@partial(jax.custom_vjp, nondiff_argnums=(3,4,5,6,7,8,9))
+def forward(X, Y, W, rows, cols, sender_perm, workspace, L3_dim, irrep_dtype, attrs):
+    forward_call = jax.ffi.ffi_call("conv_forward", 
+        jax.ShapeDtypeStruct((X.shape[0], L3_dim), irrep_dtype))
+    return forward_call(X, Y, W, rows, cols, sender_perm, workspace, **attrs)
+
+def forward_with_inputs(X, Y, W, rows, cols, sender_perm, workspace, L3_dim, irrep_dtype, attrs):
+    return forward(X, Y, W, rows, cols, sender_perm, workspace, L3_dim, irrep_dtype, attrs), (X, Y, W, rows, cols, sender_perm, workspace)
+
 class TensorProductConv(LoopUnrollConv):
     def __init__(self, config: TPProblem, deterministic: bool = False, kahan: bool = False):
         dp = extlib.DeviceProp(0)
@@ -50,7 +59,19 @@ class TensorProductConv(LoopUnrollConv):
             rows: jax.ndarray, 
             cols: jax.ndarray, 
             sender_perm: Optional[jax.ndarray] = None) -> jax.ndarray:
-        pass 
+        
+        if self.deterministic:
+            sender_perm = self.dummy_transpose_perm
+        else:
+            assert sender_perm is not None, "Must provide sender_perm for non-deterministic convolutions." 
+
+        return forward(
+            X, Y, W, 
+            rows, cols, sender_perm, 
+            self.workspace,
+            self.L3_dim, 
+            self.config.irrep_dtype, 
+            self.attrs)
 
 if __name__=="__main__":
     X_ir, Y_ir, Z_ir = Irreps("1x2e"), Irreps("1x3e"), Irreps("1x2e") 
