@@ -82,4 +82,14 @@ if __name__=="__main__":
                         internal_weights=False)
 
     conv = TensorProductConv(problem, deterministic=False, kahan=False)
+
+    node_ct, nonzero_ct = 3, 4
+    X = jax.random.uniform(jax.random.PRNGKey(0), (node_ct, X_ir.dim), dtype=jax.numpy.float32)
+    Y = jax.random.uniform(jax.random.PRNGKey(1), (nonzero_ct, Y_ir.dim), dtype=jax.numpy.float32)
+    W = jax.random.uniform(jax.random.PRNGKey(2), (nonzero_ct, conv.weight_numel), dtype=jax.numpy.float32)
+    rows = jnp.array([0, 1, 1, 2], dtype=jnp.int32)
+    cols = jnp.array([1, 0, 2, 1], dtype=jnp.int32)
+    Z = conv.forward(X, Y, W, rows, cols)
+    print("Z:", Z)
+
     print("COMPLETE!")
