@@ -1,6 +1,10 @@
 import jax
+import hashlib
 
 def postprocess_kernel(kernel):
+    '''
+    Only CUDA for now, so no postprocessing.
+    '''
     return kernel
 
 import openequivariance_extjax as oeq_extjax 
