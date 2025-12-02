@@ -50,7 +50,7 @@ forward.defvjp(forward_with_inputs, backward_autograd)
 backward.defvjp(backward_with_inputs, double_backward)
 
 class TensorProduct(LoopUnrollTP):
-    def __init__(self, config):
+    def __init__(self, config: TPProblem):
         dp = extlib.DeviceProp(0)
         super().__init__(config, dp, extlib.postprocess_kernel, torch_op=False)
 
@@ -66,7 +66,7 @@ class TensorProduct(LoopUnrollTP):
         self.weight_numel = config.weight_numel
         self.L3_dim = self.config.irreps_out.dim
 
-    def forward(self, X, Y, W):
+    def forward(self, X: jax.ndarray, Y: jax.ndarray, W: jax.ndarray) -> jax.ndarray:
         return forward(X, Y, W, self.L3_dim, self.config.irrep_dtype, self.attrs)
 
 

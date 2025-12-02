@@ -1,5 +1,6 @@
 import numpy as np
 from functools import partial
+from typing import Optional
 from openequivariance.impl_jax import extlib
 
 from openequivariance.core.e3nn_lite import TPProblem, Irreps
@@ -13,13 +14,12 @@ from openequivariance.benchmark.logging_utils import getLogger
 logger = getLogger()
 
 class TensorProductConv(LoopUnrollConv):
-    def __init__(self, config, deterministic=False, kahan=False):
+    def __init__(self, config: TPProblem, deterministic: bool = False, kahan: bool = False):
         dp = extlib.DeviceProp(0)
         super().__init__(
-            self,
-            config, 
+            config,
             dp, extlib.postprocess_kernel,
-            idx_dtype=np.int64,
+            idx_dtype=np.int32, # Note: this is distinct from PyTorch 
             torch_op=False,
             deterministic=deterministic,
             kahan=kahan
@@ -30,7 +30,7 @@ class TensorProductConv(LoopUnrollConv):
             "forward_config": vars(self.forward_schedule.launch_config),
             "backward_config": vars(self.backward_schedule.launch_config),
             "double_backward_config": vars(self.double_backward_schedule.launch_config),
-            "kernel_prop": self.kernelProp
+            "kernel_prop": self.kernel_prop
         }
         hash_attributes(self.attrs)
  
@@ -39,8 +39,18 @@ class TensorProductConv(LoopUnrollConv):
 
         self.workspace = jnp.zeros((self.workspace_size,), dtype=jnp.uint8)
         logger.info(f"Convolution requires {self.workspace_size // (2 ** 20)}MB of workspace.")
-        self.dummy_transpose_perm = jnp.zeros((1,), dtype=jnp.int64)
+        self.dummy_transpose_perm = jnp.zeros((1,), dtype=jnp.int32)
 
+
+    def forward(
+            self,
+            X: jax.ndarray, 
+            Y: jax.ndarray, 
+            W: jax.ndarray, 
+            rows: jax.ndarray, 
+            cols: jax.ndarray, 
+            sender_perm: Optional[jax.ndarray] = None) -> jax.ndarray:
+        pass 
 
 if __name__=="__main__":
     X_ir, Y_ir, Z_ir = Irreps("1x2e"), Irreps("1x3e"), Irreps("1x2e") 
