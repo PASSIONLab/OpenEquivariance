@@ -14,13 +14,13 @@ from openequivariance.benchmark.logging_utils import getLogger
 logger = getLogger()
 
 #@partial(jax.custom_vjp, nondiff_argnums=(3,4,5,6,7,8,9))
-def forward(X, Y, W, rows, cols, sender_perm, workspace, L3_dim, irrep_dtype, attrs):
+def forward(X, Y, W, rows, cols, workspace, sender_perm, L3_dim, irrep_dtype, attrs):
     forward_call = jax.ffi.ffi_call("conv_forward", 
         jax.ShapeDtypeStruct((X.shape[0], L3_dim), irrep_dtype))
-    return forward_call(X, Y, W, rows, cols, sender_perm, workspace, **attrs)
+    return forward_call(X, Y, W, rows, cols, workspace, sender_perm, **attrs)
 
-def forward_with_inputs(X, Y, W, rows, cols, sender_perm, workspace, L3_dim, irrep_dtype, attrs):
-    return forward(X, Y, W, rows, cols, sender_perm, workspace, L3_dim, irrep_dtype, attrs), (X, Y, W, rows, cols, sender_perm, workspace)
+def forward_with_inputs(X, Y, W, rows, cols, workspace, sender_perm, L3_dim, irrep_dtype, attrs):
+    return forward(X, Y, W, rows, cols, workspace, sender_perm, L3_dim, irrep_dtype, attrs), (X, Y, W, rows, cols, sender_perm, workspace)
 
 class TensorProductConv(LoopUnrollConv):
     def __init__(self, config: TPProblem, deterministic: bool = False, kahan: bool = False):
@@ -67,8 +67,9 @@ class TensorProductConv(LoopUnrollConv):
 
         return forward(
             X, Y, W, 
-            rows, cols, sender_perm, 
+            rows, cols, 
             self.workspace,
+            sender_perm,
             self.L3_dim, 
             self.config.irrep_dtype, 
             self.attrs)

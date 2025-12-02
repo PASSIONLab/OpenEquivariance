@@ -46,26 +46,20 @@ xla::ffi::DataType enum_to_xla_dtype(int64_t i){
 }
 
 inline void* data_ptr(ffi::AnyBuffer &buffer) {
-    switch (buffer.element_type()) {
-        case xla::ffi::DataType::F32:
-            return reinterpret_cast<void*>(buffer.typed_data<float>());
-        case xla::ffi::DataType::F64:
-            return reinterpret_cast<void*>(buffer.typed_data<double>());
-        case xla::ffi::DataType::S64:
-            return reinterpret_cast<void*>(buffer.typed_data<int64_t>());
-        case xla::ffi::DataType::U8:
-            return reinterpret_cast<void*>(buffer.typed_data<uint8_t>());
-        default:
-            throw logic_error("Unsupported tensor datatype!");
-    }
+    return buffer.untyped_data();
+}
+
+inline void* data_ptr(ffi::Result<ffi::AnyBuffer> &buffer) {
+    return data_ptr(*buffer);
 }
 
 inline int byte_count(ffi::AnyBuffer &buffer) {
     switch (buffer.element_type()) {
+        case xla::ffi::DataType::U32:
+        case xla::ffi::DataType::S32:
         case xla::ffi::DataType::F32:
             return 4;
         case xla::ffi::DataType::F64:
-            return 8;
         case xla::ffi::DataType::S64:
             return 8;
         case xla::ffi::DataType::U8:
@@ -73,10 +67,6 @@ inline int byte_count(ffi::AnyBuffer &buffer) {
         default:
             throw logic_error("Unsupported tensor datatype!");
     }
-}
-
-inline void* data_ptr(ffi::Result<ffi::AnyBuffer> &buffer) {
-    return data_ptr(*buffer);
 }
 
 #ifdef CUDA_BACKEND
@@ -245,7 +235,9 @@ inline void check_tensor(const ffi::AnyBuffer &buffer,
     }
 
     if (buffer.element_type() != expected_dtype) {
-        throw std::logic_error("Datatype mismatch for tensor " + tensor_name);
+        throw std::logic_error("Datatype mismatch for tensor " + tensor_name +
+            ". Expected datatype " + std::to_string(static_cast<int64_t>(expected_dtype)) +
+            ", got " + std::to_string(static_cast<int64_t>(buffer.element_type())));
     }
 }
 
