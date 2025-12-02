@@ -30,8 +30,8 @@ def backward(X, Y, W, dZ, rows, cols, workspace, sender_perm, irrep_dtype, attrs
          jax.ShapeDtypeStruct(W.shape, irrep_dtype)))
     return backward_call(X, Y, W, dZ, rows, cols, workspace, sender_perm, **attrs)
 
-def backward_with_inputs(X, Y, W, dZ, rows, cols, workspace, sender_perm, L3_dim, irrep_dtype, attrs):
-    return backward(X, Y, W, dZ, rows, cols, workspace, sender_perm, L3_dim, irrep_dtype, attrs), (X, Y, W, dZ, rows, cols, sender_perm, workspace)
+def backward_with_inputs(X, Y, W, dZ, rows, cols, workspace, sender_perm, irrep_dtype, attrs):
+    return backward(X, Y, W, dZ, rows, cols, workspace, sender_perm, irrep_dtype, attrs), (X, Y, W, dZ) #rows, cols, sender_perm, workspace)
 
 def double_backward(rows, cols, workspace, sender_perm, irrep_dtype, attrs, inputs, derivatives):
     double_backward_call = jax.ffi.ffi_call("conv_double_backward",
@@ -109,23 +109,3 @@ class TensorProductConv(LoopUnrollConv):
             sender_perm: Optional[jax.numpy.ndarray] = None) -> jax.numpy.ndarray:
         return self.forward(X, Y, W, rows, cols, sender_perm)
 
-if __name__=="__main__":
-    X_ir, Y_ir, Z_ir = Irreps("1x2e"), Irreps("1x3e"), Irreps("1x2e") 
-    instructions=[(0, 0, 0, "uvu", True)]
-    problem = TPProblem(X_ir, Y_ir, Z_ir, 
-                        instructions, 
-                        shared_weights=False, 
-                        internal_weights=False)
-
-    conv = TensorProductConv(problem, deterministic=False, kahan=False)
-
-    node_ct, nonzero_ct = 3, 4
-    X = jax.random.uniform(jax.random.PRNGKey(0), (node_ct, X_ir.dim), dtype=jax.numpy.float32)
-    Y = jax.random.uniform(jax.random.PRNGKey(1), (nonzero_ct, Y_ir.dim), dtype=jax.numpy.float32)
-    W = jax.random.uniform(jax.random.PRNGKey(2), (nonzero_ct, conv.weight_numel), dtype=jax.numpy.float32)
-    rows = jnp.array([0, 1, 1, 2], dtype=jnp.int32)
-    cols = jnp.array([1, 0, 2, 1], dtype=jnp.int32)
-    Z = conv.forward(X, Y, W, rows, cols)
-    print("Z:", Z)
-
-    print("COMPLETE!")
