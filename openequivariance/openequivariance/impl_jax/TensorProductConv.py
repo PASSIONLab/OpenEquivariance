@@ -13,7 +13,7 @@ import jax.numpy as jnp
 from openequivariance.benchmark.logging_utils import getLogger
 logger = getLogger()
 
-@partial(jax.custom_vjp, nondiff_argnums=(3,4,5,6,7,8,9))
+#@partial(jax.custom_vjp, nondiff_argnums=(3,4,5,6,7,8,9))
 def forward(X, Y, W, rows, cols, sender_perm, workspace, L3_dim, irrep_dtype, attrs):
     forward_call = jax.ffi.ffi_call("conv_forward", 
         jax.ShapeDtypeStruct((X.shape[0], L3_dim), irrep_dtype))
@@ -53,17 +53,17 @@ class TensorProductConv(LoopUnrollConv):
 
     def forward(
             self,
-            X: jax.ndarray, 
-            Y: jax.ndarray, 
-            W: jax.ndarray, 
-            rows: jax.ndarray, 
-            cols: jax.ndarray, 
-            sender_perm: Optional[jax.ndarray] = None) -> jax.ndarray:
+            X: jax.numpy.ndarray, 
+            Y: jax.numpy.ndarray, 
+            W: jax.numpy.ndarray, 
+            rows: jax.numpy.ndarray, 
+            cols: jax.numpy.ndarray, 
+            sender_perm: Optional[jax.numpy.ndarray] = None) -> jax.numpy.ndarray:
         
-        if self.deterministic:
+        if not self.deterministic:
             sender_perm = self.dummy_transpose_perm
         else:
-            assert sender_perm is not None, "Must provide sender_perm for non-deterministic convolutions." 
+            assert sender_perm is not None, "Must provide sender_perm for deterministic convolutions." 
 
         return forward(
             X, Y, W, 

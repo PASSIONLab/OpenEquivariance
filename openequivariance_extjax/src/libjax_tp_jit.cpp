@@ -144,7 +144,12 @@ std::vector<std::string> kernel_prop_keys = {
     "shared_weights", 
     "opt_level", 
     "irrep_dtype", 
-    "weight_dtype"};
+    "weight_dtype",
+
+    // Convolution only
+    "workspace_size",
+    "deterministic",
+    "idx_dtype"};
 
 std::unordered_map<string, int64_t> parse_ffi_dict(ffi::Dictionary &dict, const std::vector<string> &keys) {
     std::unordered_map<string, int64_t> result;
@@ -240,7 +245,7 @@ inline void check_tensor(const ffi::AnyBuffer &buffer,
     }
 
     if (buffer.element_type() != expected_dtype) {
-        throw std::logic_error("Datatype mismatch.");
+        throw std::logic_error("Datatype mismatch for tensor " + tensor_name);
     }
 }
 

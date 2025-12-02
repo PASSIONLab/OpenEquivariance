@@ -99,6 +99,11 @@ class LoopUnrollTP(TensorProductBase):
             "opt_level": 3,
             "irrep_dtype": dtype_to_enum[self.config.irrep_dtype],
             "weight_dtype": dtype_to_enum[self.config.weight_dtype],
+
+            # Not relevant, included for compatibility with convolution 
+            "workspace_size": 0,
+            "deterministic": 1,
+            "idx_dtype": 0
         }
 
 
