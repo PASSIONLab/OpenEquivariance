@@ -4,7 +4,11 @@ import numpy as np
 import torch
 
 import openequivariance.impl_torch.extlib as extlib
-from openequivariance.impl_torch.extlib import JITConvImpl, postprocess_kernel, DeviceProp
+from openequivariance.impl_torch.extlib import (
+    JITConvImpl,
+    postprocess_kernel,
+    DeviceProp,
+)
 
 from openequivariance.core.ConvolutionBase import (
     ConvolutionBase,
@@ -14,9 +18,12 @@ from openequivariance.core.LoopUnrollConv import LoopUnrollConv
 from openequivariance.impl_torch.TensorProduct import TensorProduct
 from openequivariance import TPProblem
 from openequivariance.core.utils import torch_to_oeq_dtype
+from openequivariance.core.dtype_enum import enum_to_torch_dtype
 
 from openequivariance.benchmark.logging_utils import getLogger
+
 logger = getLogger()
+
 
 class TensorProductConv(torch.nn.Module, LoopUnrollConv):
     r"""
@@ -62,11 +69,12 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
         self._init_class()
 
     def _init_class(self):
-        dp = extlib.DeviceProp(0)
+        dp = DeviceProp(0)
         LoopUnrollConv.__init__(
             self,
             self.input_args["problem"],
-            dp, postprocess_kernel,
+            dp,
+            postprocess_kernel,
             idx_dtype=np.int64,
             torch_op=self.input_args["torch_op"],
             deterministic=self.input_args["deterministic"],
@@ -85,7 +93,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
             vars(self.forward_schedule.launch_config),
             vars(self.backward_schedule.launch_config),
             vars(self.double_backward_schedule.launch_config),
-            self.kernel_prop
+            self.kernel_prop,
         )
         logger.info("Kernel compiled!")
 

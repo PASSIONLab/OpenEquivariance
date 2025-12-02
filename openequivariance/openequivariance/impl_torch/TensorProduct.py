@@ -8,6 +8,7 @@ from openequivariance.benchmark.logging_utils import getLogger
 
 logger = getLogger()
 
+
 class TensorProduct(torch.nn.Module, LoopUnrollTP):
     r"""
     Drop-in replacement for ``o3.TensorProduct`` from e3nn. Supports forward,
@@ -33,7 +34,11 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
     def _init_class(self):
         dp = extlib.DeviceProp(0)
         LoopUnrollTP.__init__(
-            self, self.input_args["problem"], dp, extlib.postprocess_kernel, self.input_args["torch_op"]
+            self,
+            self.input_args["problem"],
+            dp,
+            extlib.postprocess_kernel,
+            self.input_args["torch_op"],
         )
 
         internal_cls = None
@@ -48,7 +53,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
             vars(self.forward_schedule.launch_config),
             vars(self.backward_schedule.launch_config),
             vars(self.double_backward_schedule.launch_config),
-            self.kernelProp
+            self.kernelProp,
         )
         logger.info("Kernel compiled!")
         logger.info(f"Kernel File Size: {len(self.jit_kernel) // 1024} KB")
@@ -338,6 +343,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
     @staticmethod
     def name():
         return "LoopUnrollTP"
+
 
 if extlib.TORCH_COMPILE:
     TensorProduct.register_torch_fakes()

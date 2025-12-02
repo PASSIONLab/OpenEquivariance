@@ -562,6 +562,7 @@ class ConvolutionBase:
 
         if reference_implementation is None:
             from openequivariance.impl_torch.E3NNConv import E3NNConv
+
             reference_implementation = E3NNConv
 
         reference_problem = self.config

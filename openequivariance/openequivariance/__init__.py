@@ -17,6 +17,7 @@ from openequivariance.impl_torch.TensorProduct import TensorProduct
 from openequivariance.impl_torch.TensorProductConv import (
     TensorProductConv,
 )
+from openequivariance.impl_torch.extlib import torch_ext_so_path
 from openequivariance.core.utils import torch_to_oeq_dtype
 
 __version__ = None
@@ -37,19 +38,12 @@ def _check_package_editable():
 _editable_install_output_path = Path(__file__).parent.parent.parent / "outputs"
 
 
-def torch_ext_so_path():
-    """
-    :returns: Path to a ``.so`` file that must be linked to use OpenEquivariance
-              from the PyTorch C++ Interface.
-    """
-    return openequivariance.impl_torch.extlib.torch_module.__file__
-
-
 def extension_source_path():
     """
     :returns: Path to the source code of the C++ extension.
     """
     return str(Path(__file__).parent / "extension")
+
 
 torch.serialization.add_safe_globals(
     [

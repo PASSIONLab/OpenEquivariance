@@ -10,11 +10,13 @@ from openequivariance.core.dtype_enum import dtype_to_enum
 from openequivariance.templates.jinja_utils import get_jinja_environment
 from openequivariance.core.utils import filter_and_analyze_problem
 
+
 class LoopUnrollConv(ConvolutionBase):
     def __init__(
         self,
         config,
-        dp, postprocess_kernel,
+        dp,
+        postprocess_kernel,
         *,
         idx_dtype: type[np.generic] = np.int64,
         torch_op: bool = False,

@@ -10,6 +10,7 @@ import tempfile
 import hashlib
 from openequivariance.impl_torch.extlib import GPUTimer
 
+
 def sparse_outer_product_work(cg: np.ndarray) -> int:
     return np.sum(np.max(cg != 0, axis=2))
 

@@ -40,6 +40,7 @@ except Exception as e:
 generic_module = None
 if not build_ext:
     import openequivariance.impl_torch.extlib.generic_module
+
     generic_module = openequivariance.impl_torch.extlib.generic_module
 
 elif TORCH_VERSION_CUDA_OR_HIP:
@@ -138,6 +139,14 @@ def _raise_import_error_helper(import_target: str):
         raise ImportError(
             f"Could not import {import_target}: OpenEquivariance's torch extension was not built because torch.version.cuda || torch.version.hip is false"
         )
+
+
+def torch_ext_so_path():
+    """
+    :returns: Path to a ``.so`` file that must be linked to use OpenEquivariance
+              from the PyTorch C++ Interface.
+    """
+    return torch_module.__file__
 
 
 if TORCH_VERSION_CUDA_OR_HIP:

@@ -8,6 +8,7 @@ from openequivariance.core.ConvolutionBase import (
     scatter_add_wrapper,
 )
 
+
 class CUEConv(ConvolutionBase):
     def __init__(self, config, *, idx_dtype=np.int64, torch_op=True):
         super().__init__(config, idx_dtype=idx_dtype, torch_op=torch_op)

@@ -10,6 +10,7 @@ from openequivariance.core.utils import (
     count_cg_non_zero,
 )
 
+
 class LoopUnrollTP(TensorProductBase):
     def __init__(self, config, dp, postprocess_kernel, torch_op):
         super().__init__(config, torch_op=torch_op)
@@ -99,13 +100,11 @@ class LoopUnrollTP(TensorProductBase):
             "opt_level": 3,
             "irrep_dtype": dtype_to_enum[self.config.irrep_dtype],
             "weight_dtype": dtype_to_enum[self.config.weight_dtype],
-
-            # Not relevant, included for compatibility with convolution 
+            # Not relevant, included for compatibility with convolution
             "workspace_size": 0,
             "deterministic": 1,
-            "idx_dtype": 0
+            "idx_dtype": 0,
         }
-
 
     def calculate_flops_forward(self, batch_size: int) -> dict:
         if self.is_uvw:
