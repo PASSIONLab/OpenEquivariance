@@ -1,4 +1,5 @@
 import jax
+import numpy as np
 from functools import partial
 from openequivariance.impl_jax import extlib
 from openequivariance.core.e3nn_lite import TPProblem
@@ -74,10 +75,24 @@ class TensorProduct(LoopUnrollTP):
         self.weight_numel = config.weight_numel
         self.L3_dim = self.config.irreps_out.dim
 
-    def forward(self, X: jax.ndarray, Y: jax.ndarray, W: jax.ndarray) -> jax.ndarray:
+    def forward(self, X: jax.numpy.ndarray, Y: jax.numpy.ndarray, W: jax.numpy.ndarray) -> jax.numpy.ndarray:
         return forward(X, Y, W, self.L3_dim, self.config.irrep_dtype, self.attrs)
 
     def __call__(
         self, X: jax.numpy.ndarray, Y: jax.numpy.ndarray, W: jax.numpy.ndarray
     ) -> jax.numpy.ndarray:
         return self.forward(X, Y, W)
+    
+    def forward_cpu(
+        self,
+        L1_in: np.ndarray,
+        L2_in: np.ndarray,
+        L3_out: np.ndarray,
+        weights: np.ndarray,
+    ) -> None:
+        result = self.forward(
+            jax.numpy.asarray(L1_in),
+            jax.numpy.asarray(L2_in),
+            jax.numpy.asarray(weights),
+        )
+        L3_out[:] = np.asarray(result)

@@ -2,8 +2,8 @@ import pytest
 from pytest_check import check
 
 import numpy as np
+import openequivariance
 import openequivariance as oeq
-from openequivariance.impl_torch.TensorProduct import TensorProduct
 from openequivariance.benchmark.correctness_utils import (
     correctness_forward,
     correctness_backward,
@@ -18,7 +18,6 @@ from openequivariance.benchmark.problems import (
 )
 from itertools import product
 import torch
-
 
 class TPCorrectness:
     def thresh(self, direction):
@@ -41,8 +40,16 @@ class TPCorrectness:
         return {}
 
     @pytest.fixture(scope="class")
-    def tp_and_problem(self, problem, extra_tp_constructor_args):
-        tp = TensorProduct(problem, **extra_tp_constructor_args)
+    def test_jax(self, request):
+        return request.config.getoption("--jax")
+
+    @pytest.fixture(scope="class")
+    def tp_and_problem(self, problem, extra_tp_constructor_args, test_jax):
+        cls = oeq.TensorProduct 
+        if test_jax:
+            import openequivariance.impl_jax.TensorProduct as jax_tp
+            cls = jax_tp
+        tp = cls(problem, **extra_tp_constructor_args)
         return tp, problem
 
     def test_tp_fwd(self, tp_and_problem):
