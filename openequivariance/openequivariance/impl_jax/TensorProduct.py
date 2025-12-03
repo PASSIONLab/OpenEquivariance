@@ -107,5 +107,3 @@ class TensorProduct(LoopUnrollTP):
         L2_grad[:] = np.asarray(L2_grad_jax)
         weights_grad[:] = np.asarray(weights_grad_jax)
 
-
-

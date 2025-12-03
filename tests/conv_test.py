@@ -4,6 +4,7 @@ import urllib
 from pytest_check import check
 
 import numpy as np
+import openequivariance
 import openequivariance as oeq
 from openequivariance.benchmark.ConvBenchmarkSuite import load_graph
 from itertools import product
@@ -51,15 +52,24 @@ class ConvCorrectness:
     def extra_conv_constructor_args(self):
         return {}
 
+    @pytest.fixture(scope="class")
+    def test_jax(self, request):
+        return request.config.getoption("--jax")
+
     @pytest.fixture(params=["atomic", "deterministic", "kahan"], scope="class")
-    def conv_object(self, request, problem, extra_conv_constructor_args):
+    def conv_object(self, request, problem, extra_conv_constructor_args, test_jax):
+        cls = oeq.TensorProductConv
+        if test_jax:
+            from openequivariance.impl_jax import TensorProductConv as jax_conv
+            cls = jax_conv
+
         if request.param == "atomic":
-            return oeq.TensorProductConv(
+            return cls(
                 problem, deterministic=False, **extra_conv_constructor_args
             )
         elif request.param == "deterministic":
             if not problem.shared_weights:
-                return oeq.TensorProductConv(
+                return cls(
                     problem, deterministic=True, **extra_conv_constructor_args
                 )
             else:
@@ -67,7 +77,7 @@ class ConvCorrectness:
         elif request.param == "kahan":
             if problem.irrep_dtype == np.float32:
                 if not problem.shared_weights:
-                    return oeq.TensorProductConv(
+                    return cls(
                         problem,
                         deterministic=True,
                         kahan=True,

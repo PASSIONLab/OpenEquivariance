@@ -162,3 +162,52 @@ class TensorProductConv(LoopUnrollConv):
         sender_perm: Optional[jax.numpy.ndarray] = None,
     ) -> jax.numpy.ndarray:
         return self.forward(X, Y, W, rows, cols, sender_perm)
+
+    def forward_cpu(self, L1_in, L2_in, weights, L3_out, graph):
+        rows = graph.rows.astype(np.int32)
+        cols = graph.cols.astype(np.int32)
+        sender_perm = graph.transpose_perm.astype(np.int32)
+        result = self.forward(
+            jax.numpy.asarray(L1_in),
+            jax.numpy.asarray(L2_in),
+            jax.numpy.asarray(weights),
+            jax.numpy.asarray(rows),
+            jax.numpy.asarray(cols),
+            jax.numpy.asarray(sender_perm),
+        )
+        L3_out[:] = np.asarray(result)
+
+    def backward_cpu(
+        self,
+        L1_in,
+        L1_grad,
+        L2_in,
+        L2_grad,
+        L3_grad,
+        weights,
+        weights_grad,
+        graph,
+    ):
+        rows = graph.rows.astype(np.int32)
+        cols = graph.cols.astype(np.int32)
+        sender_perm = graph.transpose_perm.astype(np.int32)
+
+        backward_fn = jax.vjp(
+            lambda X, Y, W: self.forward(
+                X,
+                Y,
+                W,
+                jax.numpy.asarray(rows),
+                jax.numpy.asarray(cols),
+                jax.numpy.asarray(sender_perm),
+            ),
+            jax.numpy.asarray(L1_in),
+            jax.numpy.asarray(L2_in),
+            jax.numpy.asarray(weights),
+        )[1]
+        L1_grad_jax, L2_grad_jax, weights_grad_jax = backward_fn(
+            jax.numpy.asarray(L3_grad)
+        )
+        L1_grad[:] = np.asarray(L1_grad_jax)
+        L2_grad[:] = np.asarray(L2_grad_jax)
+        weights_grad[:] = np.asarray(weights_grad_jax)
