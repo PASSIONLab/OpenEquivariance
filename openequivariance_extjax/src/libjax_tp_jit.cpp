@@ -448,6 +448,9 @@ ffi::Error conv_forward_impl(
     if (k.deterministic){
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
     }
+    else {
+        zero_buffer(*L3_out);
+    }
 
     if (k.shared_weights)
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
@@ -495,9 +498,13 @@ ffi::Error conv_backward_impl(
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
-    if (k.deterministic)
+    if (k.deterministic) {
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
-    
+    }
+    else {
+        zero_buffer(*L1_grad);
+    }   
+
     if (k.shared_weights) {
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
         check_tensor(*W_grad, {k.weight_numel}, k.weight_dtype, "W_grad");
@@ -559,8 +566,13 @@ ffi::Error conv_double_backward_impl(
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
-    if (k.deterministic)
+    if (k.deterministic) {
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
+    }
+    else {
+        zero_buffer(*L1_grad);
+        zero_buffer(*L3_dgrad);
+    }
     
     if (k.shared_weights) {
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
@@ -571,6 +583,7 @@ ffi::Error conv_double_backward_impl(
     }
     if(k.shared_weights)
         zero_buffer(*W_grad);
+
     jit_kernel->double_backward(
             data_ptr(L1_in),
             data_ptr(L2_in),
