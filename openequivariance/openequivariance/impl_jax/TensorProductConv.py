@@ -174,6 +174,7 @@ class TensorProductConv(LoopUnrollConv):
         rows = graph.rows.astype(np.int32)
         cols = graph.cols.astype(np.int32)
         sender_perm = graph.transpose_perm.astype(np.int32)
+        weights = self.reorder_weights_from_e3nn(weights, has_batch_dim=not self.config.shared_weights)
         result = self.forward(
             jax.numpy.asarray(L1_in),
             jax.numpy.asarray(L2_in),
@@ -198,6 +199,7 @@ class TensorProductConv(LoopUnrollConv):
         rows = graph.rows.astype(np.int32)
         cols = graph.cols.astype(np.int32)
         sender_perm = graph.transpose_perm.astype(np.int32)
+        weights = self.reorder_weights_from_e3nn(weights, has_batch_dim=not self.config.shared_weights)
 
         backward_fn = jax.vjp(
             lambda X, Y, W: self.forward(
@@ -218,3 +220,4 @@ class TensorProductConv(LoopUnrollConv):
         L1_grad[:] = np.asarray(L1_grad_jax)
         L2_grad[:] = np.asarray(L2_grad_jax)
         weights_grad[:] = np.asarray(weights_grad_jax)
+        weights_grad[:] = self.reorder_weights_to_e3nn(weights_grad, has_batch_dim=not self.config.shared_weights)
