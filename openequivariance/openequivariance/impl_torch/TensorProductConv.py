@@ -19,6 +19,7 @@ from openequivariance.impl_torch.TensorProduct import TensorProduct
 from openequivariance import TPProblem
 from openequivariance.core.utils import torch_to_oeq_dtype
 from openequivariance.core.dtype_enum import enum_to_torch_dtype
+from openequivariance.impl_torch.utils import reorder_torch
 
 from openequivariance.benchmark.logging_utils import getLogger
 
@@ -418,10 +419,10 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv):
         )
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
-        return self.forward_schedule.reorder_weights_from_e3nn(weights, has_batch_dim)
+        return reorder_torch(self.forward_schedule, weights, "forward", not self.config.shared_weights)
 
     def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
-        return self.forward_schedule.reorder_weights_to_e3nn(weights, has_batch_dim)
+        return reorder_torch(self.forward_schedule, weights, "backward", not self.config.shared_weights)
 
     @staticmethod
     def name():

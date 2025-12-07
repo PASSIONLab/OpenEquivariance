@@ -619,40 +619,33 @@ class ComputationSchedule:
             smem=self.memory_per_warp * warps_per_block,
         )
 
-    def reorder_weights(self, weights_in, direction, has_batch_dim):
+    def weight_reordering_info(self, weights_in, has_batch_dim):
         """
-        Reorders weights from the canonical e3nn form to the
-        form that LoopUnrollTP can ingest. Can also reorder the parameters
-        of a dense neural network layer that produces the weight matrix.
-
-        If has_batch_dim is true, the first dimension of the input weight matrix
-        is treated as the batch dimension.
+        Calculates all shapes, slices, and permutation info to reorder
+        weights. 
         """
-        import torch  # TODO-someday: no need to specialize this to PyTorch
+        batch_dim = weights_in.shape[0]
+        reorder_specs = []
 
-        weights_out = torch.zeros_like(weights_in)
-        assert direction in ["forward", "backward"]
         for i, child_inst in enumerate(self.problem_splitter.new_instructions):
             parent_start, parent_end = (
                 child_inst.parent_weights_start,
                 child_inst.parent_weights_end,
             )
             parent_shape = list(child_inst.parent_weights_shape)
+            parent_range = [slice(parent_start, parent_end)]
 
             child_start, child_end, child_shape = (
                 self.updated_config.weight_range_and_shape_for_instruction(i)
             )
-
-            parent_range, child_range = (
-                [slice(parent_start, parent_end)],
-                [slice(child_start, child_end)],
-            )
+            child_range = [slice(child_start, child_end)]
+            
             weights_subrange = child_inst.weights_subrange
-            batch_dim = weights_in.shape[0]
+            
             reshape_size = [-1]
             transpose_perm = None
-
             connection_mode = self.updated_config.instructions[i].connection_mode
+            
             if connection_mode == "uvu":
                 transpose_perm = [1, 0]
             elif connection_mode == "uvw":
@@ -662,50 +655,27 @@ class ComputationSchedule:
                 child_range = [slice(0, batch_dim)] + child_range
                 parent_range = [slice(0, batch_dim)] + parent_range
                 parent_shape = [batch_dim] + parent_shape
+                
                 child_shape = [batch_dim] + list(child_shape)
                 weights_subrange = [slice(0, batch_dim)] + child_inst.weights_subrange
                 reshape_size = [batch_dim] + reshape_size
-                transpose_perm = [0] + [i + 1 for i in transpose_perm]
+                
+                if transpose_perm is not None:
+                    transpose_perm = [0] + [k + 1 for k in transpose_perm]
 
-            if direction == "forward":
-                sliced_weights = weights_in[tuple(parent_range)].reshape(parent_shape)[
-                    tuple(weights_subrange)
-                ]
-                weights_out[tuple(child_range)] = sliced_weights.permute(
-                    transpose_perm
-                ).reshape(reshape_size)
-            elif direction == "backward":
-                transpose_child_shape = [child_shape[i] for i in transpose_perm]
-                sliced_weights = (
-                    weights_in[tuple(child_range)]
-                    .reshape(transpose_child_shape)
-                    .permute(transpose_perm)
-                )
-                weights_out[tuple(parent_range)].reshape(parent_shape)[
-                    tuple(weights_subrange)
-                ] = sliced_weights.flatten().reshape(child_shape)
+            transpose_child_shape = None
+            if transpose_perm is not None:
+                transpose_child_shape = [child_shape[k] for k in transpose_perm]
 
-        return weights_out
+            reorder_specs.append({
+                "parent_range": tuple(parent_range),
+                "parent_shape": parent_shape,
+                "weights_subrange": tuple(weights_subrange),
+                "child_range": tuple(child_range),
+                "child_shape": child_shape,
+                "transpose_perm": transpose_perm,
+                "reshape_size": reshape_size,
+                "transpose_child_shape": transpose_child_shape,
+            })
 
-    def reorder_weights_numpy(self, weights_in, direction, has_batch_dim):
-        import torch
-
-        weights_in = torch.from_numpy(weights_in.copy())
-        result = self.reorder_weights(weights_in, direction, has_batch_dim)
-        return result.detach().cpu().numpy().copy()
-
-    def reorder_weights_from_e3nn(self, weights_in, has_batch_dim):
-        import torch
-
-        if isinstance(weights_in, np.ndarray):
-            return self.reorder_weights_numpy(weights_in, "forward", has_batch_dim)
-        elif isinstance(weights_in, torch.Tensor):
-            return self.reorder_weights(weights_in, "forward", has_batch_dim)
-
-    def reorder_weights_to_e3nn(self, weights_in, has_batch_dim):
-        import torch
-
-        if isinstance(weights_in, np.ndarray):
-            return self.reorder_weights_numpy(weights_in, "backward", has_batch_dim)
-        elif isinstance(weights_in, torch.Tensor):
-            return self.reorder_weights(weights_in, "backward", has_batch_dim)
+        return reorder_specs

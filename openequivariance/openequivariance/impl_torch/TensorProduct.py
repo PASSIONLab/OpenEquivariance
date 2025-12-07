@@ -5,6 +5,8 @@ import torch
 import typing
 from openequivariance.core.utils import torch_to_oeq_dtype
 from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.impl_torch.utils import reorder_torch
+
 
 logger = getLogger()
 
@@ -90,10 +92,10 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
         self._init_class()
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
-        return self.forward_schedule.reorder_weights_from_e3nn(weights, has_batch_dim)
+        return reorder_torch(self.forward_schedule, weights, "forward", not self.config.shared_weights)
 
     def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
-        return self.forward_schedule.reorder_weights_to_e3nn(weights, has_batch_dim)
+        return reorder_torch(self.forward_schedule, weights, "backward", not self.config.shared_weights)
 
     def forward(
         self, x: torch.Tensor, y: torch.Tensor, W: torch.Tensor
