@@ -6,6 +6,7 @@ from openequivariance.impl_jax import extlib
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.LoopUnrollConv import LoopUnrollConv
 from openequivariance.core.utils import hash_attributes
+from openequivariance.impl_jax.utils import reorder_jax
 
 import jax
 import jax.numpy as jnp
@@ -162,6 +163,12 @@ class TensorProductConv(LoopUnrollConv):
         sender_perm: Optional[jax.numpy.ndarray] = None,
     ) -> jax.numpy.ndarray:
         return self.forward(X, Y, W, rows, cols, sender_perm)
+
+    def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
+        return reorder_jax(self.forward_schedule, weights, "forward", not self.config.shared_weights)
+
+    def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
+        return reorder_jax(self.forward_schedule, weights, "backward", not self.config.shared_weights)
 
     def forward_cpu(self, L1_in, L2_in, weights, L3_out, graph):
         rows = graph.rows.astype(np.int32)

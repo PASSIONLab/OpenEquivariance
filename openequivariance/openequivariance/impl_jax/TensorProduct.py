@@ -5,7 +5,7 @@ from openequivariance.impl_jax import extlib
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.LoopUnrollTP import LoopUnrollTP
 from openequivariance.core.utils import hash_attributes
-
+from openequivariance.impl_jax.utils import reorder_jax
 
 @partial(jax.custom_vjp, nondiff_argnums=(3, 4, 5))
 def forward(X, Y, W, L3_dim, irrep_dtype, attrs):
@@ -82,7 +82,13 @@ class TensorProduct(LoopUnrollTP):
         self, X: jax.numpy.ndarray, Y: jax.numpy.ndarray, W: jax.numpy.ndarray
     ) -> jax.numpy.ndarray:
         return self.forward(X, Y, W)
-    
+
+    def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
+        return reorder_jax(self.forward_schedule, weights, "forward", not self.config.shared_weights)
+
+    def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
+        return reorder_jax(self.forward_schedule, weights, "backward", not self.config.shared_weights)
+
     def forward_cpu(self, L1_in, L2_in, L3_out, weights) -> None:
         result = self.forward(
             jax.numpy.asarray(L1_in),
@@ -106,4 +112,3 @@ class TensorProduct(LoopUnrollTP):
         L1_grad[:] = np.asarray(L1_grad_jax)
         L2_grad[:] = np.asarray(L2_grad_jax)
         weights_grad[:] = np.asarray(weights_grad_jax)
-
