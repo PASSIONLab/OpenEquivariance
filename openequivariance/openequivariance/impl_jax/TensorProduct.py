@@ -90,6 +90,7 @@ class TensorProduct(LoopUnrollTP):
         return reorder_jax(self.forward_schedule, weights, "backward", not self.config.shared_weights)
 
     def forward_cpu(self, L1_in, L2_in, L3_out, weights) -> None:
+        weights = self.reorder_weights_from_e3nn(weights, has_batch_dim=not self.config.shared_weights)
         result = self.forward(
             jax.numpy.asarray(L1_in),
             jax.numpy.asarray(L2_in),
@@ -100,6 +101,7 @@ class TensorProduct(LoopUnrollTP):
     def backward_cpu(
         self, L1_in, L1_grad, L2_in, L2_grad, L3_grad, weights, weights_grad
     ) -> None:
+        weights = self.reorder_weights_from_e3nn(weights, has_batch_dim=not self.config.shared_weights)
         backward_fn = jax.vjp(
             lambda X, Y, W: self.forward(X, Y, W),
             jax.numpy.asarray(L1_in),
@@ -112,3 +114,4 @@ class TensorProduct(LoopUnrollTP):
         L1_grad[:] = np.asarray(L1_grad_jax)
         L2_grad[:] = np.asarray(L2_grad_jax)
         weights_grad[:] = np.asarray(weights_grad_jax)
+        weights_grad[:] = self.reorder_weights_to_e3nn(weights_grad, has_batch_dim=not self.config.shared_weights)

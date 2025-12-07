@@ -254,7 +254,9 @@ class TestSharedWeights(TPCorrectness):
 
 class TestTorchbindDisable(TestProductionModels):
     @pytest.fixture(scope="class")
-    def extra_tp_constructor_args(self):
+    def extra_tp_constructor_args(self, test_jax):
+        if test_jax:
+            pytest.skip("N/A for JAX")
         return {"use_opaque": True}
 
 
@@ -268,11 +270,14 @@ class TestTorchTo(TPCorrectness):
         return problem
 
     @pytest.fixture(scope="class")
-    def tp_and_problem(self, problem, extra_tp_constructor_args):
-        tp = TensorProduct(problem, **extra_tp_constructor_args)
-        switch_map = {
-            np.float32: torch.float64,
-            np.float64: torch.float32,
-        }
-        tp.to(switch_map[problem.irrep_dtype])
-        return tp, tp.config
+    def tp_and_problem(self, problem, extra_tp_constructor_args, test_jax):
+        if test_jax:
+            pytest.skip("N/A for JAX")
+        else:
+            tp = oeq.TensorProduct(problem, **extra_tp_constructor_args)
+            switch_map = {
+                np.float32: torch.float64,
+                np.float64: torch.float32,
+            }
+            tp.to(switch_map[problem.irrep_dtype])
+            return tp, tp.config
