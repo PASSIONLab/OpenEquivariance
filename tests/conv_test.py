@@ -255,7 +255,9 @@ class TestAtomicSharedWeights(ConvCorrectness):
 
 class TestTorchbindDisable(TestProductionModels):
     @pytest.fixture(scope="class")
-    def extra_conv_constructor_args(self):
+    def extra_conv_constructor_args(self, test_jax):
+        if test_jax:
+            pytest.skip("N/A for JAX")
         return {"use_opaque": True}
 
 
@@ -263,7 +265,10 @@ class TestTorchTo(ConvCorrectness):
     problems = [mace_problems()[0]]
 
     @pytest.fixture(params=problems, ids=lambda x: x.label, scope="class")
-    def problem(self, request, dtype):
+    def problem(self, request, dtype, test_jax):
+        if test_jax:
+            pytest.skip("N/A for JAX")
+
         problem = request.param
         problem.irrep_dtype, problem.weight_dtype = dtype, dtype
         return problem
