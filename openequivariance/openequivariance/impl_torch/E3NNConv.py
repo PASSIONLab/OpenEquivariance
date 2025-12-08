@@ -5,9 +5,9 @@ from openequivariance.core.ConvolutionBase import (
     scatter_add_wrapper,
 )
 from openequivariance.impl_torch.E3NNTensorProduct import E3NNTensorProduct
+from openequivariance.impl_torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixinConv
 
-
-class E3NNConv(ConvolutionBase):
+class E3NNConv(ConvolutionBase, NumpyDoubleBackwardMixinConv):
     def __init__(self, config, *, idx_dtype=np.int64, torch_op=True):
         assert torch_op
         super().__init__(config, idx_dtype=idx_dtype, torch_op=torch_op)

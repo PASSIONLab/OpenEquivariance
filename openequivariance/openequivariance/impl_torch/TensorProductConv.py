@@ -22,11 +22,12 @@ from openequivariance.core.dtype_enum import enum_to_torch_dtype
 from openequivariance.impl_torch.utils import reorder_torch
 
 from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.impl_torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixinConv
+
 
 logger = getLogger()
 
-
-class TensorProductConv(torch.nn.Module, LoopUnrollConv):
+class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixinConv):
     r"""
     Given a **symmetric, directed** graph :math:`G = (V, E)`, inputs :math:`x_1...x_{|V|}`,
     :math:`y_1...y_{|E|}`, and weights :math:`W_1...W_{|E|}`, computes
