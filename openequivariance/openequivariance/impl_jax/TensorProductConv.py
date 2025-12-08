@@ -165,10 +165,10 @@ class TensorProductConv(LoopUnrollConv):
         return self.forward(X, Y, W, rows, cols, sender_perm)
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
-        return reorder_jax(self.forward_schedule, weights, "forward", not self.config.shared_weights)
+        return reorder_jax(self.forward_schedule, weights, "forward", has_batch_dim) 
 
     def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
-        return reorder_jax(self.forward_schedule, weights, "backward", not self.config.shared_weights)
+        return reorder_jax(self.forward_schedule, weights, "backward", has_batch_dim)
 
     def forward_cpu(self, L1_in, L2_in, weights, L3_out, graph):
         rows = graph.rows.astype(np.int32)
@@ -240,4 +240,4 @@ class TensorProductConv(LoopUnrollConv):
             in1_jax, in2_jax, weights_jax, out_grad_jax
         )[1]((in1_dgrad_jax, in2_dgrad_jax, weights_dgrad_jax))
 
-        return in1_grad, in2_grad, weights_grad, out_dgrad
+        return np.asarray(in1_grad), np.asarray(in2_grad), np.asarray(weights_grad), np.asarray(out_dgrad) 

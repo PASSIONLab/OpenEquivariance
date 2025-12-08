@@ -37,7 +37,7 @@ class E3NNConv(ConvolutionBase, NumpyDoubleBackwardMixinConv):
         if config.irrep_dtype == np.float64:
             torch.set_default_dtype(torch.float32)  # Reset to default
 
-    def forward(self, L1_in, L2_in, weights, rows, cols):
+    def forward(self, L1_in, L2_in, weights, rows, cols, transpose_perm=None):
         messages = self.reference_tp(L1_in[cols], L2_in, weights)
         return scatter_add_wrapper(messages, rows, L1_in.size(0))
 

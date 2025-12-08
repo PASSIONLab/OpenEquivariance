@@ -48,8 +48,7 @@ bench = [
   "cuequivariance-ops-torch-cu12",
 ]
 
-jax = [
-  "jax[cuda12]",
+jax = [ 
   "nanobind",
   "scikit-build-core"
 ]
