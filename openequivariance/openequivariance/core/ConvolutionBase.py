@@ -3,6 +3,7 @@ import numpy as np
 from openequivariance.benchmark.random_buffer_utils import (
     get_random_buffers_forward_conv,
     get_random_buffers_backward_conv,
+    get_random_buffers_double_backward_conv,
 )
 
 from openequivariance.benchmark.logging_utils import getLogger, bcolors
@@ -12,7 +13,6 @@ from openequivariance.core.utils import benchmark
 from openequivariance.impl_torch.extlib import DeviceBuffer
 
 logger = getLogger()
-
 
 def flops_data_per_tp(config, direction):
     """
@@ -549,20 +549,12 @@ class ConvolutionBase:
         reference_implementation=None,
         high_precision_ref=False,
     ):
-        global torch
-        import torch
-
-        assert self.torch_op
-        buffers = get_random_buffers_backward_conv(
-            self.config, graph.node_count, graph.nnz, prng_seed
-        )
-
-        rng = np.random.default_rng(seed=prng_seed * 2)
-        dummy_grad_value = rng.standard_normal(1)[0]
+        buffers = get_random_buffers_double_backward_conv(
+                self.config, graph.node_count, graph.nnz, prng_seed
+            )
 
         if reference_implementation is None:
             from openequivariance.impl_torch.E3NNConv import E3NNConv
-
             reference_implementation = E3NNConv
 
         reference_problem = self.config
@@ -576,63 +568,30 @@ class ConvolutionBase:
         result = {"thresh": thresh}
         tensors = []
         for i, tp in enumerate([self, reference_tp]):
-            in1, in2, out_grad, weights, _, _, _ = [buf.copy() for buf in buffers]
+            buffers_copy = [buf.copy() for buf in buffers]
 
             if i == 1 and high_precision_ref:
-                in1, in2, out_grad, weights, _, _, _ = [
+                buffers_copy = [
                     np.array(el, dtype=np.float64) for el in buffers
                 ]
 
-            in1_torch = torch.tensor(in1, device="cuda", requires_grad=True)
-            in2_torch = torch.tensor(in2, device="cuda", requires_grad=True)
+            in1, in2, out_grad, weights, weights_dgrad, in1_dgrad, in2_dgrad, _ = buffers_copy
 
             weights_reordered = tp.reorder_weights_from_e3nn(
                 weights, not self.config.shared_weights
             )
-
-            weights_torch = torch.tensor(
-                weights_reordered, device="cuda", requires_grad=True
+            weights_dgrad_reordered = tp.reorder_weights_from_e3nn(
+                weights_dgrad, not self.config.shared_weights
             )
 
-            torch_rows = torch.tensor(graph.rows, device="cuda")
-            torch_cols = torch.tensor(graph.cols, device="cuda")
-            torch_transpose_perm = torch.tensor(graph.transpose_perm, device="cuda")
-
-            fwd_args = [in1_torch, in2_torch, weights_torch, torch_rows, torch_cols]
-            if tp.deterministic:
-                fwd_args.append(torch_transpose_perm)
-
-            out_torch = tp.forward(*fwd_args)
-            out_grad_torch = torch.tensor(out_grad, device="cuda", requires_grad=True)
-
-            in1_grad, in2_grad, w_grad = torch.autograd.grad(
-                outputs=[out_torch],
-                inputs=[in1_torch, in2_torch, weights_torch],
-                grad_outputs=[out_grad_torch],
-                create_graph=True,
-            )
-
-            dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
-            dummy_grad = torch.tensor(
-                float(dummy_grad_value), device="cuda", requires_grad=True
-            )
-            dummy.backward(
-                dummy_grad, inputs=[out_grad_torch, in1_torch, in2_torch, weights_torch]
-            )
-
-            weights_grad = weights_torch.grad.detach().cpu().numpy()
-            weights_grad = tp.reorder_weights_to_e3nn(
-                weights_grad, not self.config.shared_weights
-            )
+            in1_grad, in2_grad, weights_grad, out_dgrad = self.double_backward_cpu(in1, in2, out_grad, weights_reordered, weights_dgrad_reordered, in1_dgrad, in2_dgrad, graph)
 
             tensors.append(
-                (
-                    out_grad_torch.grad.detach().cpu().numpy().copy(),
-                    in1_torch.grad.detach().cpu().numpy().copy(),
-                    in2_torch.grad.detach().cpu().numpy().copy(),
-                    weights_grad.copy(),
-                )
-            )
+                (   out_dgrad,
+                    in1_grad,
+                    in2_grad,
+                    self.reorder_weights_to_e3nn(weights_grad, has_batch_dim=not self.config.shared_weights) 
+                )) 
 
         for name, to_check, ground_truth in [
             ("output_grad", tensors[0][0], tensors[1][0]),

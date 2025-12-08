@@ -181,3 +181,44 @@ def get_random_buffers_backward_conv(
     return in1, in2, out_grad, weights, weights_grad, in1_grad, in2_grad
 
 
+def get_random_buffers_double_backward_conv(
+    tpp: TPProblem, node_count: int, edge_count: int, prng_seed: int
+):
+    rng = np.random.default_rng(prng_seed)
+    in1 = np.array(
+        rng.uniform(size=(node_count, tpp.irreps_in1.dim)), dtype=tpp.irrep_dtype
+    )
+    in2 = np.array(
+        rng.uniform(size=(edge_count, tpp.irreps_in2.dim)), dtype=tpp.irrep_dtype
+    )
+    out_grad = np.array(
+        rng.uniform(size=(node_count, tpp.irreps_out.dim)), dtype=tpp.irrep_dtype
+    )
+
+    weights_size = (
+        tuple([tpp.weight_numel])
+        if tpp.shared_weights
+        else tuple([edge_count, tpp.weight_numel])
+    )
+
+    weights = np.array(rng.uniform(size=weights_size), dtype=tpp.irrep_dtype)
+    weights_grad = np.array(rng.uniform(size=weights_size), dtype=tpp.irrep_dtype)
+    in1_grad = np.array(
+        rng.uniform(size=(node_count, tpp.irreps_in1.dim)), dtype=tpp.irrep_dtype
+    )
+    in2_grad = np.array(
+        rng.uniform(size=(edge_count, tpp.irreps_in2.dim)), dtype=tpp.irrep_dtype
+    )
+    out_double_grad = np.array(
+        rng.uniform(size=(node_count, tpp.irreps_out.dim)), dtype=tpp.irrep_dtype
+    )
+    return (
+        in1,
+        in2,
+        out_grad,
+        weights,
+        weights_grad,
+        in1_grad,
+        in2_grad,
+        out_double_grad,
+    )

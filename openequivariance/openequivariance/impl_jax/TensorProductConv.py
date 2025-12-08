@@ -221,3 +221,23 @@ class TensorProductConv(LoopUnrollConv):
         L2_grad[:] = np.asarray(L2_grad_jax)
         weights_grad[:] = np.asarray(weights_grad_jax)
         weights_grad[:] = self.reorder_weights_to_e3nn(weights_grad, has_batch_dim=not self.config.shared_weights)
+
+    def double_backward_cpu(self, in1, in2, out_grad, weights, weights_dgrad, in1_dgrad, in2_dgrad, graph):
+        in1_jax = jax.numpy.asarray(in1)
+        in2_jax = jax.numpy.asarray(in2)
+        weights_jax = jax.numpy.asarray(weights)
+        out_grad_jax = jax.numpy.asarray(out_grad)
+        in1_dgrad_jax = jax.numpy.asarray(in1_dgrad)
+        in2_dgrad_jax = jax.numpy.asarray(in2_dgrad)
+        weights_dgrad_jax = jax.numpy.asarray(weights_dgrad)
+
+        rows_jax = jax.numpy.asarray(graph.rows.astype(self.idx_dtype))
+        cols_jax = jax.numpy.asarray(graph.cols.astype(self.idx_dtype))
+        sender_perm_jax = jax.numpy.asarray(graph.transpose_perm.astype(self.idx_dtype))
+
+        in1_grad, in2_grad, weights_grad, out_dgrad = jax.vjp(
+            lambda x, y, w, o: jax.vjp(lambda a, b, c: self.forward(a, b, c, rows_jax, cols_jax, sender_perm_jax), x, y, w)[1](o),
+            in1_jax, in2_jax, weights_jax, out_grad_jax
+        )[1]((in1_dgrad_jax, in2_dgrad_jax, weights_dgrad_jax))
+
+        return in1_grad, in2_grad, weights_grad, out_dgrad
