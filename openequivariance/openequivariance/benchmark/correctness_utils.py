@@ -208,11 +208,12 @@ def correctness_double_backward(
     for _, impl in enumerate([test_implementation, reference_implementation]):
         tp = instantiate_implementation(impl, problem)
         weights_reordered = tp.reorder_weights_from_e3nn(weights, has_batch_dim=not problem.shared_weights)
+        weights_dgrad_reordered = tp.reorder_weights_from_e3nn(weights_dgrad, has_batch_dim=not problem.shared_weights)
 
         if impl == CUETensorProduct and problem.shared_weights:
             weights_reordered = weights_reordered[np.newaxis, :]
 
-        in1_grad, in2_grad, weights_grad, out_dgrad = tp.double_backward_cpu(in1, in2, out_grad, weights_reordered, weights_dgrad, in1_dgrad, in2_dgrad)
+        in1_grad, in2_grad, weights_grad, out_dgrad = tp.double_backward_cpu(in1, in2, out_grad, weights_reordered, weights_dgrad_reordered, in1_dgrad, in2_dgrad)
         tensors.append(
             (   out_dgrad,
                 in1_grad,

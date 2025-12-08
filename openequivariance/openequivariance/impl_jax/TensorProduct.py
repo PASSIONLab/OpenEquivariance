@@ -127,8 +127,8 @@ class TensorProduct(LoopUnrollTP):
         weights_dgrad_jax = jax.numpy.asarray(weights_dgrad)
 
         in1_grad, in2_grad, weights_grad, out_dgrad = jax.vjp(
-            lambda x, y, w: jax.vjp(lambda a, b, c: self.forward(a, b, c), x, y, w)[1](out_grad_jax),
-            in1_jax, in2_jax, weights_jax
+            lambda x, y, w, o: jax.vjp(lambda a, b, c: self.forward(a, b, c), x, y, w)[1](o),
+            in1_jax, in2_jax, weights_jax, out_grad_jax
         )[1]((in1_dgrad_jax, in2_dgrad_jax, weights_dgrad_jax))
 
         return in1_grad, in2_grad, weights_grad, out_dgrad
