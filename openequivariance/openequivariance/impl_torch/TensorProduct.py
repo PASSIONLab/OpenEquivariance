@@ -6,12 +6,13 @@ import typing
 from openequivariance.core.utils import torch_to_oeq_dtype
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.impl_torch.utils import reorder_torch
-
+from openequivariance.impl_torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
+from openequivariance.core.e3nn_lite import Irreps
 
 logger = getLogger()
 
 
-class TensorProduct(torch.nn.Module, LoopUnrollTP):
+class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
     r"""
     Drop-in replacement for ``o3.TensorProduct`` from e3nn. Supports forward,
     backward, and double-backward passes using JIT-compiled kernels. Initialization
@@ -347,7 +348,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP):
         return "LoopUnrollTP"
 
 
-if extlib.TORCH_COMPILE:
+if extlib.TORCH_COMPILE and __name__ != "__main__":
     TensorProduct.register_torch_fakes()
     TensorProduct.register_autograd()
     TensorProduct.register_autocast()

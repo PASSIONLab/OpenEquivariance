@@ -104,10 +104,13 @@ def get_random_buffers_double_backward(
     )
     weights = np.array(rng.uniform(size=weights_size), dtype=tpp.irrep_dtype)
 
-    weights_grad = np.zeros_like(weights)
-    in1_grad = np.zeros_like(in1)
-    in2_grad = np.zeros_like(in2)
-    out_double_grad = np.zeros_like(out_grad)
+    weights_grad = np.array(rng.uniform(size=weights_size), dtype=tpp.irrep_dtype)
+    in1_grad = np.array(
+        rng.uniform(size=(batch_size, tpp.irreps_in1.dim)), dtype=tpp.irrep_dtype)
+    in2_grad = np.array(
+        rng.uniform(size=(batch_size, tpp.irreps_in2.dim)), dtype=tpp.irrep_dtype)
+    out_double_grad = np.array(
+        rng.uniform(size=(batch_size, tpp.irreps_out.dim)), dtype=tpp.irrep_dtype)
 
     return (
         in1,
@@ -176,3 +179,5 @@ def get_random_buffers_backward_conv(
     in2_grad = np.zeros_like(in2)
 
     return in1, in2, out_grad, weights, weights_grad, in1_grad, in2_grad
+
+
