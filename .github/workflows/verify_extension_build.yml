@@ -35,7 +35,7 @@ jobs:
       run: |
         pytest tests/import_test.py -k test_import
 
-    - name: Install dependencies to test JAX extension build 
+    - name: Test JAX extension build 
       run: |
         pip install "jax[cuda12]"
         pip install -e ./openequivariance[jax]
