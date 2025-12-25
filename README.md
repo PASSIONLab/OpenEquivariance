@@ -29,6 +29,16 @@ computation and memory consumption significantly.
 For detailed instructions on tests, benchmarks, MACE / Nequip, and our API,
 check out the [documentation](https://passionlab.github.io/OpenEquivariance).
 
+⭐️ **JAX Support**: Our latest update brings
+support for JAX. You need to execute the following
+commands in order:
+
+```
+pip install openequivariance[jax]
+pip install openequivariance_extjax --no-build-isolation
+```
+
+
 📣 📣 OpenEquivariance was accepted to the 2025 SIAM Conference on Applied and 
 Computational Discrete Algorithms (Proceedings Track)! Catch the talk in 
 Montréal and check out the [camera-ready copy on Arxiv](https://arxiv.org/abs/2501.13986) (available May 12, 2025).

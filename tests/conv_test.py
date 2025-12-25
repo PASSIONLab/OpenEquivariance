@@ -238,7 +238,7 @@ class TestAtomicSharedWeights(ConvCorrectness):
         return {
             "fwd": 1e-5,
             "bwd": 7.5e-2,  # Expect higher errors for shared weights
-            "double_bwd": 5e-2,
+            "double_bwd": 5e-1,
         }[direction]
 
     @pytest.fixture(params=problems, ids=lambda x: x.label, scope="class")

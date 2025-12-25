@@ -70,11 +70,12 @@ inline int byte_count(ffi::AnyBuffer &buffer) {
 }
 
 #ifdef CUDA_BACKEND
-void zero_buffer(ffi::AnyBuffer &buffer) {
-    cudaMemset(
+void zero_buffer(ffi::AnyBuffer &buffer, cudaStream_t stream) {
+    cudaMemsetAsync(
         data_ptr(buffer), 
         0, 
-        buffer.element_count() * byte_count(buffer));
+        buffer.element_count() * byte_count(buffer),
+        stream);
 }
 #endif
 
@@ -303,7 +304,7 @@ ffi::Error tp_backward_impl(
     }
 
     if (k.shared_weights) {
-        zero_buffer(*W_grad);
+        zero_buffer(*W_grad, stream);
     } 
 
     jit_kernel->backward(
@@ -354,7 +355,7 @@ ffi::Error tp_double_backward_impl(
     }
 
     if (k.shared_weights) {
-        zero_buffer(*W_grad);
+        zero_buffer(*W_grad, stream);
     } 
 
     jit_kernel->double_backward(
@@ -438,6 +439,7 @@ ffi::Error conv_forward_impl(
         kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, true);
     const int64_t nnz = rows.dimensions()[0];
     const int64_t node_count = L1_in.dimensions()[0];
+    void* workspace_ptr = data_ptr(workspace);
 
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
@@ -449,8 +451,9 @@ ffi::Error conv_forward_impl(
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
     }
     else {
-        zero_buffer(*L3_out);
+        workspace_ptr = nullptr;
     }
+    zero_buffer(*L3_out, stream);
 
     if (k.shared_weights)
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
@@ -465,7 +468,7 @@ ffi::Error conv_forward_impl(
             data_ptr(rows),
             data_ptr(cols),
             nnz, node_count,
-            data_ptr(workspace),
+            workspace_ptr,
             stream);
 
     return ffi::Error::Success();
@@ -491,6 +494,8 @@ ffi::Error conv_backward_impl(
         kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, true);
     const int64_t nnz = rows.dimensions()[0];
     const int64_t node_count = L1_in.dimensions()[0];
+    void* workspace_ptr = data_ptr(workspace);
+
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
     check_tensor(L3_grad, {node_count, k.L3_dim}, k.irrep_dtype, "L3_grad");
@@ -502,8 +507,9 @@ ffi::Error conv_backward_impl(
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
     }
     else {
-        zero_buffer(*L1_grad);
-    }   
+        workspace_ptr = nullptr;
+    }
+    zero_buffer(*L1_grad, stream);
 
     if (k.shared_weights) {
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
@@ -514,7 +520,7 @@ ffi::Error conv_backward_impl(
         check_tensor(*W_grad, {nnz, k.weight_numel}, k.weight_dtype, "W_grad");
     }
     if(k.shared_weights)
-        zero_buffer(*W_grad);
+        zero_buffer(*W_grad, stream);
 
     jit_kernel->backward(
             data_ptr(L1_in),
@@ -527,7 +533,7 @@ ffi::Error conv_backward_impl(
             data_ptr(rows),
             data_ptr(cols),
             nnz, node_count,
-            data_ptr(workspace),
+            workspace_ptr,
             data_ptr(transpose_perm),
             stream);
     return ffi::Error::Success();
@@ -557,6 +563,8 @@ ffi::Error conv_double_backward_impl(
         kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, true);
     const int64_t nnz = rows.dimensions()[0];
     const int64_t node_count = L1_in.dimensions()[0];
+    void* workspace_ptr = data_ptr(workspace);
+
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
     check_tensor(L3_grad, {node_count, k.L3_dim}, k.irrep_dtype, "L3_grad");
@@ -570,9 +578,11 @@ ffi::Error conv_double_backward_impl(
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
     }
     else {
-        zero_buffer(*L1_grad);
-        zero_buffer(*L3_dgrad);
+        workspace_ptr = nullptr;
     }
+    zero_buffer(*L1_grad, stream);
+    zero_buffer(*L3_dgrad, stream);
+
     
     if (k.shared_weights) {
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
@@ -582,7 +592,7 @@ ffi::Error conv_double_backward_impl(
         check_tensor(W_dgrad, {nnz, k.weight_numel}, k.weight_dtype, "W_dgrad");
     }
     if(k.shared_weights)
-        zero_buffer(*W_grad);
+        zero_buffer(*W_grad, stream);
 
     jit_kernel->double_backward(
             data_ptr(L1_in),
@@ -599,7 +609,7 @@ ffi::Error conv_double_backward_impl(
             data_ptr(rows),
             data_ptr(cols),
             nnz, node_count,
-            data_ptr(workspace),
+            workspace_ptr,
             data_ptr(transpose_perm),
             stream);
     return ffi::Error::Success();

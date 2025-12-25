@@ -19,7 +19,7 @@ description = "JAX C++ Extension for OpenEquivariance"
 requires-python = ">=3.10"
 
 dependencies = []
-readme = "../README.md"
+readme = "README.md"
 
 #license = "BSD-3-Clause"
 #license-files = ["../LICENSE"]

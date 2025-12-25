@@ -1,6 +1,6 @@
 # OpenEquivariance
 
-This package contains the core implementation of OpenEquivariance, which is fully
-sufficient to run the package from PyTorch. For JAX support, see instructions 
+The core implementation of OpenEquivariance with
+PyTorch support. For JAX, see instructions 
 on installing `openequivariance_extjax` along with this package.
 
