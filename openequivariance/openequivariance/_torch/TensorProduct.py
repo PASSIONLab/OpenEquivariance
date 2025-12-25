@@ -1,12 +1,12 @@
 from openequivariance.core.LoopUnrollTP import LoopUnrollTP
 from openequivariance import TPProblem
-from openequivariance.impl_torch import extlib
+from openequivariance._torch import extlib
 import torch
 import typing
 from openequivariance.core.utils import torch_to_oeq_dtype
 from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance.impl_torch.utils import reorder_torch
-from openequivariance.impl_torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
+from openequivariance._torch.utils import reorder_torch
+from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
 
 logger = getLogger()
 

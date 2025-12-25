@@ -15,7 +15,6 @@ from openequivariance.benchmark.problems import (
     e3tools_problems,
 )
 
-
 class ConvCorrectness:
     def thresh(self, direction):
         return {"fwd": 3e-4, "bwd": 3e-4, "double_bwd": 3e-4}[direction]
@@ -52,13 +51,13 @@ class ConvCorrectness:
         return {}
 
     @pytest.fixture(scope="class")
-    def test_jax(self, request):
+    def with_jax(self, request):
         return request.config.getoption("--jax")
 
     @pytest.fixture(params=["atomic", "deterministic", "kahan"], scope="class")
-    def conv_object(self, request, problem, extra_conv_constructor_args, test_jax):
+    def conv_object(self, request, problem, extra_conv_constructor_args, with_jax):
         cls = oeq.TensorProductConv
-        if test_jax:
+        if with_jax:
             from openequivariance.jax import TensorProductConv as jax_conv
             cls = jax_conv
 
@@ -254,8 +253,8 @@ class TestAtomicSharedWeights(ConvCorrectness):
 
 class TestTorchbindDisable(TestProductionModels):
     @pytest.fixture(scope="class")
-    def extra_conv_constructor_args(self, test_jax):
-        if test_jax:
+    def extra_conv_constructor_args(self, with_jax):
+        if with_jax:
             pytest.skip("N/A for JAX")
         return {"use_opaque": True}
 
@@ -264,8 +263,8 @@ class TestTorchTo(ConvCorrectness):
     problems = [mace_problems()[0]]
 
     @pytest.fixture(params=problems, ids=lambda x: x.label, scope="class")
-    def problem(self, request, dtype, test_jax):
-        if test_jax:
+    def problem(self, request, dtype, with_jax):
+        if with_jax:
             pytest.skip("N/A for JAX")
 
         problem = request.param

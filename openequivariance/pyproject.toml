@@ -64,7 +64,7 @@ dev = [
   "cmake",
   "furo",
   "sphinx",
-  "sphinx-autobuild"
+  "sphinx-autobuild",
   "nanobind",
   "scikit-build-core"
 ]

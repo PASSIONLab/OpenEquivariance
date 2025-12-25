@@ -13,7 +13,7 @@ from openequivariance.benchmark.perf_metrics_utils import (
 from openequivariance.core.utils import calculate_total_nnz
 from openequivariance.core.TensorProductBase import TensorProductBase
 from openequivariance.core.e3nn_lite import TPProblem
-from openequivariance.impl_torch.CUETensorProduct import CUETensorProduct
+from openequivariance._torch.CUETensorProduct import CUETensorProduct
 from openequivariance.benchmark.logging_utils import getLogger, bcolors
 
 logger = getLogger()

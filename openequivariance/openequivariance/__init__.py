@@ -39,10 +39,11 @@ def extension_source_path():
 
 if "OEQ_NOTORCH" not in os.environ or os.environ["OEQ_NOTORCH"] != "1":
     import torch
-    from openequivariance.impl_torch.TensorProduct import TensorProduct 
-    from openequivariance.impl_torch.TensorProductConv import TensorProductConv
 
-    from openequivariance.impl_torch.extlib import torch_ext_so_path as torch_ext_so_path_internal
+    from openequivariance._torch.TensorProduct import TensorProduct 
+    from openequivariance._torch.TensorProductConv import TensorProductConv
+
+    from openequivariance._torch.extlib import torch_ext_so_path as torch_ext_so_path_internal
     from openequivariance.core.utils import torch_to_oeq_dtype
 
     torch.serialization.add_safe_globals(

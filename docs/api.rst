@@ -30,9 +30,9 @@ PyTorch API
     :undoc-members:
     :exclude-members: name
 
-.. autofunction:: openequivariance.torch_to_oeq_dtype
+.. autofunction:: openequivariance._torch_to_oeq_dtype
 
-.. autofunction:: openequivariance.torch_ext_so_path
+.. autofunction:: openequivariance._torch_ext_so_path
 
 JAX API
 ------------------------

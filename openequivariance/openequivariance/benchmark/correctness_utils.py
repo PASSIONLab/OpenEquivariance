@@ -2,7 +2,7 @@ from typing import Optional, Union
 
 from openequivariance.core.TensorProductBase import TensorProductBase
 from openequivariance.core.e3nn_lite import TPProblem
-from openequivariance.impl_torch.CUETensorProduct import CUETensorProduct
+from openequivariance._torch.CUETensorProduct import CUETensorProduct
 from openequivariance.benchmark.random_buffer_utils import (
     get_random_buffers_forward,
     get_random_buffers_backward,
@@ -72,7 +72,7 @@ def correctness_forward(
     prng_seed: int,
 ) -> dict:
     if reference_implementation is None:
-        from openequivariance.impl_torch.E3NNTensorProduct import E3NNTensorProduct
+        from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
 
         reference_implementation = E3NNTensorProduct
 
@@ -116,7 +116,7 @@ def correctness_backward(
     prng_seed: int,
 ) -> dict:
     if reference_implementation is None:
-        from openequivariance.impl_torch.E3NNTensorProduct import E3NNTensorProduct
+        from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
 
         reference_implementation = E3NNTensorProduct
 
@@ -199,7 +199,7 @@ def correctness_double_backward(
         get_random_buffers_double_backward(problem, batch_size=batch_size, prng_seed=prng_seed) 
 
     if reference_implementation is None:
-        from openequivariance.impl_torch.E3NNTensorProduct import E3NNTensorProduct
+        from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
         reference_implementation = E3NNTensorProduct
 
     result = {"thresh": correctness_threshold, "batch_size": batch_size}

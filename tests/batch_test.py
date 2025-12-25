@@ -40,13 +40,13 @@ class TPCorrectness:
         return {}
 
     @pytest.fixture(scope="class")
-    def test_jax(self, request):
+    def with_jax(self, request):
         return request.config.getoption("--jax")
 
     @pytest.fixture(scope="class")
-    def tp_and_problem(self, problem, extra_tp_constructor_args, test_jax):
+    def tp_and_problem(self, problem, extra_tp_constructor_args, with_jax):
         cls = oeq.TensorProduct 
-        if test_jax:
+        if with_jax:
             import openequivariance.jax.TensorProduct as jax_tp
             cls = jax_tp
         tp = cls(problem, **extra_tp_constructor_args)
@@ -254,8 +254,8 @@ class TestSharedWeights(TPCorrectness):
 
 class TestTorchbindDisable(TestProductionModels):
     @pytest.fixture(scope="class")
-    def extra_tp_constructor_args(self, test_jax):
-        if test_jax:
+    def extra_tp_constructor_args(self, with_jax):
+        if with_jax:
             pytest.skip("N/A for JAX")
         return {"use_opaque": True}
 
@@ -270,8 +270,8 @@ class TestTorchTo(TPCorrectness):
         return problem
 
     @pytest.fixture(scope="class")
-    def tp_and_problem(self, problem, extra_tp_constructor_args, test_jax):
-        if test_jax:
+    def tp_and_problem(self, problem, extra_tp_constructor_args, with_jax):
+        if with_jax:
             pytest.skip("N/A for JAX")
         else:
             tp = oeq.TensorProduct(problem, **extra_tp_constructor_args)

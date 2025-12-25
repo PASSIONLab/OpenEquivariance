@@ -11,7 +11,7 @@ import openequivariance as oeq
 from torch_geometric import EdgeIndex
 import importlib.resources
 
-from openequivariance.impl_torch.E3NNTensorProduct import E3NNTensorProduct
+from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
 
 
 @pytest.fixture(scope="session")

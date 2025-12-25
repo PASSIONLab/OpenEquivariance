@@ -117,7 +117,7 @@ toplevel. You can use our implementation by running
 
 .. code-block::
 
-    from openequivariance.impl_torch.symmetric_contraction import SymmetricContraction as OEQSymmetricContraction
+    from openequivariance._torch.symmetric_contraction import SymmetricContraction as OEQSymmetricContraction
 
 Some Github users report weak performance for the
 symmetric contraction backward pass; your mileage may vary.

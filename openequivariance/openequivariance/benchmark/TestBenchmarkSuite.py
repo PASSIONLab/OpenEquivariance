@@ -7,7 +7,7 @@ from typing import NamedTuple, Optional, Literal, Any, get_args
 from dataclasses import dataclass
 
 import openequivariance as oeq
-from openequivariance.impl_torch.extlib import DeviceProp
+from openequivariance._torch.extlib import DeviceProp
 from openequivariance.core.TensorProductBase import TensorProductBase
 
 from openequivariance.benchmark.logging_utils import getLogger, bcolors

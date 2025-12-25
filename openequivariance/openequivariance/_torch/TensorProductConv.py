@@ -3,8 +3,8 @@ from typing import Optional, List
 import numpy as np
 import torch
 
-import openequivariance.impl_torch.extlib as extlib
-from openequivariance.impl_torch.extlib import (
+import openequivariance._torch.extlib as extlib
+from openequivariance._torch.extlib import (
     JITConvImpl,
     postprocess_kernel,
     DeviceProp,
@@ -15,14 +15,14 @@ from openequivariance.core.ConvolutionBase import (
     scatter_add_wrapper,
 )
 from openequivariance.core.LoopUnrollConv import LoopUnrollConv
-from openequivariance.impl_torch.TensorProduct import TensorProduct
+from openequivariance._torch.TensorProduct import TensorProduct
 from openequivariance import TPProblem
 from openequivariance.core.utils import torch_to_oeq_dtype
 from openequivariance.core.dtype_enum import enum_to_torch_dtype
-from openequivariance.impl_torch.utils import reorder_torch
+from openequivariance._torch.utils import reorder_torch
 
 from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance.impl_torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixinConv
+from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixinConv
 
 
 logger = getLogger()

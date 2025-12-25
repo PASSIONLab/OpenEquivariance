@@ -10,7 +10,7 @@ from openequivariance.benchmark.logging_utils import getLogger, bcolors
 from openequivariance.benchmark.correctness_utils import check_similiarity
 from openequivariance.core.e3nn_lite import wigner_3j
 from openequivariance.core.utils import benchmark
-from openequivariance.impl_torch.extlib import DeviceBuffer
+from openequivariance._torch.extlib import DeviceBuffer
 
 logger = getLogger()
 
@@ -229,7 +229,7 @@ class ConvolutionBase:
         high_precision_ref=False,
     ):
         if reference_implementation is None:
-            from openequivariance.impl_torch.E3NNConv import E3NNConv
+            from openequivariance._torch.E3NNConv import E3NNConv
 
             reference_implementation = E3NNConv
 
@@ -473,7 +473,7 @@ class ConvolutionBase:
         high_precision_ref=False,
     ):
         if reference_implementation is None:
-            from openequivariance.impl_torch.E3NNConv import E3NNConv
+            from openequivariance._torch.E3NNConv import E3NNConv
 
             reference_implementation = E3NNConv
 
@@ -554,7 +554,7 @@ class ConvolutionBase:
             )
 
         if reference_implementation is None:
-            from openequivariance.impl_torch.E3NNConv import E3NNConv
+            from openequivariance._torch.E3NNConv import E3NNConv
             reference_implementation = E3NNConv
 
         reference_problem = self.config

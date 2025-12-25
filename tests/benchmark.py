@@ -11,14 +11,14 @@ import urllib.request
 import numpy as np
 
 from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance.impl_torch.extlib import DeviceProp
-from openequivariance.impl_torch.E3NNTensorProduct import (
+from openequivariance._torch.extlib import DeviceProp
+from openequivariance._torch.E3NNTensorProduct import (
     E3NNTensorProduct,
     E3NNTensorProductCompiledCUDAGraphs,
     E3NNTensorProductCompiledMaxAutotuneCUDAGraphs,
 )
-from openequivariance.impl_torch.TensorProduct import TensorProduct
-from openequivariance.impl_torch.CUETensorProduct import CUETensorProduct
+from openequivariance._torch.TensorProduct import TensorProduct
+from openequivariance._torch.CUETensorProduct import CUETensorProduct
 from openequivariance.benchmark.TestBenchmarkSuite import (
     TestBenchmarkSuite,
     TestDefinition,
@@ -30,15 +30,15 @@ from openequivariance.benchmark.tpp_creation_utils import (
     SingleInstruction,
 )
 
-from openequivariance.impl_torch.TensorProductConv import (
+from openequivariance._torch.TensorProductConv import (
     TensorProductConvAtomic,
     TensorProductConvDeterministic,
     TensorProductConvKahan,
     TensorProductConvScatterSum,
 )
 
-from openequivariance.impl_torch.CUEConv import CUEConv, CUEConvFused
-from openequivariance.impl_torch.FlashTPConv import FlashTPConv
+from openequivariance._torch.CUEConv import CUEConv, CUEConvFused
+from openequivariance._torch.FlashTPConv import FlashTPConv
 from openequivariance.benchmark.ConvBenchmarkSuite import ConvBenchmarkSuite, load_graph
 
 from openequivariance.benchmark.problems import (

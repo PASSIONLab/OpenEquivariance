@@ -39,9 +39,9 @@ except Exception as e:
 
 generic_module = None
 if not build_ext:
-    import openequivariance.impl_torch.extlib.generic_module
+    import openequivariance._torch.extlib.generic_module
 
-    generic_module = openequivariance.impl_torch.extlib.generic_module
+    generic_module = openequivariance._torch.extlib.generic_module
 
 elif TORCH_VERSION_CUDA_OR_HIP:
     from torch.utils.cpp_extension import library_paths, include_paths

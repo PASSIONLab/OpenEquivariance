@@ -37,7 +37,7 @@ sys.path.insert(0, str(Path("../openequivariance").resolve()))
 autodoc_mock_imports = [
     "torch",
     "jax",
-    "openequivariance.impl_torch.extlib",
+    "openequivariance._torch.extlib",
     "openequivariance.jax.extlib",
     "openequivariance_extjax",
     "jinja2",

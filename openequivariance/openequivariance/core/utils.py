@@ -8,7 +8,7 @@ from openequivariance.core.e3nn_lite import Instruction, TPProblem, wigner_3j
 import json
 import tempfile
 import hashlib
-from openequivariance.impl_torch.extlib import GPUTimer
+from openequivariance._torch.extlib import GPUTimer
 
 
 def sparse_outer_product_work(cg: np.ndarray) -> int:
