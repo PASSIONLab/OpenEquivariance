@@ -13,8 +13,8 @@ that [e3nn](https://e3nn.org/) supports
 commonly found in graph neural networks 
 (e.g. [Nequip](https://github.com/mir-group/nequip) or
 [MACE](https://github.com/ACEsuit/mace)). To get 
-started, ensure that you have GCC 9+ on your system 
-and install our package via
+started with PyTorch, ensure that you have PyTorch 
+and GCC 9+ available before installing our package via 
 
 ```bash
 pip install openequivariance
@@ -35,11 +35,11 @@ support for JAX. To install, execute the following
 commands in order:
 
 ``` bash
-pip install jax[cuda12] # Not needed if you already have JAX
+pip install jax[cuda12] # Skip if JAX installed
 pip install openequivariance[jax]
 pip install openequivariance_extjax --no-build-isolation
 ```
-See below for example usage.
+See the section below for example usage.
 
 ## Show me some examples
 Here's a CG tensor product implemented by e3nn: 
