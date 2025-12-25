@@ -1,4 +1,4 @@
-Installation
+Installation (Torch and JAX)
 ==============================
 
 .. toctree::
@@ -8,10 +8,14 @@ Installation
 You need the following to install OpenEquivariance:
 
 - A Linux system equipped with an NVIDIA / AMD graphics card.
-- PyTorch >= 2.4 (>= 2.8 for AOTI and export).
+- Either PyTorch >= 2.4 (>= 2.8 for AOTI and export), or JAX with CUDA 12 support
+  or higher.
 - GCC 9+ and the CUDA / HIP toolkit. The command
   ``c++ --version`` should return >= 9.0; see below for details on 
   setting an alternate compiler.
+
+PyTorch
+------------------------------------------
 
 Installation is one easy command, followed by import verification: 
 
@@ -28,11 +32,8 @@ To get the nightly build, run
 
 .. code-block:: bash 
 
-    pip install git+https://github.com/PASSIONLab/OpenEquivariance 
+    pip install git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance
 
-
-Compiling the Integrated PyTorch Extension
-------------------------------------------
 To support ``torch.compile``, ``torch.export``, and
 JITScript, OpenEquivariance needs to compile a C++ extension
 tightly integrated with PyTorch. If you see a warning that
@@ -48,12 +49,36 @@ environment variable and retry the import:
 
 .. code-block:: bash
 
-    export CCC=/path/to/your/gcc
+    export CC=/path/to/your/gcc
     export CXX=/path/to/your/g++
     python -c "import openequivariance"
 
 These configuration steps are required only ONCE after 
 installation (or upgrade) with pip. 
+
+JAX
+------------------------------------------
+JAX support is currently limited to NVIDIA GPUs. You need to execute
+the following two commands strictly in order:
+
+.. code-block:: bash 
+
+    pip install openequivariance[jax]
+    pip install openequivariance_extjax --no-build-isolation
+
+From there, set ``OEQ_NOTORCH=1`` to avoid a PyTorch import and test the package:
+
+.. code-block:: bash
+
+    OEQ_NOTORCH=1
+    python -c "import openequivariance.jax"
+
+You can get the nightly build as follows:
+
+.. code-block:: bash 
+
+    pip install git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance[jax]
+    pip install git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance_extjax
 
 Configurations on Major Platforms 
 ---------------------------------

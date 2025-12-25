@@ -142,10 +142,6 @@ def _raise_import_error_helper(import_target: str):
 
 
 def torch_ext_so_path():
-    """
-    :returns: Path to a ``.so`` file that must be linked to use OpenEquivariance
-              from the PyTorch C++ Interface.
-    """
     return torch_module.__file__
 
 

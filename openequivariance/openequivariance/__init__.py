@@ -31,21 +31,18 @@ def _check_package_editable():
 
 _editable_install_output_path = Path(__file__).parent.parent.parent / "outputs"
 
-
 def extension_source_path():
     """
     :returns: Path to the source code of the C++ extension.
     """
     return str(Path(__file__).parent / "extension")
 
-TensorProduct, TensorProductConv, torch_ext_so_path, torch_to_oeq_dtype = None, None, None, None
-
 if "OEQ_NOTORCH" not in os.environ or os.environ["OEQ_NOTORCH"] != "1":
     import torch
     from openequivariance.impl_torch.TensorProduct import TensorProduct 
     from openequivariance.impl_torch.TensorProductConv import TensorProductConv
 
-    from openequivariance.impl_torch.extlib import torch_ext_so_path
+    from openequivariance.impl_torch.extlib import torch_ext_so_path as torch_ext_so_path_internal
     from openequivariance.core.utils import torch_to_oeq_dtype
 
     torch.serialization.add_safe_globals(
@@ -61,6 +58,16 @@ if "OEQ_NOTORCH" not in os.environ or os.environ["OEQ_NOTORCH"] != "1":
             np.float64,
         ]
     )
+
+def torch_ext_so_path():
+    """
+    :returns: Path to a ``.so`` file that must be linked to use OpenEquivariance
+              from the PyTorch C++ Interface.
+    """
+    try:
+        return torch_ext_so_path_internal()
+    except NameError:
+        return None
 
 jax = None
 try:
