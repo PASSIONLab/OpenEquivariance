@@ -17,6 +17,7 @@ execute_process(
 )
 message(STATUS "nanobind cmake directory: ${nanobind_ROOT}")
 
+set(ENV{OEQ_NOTORCH} "1")
 execute_process(
   COMMAND "${Python_EXECUTABLE}" "-c"
           "import openequivariance; print(openequivariance.extension_source_path())"

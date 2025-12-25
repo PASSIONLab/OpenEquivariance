@@ -91,7 +91,7 @@ def test_tutorial_jax(with_jax):
     if not with_jax:
         pytest.skip("Skipping JAX tutorial when testing PyTorch")
 
-    os.environ.OEQ_NOTORCH = "1"
+    os.environ["OEQ_NOTORCH"] = "1"
     import openequivariance as oeq
     import jax
 

@@ -10,7 +10,6 @@ from openequivariance.benchmark.logging_utils import getLogger, bcolors
 from openequivariance.benchmark.correctness_utils import check_similiarity
 from openequivariance.core.e3nn_lite import wigner_3j
 from openequivariance.core.utils import benchmark
-from openequivariance._torch.extlib import DeviceBuffer
 
 logger = getLogger()
 
@@ -134,91 +133,6 @@ class ConvolutionBase:
     @staticmethod
     def name():
         raise NotImplementedError()
-
-    def forward_cpu(self, L1_in, L2_in, weights, L3_out, graph):
-        assert graph.rows.dtype == self.idx_dtype
-        assert graph.cols.dtype == self.idx_dtype
-
-        weights_chunked = self.reorder_weights_from_e3nn(
-            weights, not self.config.shared_weights
-        )
-
-        L1_d, L2_d, weights_d = (
-            DeviceBuffer(L1_in),
-            DeviceBuffer(L2_in),
-            DeviceBuffer(weights_chunked),
-        )
-        L3_d = DeviceBuffer(L3_out)
-
-        rows_d = DeviceBuffer(graph.rows)
-        cols_d = DeviceBuffer(graph.cols)
-
-        self.internal.exec_conv_rawptrs(
-            L1_d.data_ptr(),
-            L2_d.data_ptr(),
-            weights_d.data_ptr(),
-            L3_d.data_ptr(),
-            rows_d.data_ptr(),
-            cols_d.data_ptr(),
-            graph.nnz,
-            graph.node_count,
-            self.workspace_ptr,
-        )
-
-        L3_d.copy_to_host()
-
-    def backward_cpu(
-        self, L1_in, L1_grad, L2_in, L2_grad, weights, weights_grad, L3_grad, graph
-    ):
-        assert graph.rows.dtype == self.idx_dtype
-        assert graph.cols.dtype == self.idx_dtype
-
-        weights_chunked = self.reorder_weights_from_e3nn(
-            weights, not self.config.shared_weights
-        )
-
-        L1_d = DeviceBuffer(L1_in)
-        L2_d = DeviceBuffer(L2_in)
-        weights_d = DeviceBuffer(weights_chunked)
-        L3_d = DeviceBuffer(L3_grad)
-        rows_d = DeviceBuffer(graph.rows)
-        cols_d = DeviceBuffer(graph.cols)
-
-        L1_grad_d = DeviceBuffer(L1_grad)
-        L2_grad_d = DeviceBuffer(L2_grad)
-        weights_grad_d = DeviceBuffer(weights_grad)
-
-        transpose_perm_d = None
-        transpose_perm_ptr = 0
-        if self.deterministic:
-            transpose_perm_d = DeviceBuffer(graph.transpose_perm)
-            transpose_perm_ptr = transpose_perm_d.data_ptr()
-
-        self.internal.backward_rawptrs(
-            L1_d.data_ptr(),
-            L1_grad_d.data_ptr(),
-            L2_d.data_ptr(),
-            L2_grad_d.data_ptr(),
-            weights_d.data_ptr(),
-            weights_grad_d.data_ptr(),
-            L3_d.data_ptr(),
-            rows_d.data_ptr(),
-            cols_d.data_ptr(),
-            graph.nnz,
-            graph.node_count,
-            self.workspace_ptr,
-            transpose_perm_ptr,
-        )
-
-        L1_grad_d.copy_to_host()
-        L2_grad_d.copy_to_host()
-        weights_grad_d.copy_to_host()
-
-        weights_grad[:] = self.reorder_weights_to_e3nn(
-            weights_grad, not self.config.shared_weights
-        )
-
-        return L1_grad, L2_grad, weights_grad
 
     def test_correctness_forward(
         self,

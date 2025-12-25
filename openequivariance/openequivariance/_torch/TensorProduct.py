@@ -8,6 +8,9 @@ from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance._torch.utils import reorder_torch
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
 
+import numpy as np
+from openequivariance._torch.extlib import DeviceBuffer
+
 logger = getLogger()
 
 
@@ -349,6 +352,94 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
     @staticmethod
     def name():
         return "LoopUnrollTP"
+
+    def forward_raw(
+        self,
+        batch: np.uint64,
+        L1_in: np.uint64,
+        L2_in: np.uint64,
+        L3_out: np.uint64,
+        weights: np.uint64,
+    ) -> None:
+        self.internal.exec_tensor_product_rawptr(batch, L1_in, L2_in, L3_out, weights)
+
+    def backward_raw(
+        self,
+        batch_size: np.uint64,
+        L1_in: np.uint64,
+        L1_grad: np.uint64,
+        L2_in: np.uint64,
+        L2_grad: np.uint64,
+        weights: np.uint64,
+        weights_grad: np.uint64,
+        L3_grad: np.uint64,
+    ):
+        self.internal.backward_rawptr(
+            batch_size, L1_in, L1_grad, L2_in, L2_grad, weights, weights_grad, L3_grad
+        )
+
+    def forward_cpu(
+        self,
+        L1_in: np.ndarray,
+        L2_in: np.ndarray,
+        L3_out: np.ndarray,
+        weights: np.ndarray,
+    ) -> None:
+        weights_chunked = self.reorder_weights_from_e3nn(
+            weights, not self.config.shared_weights
+        )
+
+        batch = L1_in.shape[0]
+        L1_d = DeviceBuffer(L1_in)
+        L2_d = DeviceBuffer(L2_in)
+        L3_d = DeviceBuffer(L3_out)
+        weights_d = DeviceBuffer(weights_chunked)
+        self.internal.exec_tensor_product_rawptr(
+            batch,
+            L1_d.data_ptr(),
+            L2_d.data_ptr(),
+            L3_d.data_ptr(),
+            weights_d.data_ptr(),
+        )
+        L3_d.copy_to_host()
+
+    def backward_cpu(
+        self, L1_in, L1_grad, L2_in, L2_grad, L3_grad, weights, weights_grad
+    ) -> None:
+        weights_chunked = self.reorder_weights_from_e3nn(
+            weights, not self.config.shared_weights
+        )
+
+        batch = L1_in.shape[0]
+        L1_d, L2_d, L3_d = (
+            DeviceBuffer(L1_in),
+            DeviceBuffer(L2_in),
+            DeviceBuffer(L3_grad),
+        )
+        L1_grad_d, L2_grad_d = DeviceBuffer(L1_grad), DeviceBuffer(L2_grad)
+        weights_d, weights_grad_d = (
+            DeviceBuffer(weights_chunked),
+            DeviceBuffer(weights_grad),
+        )
+
+        self.internal.backward_rawptr(
+            batch,
+            L1_d.data_ptr(),
+            L1_grad_d.data_ptr(),
+            L2_d.data_ptr(),
+            L2_grad_d.data_ptr(),
+            weights_d.data_ptr(),
+            weights_grad_d.data_ptr(),
+            L3_d.data_ptr(),
+        )
+
+        L1_grad_d.copy_to_host()
+        L2_grad_d.copy_to_host()
+        weights_grad_d.copy_to_host()
+
+        weights_grad[:] = self.reorder_weights_to_e3nn(
+            weights_grad, not self.config.shared_weights
+        )
 
 
 if extlib.TORCH_COMPILE:
