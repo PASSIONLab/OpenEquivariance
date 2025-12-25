@@ -33,6 +33,7 @@ jobs:
 
     - name: Test extension build via import 
       run: |
+<<<<<<< HEAD
         pytest tests/import_test.py -k test_import
 
     - name: Test JAX extension build 
@@ -40,3 +41,8 @@ jobs:
         pip install "jax[cuda12]"
         pip install -e ./openequivariance[jax]
         pip install -e ./openequivariance_extjax --no-build-isolation
+=======
+        pytest \
+          tests/import_test.py::test_extension_built \
+          tests/import_test.py::test_torch_extension_built 
+>>>>>>> main
