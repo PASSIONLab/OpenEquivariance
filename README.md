@@ -34,7 +34,8 @@ check out the [documentation](https://passionlab.github.io/OpenEquivariance).
 support for JAX. To install, execute the following 
 commands in order:
 
-```
+``` bash
+pip install jax[cuda12] # Not needed if you already have JAX
 pip install openequivariance[jax]
 pip install openequivariance_extjax --no-build-isolation
 ```
