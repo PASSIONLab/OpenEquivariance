@@ -4,7 +4,6 @@ import urllib
 from pytest_check import check
 
 import numpy as np
-import openequivariance
 import openequivariance as oeq
 from openequivariance.benchmark.ConvBenchmarkSuite import load_graph
 from itertools import product
@@ -60,7 +59,7 @@ class ConvCorrectness:
     def conv_object(self, request, problem, extra_conv_constructor_args, test_jax):
         cls = oeq.TensorProductConv
         if test_jax:
-            from openequivariance.impl_jax import TensorProductConv as jax_conv
+            from openequivariance.jax import TensorProductConv as jax_conv
             cls = jax_conv
 
         if request.param == "atomic":

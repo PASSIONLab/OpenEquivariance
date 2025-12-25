@@ -72,7 +72,7 @@ def torch_ext_so_path():
 jax = None
 try:
     import openequivariance_extjax
-    import openequivariance.impl_jax as jax
+    import openequivariance.jax as jax
 except ImportError:
     pass
 

@@ -1,12 +1,12 @@
 import numpy as np
 from functools import partial
 from typing import Optional
-from openequivariance.impl_jax import extlib
+from openequivariance.jax import extlib
 
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.LoopUnrollConv import LoopUnrollConv
 from openequivariance.core.utils import hash_attributes
-from openequivariance.impl_jax.utils import reorder_jax
+from openequivariance.jax.utils import reorder_jax
 
 import jax
 import jax.numpy as jnp

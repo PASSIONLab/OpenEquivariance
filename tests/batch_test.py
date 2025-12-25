@@ -47,7 +47,7 @@ class TPCorrectness:
     def tp_and_problem(self, problem, extra_tp_constructor_args, test_jax):
         cls = oeq.TensorProduct 
         if test_jax:
-            import openequivariance.impl_jax.TensorProduct as jax_tp
+            import openequivariance.jax.TensorProduct as jax_tp
             cls = jax_tp
         tp = cls(problem, **extra_tp_constructor_args)
         return tp, problem

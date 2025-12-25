@@ -1,11 +1,11 @@
 import jax
 import numpy as np
 from functools import partial
-from openequivariance.impl_jax import extlib
+from openequivariance.jax import extlib
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.LoopUnrollTP import LoopUnrollTP
 from openequivariance.core.utils import hash_attributes
-from openequivariance.impl_jax.utils import reorder_jax
+from openequivariance.jax.utils import reorder_jax
 
 @partial(jax.custom_vjp, nondiff_argnums=(3, 4, 5))
 def forward(X, Y, W, L3_dim, irrep_dtype, attrs):
