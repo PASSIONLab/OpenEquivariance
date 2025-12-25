@@ -23,7 +23,6 @@ LINKED_LIBPYTHON_ERROR = None
 torch_module, generic_module = None, None
 postprocess_kernel = lambda kernel: kernel  # noqa : E731
 
-
 try:
     python_lib_dir = sysconfig.get_config_var("LIBDIR")
     major, minor = sys.version_info.major, sys.version_info.minor
@@ -44,6 +43,7 @@ except Exception as e:
 if BUILT_EXTENSION:
     import openequivariance._torch.extlib.generic_module
     generic_module = openequivariance._torch.extlib.generic_module
+
 elif torch.version.cuda or torch.version.hip:
     try:
         from torch.utils.cpp_extension import library_paths, include_paths
@@ -141,12 +141,10 @@ def _raise_import_error_helper(import_target: str):
     if not BUILT_EXTENSION:
         raise ImportError(f"Could not import {import_target}: {BUILT_EXTENSION_ERROR}")
 
-
 def torch_ext_so_path():
     return torch_module.__file__
 
-
-if TORCH_VERSION_CUDA_OR_HIP:
+if BUILT_EXTENSION:
     from generic_module import (
         JITTPImpl,
         JITConvImpl,
