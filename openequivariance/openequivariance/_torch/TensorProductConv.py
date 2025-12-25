@@ -27,6 +27,7 @@ from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMix
 
 logger = getLogger()
 
+
 class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixinConv):
     r"""
     Given a **symmetric, directed** graph :math:`G = (V, E)`, inputs :math:`x_1...x_{|V|}`,
@@ -420,10 +421,14 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
         )
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
-        return reorder_torch(self.forward_schedule, weights, "forward", not self.config.shared_weights)
+        return reorder_torch(
+            self.forward_schedule, weights, "forward", not self.config.shared_weights
+        )
 
     def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
-        return reorder_torch(self.forward_schedule, weights, "backward", not self.config.shared_weights)
+        return reorder_torch(
+            self.forward_schedule, weights, "backward", not self.config.shared_weights
+        )
 
     @staticmethod
     def name():

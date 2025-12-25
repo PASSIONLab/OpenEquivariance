@@ -6,7 +6,8 @@ from openequivariance._torch.CUETensorProduct import CUETensorProduct
 from openequivariance.benchmark.random_buffer_utils import (
     get_random_buffers_forward,
     get_random_buffers_backward,
-    get_random_buffers_double_backward)
+    get_random_buffers_double_backward,
+)
 
 from openequivariance.benchmark.logging_utils import getLogger, bcolors
 import numpy as np
@@ -195,11 +196,15 @@ def correctness_double_backward(
     global torch
     import torch
 
-    in1, in2, out_grad, weights, weights_dgrad, in1_dgrad, in2_dgrad, _ = \
-        get_random_buffers_double_backward(problem, batch_size=batch_size, prng_seed=prng_seed) 
+    in1, in2, out_grad, weights, weights_dgrad, in1_dgrad, in2_dgrad, _ = (
+        get_random_buffers_double_backward(
+            problem, batch_size=batch_size, prng_seed=prng_seed
+        )
+    )
 
     if reference_implementation is None:
         from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
+
         reference_implementation = E3NNTensorProduct
 
     result = {"thresh": correctness_threshold, "batch_size": batch_size}
@@ -207,19 +212,35 @@ def correctness_double_backward(
     tensors = []
     for _, impl in enumerate([test_implementation, reference_implementation]):
         tp = instantiate_implementation(impl, problem)
-        weights_reordered = tp.reorder_weights_from_e3nn(weights, has_batch_dim=not problem.shared_weights)
-        weights_dgrad_reordered = tp.reorder_weights_from_e3nn(weights_dgrad, has_batch_dim=not problem.shared_weights)
+        weights_reordered = tp.reorder_weights_from_e3nn(
+            weights, has_batch_dim=not problem.shared_weights
+        )
+        weights_dgrad_reordered = tp.reorder_weights_from_e3nn(
+            weights_dgrad, has_batch_dim=not problem.shared_weights
+        )
 
         if impl == CUETensorProduct and problem.shared_weights:
             weights_reordered = weights_reordered[np.newaxis, :]
 
-        in1_grad, in2_grad, weights_grad, out_dgrad = tp.double_backward_cpu(in1, in2, out_grad, weights_reordered, weights_dgrad_reordered, in1_dgrad, in2_dgrad)
+        in1_grad, in2_grad, weights_grad, out_dgrad = tp.double_backward_cpu(
+            in1,
+            in2,
+            out_grad,
+            weights_reordered,
+            weights_dgrad_reordered,
+            in1_dgrad,
+            in2_dgrad,
+        )
         tensors.append(
-            (   out_dgrad,
+            (
+                out_dgrad,
                 in1_grad,
                 in2_grad,
-                tp.reorder_weights_to_e3nn(weights_grad, has_batch_dim=not problem.shared_weights) 
-            )) 
+                tp.reorder_weights_to_e3nn(
+                    weights_grad, has_batch_dim=not problem.shared_weights
+                ),
+            )
+        )
 
     for name, to_check, ground_truth in [
         ("output_double_grad", tensors[0][0], tensors[1][0]),

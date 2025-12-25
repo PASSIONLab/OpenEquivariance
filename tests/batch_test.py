@@ -2,7 +2,6 @@ import pytest
 from pytest_check import check
 
 import numpy as np
-import openequivariance
 import openequivariance as oeq
 from openequivariance.benchmark.correctness_utils import (
     correctness_forward,
@@ -18,6 +17,7 @@ from openequivariance.benchmark.problems import (
 )
 from itertools import product
 import torch
+
 
 class TPCorrectness:
     def thresh(self, direction):
@@ -45,9 +45,10 @@ class TPCorrectness:
 
     @pytest.fixture(scope="class")
     def tp_and_problem(self, problem, extra_tp_constructor_args, with_jax):
-        cls = oeq.TensorProduct 
+        cls = oeq.TensorProduct
         if with_jax:
             import openequivariance.jax.TensorProduct as jax_tp
+
             cls = jax_tp
         tp = cls(problem, **extra_tp_constructor_args)
         return tp, problem

@@ -7,6 +7,7 @@ from openequivariance.core.ConvolutionBase import (
 from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixinConv
 
+
 class E3NNConv(ConvolutionBase, NumpyDoubleBackwardMixinConv):
     def __init__(self, config, *, idx_dtype=np.int64, torch_op=True):
         assert torch_op

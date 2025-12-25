@@ -14,6 +14,7 @@ from openequivariance._torch.extlib import DeviceBuffer
 
 logger = getLogger()
 
+
 def flops_data_per_tp(config, direction):
     """
     Assumes all interactions are "uvu" for now
@@ -550,11 +551,12 @@ class ConvolutionBase:
         high_precision_ref=False,
     ):
         buffers = get_random_buffers_double_backward_conv(
-                self.config, graph.node_count, graph.nnz, prng_seed
-            )
+            self.config, graph.node_count, graph.nnz, prng_seed
+        )
 
         if reference_implementation is None:
             from openequivariance._torch.E3NNConv import E3NNConv
+
             reference_implementation = E3NNConv
 
         reference_problem = self.config
@@ -571,11 +573,11 @@ class ConvolutionBase:
             buffers_copy = [buf.copy() for buf in buffers]
 
             if i == 1 and high_precision_ref:
-                buffers_copy = [
-                    np.array(el, dtype=np.float64) for el in buffers
-                ]
+                buffers_copy = [np.array(el, dtype=np.float64) for el in buffers]
 
-            in1, in2, out_grad, weights, weights_dgrad, in1_dgrad, in2_dgrad, _ = buffers_copy
+            in1, in2, out_grad, weights, weights_dgrad, in1_dgrad, in2_dgrad, _ = (
+                buffers_copy
+            )
 
             weights_reordered = tp.reorder_weights_from_e3nn(
                 weights, not tp.config.shared_weights
@@ -584,14 +586,27 @@ class ConvolutionBase:
                 weights_dgrad, not tp.config.shared_weights
             )
 
-            in1_grad, in2_grad, weights_grad, out_dgrad = tp.double_backward_cpu(in1, in2, out_grad, weights_reordered, weights_dgrad_reordered, in1_dgrad, in2_dgrad, graph)
+            in1_grad, in2_grad, weights_grad, out_dgrad = tp.double_backward_cpu(
+                in1,
+                in2,
+                out_grad,
+                weights_reordered,
+                weights_dgrad_reordered,
+                in1_dgrad,
+                in2_dgrad,
+                graph,
+            )
 
             tensors.append(
-                (   out_dgrad,
+                (
+                    out_dgrad,
                     in1_grad,
                     in2_grad,
-                    tp.reorder_weights_to_e3nn(weights_grad, has_batch_dim=not self.config.shared_weights) 
-                )) 
+                    tp.reorder_weights_to_e3nn(
+                        weights_grad, has_batch_dim=not self.config.shared_weights
+                    ),
+                )
+            )
 
         for name, to_check, ground_truth in [
             ("output_grad", tensors[0][0], tensors[1][0]),

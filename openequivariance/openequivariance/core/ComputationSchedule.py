@@ -622,7 +622,7 @@ class ComputationSchedule:
     def weight_reordering_info(self, weights_in, has_batch_dim):
         """
         Calculates all shapes, slices, and permutation info to reorder
-        weights. 
+        weights.
         """
         batch_dim = weights_in.shape[0]
         reorder_specs = []
@@ -639,13 +639,13 @@ class ComputationSchedule:
                 self.updated_config.weight_range_and_shape_for_instruction(i)
             )
             child_range = [slice(child_start, child_end)]
-            
+
             weights_subrange = child_inst.weights_subrange
-            
+
             reshape_size = [-1]
             transpose_perm = None
             connection_mode = self.updated_config.instructions[i].connection_mode
-            
+
             if connection_mode == "uvu":
                 transpose_perm = [1, 0]
             elif connection_mode == "uvw":
@@ -655,11 +655,11 @@ class ComputationSchedule:
                 child_range = [slice(0, batch_dim)] + child_range
                 parent_range = [slice(0, batch_dim)] + parent_range
                 parent_shape = [batch_dim] + parent_shape
-                
+
                 child_shape = [batch_dim] + list(child_shape)
                 weights_subrange = [slice(0, batch_dim)] + child_inst.weights_subrange
                 reshape_size = [batch_dim] + reshape_size
-                
+
                 if transpose_perm is not None:
                     transpose_perm = [0] + [k + 1 for k in transpose_perm]
 
@@ -667,15 +667,17 @@ class ComputationSchedule:
             if transpose_perm is not None:
                 transpose_child_shape = [child_shape[k] for k in transpose_perm]
 
-            reorder_specs.append({
-                "parent_range": tuple(parent_range),
-                "parent_shape": parent_shape,
-                "weights_subrange": tuple(weights_subrange),
-                "child_range": tuple(child_range),
-                "child_shape": child_shape,
-                "transpose_perm": transpose_perm,
-                "reshape_size": reshape_size,
-                "transpose_child_shape": transpose_child_shape,
-            })
+            reorder_specs.append(
+                {
+                    "parent_range": tuple(parent_range),
+                    "parent_shape": parent_shape,
+                    "weights_subrange": tuple(weights_subrange),
+                    "child_range": tuple(child_range),
+                    "child_shape": child_shape,
+                    "transpose_perm": transpose_perm,
+                    "reshape_size": reshape_size,
+                    "transpose_child_shape": transpose_child_shape,
+                }
+            )
 
         return reorder_specs

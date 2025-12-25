@@ -1,9 +1,11 @@
 import pytest
 import os
 
+
 @pytest.fixture
 def with_jax(request):
     return request.config.getoption("--jax")
+
 
 def test_tutorial_torch(with_jax):
     if with_jax:
@@ -36,7 +38,7 @@ def test_tutorial_torch(with_jax):
     problem = oeq.TPProblem(
         X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
     )
-    tp_fast = oeq.TensorProduct(problem) 
+    tp_fast = oeq.TensorProduct(problem)
 
     Z = tp_fast(X, Y, W)  # Reuse X, Y, W from earlier
     print(torch.norm(Z))
@@ -103,31 +105,59 @@ def test_tutorial_jax(with_jax):
     problem = oeq.TPProblem(
         X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
     )
-    tp_fast = oeq.jax.TensorProduct(problem) 
+    tp_fast = oeq.jax.TensorProduct(problem)
 
-    X = jax.random.uniform(key, shape=(batch_size, X_ir.dim), minval=0.0, maxval=1.0, dtype=jax.numpy.float32) 
-    Y = jax.random.uniform(key, shape=(batch_size, Y_ir.dim), minval=0.0, maxval=1.0, dtype=jax.numpy.float32)
-    W = jax.random.uniform(key, shape=(batch_size, tp_fast.weight_numel), minval=0.0, maxval=1.0, dtype=jax.numpy.float32)
+    X = jax.random.uniform(
+        key,
+        shape=(batch_size, X_ir.dim),
+        minval=0.0,
+        maxval=1.0,
+        dtype=jax.numpy.float32,
+    )
+    Y = jax.random.uniform(
+        key,
+        shape=(batch_size, Y_ir.dim),
+        minval=0.0,
+        maxval=1.0,
+        dtype=jax.numpy.float32,
+    )
+    W = jax.random.uniform(
+        key,
+        shape=(batch_size, tp_fast.weight_numel),
+        minval=0.0,
+        maxval=1.0,
+        dtype=jax.numpy.float32,
+    )
 
     Z = tp_fast(X, Y, W)
     print(jax.numpy.linalg.norm(Z))
- 
+
     edge_index = jax.numpy.array(
         [
             [0, 1, 1, 2],
             [1, 0, 2, 1],
         ],
-        dtype=jax.numpy.int32, # NOTE: This int32, not int64
+        dtype=jax.numpy.int32,  # NOTE: This int32, not int64
     )
 
     node_ct, nonzero_ct = 3, 4
-    X = jax.random.uniform(key, shape=(node_ct, X_ir.dim), minval=0.0, maxval=1.0, dtype=jax.numpy.float32)
-    Y = jax.random.uniform(key, shape=(nonzero_ct, Y_ir.dim),
-                            minval=0.0, maxval=1.0, dtype=jax.numpy.float32)
-    W = jax.random.uniform(key, shape=(nonzero_ct, problem.weight_numel),
-                            minval=0.0, maxval=1.0, dtype=jax.numpy.float32)
-    tp_conv = oeq.jax.TensorProductConv(problem, deterministic=False)
-    Z = tp_conv.forward(
-        X, Y, W, edge_index[0], edge_index[1]
+    X = jax.random.uniform(
+        key, shape=(node_ct, X_ir.dim), minval=0.0, maxval=1.0, dtype=jax.numpy.float32
     )
+    Y = jax.random.uniform(
+        key,
+        shape=(nonzero_ct, Y_ir.dim),
+        minval=0.0,
+        maxval=1.0,
+        dtype=jax.numpy.float32,
+    )
+    W = jax.random.uniform(
+        key,
+        shape=(nonzero_ct, problem.weight_numel),
+        minval=0.0,
+        maxval=1.0,
+        dtype=jax.numpy.float32,
+    )
+    tp_conv = oeq.jax.TensorProductConv(problem, deterministic=False)
+    Z = tp_conv.forward(X, Y, W, edge_index[0], edge_index[1])
     print(jax.numpy.linalg.norm(Z))

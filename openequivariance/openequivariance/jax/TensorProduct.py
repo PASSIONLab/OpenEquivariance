@@ -7,6 +7,7 @@ from openequivariance.core.LoopUnrollTP import LoopUnrollTP
 from openequivariance.core.utils import hash_attributes
 from openequivariance.jax.utils import reorder_jax
 
+
 @partial(jax.custom_vjp, nondiff_argnums=(3, 4, 5))
 def forward(X, Y, W, L3_dim, irrep_dtype, attrs):
     forward_call = jax.ffi.ffi_call(
@@ -81,7 +82,9 @@ class TensorProduct(LoopUnrollTP):
         self.weight_numel = problem.weight_numel
         self.L3_dim = self.config.irreps_out.dim
 
-    def forward(self, X: jax.numpy.ndarray, Y: jax.numpy.ndarray, W: jax.numpy.ndarray) -> jax.numpy.ndarray:
+    def forward(
+        self, X: jax.numpy.ndarray, Y: jax.numpy.ndarray, W: jax.numpy.ndarray
+    ) -> jax.numpy.ndarray:
         return forward(X, Y, W, self.L3_dim, self.config.irrep_dtype, self.attrs)
 
     def __call__(
@@ -90,13 +93,19 @@ class TensorProduct(LoopUnrollTP):
         return self.forward(X, Y, W)
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
-        return reorder_jax(self.forward_schedule, weights, "forward", not self.config.shared_weights)
+        return reorder_jax(
+            self.forward_schedule, weights, "forward", not self.config.shared_weights
+        )
 
     def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
-        return reorder_jax(self.forward_schedule, weights, "backward", not self.config.shared_weights)
+        return reorder_jax(
+            self.forward_schedule, weights, "backward", not self.config.shared_weights
+        )
 
     def forward_cpu(self, L1_in, L2_in, L3_out, weights) -> None:
-        weights = self.reorder_weights_from_e3nn(weights, has_batch_dim=not self.config.shared_weights)
+        weights = self.reorder_weights_from_e3nn(
+            weights, has_batch_dim=not self.config.shared_weights
+        )
         result = self.forward(
             jax.numpy.asarray(L1_in),
             jax.numpy.asarray(L2_in),
@@ -107,7 +116,9 @@ class TensorProduct(LoopUnrollTP):
     def backward_cpu(
         self, L1_in, L1_grad, L2_in, L2_grad, L3_grad, weights, weights_grad
     ) -> None:
-        weights = self.reorder_weights_from_e3nn(weights, has_batch_dim=not self.config.shared_weights)
+        weights = self.reorder_weights_from_e3nn(
+            weights, has_batch_dim=not self.config.shared_weights
+        )
         backward_fn = jax.vjp(
             lambda X, Y, W: self.forward(X, Y, W),
             jax.numpy.asarray(L1_in),
@@ -120,10 +131,13 @@ class TensorProduct(LoopUnrollTP):
         L1_grad[:] = np.asarray(L1_grad_jax)
         L2_grad[:] = np.asarray(L2_grad_jax)
         weights_grad[:] = np.asarray(weights_grad_jax)
-        weights_grad[:] = self.reorder_weights_to_e3nn(weights_grad, has_batch_dim=not self.config.shared_weights)
+        weights_grad[:] = self.reorder_weights_to_e3nn(
+            weights_grad, has_batch_dim=not self.config.shared_weights
+        )
 
-
-    def double_backward_cpu(self, in1, in2, out_grad, weights, weights_dgrad, in1_dgrad, in2_dgrad):
+    def double_backward_cpu(
+        self, in1, in2, out_grad, weights, weights_dgrad, in1_dgrad, in2_dgrad
+    ):
         in1_jax = jax.numpy.asarray(in1)
         in2_jax = jax.numpy.asarray(in2)
         weights_jax = jax.numpy.asarray(weights)
@@ -133,8 +147,13 @@ class TensorProduct(LoopUnrollTP):
         weights_dgrad_jax = jax.numpy.asarray(weights_dgrad)
 
         in1_grad, in2_grad, weights_grad, out_dgrad = jax.vjp(
-            lambda x, y, w, o: jax.vjp(lambda a, b, c: self.forward(a, b, c), x, y, w)[1](o),
-            in1_jax, in2_jax, weights_jax, out_grad_jax
+            lambda x, y, w, o: jax.vjp(lambda a, b, c: self.forward(a, b, c), x, y, w)[
+                1
+            ](o),
+            in1_jax,
+            in2_jax,
+            weights_jax,
+            out_grad_jax,
         )[1]((in1_dgrad_jax, in2_dgrad_jax, weights_dgrad_jax))
 
         return in1_grad, in2_grad, weights_grad, out_dgrad

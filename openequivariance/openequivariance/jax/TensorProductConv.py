@@ -95,7 +95,7 @@ class TensorProductConv(LoopUnrollConv):
     r"""
     Identical to ``oeq.torch.TensorProductConv`` with functionality in JAX, with one
     key difference: integer arrays passed to this function must have dtype
-    ``np.int32`` (as opposed to ``np.int64`` in the PyTorch version). 
+    ``np.int32`` (as opposed to ``np.int64`` in the PyTorch version).
 
     :param problem: Specification of the tensor product.
     :param deterministic: if ``False``, uses atomics for the convolution. If ``True``, uses a deterministic
@@ -144,7 +144,7 @@ class TensorProductConv(LoopUnrollConv):
         rows: jax.numpy.ndarray,
         cols: jax.numpy.ndarray,
         sender_perm: Optional[jax.numpy.ndarray] = None,
-    ) -> jax.numpy.ndarray: 
+    ) -> jax.numpy.ndarray:
         r"""
         Computes the fused CG tensor product + convolution.
 
@@ -197,7 +197,7 @@ class TensorProductConv(LoopUnrollConv):
         return self.forward(X, Y, W, rows, cols, sender_perm)
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
-        return reorder_jax(self.forward_schedule, weights, "forward", has_batch_dim) 
+        return reorder_jax(self.forward_schedule, weights, "forward", has_batch_dim)
 
     def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
         return reorder_jax(self.forward_schedule, weights, "backward", has_batch_dim)
@@ -206,7 +206,9 @@ class TensorProductConv(LoopUnrollConv):
         rows = graph.rows.astype(np.int32)
         cols = graph.cols.astype(np.int32)
         sender_perm = graph.transpose_perm.astype(np.int32)
-        weights = self.reorder_weights_from_e3nn(weights, has_batch_dim=not self.config.shared_weights)
+        weights = self.reorder_weights_from_e3nn(
+            weights, has_batch_dim=not self.config.shared_weights
+        )
         result = self.forward(
             jax.numpy.asarray(L1_in),
             jax.numpy.asarray(L2_in),
@@ -231,7 +233,9 @@ class TensorProductConv(LoopUnrollConv):
         rows = graph.rows.astype(np.int32)
         cols = graph.cols.astype(np.int32)
         sender_perm = graph.transpose_perm.astype(np.int32)
-        weights = self.reorder_weights_from_e3nn(weights, has_batch_dim=not self.config.shared_weights)
+        weights = self.reorder_weights_from_e3nn(
+            weights, has_batch_dim=not self.config.shared_weights
+        )
 
         backward_fn = jax.vjp(
             lambda X, Y, W: self.forward(
@@ -252,9 +256,13 @@ class TensorProductConv(LoopUnrollConv):
         L1_grad[:] = np.asarray(L1_grad_jax)
         L2_grad[:] = np.asarray(L2_grad_jax)
         weights_grad[:] = np.asarray(weights_grad_jax)
-        weights_grad[:] = self.reorder_weights_to_e3nn(weights_grad, has_batch_dim=not self.config.shared_weights)
+        weights_grad[:] = self.reorder_weights_to_e3nn(
+            weights_grad, has_batch_dim=not self.config.shared_weights
+        )
 
-    def double_backward_cpu(self, in1, in2, out_grad, weights, weights_dgrad, in1_dgrad, in2_dgrad, graph):
+    def double_backward_cpu(
+        self, in1, in2, out_grad, weights, weights_dgrad, in1_dgrad, in2_dgrad, graph
+    ):
         in1_jax = jax.numpy.asarray(in1)
         in2_jax = jax.numpy.asarray(in2)
         weights_jax = jax.numpy.asarray(weights)
@@ -268,8 +276,23 @@ class TensorProductConv(LoopUnrollConv):
         sender_perm_jax = jax.numpy.asarray(graph.transpose_perm.astype(self.idx_dtype))
 
         in1_grad, in2_grad, weights_grad, out_dgrad = jax.vjp(
-            lambda x, y, w, o: jax.vjp(lambda a, b, c: self.forward(a, b, c, rows_jax, cols_jax, sender_perm_jax), x, y, w)[1](o),
-            in1_jax, in2_jax, weights_jax, out_grad_jax
+            lambda x, y, w, o: jax.vjp(
+                lambda a, b, c: self.forward(
+                    a, b, c, rows_jax, cols_jax, sender_perm_jax
+                ),
+                x,
+                y,
+                w,
+            )[1](o),
+            in1_jax,
+            in2_jax,
+            weights_jax,
+            out_grad_jax,
         )[1]((in1_dgrad_jax, in2_dgrad_jax, weights_dgrad_jax))
 
-        return np.asarray(in1_grad), np.asarray(in2_grad), np.asarray(weights_grad), np.asarray(out_dgrad) 
+        return (
+            np.asarray(in1_grad),
+            np.asarray(in2_grad),
+            np.asarray(weights_grad),
+            np.asarray(out_dgrad),
+        )

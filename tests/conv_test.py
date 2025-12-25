@@ -15,6 +15,7 @@ from openequivariance.benchmark.problems import (
     e3tools_problems,
 )
 
+
 class ConvCorrectness:
     def thresh(self, direction):
         return {"fwd": 3e-4, "bwd": 3e-4, "double_bwd": 3e-4}[direction]
@@ -59,17 +60,14 @@ class ConvCorrectness:
         cls = oeq.TensorProductConv
         if with_jax:
             from openequivariance.jax import TensorProductConv as jax_conv
+
             cls = jax_conv
 
         if request.param == "atomic":
-            return cls(
-                problem, deterministic=False, **extra_conv_constructor_args
-            )
+            return cls(problem, deterministic=False, **extra_conv_constructor_args)
         elif request.param == "deterministic":
             if not problem.shared_weights:
-                return cls(
-                    problem, deterministic=True, **extra_conv_constructor_args
-                )
+                return cls(problem, deterministic=True, **extra_conv_constructor_args)
             else:
                 pytest.skip("Shared weights not supported with deterministic")
         elif request.param == "kahan":

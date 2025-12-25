@@ -92,10 +92,14 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
         self._init_class()
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
-        return reorder_torch(self.forward_schedule, weights, "forward", not self.config.shared_weights)
+        return reorder_torch(
+            self.forward_schedule, weights, "forward", not self.config.shared_weights
+        )
 
     def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
-        return reorder_torch(self.forward_schedule, weights, "backward", not self.config.shared_weights)
+        return reorder_torch(
+            self.forward_schedule, weights, "backward", not self.config.shared_weights
+        )
 
     def forward(
         self, x: torch.Tensor, y: torch.Tensor, W: torch.Tensor
@@ -347,7 +351,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
         return "LoopUnrollTP"
 
 
-if extlib.TORCH_COMPILE: 
+if extlib.TORCH_COMPILE:
     TensorProduct.register_torch_fakes()
     TensorProduct.register_autograd()
     TensorProduct.register_autocast()

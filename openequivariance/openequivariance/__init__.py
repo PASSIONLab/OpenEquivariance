@@ -31,19 +31,23 @@ def _check_package_editable():
 
 _editable_install_output_path = Path(__file__).parent.parent.parent / "outputs"
 
+
 def extension_source_path():
     """
     :returns: Path to the source code of the C++ extension.
     """
     return str(Path(__file__).parent / "extension")
 
+
 if "OEQ_NOTORCH" not in os.environ or os.environ["OEQ_NOTORCH"] != "1":
     import torch
 
-    from openequivariance._torch.TensorProduct import TensorProduct 
+    from openequivariance._torch.TensorProduct import TensorProduct
     from openequivariance._torch.TensorProductConv import TensorProductConv
 
-    from openequivariance._torch.extlib import torch_ext_so_path as torch_ext_so_path_internal
+    from openequivariance._torch.extlib import (
+        torch_ext_so_path as torch_ext_so_path_internal,
+    )
     from openequivariance.core.utils import torch_to_oeq_dtype
 
     torch.serialization.add_safe_globals(
@@ -60,6 +64,7 @@ if "OEQ_NOTORCH" not in os.environ or os.environ["OEQ_NOTORCH"] != "1":
         ]
     )
 
+
 def torch_ext_so_path():
     """
     :returns: Path to a ``.so`` file that must be linked to use OpenEquivariance
@@ -69,6 +74,7 @@ def torch_ext_so_path():
         return torch_ext_so_path_internal()
     except NameError:
         return None
+
 
 jax = None
 try:
@@ -85,5 +91,5 @@ __all__ = [
     "torch_to_oeq_dtype",
     "_check_package_editable",
     "torch_ext_so_path",
-    "jax"
+    "jax",
 ]
