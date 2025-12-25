@@ -65,6 +65,8 @@ dev = [
   "furo",
   "sphinx",
   "sphinx-autobuild"
+  "nanobind",
+  "scikit-build-core"
 ]
 
 [tool.setuptools.packages.find]
