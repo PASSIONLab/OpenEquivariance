@@ -45,6 +45,44 @@ xla::ffi::DataType enum_to_xla_dtype(int64_t i){
     throw logic_error("Unsupported tensor datatype!");
 }
 
+std::string xla_dtype_to_string(xla::ffi::DataType dtype) {
+    const std::unordered_map<xla::ffi::DataType, std::string> map = {
+        {xla::ffi::DataType::INVALID, "INVALID"},
+        {xla::ffi::DataType::PRED, "PRED"},
+        {xla::ffi::DataType::S1, "S1"},
+        {xla::ffi::DataType::S2, "S2"},
+        {xla::ffi::DataType::S4, "S4"},
+        {xla::ffi::DataType::S8, "S8"},
+        {xla::ffi::DataType::S16, "S16"},
+        {xla::ffi::DataType::S32, "S32"},
+        {xla::ffi::DataType::S64, "S64"},
+        {xla::ffi::DataType::U1, "U1"},
+        {xla::ffi::DataType::U2, "U2"},
+        {xla::ffi::DataType::U4, "U4"},
+        {xla::ffi::DataType::U8, "U8"},
+        {xla::ffi::DataType::U16, "U16"},
+        {xla::ffi::DataType::U32, "U32"},
+        {xla::ffi::DataType::U64, "U64"},
+        {xla::ffi::DataType::F16, "F16"},
+        {xla::ffi::DataType::F32, "F32"},
+        {xla::ffi::DataType::F64, "F64"},
+        {xla::ffi::DataType::BF16, "BF16"},
+        {xla::ffi::DataType::C64, "C64"},
+        {xla::ffi::DataType::C128, "C128"},
+        {xla::ffi::DataType::TOKEN, "TOKEN"},
+        {xla::ffi::DataType::F8E5M2, "F8E5M2"},
+        {xla::ffi::DataType::F8E4M3, "F8E4M3"},
+        {xla::ffi::DataType::F8E4M3FN, "F8E4M3FN"},
+        {xla::ffi::DataType::F8E4M3B11FNUZ, "F8E4M3B11FNUZ"},
+        {xla::ffi::DataType::F8E5M2FNUZ, "F8E5M2FNUZ"},
+        {xla::ffi::DataType::F8E4M3FNUZ, "F8E4M3FNUZ"},
+        {xla::ffi::DataType::F8E3M4, "F8E3M4"},
+        {xla::ffi::DataType::F4E2M1FN, "F4E2M1FN"},
+        {xla::ffi::DataType::F8E8M0FNU, "F8E8M0FNU"},
+    };
+    return map.at(dtype);
+}
+
 inline void* data_ptr(ffi::AnyBuffer &buffer) {
     return buffer.untyped_data();
 }
@@ -237,8 +275,8 @@ inline void check_tensor(const ffi::AnyBuffer &buffer,
 
     if (buffer.element_type() != expected_dtype) {
         throw std::logic_error("Datatype mismatch for tensor " + tensor_name +
-            ". Expected datatype " + std::to_string(static_cast<int64_t>(expected_dtype)) +
-            ", got " + std::to_string(static_cast<int64_t>(buffer.element_type())));
+            ". Expected datatype " + xla_dtype_to_string(expected_dtype) + 
+            ", got " + xla_dtype_to_string(buffer.element_type()));
     }
 }
 
