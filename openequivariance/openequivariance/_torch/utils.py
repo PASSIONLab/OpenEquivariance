@@ -1,5 +1,7 @@
 import torch
-
+from types import MappingProxyType
+from openequivariance.core.utils import DTypeEnum
+from openequivariance.core.utils import dtype_to_enum as dtype_to_enum_core
 
 def reorder_helper(schedule, weights_in, direction, has_batch_dim):
     assert direction in ["forward", "backward"]
@@ -53,3 +55,13 @@ def reorder_torch(schedule, weights_in, direction, has_batch_dim):
         return reorder_helper(schedule, weights_in, direction, has_batch_dim)
     else:
         return reorder_numpy_helper(schedule, weights_in, direction, has_batch_dim)
+
+enum_to_torch_dtype = MappingProxyType(
+    {
+        DTypeEnum.FLOAT32: torch.float32,
+        DTypeEnum.FLOAT64: torch.float64,
+        DTypeEnum.INT32: torch.int32,
+        DTypeEnum.INT64: torch.int64,
+        DTypeEnum.UINT8: torch.uint8,
+    }
+)

@@ -8,12 +8,37 @@ from openequivariance.core.e3nn_lite import Instruction, TPProblem, wigner_3j
 import json
 import tempfile
 import hashlib
-from openequivariance._torch.extlib import GPUTimer
+
+from enum import IntEnum
+import numpy as np
+
+class DTypeEnum(IntEnum):
+    '''
+    The C++ layer storess a copy of this map.
+    '''
+    FLOAT32 = 1
+    FLOAT64 = 2
+    INT32 = 3
+    INT64 = 4
+    UINT8 = 5
+
+dtype_to_enum = {
+        np.float32: DTypeEnum.FLOAT32,
+        np.float64: DTypeEnum.FLOAT64,
+        np.int32: DTypeEnum.INT32,
+        np.int64: DTypeEnum.INT64,
+        np.uint8: DTypeEnum.UINT8,
+
+        np.dtype(np.float32): DTypeEnum.FLOAT32,
+        np.dtype(np.float64): DTypeEnum.FLOAT64,
+        np.dtype(np.int32): DTypeEnum.INT32,
+        np.dtype(np.int64): DTypeEnum.INT64,
+        np.dtype(np.uint8): DTypeEnum.UINT8,
+    }
 
 
 def sparse_outer_product_work(cg: np.ndarray) -> int:
     return np.sum(np.max(cg != 0, axis=2))
-
 
 # Nonzeros
 @functools.lru_cache(typed=True)
@@ -86,7 +111,6 @@ def filter_and_analyze_problem(problem):
     }
     return result
 
-
 def torch_to_oeq_dtype(torch_dtype) -> type[np.generic]:
     """
     Convenience function; converts a torch datatype to the corresponding
@@ -124,6 +148,7 @@ def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
     mode=gpu_time may include PyTorch overhead
     mode=kernel_time measures runtime for only the specified kernels
     """
+    from openequivariance._torch.extlib import GPUTimer
     assert mode in ["gpu_time", "torch_kernel_time"]
     time_millis = np.zeros(num_iter, dtype=np.float32)
     timer = GPUTimer()

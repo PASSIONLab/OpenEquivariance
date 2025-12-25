@@ -3,7 +3,7 @@ import numpy as np
 from openequivariance.templates.jinja_utils import get_jinja_environment
 from openequivariance.core.ComputationSchedule import ComputationSchedule
 from openequivariance.core.TensorProductBase import TensorProductBase
-from openequivariance.core.dtype_enum import dtype_to_enum
+from openequivariance.core.utils import dtype_to_enum
 
 from openequivariance.core.utils import (
     filter_and_analyze_problem,
