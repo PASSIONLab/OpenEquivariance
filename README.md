@@ -37,6 +37,36 @@ pip install openequivariance[jax]
 pip install openequivariance_extjax --no-build-isolation
 ```
 
+```python
+os.environ["OEQ_NOTORCH"] = "1"
+import openequivariance as oeq
+import jax
+
+seed = 42
+key = jax.random.PRNGKey(seed)
+
+node_ct, nonzero_ct = 3, 4
+edge_index = jax.numpy.array(
+    [
+        [0, 1, 1, 2],
+        [1, 0, 2, 1],
+    ],
+    dtype=jax.numpy.int32, # NOTE: This int32, not int64
+)
+
+X = jax.random.uniform(key, shape=(node_ct, X_ir.dim), minval=0.0, maxval=1.0, dtype=jax.numpy.float32)
+Y = jax.random.uniform(key, shape=(nonzero_ct, Y_ir.dim),
+                        minval=0.0, maxval=1.0, dtype=jax.numpy.float32)
+W = jax.random.uniform(key, shape=(nonzero_ct, problem.weight_numel),
+                        minval=0.0, maxval=1.0, dtype=jax.numpy.float32)
+
+# Reuse problem from earlier
+tp_conv = oeq.jax.TensorProductConv(problem, deterministic=False)
+Z = tp_conv.forward(
+    X, Y, W, edge_index[0], edge_index[1]
+)
+print(jax.numpy.linalg.norm(Z))
+```
 
 📣 📣 OpenEquivariance was accepted to the 2025 SIAM Conference on Applied and 
 Computational Discrete Algorithms (Proceedings Track)! Catch the talk in 

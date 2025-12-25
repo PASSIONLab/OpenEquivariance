@@ -131,5 +131,3 @@ def test_tutorial_jax(with_jax):
         X, Y, W, edge_index[0], edge_index[1]
     )
     print(jax.numpy.linalg.norm(Z))
-
-
