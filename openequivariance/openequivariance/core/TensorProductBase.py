@@ -44,7 +44,7 @@ class TensorProductBase:
         Reorders weights from ``e3nn`` canonical order to the order used by ``oeq``.
 
         :param weights: Weights in ``e3nn`` canonical order, either an
-                        np.ndarray or a torch.Tensor. Tensor of dimensions ``[B, problem.weight_numel]``
+                        np.ndarray, torch.Tensor or JAX array. Tensor of dimensions ``[B, problem.weight_numel]``
                         when ``has_batch_dim=True``, otherwise of dimensions ``[problem.weight_numel]``.
 
         :param has_batch_dim: If ``True``, treats the first dimension of weights as a batch dimension. Default: ``True``.
@@ -57,8 +57,8 @@ class TensorProductBase:
         r"""
         Reorders weights from ``oeq`` canonical order to the order used by ``e3nn``.
 
-        :param weights: Weights in ``oeq`` canonical order, either an
-                        np.ndarray or a torch.Tensor. Tensor of dimensions ``[B, problem.weight_numel]``
+        :param weights: Weights in ``oeq`` canonical order, either a
+                        np.ndarray, torch.Tensor or JAX array. Tensor of dimensions ``[B, problem.weight_numel]``
                         when ``has_batch_dim=True``, otherwise of dimensions ``[problem.weight_numel]``.
 
         :param has_batch_dim: If ``True``, treats the first dimension of wieghts as a batch dimension. Default: ``True``.

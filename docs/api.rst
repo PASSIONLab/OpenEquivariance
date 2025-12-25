@@ -31,9 +31,26 @@ trying our code. OpenEquivariance cannot accelerate all tensor products; see
     :members:
     :undoc-members:
 
-.. autofunction:: openequivariance.impl_torch_to_oeq_dtype
+.. autofunction:: openequivariance.torch_to_oeq_dtype
 
-.. autofunction:: openequivariance.impl_torch_ext_so_path
+.. autofunction:: openequivariance.torch_ext_so_path
+
+OpenEquivariance JAX API
+------------------------
+The JAX API consists of ``TensorProduct`` and ``TensorProductConv``
+classes that behave identically to their PyTorch counterparts. These classes
+do not conform exactly to the e3nn-jax API, but perform the same computation. 
+
+.. autoclass:: openequivariance.jax.TensorProduct
+    :members: forward, reorder_weights_from_e3nn, reorder_weights_to_e3nn
+    :undoc-members:
+    :exclude-members:
+
+.. autoclass:: openequivariance.jax.TensorProductConv
+    :members: forward, reorder_weights_from_e3nn, reorder_weights_to_e3nn
+    :undoc-members:
+    :exclude-members: 
+
 
 API Identical to e3nn
 ---------------------

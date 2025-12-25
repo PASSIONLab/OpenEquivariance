@@ -65,9 +65,9 @@ class TensorProduct(LoopUnrollTP):
     :param problem: Specification of the tensor product.
     """
 
-    def __init__(self, config: TPProblem):
+    def __init__(self, problem: TPProblem):
         dp = extlib.DeviceProp(0)
-        super().__init__(config, dp, extlib.postprocess_kernel, torch_op=False)
+        super().__init__(problem, dp, extlib.postprocess_kernel, torch_op=False)
 
         self.attrs = {
             "kernel": self.jit_kernel,
@@ -78,7 +78,7 @@ class TensorProduct(LoopUnrollTP):
         }
         hash_attributes(self.attrs)
 
-        self.weight_numel = config.weight_numel
+        self.weight_numel = problem.weight_numel
         self.L3_dim = self.config.irreps_out.dim
 
     def forward(self, X: jax.numpy.ndarray, Y: jax.numpy.ndarray, W: jax.numpy.ndarray) -> jax.numpy.ndarray:
