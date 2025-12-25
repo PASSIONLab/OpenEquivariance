@@ -69,7 +69,7 @@ jobs:
         name: python-package-distributions
         path: openequivariance_extjax/dist/
 
-  pypi-publish:
+  pypi-publish-extjax:
     name: Upload release to PyPI
     runs-on: ubuntu-latest
     # build task to be completed first
