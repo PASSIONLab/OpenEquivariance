@@ -92,6 +92,18 @@ backward.defvjp(backward_with_inputs, double_backward)
 
 
 class TensorProductConv(LoopUnrollConv):
+    r"""
+    Identical to ``oeq.torch.TensorProductConv`` with functionality in JAX, with one
+    key difference: integer arrays passed to this function must have dtype
+    ``np.int32`` (as opposed to ``np.int64`` in the PyTorch version). 
+
+    :param problem: Specification of the tensor product.
+    :param deterministic: if ``False``, uses atomics for the convolution. If ``True``, uses a deterministic
+           fixup-based algorithm. `Default`: ``False``.
+    :param kahan: If ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
+           the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
+    """
+
     def __init__(
         self, config: TPProblem, deterministic: bool = False, kahan: bool = False
     ):
@@ -132,7 +144,27 @@ class TensorProductConv(LoopUnrollConv):
         rows: jax.numpy.ndarray,
         cols: jax.numpy.ndarray,
         sender_perm: Optional[jax.numpy.ndarray] = None,
-    ) -> jax.numpy.ndarray:
+    ) -> jax.numpy.ndarray: 
+        r"""
+        Computes the fused CG tensor product + convolution.
+
+        :param X: Tensor of shape ``[|V|, problem.irreps_in1.dim()]``, datatype ``problem.irrep_dtype``.
+        :param Y: Tensor of shape ``[|E|, problem.irreps_in1.dim()]``, datatype ``problem.irrep_dtype``.
+        :param W: Tensor of datatype ``problem.weight_dtype`` and shape
+
+            * ``[|E|, problem.weight_numel]`` if ``problem.shared_weights=False``
+            * ``[problem.weight_numel]`` if ``problem.shared_weights=True``
+
+        :param rows: Tensor of shape ``[|E|]`` with row indices for each nonzero in the adjacency matrix,
+                datatype ``np.int32``. Must be row-major sorted along with ``cols`` when ``deterministic=True``.
+        :param cols: Tensor of shape ``[|E|]`` with column indices for each nonzero in the adjacency matrix,
+                datatype ``np.int32``.
+        :param sender_perm: Tensor of shape ``[|E|]`` and ``np.int32`` datatype containing a
+                permutation that transposes the adjacency matrix nonzeros from row-major to column-major order.
+                Must be provided when ``deterministic=True``.
+
+        :return: Tensor of shape ``[|V|, problem.irreps_out.dim()]``, datatype ``problem.irrep_dtype``.
+        """
         if not self.deterministic:
             sender_perm = self.dummy_transpose_perm
         else:

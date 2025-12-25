@@ -30,8 +30,7 @@ For detailed instructions on tests, benchmarks, MACE / Nequip, and our API,
 check out the [documentation](https://passionlab.github.io/OpenEquivariance).
 
 ⭐️ **JAX Support**: Our latest update brings
-support for JAX. You need to execute the following
-commands in order:
+support for JAX. To install, execute the following commands in order:
 
 ```
 pip install openequivariance[jax]

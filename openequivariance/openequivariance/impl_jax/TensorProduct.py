@@ -59,6 +59,12 @@ backward.defvjp(backward_with_inputs, double_backward)
 
 
 class TensorProduct(LoopUnrollTP):
+    r"""
+    Identical to ``oeq.torch.TensorProduct`` with functionality in JAX.
+
+    :param problem: Specification of the tensor product.
+    """
+
     def __init__(self, config: TPProblem):
         dp = extlib.DeviceProp(0)
         super().__init__(config, dp, extlib.postprocess_kernel, torch_op=False)
