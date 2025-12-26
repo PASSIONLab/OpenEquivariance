@@ -2,7 +2,7 @@
 [![OEQ CUDA C++ Extension Build Verification](https://github.com/PASSIONLab/OpenEquivariance/actions/workflows/verify_extension_build.yml/badge.svg?event=push)](https://github.com/PASSIONLab/OpenEquivariance/actions/workflows/verify_extension_build.yml)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
-[[Examples]](#show-me-some-examples) 
+[[PyTorch Examples]](#pytorch-examples) 
 [[JAX Examples]](#jax-examples)
 [[Citation and Acknowledgements]](#citation-and-acknowledgements)
 
@@ -41,7 +41,7 @@ pip install openequivariance_extjax
 See the section below for example usage and 
 our [API page](https://passionlab.github.io/OpenEquivariance/api/) for more details.
 
-## Show me some examples
+## PyTorch Examples 
 Here's a CG tensor product implemented by e3nn: 
 
 ```python
