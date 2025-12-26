@@ -349,7 +349,11 @@ public:
 
     ~CUJITKernel() {
         if(compiled) {
-            CUDA_SAFE_CALL(cuLibraryUnload(library));
+            auto result = cuLibraryUnload(library);
+            if (result != CUDA_SUCCESS && result != CUDA_ERROR_DEINITIALIZED) {
+                std::cout << "Failed to unload CUDA library, error code: " << ((int) result) << std::endl; 
+            }
+
             delete[] code;
         }
         NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
