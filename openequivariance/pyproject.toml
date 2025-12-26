@@ -48,11 +48,6 @@ bench = [
   "cuequivariance-ops-torch-cu12",
 ]
 
-jax = [ 
-  "nanobind",
-  "scikit-build-core"
-]
-
 dev = [
   "e3nn",
   "pre-commit",
@@ -64,9 +59,7 @@ dev = [
   "cmake",
   "furo",
   "sphinx",
-  "sphinx-autobuild",
-  "nanobind",
-  "scikit-build-core"
+  "sphinx-autobuild"
 ]
 
 [tool.setuptools.packages.find]

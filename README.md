@@ -31,15 +31,15 @@ For detailed instructions on tests, benchmarks, MACE / Nequip, and our API,
 check out the [documentation](https://passionlab.github.io/OpenEquivariance).
 
 ⭐️ **JAX**: Our latest update brings
-support for JAX. To install, execute the following 
-commands in order:
+support for JAX. Install it with the following:
 
 ``` bash
-pip install jax[cuda12] # Skip if JAX installed
-pip install openequivariance[jax]
-pip install openequivariance_extjax --no-build-isolation
+pip install openequivariance
+pip install openequivariance_extjax
 ```
-See the section below for example usage.
+
+See the section below for example usage and 
+our [API page](https://passionlab.github.io/OpenEquivariance/api/) for more details.
 
 ## Show me some examples
 Here's a CG tensor product implemented by e3nn: 
