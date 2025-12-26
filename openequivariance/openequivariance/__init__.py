@@ -31,14 +31,6 @@ def _check_package_editable():
 
 _editable_install_output_path = Path(__file__).parent.parent.parent / "outputs"
 
-
-def extension_source_path():
-    """
-    :returns: Path to the source code of the C++ extension.
-    """
-    return str(Path(__file__).parent / "extension")
-
-
 if "OEQ_NOTORCH" not in os.environ or os.environ["OEQ_NOTORCH"] != "1":
     import torch
 
