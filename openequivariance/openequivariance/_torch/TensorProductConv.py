@@ -18,7 +18,7 @@ from openequivariance.core.LoopUnrollConv import LoopUnrollConv
 from openequivariance._torch.TensorProduct import TensorProduct
 from openequivariance import TPProblem
 from openequivariance.core.utils import torch_to_oeq_dtype
-from openequivariance.core.dtype_enum import enum_to_torch_dtype
+from openequivariance._torch.utils import enum_to_torch_dtype
 from openequivariance._torch.utils import reorder_torch
 
 from openequivariance.benchmark.logging_utils import getLogger
