@@ -4,11 +4,29 @@ project(${SKBUILD_PROJECT_NAME} LANGUAGES CXX) # TODO: Add HIP support
 find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(CUDAToolkit REQUIRED)
 
-execute_process(
-  COMMAND "${Python_EXECUTABLE}" "-c"
-          "from jax import ffi; print(ffi.include_dir())"
-  OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE XLA_DIR
-)
+# Includes XLA headers based on a JAX installation 
+#execute_process(
+#  COMMAND "${Python_EXECUTABLE}" "-c"
+#          "from jax import ffi; print(ffi.include_dir())"
+#  OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE XLA_DIR
+#)
+#message(STATUS "XLA include directory: ${XLA_DIR}")
+
+include(ExternalProject)
+ExternalProject_Add(
+    xla 
+    PREFIX ${CMAKE_BINARY_DIR}/xla
+    GIT_REPOSITORY https://github.com/openxla/xla.git
+    GIT_TAG d56e645fe72988e2b4464119300ca6f894f82598 
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND ""
+    INSTALL_COMMAND ""
+    LOG_DOWNLOAD ON
+    )
+ExternalProject_Get_Property(xla source_dir)
+set(XLA_DIR ${source_dir})
 message(STATUS "XLA include directory: ${XLA_DIR}")
 
 execute_process(
@@ -47,6 +65,8 @@ target_compile_options(openequivariance_extjax PRIVATE -Wno-attributes -Wno-retu
 
 get_target_property(CUDA_LIB_DIR CUDA::nvrtc IMPORTED_LOCATION)
 get_filename_component(CUDA_LIB_DIR ${CUDA_LIB_DIR} DIRECTORY)
+
+add_dependencies(openequivariance_extjax xla)
 
 set_target_properties(openequivariance_extjax PROPERTIES
     BUILD_RPATH "${CUDA_LIB_DIR}"
