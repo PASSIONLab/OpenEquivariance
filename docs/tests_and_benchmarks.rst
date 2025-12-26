@@ -21,7 +21,7 @@ download the test folder and install the non-editable package and the dependenci
 
 Correctness
 ------------------------------
-To set up the editable install and run the entire testsuite, use: 
+To set up the editable install and run the entire PyTorch testsuite, use: 
 
 .. code-block:: bash
 
@@ -36,7 +36,7 @@ To test the JAX wrappers, follow the same steps above and make sure that
 ``openequivariance_extjax`` is installed without build isolation. Then run
 
 .. code-block:: bash
-
+    pytest --jax tests/example_test.py
     pytest --jax tests/batch_test.py
     pytest --jax tests/conv_test.py
 
