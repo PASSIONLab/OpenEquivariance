@@ -638,7 +638,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             "libtorch_tp_jit::jit_conv_double_backward", "cuda", torch.float32
         )
 
-
     def forward_cpu(self, L1_in, L2_in, weights, L3_out, graph):
         assert graph.rows.dtype == self.idx_dtype
         assert graph.cols.dtype == self.idx_dtype
@@ -723,7 +722,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
         )
 
         return L1_grad, L2_grad, weights_grad
-
 
 
 if extlib.TORCH_COMPILE:

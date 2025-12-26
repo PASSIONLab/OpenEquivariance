@@ -42,6 +42,7 @@ except Exception as e:
 
 if BUILT_EXTENSION:
     import openequivariance._torch.extlib.generic_module
+
     generic_module = openequivariance._torch.extlib.generic_module
 
 elif torch.version.cuda or torch.version.hip:
@@ -141,8 +142,10 @@ def _raise_import_error_helper(import_target: str):
     if not BUILT_EXTENSION:
         raise ImportError(f"Could not import {import_target}: {BUILT_EXTENSION_ERROR}")
 
+
 def torch_ext_so_path():
     return torch_module.__file__
+
 
 if BUILT_EXTENSION:
     from generic_module import (
