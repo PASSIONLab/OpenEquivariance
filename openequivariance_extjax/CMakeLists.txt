@@ -4,14 +4,6 @@ project(${SKBUILD_PROJECT_NAME} LANGUAGES CXX) # TODO: Add HIP support
 find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(CUDAToolkit REQUIRED)
 
-# Includes XLA headers based on a JAX installation 
-#execute_process(
-#  COMMAND "${Python_EXECUTABLE}" "-c"
-#          "from jax import ffi; print(ffi.include_dir())"
-#  OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE XLA_DIR
-#)
-#message(STATUS "XLA include directory: ${XLA_DIR}")
-
 include(ExternalProject)
 ExternalProject_Add(
     xla 
@@ -34,14 +26,7 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT
 )
 message(STATUS "nanobind cmake directory: ${nanobind_ROOT}")
-
-set(ENV{OEQ_NOTORCH} "1")
-execute_process(
-  COMMAND "${Python_EXECUTABLE}" "-c"
-          "import openequivariance; print(openequivariance.extension_source_path())"
-  OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE HEADER_DIR 
-)
-message(STATUS "OpenEquivariance extension source directory: ${HEADER_DIR}")
+set(HEADER_DIR "src/extension")
 
 find_package(nanobind CONFIG REQUIRED)
 
@@ -79,3 +64,13 @@ target_link_libraries(openequivariance_extjax PRIVATE
     CUDA::nvrtc)
 
 install(TARGETS openequivariance_extjax LIBRARY DESTINATION .)
+
+# -------------------------------------------------------------
+
+# Uncomment to include XLA from JAX installation 
+#execute_process(
+#  COMMAND "${Python_EXECUTABLE}" "-c"
+#          "from jax import ffi; print(ffi.include_dir())"
+#  OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE XLA_DIR
+#)
+#message(STATUS "XLA include directory: ${XLA_DIR}")
