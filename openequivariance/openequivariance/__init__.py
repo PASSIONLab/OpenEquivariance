@@ -72,7 +72,7 @@ jax = None
 try:
     import openequivariance_extjax
     import openequivariance.jax as jax
-except ImportError:
+except Exception:
     pass
 
 __all__ = [
