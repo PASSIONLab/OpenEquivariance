@@ -151,6 +151,11 @@ import openequivariance as oeq
 seed = 42
 key = jax.random.PRNGKey(seed)
 
+batch_size = 1000
+X_ir, Y_ir, Z_ir = oeq.Irreps("1x2e"), oeq.Irreps("1x3e"), oeq.Irreps("1x2e")
+problem = oeq.TPProblem(X_ir, Y_ir, Z_ir, [(0, 0, 0, "uvu", True)], shared_weights=False, internal_weights=False)
+
+
 node_ct, nonzero_ct = 3, 4
 edge_index = jax.numpy.array(
     [
@@ -166,8 +171,6 @@ Y = jax.random.uniform(key, shape=(nonzero_ct, Y_ir.dim),
 W = jax.random.uniform(key, shape=(nonzero_ct, problem.weight_numel),
                         minval=0.0, maxval=1.0, dtype=jax.numpy.float32)
 
-# Reuse problem from earlier
-# ...
 tp_conv = oeq.jax.TensorProductConv(problem, deterministic=False)
 Z = tp_conv.forward(
     X, Y, W, edge_index[0], edge_index[1]
