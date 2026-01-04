@@ -57,7 +57,7 @@ target_compile_options(openequivariance_extjax PRIVATE -Wno-attributes -Wno-retu
 get_target_property(CUDA_LIB_DIR CUDA::nvrtc IMPORTED_LOCATION)
 get_filename_component(CUDA_LIB_DIR ${CUDA_LIB_DIR} DIRECTORY)
 
-add_dependencies(openequivariance_extjax xla)
+#add_dependencies(openequivariance_extjax xla)
 
 set_target_properties(openequivariance_extjax PROPERTIES
     BUILD_RPATH "${CUDA_LIB_DIR}"
