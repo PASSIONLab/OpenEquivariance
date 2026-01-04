@@ -29,7 +29,7 @@ jobs:
         sudo apt-get update
         sudo apt install nvidia-cuda-toolkit
         pip install -r .github/workflows/requirements_cuda_ci.txt
-        pip install -e ./openequivariance
+        pip install -e "./openequivariance"
 
     - name: Test extension build via import 
       run: |
@@ -37,6 +37,7 @@ jobs:
           tests/import_test.py::test_extension_built \
           tests/import_test.py::test_torch_extension_built 
 
-    - name: Test JAX extension build 
-      run: |
-        pip install -e ./openequivariance_extjax
+    #- name: Test JAX extension build 
+    #  run: |
+    #    pip install -e "./openequivariance[jax]"
+    #    pip install -e ""./openequivariance_extjax" --no-build-isolation

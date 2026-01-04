@@ -56,6 +56,14 @@ if "OEQ_NOTORCH" not in os.environ or os.environ["OEQ_NOTORCH"] != "1":
         ]
     )
 
+    from openequivariance._torch.extlib import (
+        LINKED_LIBPYTHON,
+        LINKED_LIBPYTHON_ERROR,
+        BUILT_EXTENSION,
+        BUILT_EXTENSION_ERROR,
+        TORCH_COMPILE,
+        TORCH_COMPILE_ERROR,
+    )
 
 def torch_ext_so_path():
     """
@@ -72,8 +80,16 @@ jax = None
 try:
     import openequivariance_extjax
     import openequivariance.jax as jax
-except Exception:
-    pass
+except Exception as e:
+    error = e
+    class JAX_ERR:
+        def TensorProduct(*args, **kwargs):
+            raise error
+        
+        def TensorProductConv(*args, **kwargs):
+            raise error
+            
+    jax = JAX_ERR()
 
 __all__ = [
     "TPProblem",
