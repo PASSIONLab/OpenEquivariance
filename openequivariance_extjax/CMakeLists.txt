@@ -4,6 +4,7 @@ project(${SKBUILD_PROJECT_NAME} LANGUAGES CXX) # TODO: Add HIP support
 find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(CUDAToolkit REQUIRED)
 
+# Would like this to avoid build isolation, but breaks ABI compat.
 #include(ExternalProject)
 #ExternalProject_Add(
 #    xla 
@@ -19,6 +20,7 @@ find_package(CUDAToolkit REQUIRED)
 #    )
 #ExternalProject_Get_Property(xla source_dir)
 #set(XLA_DIR ${source_dir})
+#add_dependencies(openequivariance_extjax xla)
 
 execute_process(
   COMMAND "${Python_EXECUTABLE}" "-c"
@@ -57,8 +59,6 @@ target_compile_options(openequivariance_extjax PRIVATE -Wno-attributes -Wno-retu
 get_target_property(CUDA_LIB_DIR CUDA::nvrtc IMPORTED_LOCATION)
 get_filename_component(CUDA_LIB_DIR ${CUDA_LIB_DIR} DIRECTORY)
 
-#add_dependencies(openequivariance_extjax xla)
-
 set_target_properties(openequivariance_extjax PROPERTIES
     BUILD_RPATH "${CUDA_LIB_DIR}"
     INSTALL_RPATH "${CUDA_LIB_DIR}"
@@ -70,8 +70,3 @@ target_link_libraries(openequivariance_extjax PRIVATE
     CUDA::nvrtc)
 
 install(TARGETS openequivariance_extjax LIBRARY DESTINATION .)
-
-# -------------------------------------------------------------
-
-# Uncomment to include XLA from JAX installation 
-#message(STATUS "XLA include directory: ${XLA_DIR}")

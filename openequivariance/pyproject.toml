@@ -62,6 +62,12 @@ dev = [
   "sphinx-autobuild"
 ]
 
+jax = [
+  "nanobind",
+  "scikit-build-core",
+  "setuptools-scm"
+]
+
 [tool.setuptools.packages.find]
 include = ["openequivariance*"]
 
