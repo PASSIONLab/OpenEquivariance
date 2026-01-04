@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15...3.30)
 project(${SKBUILD_PROJECT_NAME} LANGUAGES CXX) # TODO: Add HIP support
 
-find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development.Module)
+find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(CUDAToolkit REQUIRED)
 
 include(ExternalProject)
@@ -9,7 +9,7 @@ ExternalProject_Add(
     xla 
     PREFIX ${CMAKE_BINARY_DIR}/xla
     GIT_REPOSITORY https://github.com/openxla/xla.git
-    GIT_TAG d56e645fe72988e2b4464119300ca6f894f82598 
+    GIT_TAG main 
     GIT_SHALLOW TRUE
     GIT_PROGRESS TRUE
     CONFIGURE_COMMAND ""
