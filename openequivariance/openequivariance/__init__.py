@@ -65,6 +65,7 @@ if "OEQ_NOTORCH" not in os.environ or os.environ["OEQ_NOTORCH"] != "1":
         TORCH_COMPILE_ERROR,
     )
 
+
 def torch_ext_so_path():
     """
     :returns: Path to a ``.so`` file that must be linked to use OpenEquivariance
@@ -82,13 +83,14 @@ try:
     import openequivariance.jax as jax
 except Exception as e:
     error = e
+
     class JAX_ERR:
         def TensorProduct(*args, **kwargs):
             raise error
-        
+
         def TensorProductConv(*args, **kwargs):
             raise error
-            
+
     jax = JAX_ERR()
 
 __all__ = [
