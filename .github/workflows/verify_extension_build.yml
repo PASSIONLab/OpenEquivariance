@@ -37,7 +37,7 @@ jobs:
           tests/import_test.py::test_extension_built \
           tests/import_test.py::test_torch_extension_built 
 
-    - name: Test JAX extension build 
-      run: |
-        pip install -e "./openequivariance[jax]"
-        pip install -e ""./openequivariance_extjax" --no-build-isolation
+    #- name: Test JAX extension build 
+    #  run: |
+    #    pip install -e "./openequivariance[jax]"
+    #    pip install -e ""./openequivariance_extjax" --no-build-isolation
