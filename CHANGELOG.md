@@ -2,7 +2,8 @@
 
 ### v0.5.0 (2025-12-25) 
 JAX support is now available in 
-OpenEquivariance for NVIDIA GPUs. See the 
+OpenEquivariance for BOTH NVIDIA and
+AMD GPUs! See the 
 [documentation](https://passionlab.github.io/OpenEquivariance/)
 and README.md for instructions on installation
 and usage. 

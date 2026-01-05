@@ -32,8 +32,8 @@ check out the [documentation](https://passionlab.github.io/OpenEquivariance).
 
 ⭐️ **JAX**: Our latest update brings
 support for JAX. For NVIDIA GPUs, 
-install it with the following two commands
-(strictly in order):
+install it (after installing JAX) 
+with the following two commands strictly in order:
 
 ``` bash
 pip install openequivariance[jax]
