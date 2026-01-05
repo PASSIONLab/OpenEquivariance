@@ -1,26 +1,7 @@
 cmake_minimum_required(VERSION 3.15...3.30)
-project(${SKBUILD_PROJECT_NAME} LANGUAGES CXX) # TODO: Add HIP support
+project(${SKBUILD_PROJECT_NAME} LANGUAGES CXX)
 
 find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
-find_package(hip REQUIRED)
-
-# Would like this to avoid build isolation, but breaks ABI compat.
-#include(ExternalProject)
-#ExternalProject_Add(
-#    xla 
-#    PREFIX ${CMAKE_BINARY_DIR}/xla
-#    GIT_REPOSITORY https://github.com/openxla/xla.git
-#    GIT_TAG d56e645fe72988e2b4464119300ca6f894f82598 
-#    GIT_SHALLOW TRUE
-#    GIT_PROGRESS TRUE
-#    CONFIGURE_COMMAND ""
-#    BUILD_COMMAND ""
-#    INSTALL_COMMAND ""
-#    LOG_DOWNLOAD ON
-#    )
-#ExternalProject_Get_Property(xla source_dir)
-#set(XLA_DIR ${source_dir})
-#add_dependencies(openequivariance_extjax xla)
 
 execute_process(
   COMMAND "${Python_EXECUTABLE}" "-c"
@@ -34,10 +15,18 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT
 )
 message(STATUS "nanobind cmake directory: ${nanobind_ROOT}")
-set(HEADER_DIR "src/extension")
 
 find_package(nanobind CONFIG REQUIRED)
 
+if(DJAX_HIP)
+    message(STATUS "DJAX_HIP is set. Building with HIP backend.")
+    find_package(hip REQUIRED)
+else()
+    message(STATUS "DJAX_HIP is not set (or zero). Building with CUDA backend.")
+    find_package(CUDAToolkit REQUIRED)
+endif()
+
+set(HEADER_DIR "src/extension")
 set(OEQ_JAX_SOURCES
     src/libjax_tp_jit.cpp
 )
@@ -51,20 +40,29 @@ set(OEQ_JAX_HEADERS
 )
 
 nanobind_add_module(openequivariance_extjax NB_STATIC ${OEQ_JAX_SOURCES} ${OEQ_JAX_HEADERS})
-
 target_include_directories(openequivariance_extjax PUBLIC ${XLA_DIR} ${HEADER_DIR})
-set_target_properties(openequivariance_extjax PROPERTIES CUDA_STANDARD 17 POSITION_INDEPENDENT_CODE ON)
+set_target_properties(openequivariance_extjax PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_options(openequivariance_extjax PRIVATE -Wno-attributes -Wno-return-type)
 
-#get_target_property(CUDA_LIB_DIR CUDA::nvrtc IMPORTED_LOCATION)
-#get_filename_component(CUDA_LIB_DIR ${CUDA_LIB_DIR} DIRECTORY)
+if(DJAX_HIP)
+    target_link_libraries(openequivariance_extjax PRIVATE hiprtc)
+    target_compile_definitions(openequivariance_extjax PRIVATE DJAX_HIP=1)
 
-set_target_properties(openequivariance_extjax PROPERTIES
-    BUILD_RPATH "${CUDA_LIB_DIR}"
-    INSTALL_RPATH "${CUDA_LIB_DIR}"
-)
+else()
+    set_target_properties(openequivariance_extjax PROPERTIES CUDA_STANDARD 17)
 
-target_link_libraries(openequivariance_extjax PRIVATE 
-    hiprtc)
+    get_target_property(CUDA_LIB_DIR CUDA::nvrtc IMPORTED_LOCATION)
+    get_filename_component(CUDA_LIB_DIR ${CUDA_LIB_DIR} DIRECTORY)
+
+    set_target_properties(openequivariance_extjax PROPERTIES
+        BUILD_RPATH "${CUDA_LIB_DIR}"
+        INSTALL_RPATH "${CUDA_LIB_DIR}"
+    )
+
+    target_link_libraries(openequivariance_extjax PRIVATE 
+      CUDA::cudart
+      CUDA::cuda_driver
+      CUDA::nvrtc)
+endif()
 
 install(TARGETS openequivariance_extjax LIBRARY DESTINATION .)
