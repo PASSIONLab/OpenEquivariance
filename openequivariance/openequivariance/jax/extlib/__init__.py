@@ -1,6 +1,7 @@
 import jax
 import openequivariance_extjax as oeq_extjax
 
+
 def postprocess_kernel(kernel):
     if oeq_extjax.is_hip():
         kernel = kernel.replace("__syncwarp();", "__threadfence_block();")
@@ -10,9 +11,10 @@ def postprocess_kernel(kernel):
     else:
         return kernel
 
-platform = "CUDA" 
+
+platform = "CUDA"
 if oeq_extjax.is_hip():
-    platform = "ROCM" 
+    platform = "ROCM"
 
 for name, target in oeq_extjax.registrations().items():
     jax.ffi.register_ffi_target(name, target, platform=platform)
