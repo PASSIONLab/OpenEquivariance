@@ -18,11 +18,11 @@ message(STATUS "nanobind cmake directory: ${nanobind_ROOT}")
 
 find_package(nanobind CONFIG REQUIRED)
 
-if(DJAX_HIP)
-    message(STATUS "DJAX_HIP is set. Building with HIP backend.")
+if(JAX_HIP)
+    message(STATUS "JAX_HIP is set. Building with HIP backend.")
     find_package(hip REQUIRED)
 else()
-    message(STATUS "DJAX_HIP is not set (or zero). Building with CUDA backend.")
+    message(STATUS "JAX_HIP is not set (or zero). Building with CUDA backend.")
     find_package(CUDAToolkit REQUIRED)
 endif()
 
@@ -44,7 +44,7 @@ target_include_directories(openequivariance_extjax PUBLIC ${XLA_DIR} ${HEADER_DI
 set_target_properties(openequivariance_extjax PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_options(openequivariance_extjax PRIVATE -Wno-attributes -Wno-return-type)
 
-if(DJAX_HIP)
+if(JAX_HIP)
     target_link_libraries(openequivariance_extjax PRIVATE hiprtc)
     target_compile_definitions(openequivariance_extjax PRIVATE HIP_BACKEND=1)
 
