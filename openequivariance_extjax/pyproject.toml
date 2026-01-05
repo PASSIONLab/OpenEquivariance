@@ -37,6 +37,8 @@ homepage = "https://passionlab.github.io/OpenEquivariance/"
 source = "https://github.com/PASSIONLab/OpenEquivariance"
 issues = "https://github.com/PASSIONLab/OpenEquivariance/issues"
 
+[tool.scikit-build.cmake.define]
+JAX_HIP = {env="JAX_HIP", default="0"}
 
 [tool.setuptools_scm]
 root = ".."
