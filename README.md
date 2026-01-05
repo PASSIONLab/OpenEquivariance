@@ -31,12 +31,19 @@ For detailed instructions on tests, benchmarks, MACE / Nequip, and our API,
 check out the [documentation](https://passionlab.github.io/OpenEquivariance).
 
 ⭐️ **JAX**: Our latest update brings
-support for JAX. Install it with the following two commands
+support for JAX. For NVIDIA GPUs, 
+install it with the following two commands
 (strictly in order):
 
 ``` bash
 pip install openequivariance[jax]
 pip install openequivariance_extjax --no-build-isolation
+```
+
+For AMD GPUs:
+``` bash
+pip install openequivariance[jax]
+JAX_HIP=1 pip install openequivariance_extjax --no-build-isolation
 ```
 
 See the section below for example usage and 

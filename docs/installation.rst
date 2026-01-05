@@ -58,13 +58,21 @@ installation (or upgrade) with pip.
 
 JAX
 ------------------------------------------
-JAX support is currently limited to NVIDIA GPUs. Install it by
+Install OpenEquivariance for NVIDIA GPUs by
 executing the following two commands in order:
 
 .. code-block:: bash 
 
     pip install openequivariance[jax]
     pip install openequivariance_extjax --no-build-isolation
+
+
+For AMD GPUs, use
+
+.. code-block:: bash 
+
+    pip install openequivariance[jax]
+    JAX_HIP=1 pip install openequivariance_extjax --no-build-isolation
 
 From there, set ``OEQ_NOTORCH=1`` to avoid a PyTorch import and test the package:
 
@@ -73,7 +81,7 @@ From there, set ``OEQ_NOTORCH=1`` to avoid a PyTorch import and test the package
     OEQ_NOTORCH=1
     python -c "import openequivariance.jax"
 
-You can get the nightly build with teh following command: 
+Likewise, you can get the nightly build with the following commands:
 
 .. code-block:: bash 
 
