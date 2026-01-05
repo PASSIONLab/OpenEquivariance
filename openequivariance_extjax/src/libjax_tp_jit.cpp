@@ -5,8 +5,6 @@
 #include <string_view>
 #include <unordered_map>
 #include <iostream>
-#include <cuda.h>
-#include <cuda_runtime.h>
 
 #include "nanobind/nanobind.h"
 #include "xla/ffi/api/ffi.h"
@@ -14,9 +12,12 @@
 namespace nb = nanobind;
 namespace ffi = xla::ffi;
 
-#define CUDA_BACKEND // Stick to CUDA for now 
+#define HIP_BACKEND
 
 #ifdef CUDA_BACKEND
+    #include <cuda.h>
+    #include <cuda_runtime.h>
+
     #include "util/backend_cuda.hpp"
     #include "group_mm_cuda.hpp"
     using JITKernel = CUJITKernel;
@@ -24,6 +25,18 @@ namespace ffi = xla::ffi;
 
     template<typename T>
     using GroupMM = GroupMMCUDA<T>;
+    using stream_t = cudaStream_t;
+#endif
+
+#ifdef HIP_BACKEND
+    #include "util/backend_hip.hpp"
+    #include "group_mm_hip.hpp"
+    using JITKernel = HIPJITKernel;
+    using GPU_Allocator = HIP_Allocator;
+
+    template<typename T>
+    using GroupMM = GroupMMHIP<T>;
+    using stream_t = hipStream_t; 
 #endif
 
 #include "tensorproducts.hpp"
@@ -49,16 +62,10 @@ std::string xla_dtype_to_string(xla::ffi::DataType dtype) {
     const std::unordered_map<xla::ffi::DataType, std::string> map = {
         {xla::ffi::DataType::INVALID, "INVALID"},
         {xla::ffi::DataType::PRED, "PRED"},
-        {xla::ffi::DataType::S1, "S1"},
-        {xla::ffi::DataType::S2, "S2"},
-        {xla::ffi::DataType::S4, "S4"},
         {xla::ffi::DataType::S8, "S8"},
         {xla::ffi::DataType::S16, "S16"},
         {xla::ffi::DataType::S32, "S32"},
         {xla::ffi::DataType::S64, "S64"},
-        {xla::ffi::DataType::U1, "U1"},
-        {xla::ffi::DataType::U2, "U2"},
-        {xla::ffi::DataType::U4, "U4"},
         {xla::ffi::DataType::U8, "U8"},
         {xla::ffi::DataType::U16, "U16"},
         {xla::ffi::DataType::U32, "U32"},
@@ -108,8 +115,17 @@ inline int byte_count(ffi::AnyBuffer &buffer) {
 }
 
 #ifdef CUDA_BACKEND
-void zero_buffer(ffi::AnyBuffer &buffer, cudaStream_t stream) {
+void zero_buffer(ffi::AnyBuffer &buffer, stream_t stream) {
     cudaMemsetAsync(
+        data_ptr(buffer), 
+        0, 
+        buffer.element_count() * byte_count(buffer),
+        stream);
+}
+#endif
+#ifdef HIP_BACKEND
+void zero_buffer(ffi::AnyBuffer &buffer, stream_t stream) {
+    std::ignore = hipMemsetAsync(
         data_ptr(buffer), 
         0, 
         buffer.element_count() * byte_count(buffer),
@@ -286,7 +302,7 @@ ffi::Error tp_forward_impl(
         ffi::AnyBuffer L2_in,
         ffi::AnyBuffer W,
         ffi::Result<ffi::AnyBuffer> L3_out,
-        cudaStream_t stream, 
+        stream_t stream, 
         std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
         int64_t hash) {
    
@@ -321,7 +337,7 @@ ffi::Error tp_backward_impl(
         ffi::Result<ffi::AnyBuffer> L1_grad,
         ffi::Result<ffi::AnyBuffer> L2_grad,
         ffi::Result<ffi::AnyBuffer> W_grad, 
-        cudaStream_t stream, 
+        stream_t stream, 
         std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
         int64_t hash) {
     
@@ -371,7 +387,7 @@ ffi::Error tp_double_backward_impl(
         ffi::Result<ffi::AnyBuffer> L2_grad,
         ffi::Result<ffi::AnyBuffer> W_grad,
         ffi::Result<ffi::AnyBuffer> L3_dgrad,
-        cudaStream_t stream, 
+        stream_t stream, 
         std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
         int64_t hash) {
     
@@ -420,7 +436,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
         .Ret<ffi::AnyBuffer>()
-        .Ctx<ffi::PlatformStream<cudaStream_t>>()
+        .Ctx<ffi::PlatformStream<stream_t>>()
         .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});  // cudaGraph enabled
@@ -435,7 +451,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Ret<ffi::AnyBuffer>()
         .Ret<ffi::AnyBuffer>()
         .Ret<ffi::AnyBuffer>()
-        .Ctx<ffi::PlatformStream<cudaStream_t>>()
+        .Ctx<ffi::PlatformStream<stream_t>>()
         .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});
@@ -454,7 +470,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Ret<ffi::AnyBuffer>()
         .Ret<ffi::AnyBuffer>()
         .Ret<ffi::AnyBuffer>()
-        .Ctx<ffi::PlatformStream<cudaStream_t>>()
+        .Ctx<ffi::PlatformStream<stream_t>>()
         .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});
@@ -469,7 +485,7 @@ ffi::Error conv_forward_impl(
         ffi::AnyBuffer workspace,
         ffi::AnyBuffer transpose_perm,
         ffi::Result<ffi::AnyBuffer> L3_out,
-        cudaStream_t stream, 
+        stream_t stream, 
         std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
         int64_t hash) {
    
@@ -524,7 +540,7 @@ ffi::Error conv_backward_impl(
         ffi::AnyBuffer cols,
         ffi::AnyBuffer workspace,
         ffi::AnyBuffer transpose_perm,
-        cudaStream_t stream, 
+        stream_t stream, 
         std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
         int64_t hash) {
     
@@ -593,7 +609,7 @@ ffi::Error conv_double_backward_impl(
         ffi::AnyBuffer cols,
         ffi::AnyBuffer workspace,
         ffi::AnyBuffer transpose_perm,
-        cudaStream_t stream, 
+        stream_t stream, 
         std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
         int64_t hash) {
     
@@ -664,7 +680,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
         .Ret<ffi::AnyBuffer>()
-        .Ctx<ffi::PlatformStream<cudaStream_t>>()
+        .Ctx<ffi::PlatformStream<stream_t>>()
         .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});
@@ -683,7 +699,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
-        .Ctx<ffi::PlatformStream<cudaStream_t>>()
+        .Ctx<ffi::PlatformStream<stream_t>>()
         .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});
@@ -706,7 +722,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
-        .Ctx<ffi::PlatformStream<cudaStream_t>>()
+        .Ctx<ffi::PlatformStream<stream_t>>()
         .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});
