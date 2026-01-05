@@ -12,8 +12,6 @@
 namespace nb = nanobind;
 namespace ffi = xla::ffi;
 
-#define HIP_BACKEND
-
 #ifdef CUDA_BACKEND
     #include <cuda.h>
     #include <cuda_runtime.h>
@@ -669,6 +667,16 @@ ffi::Error conv_double_backward_impl(
     return ffi::Error::Success();
 }
 
+bool is_hip() {
+#ifdef HIP_BACKEND
+    return true;
+#else
+    return false;
+#endif
+}
+
+// --------------------- FFI Bindings --------------------------
+
 XLA_FFI_DEFINE_HANDLER_SYMBOL(
     conv_forward, conv_forward_impl,
     ffi::Ffi::Bind()
@@ -740,6 +748,7 @@ NB_MODULE(openequivariance_extjax, m) {
         registrations["conv_double_backward"] = nb::capsule(reinterpret_cast<void *>(conv_double_backward));
         return registrations;
     });
+    m.def("is_hip", &is_hip);
 
     nb::class_<DeviceProp>(m, "DeviceProp")
         .def(nb::init<int>())

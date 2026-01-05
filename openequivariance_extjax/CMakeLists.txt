@@ -46,7 +46,7 @@ target_compile_options(openequivariance_extjax PRIVATE -Wno-attributes -Wno-retu
 
 if(DJAX_HIP)
     target_link_libraries(openequivariance_extjax PRIVATE hiprtc)
-    target_compile_definitions(openequivariance_extjax PRIVATE DJAX_HIP=1)
+    target_compile_definitions(openequivariance_extjax PRIVATE HIP_BACKEND=1)
 
 else()
     set_target_properties(openequivariance_extjax PROPERTIES CUDA_STANDARD 17)
@@ -63,6 +63,7 @@ else()
       CUDA::cudart
       CUDA::cuda_driver
       CUDA::nvrtc)
+    target_compile_definitions(openequivariance_extjax PRIVATE CUDA_BACKEND=1)
 endif()
 
 install(TARGETS openequivariance_extjax LIBRARY DESTINATION .)
