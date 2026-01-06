@@ -28,10 +28,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 html_theme = "furo"
 # html_static_path = ["_static"]
 
-extensions = [
-    "sphinx.ext.autodoc",
-    "sphinx_inline_tabs"
-]
+extensions = ["sphinx.ext.autodoc", "sphinx_inline_tabs"]
 
 sys.path.insert(0, str(Path("../openequivariance").resolve()))
 
