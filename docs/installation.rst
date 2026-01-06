@@ -9,7 +9,7 @@ You need the following to install OpenEquivariance:
 
 - A Linux system equipped with an NVIDIA / AMD graphics card.
 - Either PyTorch >= 2.4 (>= 2.8 for AOTI and export), or JAX>0.5.0 
-  with CUDA 12 support or higher.
+  with CUDA or RocM support. 
 - GCC 9+ and the CUDA / HIP toolkit. The command
   ``c++ --version`` should return >= 9.0; see below for details on 
   setting an alternate compiler.
