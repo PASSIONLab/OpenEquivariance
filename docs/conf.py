@@ -30,6 +30,7 @@ html_theme = "furo"
 
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx_inline_tabs"
 ]
 
 sys.path.insert(0, str(Path("../openequivariance").resolve()))

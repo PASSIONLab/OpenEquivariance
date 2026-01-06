@@ -56,10 +56,7 @@ dev = [
   "pytest-check",
   "pytest-subtests",
   "torch_geometric",
-  "cmake",
-  "furo",
-  "sphinx",
-  "sphinx-autobuild"
+  "cmake"
 ]
 
 jax = [
