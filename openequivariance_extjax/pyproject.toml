@@ -8,7 +8,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "openequivariance_extjax"
-dynamic = ["version"]
+version = "0.1.0"
 authors = [
   { name="Austin Glover" },
   { name="Vivek Bharadwaj" },
