@@ -3,7 +3,6 @@ from pytest_check import check
 
 import numpy as np
 import openequivariance as oeq
-from openequivariance.implementations.TensorProduct import TensorProduct
 from openequivariance.benchmark.correctness_utils import (
     correctness_forward,
     correctness_backward,
@@ -41,8 +40,17 @@ class TPCorrectness:
         return {}
 
     @pytest.fixture(scope="class")
-    def tp_and_problem(self, problem, extra_tp_constructor_args):
-        tp = TensorProduct(problem, **extra_tp_constructor_args)
+    def with_jax(self, request):
+        return request.config.getoption("--jax")
+
+    @pytest.fixture(scope="class")
+    def tp_and_problem(self, problem, extra_tp_constructor_args, with_jax):
+        cls = oeq.TensorProduct
+        if with_jax:
+            import openequivariance.jax.TensorProduct as jax_tp
+
+            cls = jax_tp
+        tp = cls(problem, **extra_tp_constructor_args)
         return tp, problem
 
     def test_tp_fwd(self, tp_and_problem):
@@ -247,7 +255,9 @@ class TestSharedWeights(TPCorrectness):
 
 class TestTorchbindDisable(TestProductionModels):
     @pytest.fixture(scope="class")
-    def extra_tp_constructor_args(self):
+    def extra_tp_constructor_args(self, with_jax):
+        if with_jax:
+            pytest.skip("N/A for JAX")
         return {"use_opaque": True}
 
 
@@ -261,11 +271,14 @@ class TestTorchTo(TPCorrectness):
         return problem
 
     @pytest.fixture(scope="class")
-    def tp_and_problem(self, problem, extra_tp_constructor_args):
-        tp = TensorProduct(problem, **extra_tp_constructor_args)
-        switch_map = {
-            np.float32: torch.float64,
-            np.float64: torch.float32,
-        }
-        tp.to(switch_map[problem.irrep_dtype])
-        return tp, tp.config
+    def tp_and_problem(self, problem, extra_tp_constructor_args, with_jax):
+        if with_jax:
+            pytest.skip("N/A for JAX")
+        else:
+            tp = oeq.TensorProduct(problem, **extra_tp_constructor_args)
+            switch_map = {
+                np.float32: torch.float64,
+                np.float64: torch.float32,
+            }
+            tp.to(switch_map[problem.irrep_dtype])
+            return tp, tp.config

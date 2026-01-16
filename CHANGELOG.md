@@ -1,5 +1,17 @@
 ## Latest Changes
 
+### v0.5.0 (2025-12-25) 
+JAX support is now available in 
+OpenEquivariance for BOTH NVIDIA and
+AMD GPUs! See the 
+[documentation](https://passionlab.github.io/OpenEquivariance/)
+and README.md for instructions on installation
+and usage. 
+
+Minor changes:
+- Defer error reporting when CUDA is not available
+  to the first library usage in code, not library load. 
+
 ### v0.4.1 (2025-09-04)
 Minor update, fixes a bug loading JIT-compiled modules
 with PyTorch 2.9.

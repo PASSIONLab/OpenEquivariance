@@ -1,4 +1,4 @@
-name: OEQ CUDA C++ Extension Build Verification
+name: OEQ C++ Extension Build Verification
 
 on:
   push:
@@ -29,10 +29,14 @@ jobs:
         sudo apt-get update
         sudo apt install nvidia-cuda-toolkit
         pip install -r .github/workflows/requirements_cuda_ci.txt
-        pip install -e .
+        pip install -e "./openequivariance"
 
-    - name: Test extension build via import 
+    - name: Test CUDA extension build via import 
       run: |
         pytest \
           tests/import_test.py::test_extension_built \
           tests/import_test.py::test_torch_extension_built 
+
+    - name: Test JAX extension build
+      run: |
+        XLA_DIRECT_DOWNLOAD=1 pip install -e "./openequivariance_extjax" --no-build-isolation 

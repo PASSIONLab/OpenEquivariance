@@ -1,0 +1,4 @@
+furo
+sphinx
+sphinx-inline-tabs
+sphinx-autobuild

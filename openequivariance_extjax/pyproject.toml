@@ -1,0 +1,53 @@
+[build-system]
+requires = [
+    "setuptools-scm", 
+    "scikit-build-core", 
+    "nanobind"
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "openequivariance_extjax"
+dynamic = ["version"]
+authors = [
+  { name="Austin Glover" },
+  { name="Vivek Bharadwaj" },
+  { name="Aydin Buluc" },
+  { name="James Demmel" }
+]
+description = "JAX C++ Extension for OpenEquivariance"
+requires-python = ">=3.10"
+
+dependencies = []
+readme = "README.md"
+
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+
+[project.urls]
+homepage = "https://passionlab.github.io/OpenEquivariance/"
+source = "https://github.com/PASSIONLab/OpenEquivariance"
+issues = "https://github.com/PASSIONLab/OpenEquivariance/issues"
+
+[tool.scikit-build.cmake.define]
+JAX_HIP = {env="JAX_HIP", default="0"}
+XLA_DIRECT_DOWNLOAD = {env="XLA_DIRECT_DOWNLOAD", default="0"}
+
+[tool.setuptools_scm]
+root = ".."
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
+
+[tool.ruff]
+lint.ignore = ["E741"]

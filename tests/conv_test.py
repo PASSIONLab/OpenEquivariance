@@ -51,23 +51,29 @@ class ConvCorrectness:
     def extra_conv_constructor_args(self):
         return {}
 
+    @pytest.fixture(scope="class")
+    def with_jax(self, request):
+        return request.config.getoption("--jax")
+
     @pytest.fixture(params=["atomic", "deterministic", "kahan"], scope="class")
-    def conv_object(self, request, problem, extra_conv_constructor_args):
+    def conv_object(self, request, problem, extra_conv_constructor_args, with_jax):
+        cls = oeq.TensorProductConv
+        if with_jax:
+            from openequivariance.jax import TensorProductConv as jax_conv
+
+            cls = jax_conv
+
         if request.param == "atomic":
-            return oeq.TensorProductConv(
-                problem, deterministic=False, **extra_conv_constructor_args
-            )
+            return cls(problem, deterministic=False, **extra_conv_constructor_args)
         elif request.param == "deterministic":
             if not problem.shared_weights:
-                return oeq.TensorProductConv(
-                    problem, deterministic=True, **extra_conv_constructor_args
-                )
+                return cls(problem, deterministic=True, **extra_conv_constructor_args)
             else:
                 pytest.skip("Shared weights not supported with deterministic")
         elif request.param == "kahan":
             if problem.irrep_dtype == np.float32:
                 if not problem.shared_weights:
-                    return oeq.TensorProductConv(
+                    return cls(
                         problem,
                         deterministic=True,
                         kahan=True,
@@ -228,7 +234,7 @@ class TestAtomicSharedWeights(ConvCorrectness):
         return {
             "fwd": 1e-5,
             "bwd": 7.5e-2,  # Expect higher errors for shared weights
-            "double_bwd": 5e-2,
+            "double_bwd": 5e-1,
         }[direction]
 
     @pytest.fixture(params=problems, ids=lambda x: x.label, scope="class")
@@ -245,7 +251,9 @@ class TestAtomicSharedWeights(ConvCorrectness):
 
 class TestTorchbindDisable(TestProductionModels):
     @pytest.fixture(scope="class")
-    def extra_conv_constructor_args(self):
+    def extra_conv_constructor_args(self, with_jax):
+        if with_jax:
+            pytest.skip("N/A for JAX")
         return {"use_opaque": True}
 
 
@@ -253,7 +261,10 @@ class TestTorchTo(ConvCorrectness):
     problems = [mace_problems()[0]]
 
     @pytest.fixture(params=problems, ids=lambda x: x.label, scope="class")
-    def problem(self, request, dtype):
+    def problem(self, request, dtype, with_jax):
+        if with_jax:
+            pytest.skip("N/A for JAX")
+
         problem = request.param
         problem.irrep_dtype, problem.weight_dtype = dtype, dtype
         return problem

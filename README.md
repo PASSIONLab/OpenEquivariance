@@ -1,8 +1,9 @@
 # OpenEquivariance
-[![OEQ CUDA C++ Extension Build Verification](https://github.com/PASSIONLab/OpenEquivariance/actions/workflows/verify_extension_build.yml/badge.svg?event=push)](https://github.com/PASSIONLab/OpenEquivariance/actions/workflows/verify_extension_build.yml)
+[![OEQ C++ Extension Build Verification](https://github.com/PASSIONLab/OpenEquivariance/actions/workflows/verify_extension_build.yml/badge.svg?event=push)](https://github.com/PASSIONLab/OpenEquivariance/actions/workflows/verify_extension_build.yml)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
-[[Examples]](#show-me-some-examples) 
+[[PyTorch Examples]](#pytorch-examples) 
+[[JAX Examples]](#jax-examples)
 [[Citation and Acknowledgements]](#citation-and-acknowledgements)
 
 OpenEquivariance is a CUDA and HIP kernel generator for the Clebsch-Gordon tensor product, 
@@ -12,8 +13,8 @@ that [e3nn](https://e3nn.org/) supports
 commonly found in graph neural networks 
 (e.g. [Nequip](https://github.com/mir-group/nequip) or
 [MACE](https://github.com/ACEsuit/mace)). To get 
-started, ensure that you have GCC 9+ on your system 
-and install our package via
+started with PyTorch, ensure that you have PyTorch 
+and GCC 9+ available before installing our package via 
 
 ```bash
 pip install openequivariance
@@ -29,11 +30,26 @@ computation and memory consumption significantly.
 For detailed instructions on tests, benchmarks, MACE / Nequip, and our API,
 check out the [documentation](https://passionlab.github.io/OpenEquivariance).
 
-📣 📣 OpenEquivariance was accepted to the 2025 SIAM Conference on Applied and 
-Computational Discrete Algorithms (Proceedings Track)! Catch the talk in 
-Montréal and check out the [camera-ready copy on Arxiv](https://arxiv.org/abs/2501.13986) (available May 12, 2025).
+⭐️ **JAX**: Our latest update brings
+support for JAX. For NVIDIA GPUs, 
+install it (after installing JAX) 
+with the following two commands strictly in order:
 
-## Show me some examples
+``` bash
+pip install openequivariance[jax]
+pip install openequivariance_extjax --no-build-isolation
+```
+
+For AMD GPUs:
+``` bash
+pip install openequivariance[jax]
+JAX_HIP=1 pip install openequivariance_extjax --no-build-isolation
+```
+
+See the section below for example usage and 
+our [API page](https://passionlab.github.io/OpenEquivariance/api/) for more details.
+
+## PyTorch Examples 
 Here's a CG tensor product implemented by e3nn: 
 
 ```python
@@ -126,6 +142,48 @@ print(torch.norm(Z))
 **Note**: you don't need Pytorch geometric to use our kernels. When
 `deterministic=False`, the `sender` and `receiver` indices can have
 arbitrary order.
+
+## JAX Examples
+After installation, use the library
+as follows. Set `OEQ_NOTORCH=1`
+in your environment to avoid the PyTorch import in
+the regular `openequivariance` package.
+```python
+import jax
+import os
+
+os.environ["OEQ_NOTORCH"] = "1"
+import openequivariance as oeq
+
+seed = 42
+key = jax.random.PRNGKey(seed)
+
+batch_size = 1000
+X_ir, Y_ir, Z_ir = oeq.Irreps("1x2e"), oeq.Irreps("1x3e"), oeq.Irreps("1x2e")
+problem = oeq.TPProblem(X_ir, Y_ir, Z_ir, [(0, 0, 0, "uvu", True)], shared_weights=False, internal_weights=False)
+
+
+node_ct, nonzero_ct = 3, 4
+edge_index = jax.numpy.array(
+    [
+        [0, 1, 1, 2],
+        [1, 0, 2, 1],
+    ],
+    dtype=jax.numpy.int32, # NOTE: This int32, not int64
+)
+
+X = jax.random.uniform(key, shape=(node_ct, X_ir.dim), minval=0.0, maxval=1.0, dtype=jax.numpy.float32)
+Y = jax.random.uniform(key, shape=(nonzero_ct, Y_ir.dim),
+                        minval=0.0, maxval=1.0, dtype=jax.numpy.float32)
+W = jax.random.uniform(key, shape=(nonzero_ct, problem.weight_numel),
+                        minval=0.0, maxval=1.0, dtype=jax.numpy.float32)
+
+tp_conv = oeq.jax.TensorProductConv(problem, deterministic=False)
+Z = tp_conv.forward(
+    X, Y, W, edge_index[0], edge_index[1]
+)
+print(jax.numpy.linalg.norm(Z))
+```
 
 ## Citation and Acknowledgements
 If you find this code useful, please cite our paper:

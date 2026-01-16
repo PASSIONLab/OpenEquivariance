@@ -12,25 +12,39 @@ these; we provide instructions below.
 We recommend you clone our repository and use an editable install to run tests
 and benchmarks. 
 
-You can still test our code with a non-editable install; just 
-download the test folder and install the non-editable package and the dependencies with:
-
-.. code-block:: bash
-
-    pip install openequivariance[dev,bench]
-
 Correctness
 ------------------------------
-To set up the editable install and run the entire testsuite, use: 
+To set up an editable install and run our tests, use the following code: 
 
-.. code-block:: bash
+.. tab:: PyTorch
 
-    git clone https://github.com/PASSIONLab/OpenEquivariance 
-    cd OpenEquivariance
-    pip install -e .[dev] 
-    pytest 
+    .. code-block:: bash
+
+        git clone https://github.com/PASSIONLab/OpenEquivariance 
+        cd OpenEquivariance
+        pip install -e "./openequivariance[dev]"
+        pytest tests/ 
+
+.. tab:: JAX
+
+    Note: To test correctness in JAX, we still require
+    an installation of PyTorch and e3nn in your environment. 
+
+    .. code-block:: bash
+
+        git clone https://github.com/PASSIONLab/OpenEquivariance 
+        cd OpenEquivariance
+
+        pip install "./openequivariance[jax]"
+        pip install "./openequivariance[dev]"
+        pip install "./openequivariance_extjax" --no-build-isolation
+
+        pytest --jax tests/example_test.py
+        pytest --jax tests/batch_test.py
+        pytest --jax tests/conv_test.py
 
 Browse the ``tests`` directory to run specific components. 
+
 
 
 Replicating our Benchmarks
@@ -79,12 +93,13 @@ OpenEquivariance exhibits up to 2x speedup over FlashTP's fused kernels.
 
 List of GPUs Tested
 --------------------------------
-OpenEquivariance has been tested successfully the following GPUs. Submit a pull 
+OpenEquivariance runs successfully the following GPUs. Submit a pull 
 request if you'd like to add your own!
 
 - NVIDIA V100 (V. Bharadwaj, LBNL Einsteinium, June 2025)
 - NVIDIA A100-SXM-40GB and A100-SXM-80GB (A. Glover, NERSC Perlmutter, June 2025)
 - NVIDIA A5000 (V. Bharadwaj, UCB SLICE, June 2025)
+- NVIDIA T4 (V. Bharadwaj, Google Colab, Jan 2026)
 - NVIDIA H100 (L. Larsen, P1 DTU HPC, June 2025)
 - AMD MI250x (V. Bharadwaj, OLCF Frontier, June 2025)
 - AMD MI300x (V. Bharadwaj, AMD Cloud, February 2025)

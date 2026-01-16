@@ -28,11 +28,17 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 html_theme = "furo"
 # html_static_path = ["_static"]
 
-extensions = [
-    "sphinx.ext.autodoc",
+extensions = ["sphinx.ext.autodoc", "sphinx_inline_tabs"]
+
+sys.path.insert(0, str(Path("../openequivariance").resolve()))
+
+autodoc_mock_imports = [
+    "torch",
+    "jax",
+    "openequivariance._torch.extlib",
+    "openequivariance.jax.extlib",
+    "openequivariance_extjax",
+    "jinja2",
+    "numpy",
 ]
-
-sys.path.insert(0, str(Path("..").resolve()))
-
-autodoc_mock_imports = ["torch", "openequivariance.extlib", "jinja2", "numpy"]
 autodoc_typehints = "description"
