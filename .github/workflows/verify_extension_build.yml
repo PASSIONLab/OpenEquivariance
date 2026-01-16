@@ -39,4 +39,4 @@ jobs:
 
     - name: Test JAX extension build
       run: |
-        pip install -e "./openequivariance_extjax" --no-build-isolation 
+        XLA_DIRECT_DOWNLOAD=1 pip install -e "./openequivariance_extjax" --no-build-isolation 
