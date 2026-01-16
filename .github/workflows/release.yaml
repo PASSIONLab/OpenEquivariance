@@ -3,11 +3,9 @@ name: Upload Python Package
 on:
   workflow_dispatch:
 
-# ref: https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
-
 jobs:
   build-oeq:
-    name: Build distribution
+    name: Build oeq dist 
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -18,37 +16,36 @@ jobs:
     - name: install dependencies, then build source tarball
       run: |
         cd openequivariance 
-        python3 -m pip install build --user
-        python3 -m build --sdist 
+        python3 -m pip install build 
+        python3 -m build --sdist
     - name: store the distribution packages 
       uses: actions/upload-artifact@v4
       with:
-        name: python-package-distributions
+        name: oeq-package-distributions
         path: openequivariance/dist/
 
   pypi-publish:
-    name: Upload release to PyPI
+    name: Upload oeq to PyPI
     runs-on: ubuntu-latest
     needs: build-oeq
     environment: 
         name: pypi
         url: https://pypi.org/p/openequivariance
     permissions:
-      # IMPORTANT: this permission is mandatory for Trusted Publishing
       id-token: write
     steps:
       - name: download the distributions
         uses: actions/download-artifact@v4
         with:
-          name: python-package-distributions
-          path: openequivariance/dist/
+          name: oeq-package-distributions
+          path: dist/ 
       - name: publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
 
   # ------------------------------------
 
   build-oeq-extjax:
-    name: Build distribution
+    name: Build extjax dist
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -59,29 +56,28 @@ jobs:
     - name: install dependencies, then build source tarball
       run: |
         cd openequivariance_extjax 
-        python3 -m pip install build --user
+        python3 -m pip install build 
         python3 -m build --sdist 
     - name: store the distribution packages 
       uses: actions/upload-artifact@v4
       with:
-        name: python-package-distributions
+        name: oeqjax-package-distributions
         path: openequivariance_extjax/dist/
 
   pypi-publish-extjax:
-    name: Upload release to PyPI
+    name: Upload extjax to PyPI
     runs-on: ubuntu-latest
     needs: build-oeq-extjax
     environment: 
         name: pypi
         url: https://pypi.org/p/openequivariance_extjax
     permissions:
-      # IMPORTANT: this permission is mandatory for Trusted Publishing
       id-token: write
     steps:
       - name: download the distributions
         uses: actions/download-artifact@v4
         with:
-          name: python-package-distributions
-          path: openequivariance_extjax/dist/
+          name: oeqjax-package-distributions
+          path: dist/ 
       - name: publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
