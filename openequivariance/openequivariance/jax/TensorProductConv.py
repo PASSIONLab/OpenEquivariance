@@ -17,7 +17,7 @@ logger = getLogger()
 def zeros_like(x):
     return jnp.zeros_like(x)
 
-@partial(jax.custom_vjp, nondiff_argnums=(3, 4, 5, 6, 7, 8, 9))
+@partial(jax.custom_vjp, nondiff_argnums=(5, 6, 7, 8, 9))
 def forward(X, Y, W, rows, cols, workspace, sender_perm, L3_dim, irrep_dtype, attrs):
     forward_call = jax.ffi.ffi_call(
         "conv_forward", jax.ShapeDtypeStruct((X.shape[0], L3_dim), irrep_dtype)
@@ -31,22 +31,23 @@ def forward_fwd(
     out = forward(
         X, Y, W, rows, cols, workspace, sender_perm, L3_dim, irrep_dtype, attrs
     )
-    return out, (X, Y, W)
+    return out, (X, Y, W, rows, cols)
 
 
 def forward_bwd(
-    rows, cols, workspace, sender_perm, L3_dim, irrep_dtype, attrs, inputs, dZ
+    workspace, sender_perm, L3_dim, irrep_dtype, attrs, res, dZ
 ):
-    X, Y, W = inputs
-    return backward(
+    X, Y, W, rows, cols = res
+    dX, dY, dW = backward(
         X, Y, W, dZ, rows, cols, workspace, sender_perm, irrep_dtype, attrs
     )
+    return dX, dY, dW, None, None
 
 
 forward.defvjp(forward_fwd, forward_bwd)
 
 
-@partial(jax.custom_vjp, nondiff_argnums=(4, 5, 6, 7, 8, 9))
+@partial(jax.custom_vjp, nondiff_argnums=(6, 7, 8, 9))
 def backward(X, Y, W, dZ, rows, cols, workspace, sender_perm, irrep_dtype, attrs):
     backward_call = jax.ffi.ffi_call(
         "conv_backward",
@@ -65,35 +66,26 @@ def backward_fwd(
     out = backward(
         X, Y, W, dZ, rows, cols, workspace, sender_perm, irrep_dtype, attrs
     )
-    return out, (X, Y, W, dZ)
+    return out, (X, Y, W, dZ, rows, cols)
 
 
 def backward_bwd(
-    rows, cols, workspace, sender_perm, irrep_dtype, attrs, inputs, derivatives
+    workspace, sender_perm, irrep_dtype, attrs, res, derivatives
 ):
-    X, Y, W, dZ = inputs
+    X, Y, W, dZ, rows, cols = res
     ddX, ddY, ddW = derivatives
-    return double_backward(
-        X,
-        Y,
-        W,
-        dZ,
-        ddX,
-        ddY,
-        ddW,
-        rows,
-        cols,
-        workspace,
-        sender_perm,
-        irrep_dtype,
-        attrs,
+
+    gX, gY, gW, gdZ = double_backward(
+        X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, irrep_dtype, attrs
     )
+
+    return gX, gY, gW, gdZ, None, None
 
 
 backward.defvjp(backward_fwd, backward_bwd)
 
 
-@partial(jax.custom_vjp, nondiff_argnums=(7, 8, 9, 10, 11, 12))
+@partial(jax.custom_vjp, nondiff_argnums=(9, 10, 11, 12))
 def double_backward(
     X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, irrep_dtype, attrs
 ):
@@ -129,12 +121,10 @@ def double_backward_fwd(
         irrep_dtype,
         attrs,
     )
-    return out, (X, Y, W, dZ, ddX, ddY, ddW)
+    return out, (X, Y, W, dZ, ddX, ddY, ddW, rows, cols)
 
 
 def triple_backward(
-    rows,
-    cols,
     workspace,
     sender_perm,
     irrep_dtype,
@@ -142,7 +132,7 @@ def triple_backward(
     residuals,
     tangent_outputs,
 ):
-    X, Y, W, dZ, ddX, ddY, ddW = residuals
+    X, Y, W, dZ, ddX, ddY, ddW, rows, cols = residuals
     t_dX, t_dY, t_dW, t_ddZ = tangent_outputs
 
     common_args = (rows, cols, workspace, sender_perm, irrep_dtype, attrs)
@@ -172,25 +162,13 @@ def triple_backward(
     grad_ddY = g1_ddY + g4_ddY + g6_ddY
     grad_ddW = g2_ddW + g7_ddW
 
-    return grad_X, grad_Y, grad_W, grad_dZ, grad_ddX, grad_ddY, grad_ddW
+    return grad_X, grad_Y, grad_W, grad_dZ, grad_ddX, grad_ddY, grad_ddW, None, None
 
 
 double_backward.defvjp(double_backward_fwd, triple_backward)
 
 
 class TensorProductConv(LoopUnrollConv):
-    r"""
-    Identical to ``oeq.torch.TensorProductConv`` with functionality in JAX, with one
-    key difference: integer arrays passed to this function must have dtype
-    ``np.int32`` (as opposed to ``np.int64`` in the PyTorch version).
-
-    :param problem: Specification of the tensor product.
-    :param deterministic: if ``False``, uses atomics for the convolution. If ``True``, uses a deterministic
-           fixup-based algorithm. `Default`: ``False``.
-    :param kahan: If ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
-           the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
-    """
-
     def __init__(
         self, config: TPProblem, deterministic: bool = False, kahan: bool = False
     ):
@@ -199,7 +177,7 @@ class TensorProductConv(LoopUnrollConv):
             config,
             dp,
             extlib.postprocess_kernel,
-            idx_dtype=np.int32,  # N.B. this is distinct from the PyTorch version
+            idx_dtype=np.int32,
             torch_op=False,
             deterministic=deterministic,
             kahan=kahan,
@@ -232,26 +210,6 @@ class TensorProductConv(LoopUnrollConv):
         cols: jax.numpy.ndarray,
         sender_perm: Optional[jax.numpy.ndarray] = None,
     ) -> jax.numpy.ndarray:
-        r"""
-        Computes the fused CG tensor product + convolution.
-
-        :param X: Tensor of shape ``[|V|, problem.irreps_in1.dim()]``, datatype ``problem.irrep_dtype``.
-        :param Y: Tensor of shape ``[|E|, problem.irreps_in1.dim()]``, datatype ``problem.irrep_dtype``.
-        :param W: Tensor of datatype ``problem.weight_dtype`` and shape
-
-            * ``[|E|, problem.weight_numel]`` if ``problem.shared_weights=False``
-            * ``[problem.weight_numel]`` if ``problem.shared_weights=True``
-
-        :param rows: Tensor of shape ``[|E|]`` with row indices for each nonzero in the adjacency matrix,
-                datatype ``np.int32``. Must be row-major sorted along with ``cols`` when ``deterministic=True``.
-        :param cols: Tensor of shape ``[|E|]`` with column indices for each nonzero in the adjacency matrix,
-                datatype ``np.int32``.
-        :param sender_perm: Tensor of shape ``[|E|]`` and ``np.int32`` datatype containing a
-                permutation that transposes the adjacency matrix nonzeros from row-major to column-major order.
-                Must be provided when ``deterministic=True``.
-
-        :return: Tensor of shape ``[|V|, problem.irreps_out.dim()]``, datatype ``problem.irrep_dtype``.
-        """
         if not self.deterministic:
             sender_perm = self.dummy_transpose_perm
         else:
