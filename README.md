@@ -183,6 +183,11 @@ Z = tp_conv.forward(
     X, Y, W, edge_index[0], edge_index[1]
 )
 print(jax.numpy.linalg.norm(Z))
+
+# Test JAX JIT
+func = lambda X, Y, W, e1, e2: tp_conv.forward(X, Y, W, e1, e2) 
+jitted = jax.jit(func)
+print(jax.numpy.linalg.norm(jitted(X, Y, W, edge_index[0], edge_index[1])))
 ```
 
 ## Citation and Acknowledgements

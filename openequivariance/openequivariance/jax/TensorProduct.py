@@ -72,10 +72,12 @@ def double_backward_fwd(X, Y, W, dZ, ddX, ddY, ddW, irrep_dtype, attrs):
     out = double_backward(X, Y, W, dZ, ddX, ddY, ddW, irrep_dtype, attrs)
     return out, (X, Y, W, dZ, ddX, ddY, ddW)
 
-def zeros_like(x): 
+
+def zeros_like(x):
     return jnp.zeros_like(x)
 
-def triple_backward(irrep_dtype, attrs, residuals, tangent_outputs): 
+
+def triple_backward(irrep_dtype, attrs, residuals, tangent_outputs):
     X, Y, W, dZ, ddX, ddY, ddW = residuals
     t_dX, t_dY, t_dW, t_ddZ = tangent_outputs
 
@@ -91,21 +93,21 @@ def triple_backward(irrep_dtype, attrs, residuals, tangent_outputs):
     op4_inputs = (X, ddY, W, dZ, zeros_like(X), zeros_like(ddY), t_dW)
     g4_X, g4_ddY, g4_W, g4_dZ = double_backward(*op4_inputs, irrep_dtype, attrs)
 
-
     g5_ddX, g5_Y, g5_W = backward(ddX, Y, W, t_ddZ, irrep_dtype, attrs)
     g6_X, g6_ddY, g6_W = backward(X, ddY, W, t_ddZ, irrep_dtype, attrs)
     g7_X, g7_Y, g7_ddW = backward(X, Y, ddW, t_ddZ, irrep_dtype, attrs)
 
-    grad_X  = g2_X + g4_X + g6_X + g7_X
-    grad_Y  = g2_Y + g3_Y + g5_Y + g7_Y
-    grad_W  = g1_W + g3_W + g4_W + g5_W + g6_W
-    grad_dZ = g1_dZ + g2_dZ + g3_dZ + g4_dZ 
+    grad_X = g2_X + g4_X + g6_X + g7_X
+    grad_Y = g2_Y + g3_Y + g5_Y + g7_Y
+    grad_W = g1_W + g3_W + g4_W + g5_W + g6_W
+    grad_dZ = g1_dZ + g2_dZ + g3_dZ + g4_dZ
 
     grad_ddX = g1_ddX + g3_ddX + g5_ddX
     grad_ddY = g1_ddY + g4_ddY + g6_ddY
     grad_ddW = g2_ddW + g7_ddW
 
     return grad_X, grad_Y, grad_W, grad_dZ, grad_ddX, grad_ddY, grad_ddW
+
 
 double_backward.defvjp(double_backward_fwd, triple_backward)
 
