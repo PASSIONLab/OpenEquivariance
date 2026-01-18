@@ -14,8 +14,10 @@ from openequivariance.benchmark.logging_utils import getLogger
 
 logger = getLogger()
 
+
 def zeros_like(x):
     return jnp.zeros_like(x)
+
 
 @partial(jax.custom_vjp, nondiff_argnums=(5, 6, 7, 8, 9))
 def forward(X, Y, W, rows, cols, workspace, sender_perm, L3_dim, irrep_dtype, attrs):
@@ -34,9 +36,7 @@ def forward_fwd(
     return out, (X, Y, W, rows, cols)
 
 
-def forward_bwd(
-    workspace, sender_perm, L3_dim, irrep_dtype, attrs, res, dZ
-):
+def forward_bwd(workspace, sender_perm, L3_dim, irrep_dtype, attrs, res, dZ):
     X, Y, W, rows, cols = res
     dX, dY, dW = backward(
         X, Y, W, dZ, rows, cols, workspace, sender_perm, irrep_dtype, attrs
@@ -60,23 +60,29 @@ def backward(X, Y, W, dZ, rows, cols, workspace, sender_perm, irrep_dtype, attrs
     return backward_call(X, Y, W, dZ, rows, cols, workspace, sender_perm, **attrs)
 
 
-def backward_fwd(
-    X, Y, W, dZ, rows, cols, workspace, sender_perm, irrep_dtype, attrs
-):
-    out = backward(
-        X, Y, W, dZ, rows, cols, workspace, sender_perm, irrep_dtype, attrs
-    )
+def backward_fwd(X, Y, W, dZ, rows, cols, workspace, sender_perm, irrep_dtype, attrs):
+    out = backward(X, Y, W, dZ, rows, cols, workspace, sender_perm, irrep_dtype, attrs)
     return out, (X, Y, W, dZ, rows, cols)
 
 
-def backward_bwd(
-    workspace, sender_perm, irrep_dtype, attrs, res, derivatives
-):
+def backward_bwd(workspace, sender_perm, irrep_dtype, attrs, res, derivatives):
     X, Y, W, dZ, rows, cols = res
     ddX, ddY, ddW = derivatives
 
     gX, gY, gW, gdZ = double_backward(
-        X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, irrep_dtype, attrs
+        X,
+        Y,
+        W,
+        dZ,
+        ddX,
+        ddY,
+        ddW,
+        rows,
+        cols,
+        workspace,
+        sender_perm,
+        irrep_dtype,
+        attrs,
     )
 
     return gX, gY, gW, gdZ, None, None
