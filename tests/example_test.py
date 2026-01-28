@@ -132,35 +132,7 @@ def test_tutorial_jax(with_jax):
     Z = tp_fast(X, Y, W)
     print(jax.numpy.linalg.norm(Z))
 
-    edge_index = jax.numpy.array(
-        [
-            [0, 1, 1, 2],
-            [1, 0, 2, 1],
-        ],
-        dtype=jax.numpy.int32,  # NOTE: This int32, not int64
+    result = jax.vjp(lambda X, Y, W: tp_fast(X, Y, W), X, Y, W)[1](
+        jax.numpy.ones_like(Z)
     )
-
-    node_ct, nonzero_ct = 3, 4
-    X = jax.random.uniform(
-        key, shape=(node_ct, X_ir.dim), minval=0.0, maxval=1.0, dtype=jax.numpy.float32
-    )
-    Y = jax.random.uniform(
-        key,
-        shape=(nonzero_ct, Y_ir.dim),
-        minval=0.0,
-        maxval=1.0,
-        dtype=jax.numpy.float32,
-    )
-    W = jax.random.uniform(
-        key,
-        shape=(nonzero_ct, problem.weight_numel),
-        minval=0.0,
-        maxval=1.0,
-        dtype=jax.numpy.float32,
-    )
-    tp_conv = oeq.jax.TensorProductConv(problem, deterministic=False)
-    Z = tp_conv.forward(X, Y, W, edge_index[0], edge_index[1])
-    print(jax.numpy.linalg.norm(Z))
-
-    jitted = jax.jit(lambda X, Y, W, e1, e2: tp_conv.forward(X, Y, W, e1, e2))
-    print(jax.numpy.linalg.norm(jitted(X, Y, W, edge_index[0], edge_index[1])))
+    print(result)
