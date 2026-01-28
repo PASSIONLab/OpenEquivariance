@@ -39,29 +39,18 @@ mlir.register_lowering(tp_fwd_p, mlir.lower_fun(tp_fwd_impl, multiple_results=Fa
 # ==============================================================================
 
 tp_bwd_p = core.Primitive("tp_bwd")
+tp_bwd_p.multiple_results = True 
 
 def tp_bwd_impl(X, Y, W, dZ, *, kernel, hash):
-    print("hihi, Am here")
     irrep_dtype = X.dtype
     out_shapes = (
         jax.ShapeDtypeStruct(X.shape, irrep_dtype),
         jax.ShapeDtypeStruct(Y.shape, irrep_dtype),
         jax.ShapeDtypeStruct(W.shape, irrep_dtype),
     )
+
     call = jax.ffi.ffi_call("tp_backward", out_shapes)
-
-    print("MADE IT HERE!")
-    print(X.shape, Y.shape, W.shape, dZ.shape)
-    print(type(kernel))
-    print(hash)
-    print(type(X))
-    print(type(Y))
-    print(type(W))
-    print(type(dZ))
-
     result = call(X, Y, W, dZ, kernel=kernel, hash=hash)
-    print("Made call successfully")
-    print(type(result))
     return result
 
 def tp_bwd_abstract_eval(X, Y, W, dZ, *, kernel, hash):
@@ -83,6 +72,7 @@ mlir.register_lowering(tp_bwd_p, mlir.lower_fun(tp_bwd_impl, multiple_results=Tr
 # ==============================================================================
 
 tp_dbwd_p = core.Primitive("tp_dbwd")
+tp_dbwd_p.multiple_results = True
 
 def tp_dbwd_impl(X, Y, W, dZ, ddX, ddY, ddW, *, kernel, hash):
     irrep_dtype = X.dtype
@@ -148,9 +138,7 @@ def tp_fwd_jvp_transpose(ct, X, Y, W, dX, dY, dW, *, L3_dim, kernel, hash):
     if ad.is_undefined_primal(W):
         W = jnp.zeros(W.aval.shape, W.aval.dtype)
 
-    print("STARTED HERE!")
     grad_X, grad_Y, grad_W = tp_bwd_p.bind(X, Y, W, ct, kernel=kernel, hash=hash)
-    print("GOT OUT HERE!")
 
     # Return gradients for (X, Y, W, dX, dY, dW). 
     # Primals get None, tangents get the computed gradients.
@@ -209,6 +197,7 @@ ad.primitive_jvps[tp_fwd_jvp_p] = tp_fwd_jvp_jvp_rule
 # ==============================================================================
 
 tp_bwd_jvp_p = core.Primitive("tp_bwd_jvp")
+tp_bwd_jvp_p.multiple_results = True
 
 def tp_bwd_jvp_impl(X, Y, W, dZ, tX, tY, tW, tdZ, *, kernel, hash):
     term_dZ = tp_bwd_p.bind(X, Y, W, tdZ, kernel=kernel, hash=hash)
@@ -288,14 +277,10 @@ def tp_bwd_jvp_rule(primals, tangents, *, kernel, hash):
     tX, tY, tW, tdZ = tangents
 
     tX, tY, tW, tdZ = [ensure_array(t, p) for t, p in zip(tangents, primals)]
-    print("AM HERE!")
-    print(type(kernel))
-    print(hash)
     out_primal = tp_bwd_p.bind(X, Y, W, dZ, kernel=kernel, hash=hash)
-    #out_tangent = tp_bwd_jvp_p.bind(X, Y, W, dZ, tX, tY, tW, tdZ, kernel=kernel, hash=hash)
+    out_tangent = tp_bwd_jvp_p.bind(X, Y, W, dZ, tX, tY, tW, tdZ, kernel=kernel, hash=hash)
 
-    #return out_primal, out_tangent
-    return out_primal, None
+    return out_primal, out_tangent 
 
 ad.primitive_jvps[tp_bwd_p] = tp_bwd_jvp_rule
 
