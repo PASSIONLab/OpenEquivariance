@@ -37,7 +37,7 @@ class TensorProductConv(LoopUnrollConv):
             "forward_config": vars(self.forward_schedule.launch_config),
             "backward_config": vars(self.backward_schedule.launch_config),
             "double_backward_config": vars(self.double_backward_schedule.launch_config),
-            "kernel_prop": self.kernelProp,
+            "kernel_prop": self.kernel_prop,
         })
         self.hash = self.kernel.__hash__() 
 
