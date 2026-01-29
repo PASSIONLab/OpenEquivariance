@@ -238,7 +238,7 @@ def conv_bwd_jvp_transpose(ct, X, Y, W, dZ, tX, tY, tW, tdZ, rows, cols, workspa
     if ad.is_undefined_primal(W): W = jnp.zeros(W.aval.shape, W.aval.dtype)
     if ad.is_undefined_primal(dZ): dZ = jnp.zeros(dZ.aval.shape, dZ.aval.dtype)
 
-    tensors_clean = clean_tensors(X, Y, W, dZ, tX, tY, tW)
+    tensors_clean = clean_tensors(X, Y, W, dZ, ddX, ddY, ddW)
 
     g_X, g_Y, g_W, g_dZ = conv_dbwd_p.bind(
         *tensors_clean, rows, cols, workspace, sender_perm, 
