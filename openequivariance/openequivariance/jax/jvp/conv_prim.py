@@ -173,13 +173,7 @@ ad.primitive_jvps[conv_fwd_p] = conv_fwd_jvp_rule
 # ==============================================================================
 
 def conv_fwd_jvp_jvp_rule(primals, tangents, *, L3_dim, kernel, hash):
-    tangents_clean = []
-    for t, p in zip(tangents, primals):
-        if type(t) is ad.Zero:
-            tangents_clean.append(jnp.zeros_like(p))
-        else:
-            tangents_clean.append(t)
-    tangents_clean = tuple(tangents_clean)
+    tangents_clean = tuple(clean_tensors(*tangents))
 
     def func(x, y, w, dx, dy, dw, r, c, ws, sp):
         return conv_fwd_jvp_impl(
@@ -255,13 +249,7 @@ ad.primitive_transposes[conv_bwd_jvp_p] = conv_bwd_jvp_transpose
 # ==============================================================================
 
 def conv_bwd_jvp_jvp_rule(primals, tangents, *, kernel, hash):
-    tangents_clean = []
-    for t, p in zip(tangents, primals):
-        if type(t) is ad.Zero:
-            tangents_clean.append(jnp.zeros_like(p))
-        else:
-            tangents_clean.append(t)
-    tangents_clean = tuple(tangents_clean)
+    tangents_clean = tuple(clean_tensors(*tangents))
 
     def func(x, y, w, dz, tx, ty, tw, tdz, r, c, ws, sp):
         return conv_bwd_jvp_impl(
