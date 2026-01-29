@@ -172,7 +172,7 @@ class TensorProductConv(LoopUnrollConv):
         cols_jax = jax.numpy.asarray(graph.cols.astype(self.idx_dtype))
         sender_perm_jax = jax.numpy.asarray(graph.transpose_perm.astype(self.idx_dtype))
 
-        in1_grad, in2_grad, weights_grad, out_dgrad = jax.vjp(
+        in1_grad, in2_grad, weights_grad, out_dgrad = jax.jit(jax.vjp(
             lambda x, y, w, o: jax.vjp(
                 lambda a, b, c: self.forward(
                     a, b, c, rows_jax, cols_jax, sender_perm_jax
@@ -185,7 +185,7 @@ class TensorProductConv(LoopUnrollConv):
             in2_jax,
             weights_jax,
             out_grad_jax,
-        )[1]((in1_dgrad_jax, in2_dgrad_jax, weights_dgrad_jax))
+        )[1])((in1_dgrad_jax, in2_dgrad_jax, weights_dgrad_jax))
 
         return (
             np.asarray(in1_grad),
