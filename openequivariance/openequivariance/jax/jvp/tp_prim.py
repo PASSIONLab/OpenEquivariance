@@ -277,3 +277,66 @@ def tp_bwd_jvp_rule(primals, tangents, *, kernel, hash):
     return out_primal, out_tangent 
 
 ad.primitive_jvps[tp_bwd_p] = tp_bwd_jvp_rule
+
+# ==============================================================================
+# 12. Slow Double Backward Implementation (Reference)
+# ==============================================================================
+
+def tp_dbwd_slow(X, Y, W, dZ, ddX, ddY, ddW, *, L3_dim, kernel, hash):
+    op1 = tp_bwd_p.bind(ddX, ddY, W, dZ, kernel=kernel, hash=hash)
+    op2 = tp_bwd_p.bind(X, Y, ddW, dZ, kernel=kernel, hash=hash)
+    op3 = tp_fwd_p.bind(ddX, Y, W, L3_dim=L3_dim, kernel=kernel, hash=hash)
+    op4 = tp_bwd_p.bind(ddX, Y, W, dZ, kernel=kernel, hash=hash)
+    op5 = tp_bwd_p.bind(X, ddY, W, dZ, kernel=kernel, hash=hash)
+    op6 = tp_fwd_p.bind(X, ddY, W, L3_dim=L3_dim, kernel=kernel, hash=hash)
+    op7 = tp_fwd_p.bind(X, Y, ddW, L3_dim=L3_dim, kernel=kernel, hash=hash)
+
+    grad_X = op1[0] + op2[0]
+    grad_Y = op1[1] + op2[1]
+    grad_W = op4[2] + op5[2]
+    grad_dZ = op3 + op6 + op7
+
+    return grad_X, grad_Y, grad_W, grad_dZ
+
+# ==============================================================================
+# 12. JVP rule for double backward (implicit) 
+# ==============================================================================
+
+def tp_dbwd_jvp_rule(primals, tangents, *, L3_dim, kernel, hash):
+    tangents_clean = []
+    for t, p in zip(tangents, primals):
+        if type(t) is ad.Zero:
+            tangents_clean.append(jnp.zeros_like(p))
+        else:
+            tangents_clean.append(t)
+    tangents_clean = tuple(tangents_clean)
+
+    def func(x, y, w, dz, ddx, ddy, ddw):
+        return tp_dbwd_slow(x, y, w, dz, ddx, ddy, ddw, L3_dim=L3_dim, kernel=kernel, hash=hash)
+
+    return jax.jvp(func, primals, tangents_clean)
+
+ad.primitive_jvps[tp_dbwd_p] = tp_dbwd_jvp_rule
+
+# ==============================================================================
+# 12. Transpose rule for double backward
+# ==============================================================================
+
+def tp_dbwd_transpose(ct, X, Y, W, dZ, ddX, ddY, ddW, *, L3_dim, kernel, hash):
+    if ad.is_undefined_primal(X): X = jnp.zeros(X.aval.shape, X.aval.dtype)
+    if ad.is_undefined_primal(Y): Y = jnp.zeros(Y.aval.shape, Y.aval.dtype)
+    if ad.is_undefined_primal(W): W = jnp.zeros(W.aval.shape, W.aval.dtype)
+    if ad.is_undefined_primal(dZ): dZ = jnp.zeros(dZ.aval.shape, dZ.aval.dtype)
+    if ad.is_undefined_primal(ddX): ddX = jnp.zeros(ddX.aval.shape, ddX.aval.dtype)
+    if ad.is_undefined_primal(ddY): ddY = jnp.zeros(ddY.aval.shape, ddY.aval.dtype)
+    if ad.is_undefined_primal(ddW): ddW = jnp.zeros(ddW.aval.shape, ddW.aval.dtype)
+
+    def func(x, y, w, dz, ddx, ddy, ddw):
+        return tp_dbwd_slow(x, y, w, dz, ddx, ddy, ddw, L3_dim=L3_dim, kernel=kernel, hash=hash)
+
+    _, vjp_fun = jax.vjp(func, X, Y, W, dZ, ddX, ddY, ddW)
+    input_grads = vjp_fun(ct)
+
+    return input_grads
+
+ad.primitive_transposes[tp_dbwd_p] = tp_dbwd_transpose
