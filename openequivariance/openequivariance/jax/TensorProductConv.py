@@ -103,7 +103,9 @@ class TensorProductConv(LoopUnrollConv):
         weights = self.reorder_weights_from_e3nn(
             weights, has_batch_dim=not self.config.shared_weights
         )
-        result = self.forward(
+
+        jit_fwd = jax.jit(self.forward)
+        result = jit_fwd(
             jax.numpy.asarray(L1_in),
             jax.numpy.asarray(L2_in),
             jax.numpy.asarray(weights),
@@ -131,7 +133,7 @@ class TensorProductConv(LoopUnrollConv):
             weights, has_batch_dim=not self.config.shared_weights
         )
 
-        backward_fn = jax.vjp(
+        backward_fn = jax.jit(jax.vjp(
             lambda X, Y, W: self.forward(
                 X,
                 Y,
@@ -143,7 +145,8 @@ class TensorProductConv(LoopUnrollConv):
             jax.numpy.asarray(L1_in),
             jax.numpy.asarray(L2_in),
             jax.numpy.asarray(weights),
-        )[1]
+        )[1])
+
         L1_grad_jax, L2_grad_jax, weights_grad_jax = backward_fn(
             jax.numpy.asarray(L3_grad)
         )

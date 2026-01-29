@@ -50,9 +50,9 @@ def tp_bwd_impl(X, Y, W, dZ, *, kernel, hash):
 def tp_bwd_abstract_eval(X, Y, W, dZ, *, kernel, hash):
     irrep_dtype = X.dtype
     return (
-        core.ShapedArray(X.shape, irrep_dtype),
-        core.ShapedArray(Y.shape, irrep_dtype),
-        core.ShapedArray(W.shape, irrep_dtype),
+        jax.core.ShapedArray(X.shape, irrep_dtype),
+        jax.core.ShapedArray(Y.shape, irrep_dtype),
+        jax.core.ShapedArray(W.shape, irrep_dtype),
     )
 
 tp_bwd_p.def_impl(tp_bwd_impl)
