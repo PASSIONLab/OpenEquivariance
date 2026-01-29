@@ -12,6 +12,15 @@ def ensure_array(tan, primal):
         return jnp.zeros_like(primal)
     return tan
 
+def clean_tensors(*tensors):
+    tensors_clean = []
+    for t in tensors: 
+        result = t
+        if type(t) is ad.Zero or ad.is_undefined_primal(t):
+            result = jnp.zeros(t.aval.shape, t.aval.dtype)
+        tensors_clean.append(result)
+    return tensors_clean
+
 # ==============================================================================
 # 1. Forward Primitive
 # ==============================================================================
@@ -124,10 +133,6 @@ conv_fwd_jvp_p.def_abstract_eval(conv_fwd_jvp_abstract_eval)
 # ==============================================================================
 
 def conv_fwd_jvp_transpose(ct, X, Y, W, dX, dY, dW, rows, cols, workspace, sender_perm, *, L3_dim, kernel, hash):
-    assert ad.is_undefined_primal(dX)
-    assert ad.is_undefined_primal(dY)
-    assert ad.is_undefined_primal(dW)
-
     if ad.is_undefined_primal(X): X = jnp.zeros(X.aval.shape, X.aval.dtype)
     if ad.is_undefined_primal(Y): Y = jnp.zeros(Y.aval.shape, Y.aval.dtype)
     if ad.is_undefined_primal(W): W = jnp.zeros(W.aval.shape, W.aval.dtype)
@@ -228,19 +233,15 @@ conv_bwd_jvp_p.def_abstract_eval(conv_bwd_jvp_abstract_eval)
 def conv_bwd_jvp_transpose(ct, X, Y, W, dZ, tX, tY, tW, tdZ, rows, cols, workspace, sender_perm, *, kernel, hash):
     ddX, ddY, ddW = ct
 
-    assert ad.is_undefined_primal(tX)
-    assert ad.is_undefined_primal(tY)
-    assert ad.is_undefined_primal(tW)
-    assert ad.is_undefined_primal(tdZ)
-
     if ad.is_undefined_primal(X): X = jnp.zeros(X.aval.shape, X.aval.dtype)
     if ad.is_undefined_primal(Y): Y = jnp.zeros(Y.aval.shape, Y.aval.dtype)
     if ad.is_undefined_primal(W): W = jnp.zeros(W.aval.shape, W.aval.dtype)
     if ad.is_undefined_primal(dZ): dZ = jnp.zeros(dZ.aval.shape, dZ.aval.dtype)
 
+    tensors_clean = clean_tensors(X, Y, W, dZ, tX, tY, tW)
+
     g_X, g_Y, g_W, g_dZ = conv_dbwd_p.bind(
-        X, Y, W, dZ, ddX, ddY, ddW, 
-        rows, cols, workspace, sender_perm, 
+        *tensors_clean, rows, cols, workspace, sender_perm, 
         kernel=kernel, hash=hash
     )
 
@@ -332,20 +333,13 @@ def conv_dbwd_jvp_rule(primals, tangents, *, kernel, hash):
     dZ = primals[3]
     L3_dim = dZ.shape[1]
 
-    tangents_clean = []
-    for t, p in zip(tangents, primals):
-        if type(t) is ad.Zero:
-            tangents_clean.append(jnp.zeros_like(p))
-        else:
-            tangents_clean.append(t)
-    tangents_clean = tuple(tangents_clean)
-
     def func(x, y, w, dz, ddx, ddy, ddw, r, c, ws, sp):
         return conv_dbwd_slow(
             x, y, w, dz, ddx, ddy, ddw, r, c, ws, sp, 
             L3_dim=L3_dim, kernel=kernel, hash=hash
         )
 
+    tangents_clean = tuple(clean_tensors(*tangents))
     return jax.jvp(func, primals, tangents_clean)
 
 ad.primitive_jvps[conv_dbwd_p] = conv_dbwd_jvp_rule

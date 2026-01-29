@@ -117,14 +117,6 @@ tp_fwd_jvp_p.def_abstract_eval(tp_fwd_jvp_abstract_eval)
 # ==============================================================================
 
 def tp_fwd_jvp_transpose(ct, X, Y, W, dX, dY, dW, *, L3_dim, kernel, hash):
-    # This transpose corresponds to the Backward pass.
-    # We assert that we are differentiating with respect to the input tangents.
-    assert ad.is_undefined_primal(dX)
-    assert ad.is_undefined_primal(dY)
-    assert ad.is_undefined_primal(dW)
-
-    # If the primals X, Y, W are being differentiated (undefined), we replace 
-    # them with zeros for the purpose of this kernel call.
     if ad.is_undefined_primal(X):
         X = jnp.zeros(X.aval.shape, X.aval.dtype)
     if ad.is_undefined_primal(Y):
@@ -134,8 +126,6 @@ def tp_fwd_jvp_transpose(ct, X, Y, W, dX, dY, dW, *, L3_dim, kernel, hash):
 
     grad_X, grad_Y, grad_W = tp_bwd_p.bind(X, Y, W, ct, kernel=kernel, hash=hash)
 
-    # Return gradients for (X, Y, W, dX, dY, dW). 
-    # Primals get None, tangents get the computed gradients.
     return (None, None, None, grad_X, grad_Y, grad_W)
 
 ad.primitive_transposes[tp_fwd_jvp_p] = tp_fwd_jvp_transpose
@@ -223,11 +213,6 @@ tp_bwd_jvp_p.def_abstract_eval(tp_bwd_jvp_abstract_eval)
 
 def tp_bwd_jvp_transpose(ct, X, Y, W, dZ, tX, tY, tW, tdZ, *, kernel, hash):
     ddX, ddY, ddW = ct
-
-    assert ad.is_undefined_primal(tX)
-    assert ad.is_undefined_primal(tY)
-    assert ad.is_undefined_primal(tW)
-    assert ad.is_undefined_primal(tdZ)
 
     if ad.is_undefined_primal(X): X = jnp.zeros(X.aval.shape, X.aval.dtype)
     if ad.is_undefined_primal(Y): Y = jnp.zeros(Y.aval.shape, Y.aval.dtype)
