@@ -11,7 +11,8 @@ from openequivariance.core.LoopUnrollConv import LoopUnrollConv
 from openequivariance.jax.utils import reorder_jax
 
 from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance.jax.jvp.conv_prim import conv_fwd_p
+from openequivariance.jax.jvp import conv_prim
+from openequivariance.jax.vjp import conv_func
 
 
 logger = getLogger()
@@ -19,9 +20,10 @@ logger = getLogger()
 
 class TensorProductConv(LoopUnrollConv):
     def __init__(
-        self, config: TPProblem, deterministic: bool = False, kahan: bool = False
+        self, config: TPProblem, deterministic: bool = False, kahan: bool = False, requires_jvp: bool = True
     ):
         dp = extlib.DeviceProp(0)
+        self.requires_jvp = requires_jvp
         super().__init__(
             config,
             dp,
@@ -66,7 +68,11 @@ class TensorProductConv(LoopUnrollConv):
                 "Must provide sender_perm for deterministic convolutions."
             )
 
-        return conv_fwd_p.bind(
+        func = conv_func.forward
+        if self.requires_jvp:
+            func = conv_prim.conv_fwd_p.bind
+
+        return func(
             X,
             Y,
             W,
