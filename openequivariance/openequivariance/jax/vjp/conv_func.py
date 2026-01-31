@@ -1,26 +1,24 @@
 import jax
 import jax.numpy as jnp
-from jax.extend import core
 from functools import partial
-from jax.interpreters import mlir, ad
+
 
 def zeros_like(x):
     return jnp.zeros_like(x)
+
 
 @partial(jax.custom_vjp, nondiff_argnums=(5, 6, 7, 8, 9))
 def forward(X, Y, W, rows, cols, workspace, sender_perm, L3_dim, kernel, hash):
     forward_call = jax.ffi.ffi_call(
         "conv_forward", jax.ShapeDtypeStruct((X.shape[0], L3_dim), X.dtype)
     )
-    return forward_call(X, Y, W, rows, cols, workspace, sender_perm, kernel=kernel, hash=hash)
-
-
-def forward_fwd(
-    X, Y, W, rows, cols, workspace, sender_perm, L3_dim, kernel, hash
-):
-    out = forward(
-        X, Y, W, rows, cols, workspace, sender_perm, L3_dim, kernel, hash 
+    return forward_call(
+        X, Y, W, rows, cols, workspace, sender_perm, kernel=kernel, hash=hash
     )
+
+
+def forward_fwd(X, Y, W, rows, cols, workspace, sender_perm, L3_dim, kernel, hash):
+    out = forward(X, Y, W, rows, cols, workspace, sender_perm, L3_dim, kernel, hash)
     return out, (X, Y, W, rows, cols)
 
 
@@ -45,7 +43,9 @@ def backward(X, Y, W, dZ, rows, cols, workspace, sender_perm, kernel, hash):
             jax.ShapeDtypeStruct(W.shape, W.dtype),
         ),
     )
-    return backward_call(X, Y, W, dZ, rows, cols, workspace, sender_perm, kernel=kernel, hash=hash)
+    return backward_call(
+        X, Y, W, dZ, rows, cols, workspace, sender_perm, kernel=kernel, hash=hash
+    )
 
 
 def backward_fwd(X, Y, W, dZ, rows, cols, workspace, sender_perm, kernel, hash):
@@ -81,7 +81,7 @@ backward.defvjp(backward_fwd, backward_bwd)
 
 @partial(jax.custom_vjp, nondiff_argnums=(9, 10, 11, 12))
 def double_backward(
-    X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, kernel, hash 
+    X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, kernel, hash
 ):
     double_backward_call = jax.ffi.ffi_call(
         "conv_double_backward",
@@ -93,14 +93,6 @@ def double_backward(
         ),
     )
     return double_backward_call(
-        X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, kernel=kernel, hash=hash
-    )
-
-
-def double_backward_fwd(
-    X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, kernel, hash
-):
-    out = double_backward(
         X,
         Y,
         W,
@@ -112,8 +104,16 @@ def double_backward_fwd(
         cols,
         workspace,
         sender_perm,
-        kernel,
-        hash
+        kernel=kernel,
+        hash=hash,
+    )
+
+
+def double_backward_fwd(
+    X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, kernel, hash
+):
+    out = double_backward(
+        X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, kernel, hash
     )
     return out, (X, Y, W, dZ, ddX, ddY, ddW, rows, cols)
 

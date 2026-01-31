@@ -7,7 +7,6 @@ from openequivariance.core.e3nn_lite import Instruction, TPProblem, wigner_3j
 
 import json
 import tempfile
-import hashlib
 
 from enum import IntEnum
 
