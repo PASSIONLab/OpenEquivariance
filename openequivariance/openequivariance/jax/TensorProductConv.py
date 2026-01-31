@@ -19,6 +19,17 @@ logger = getLogger()
 
 
 class TensorProductConv(LoopUnrollConv):
+    r"""
+    Identical to ``oeq.torch.TensorProductConv`` with functionality in JAX, with one
+    key difference: integer arrays passed to this function must have dtype
+    ``np.int32`` (as opposed to ``np.int64`` in the PyTorch version).
+
+    :param problem: Specification of the tensor product.
+    :param deterministic: if ``False``, uses atomics for the convolution. If ``True``, uses a deterministic
+           fixup-based algorithm. `Default`: ``False``.
+    :param kahan: If ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
+           the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
+    """
     def __init__(
         self, config: TPProblem, deterministic: bool = False, kahan: bool = False, requires_jvp: bool = True
     ):
