@@ -1,7 +1,7 @@
 ## Latest Changes
 
 ### v0.5.4 (2025-02-01) 
-Minor update, improvements to JAX.
+Improvements to JAX frontend.
 
 **Added**:
 - Jacobian Vector Products (JVP) 
