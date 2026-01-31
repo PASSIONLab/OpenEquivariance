@@ -68,9 +68,10 @@ class TensorProductConv(LoopUnrollConv):
                 "Must provide sender_perm for deterministic convolutions."
             )
 
-        func = conv_func.forward
-        if self.requires_jvp:
-            func = conv_prim.conv_fwd_p.bind
+        func = conv_prim.conv_fwd_p.bind
+
+        if not self.requires_jvp:
+            func = conv_func.forward
 
         return func(
             X,

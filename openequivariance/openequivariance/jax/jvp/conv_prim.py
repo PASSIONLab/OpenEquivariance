@@ -2,24 +2,7 @@ import jax
 import jax.numpy as jnp
 from jax.extend import core
 from jax.interpreters import mlir, ad
-
-# ==============================================================================
-# 0. Helpers
-# ==============================================================================
-
-def ensure_array(tan, primal):
-    if type(tan) is ad.Zero:
-        return jnp.zeros_like(primal)
-    return tan
-
-def clean_tensors(*tensors):
-    tensors_clean = []
-    for t in tensors: 
-        result = t
-        if type(t) is ad.Zero or ad.is_undefined_primal(t):
-            result = jnp.zeros(t.aval.shape, t.aval.dtype)
-        tensors_clean.append(result)
-    return tensors_clean
+from openequivariance.jax.utils import clean_tensors
 
 # ==============================================================================
 # 1. Forward Primitive
@@ -133,9 +116,7 @@ conv_fwd_jvp_p.def_abstract_eval(conv_fwd_jvp_abstract_eval)
 # ==============================================================================
 
 def conv_fwd_jvp_transpose(ct, X, Y, W, dX, dY, dW, rows, cols, workspace, sender_perm, *, L3_dim, kernel, hash):
-    if ad.is_undefined_primal(X): X = jnp.zeros(X.aval.shape, X.aval.dtype)
-    if ad.is_undefined_primal(Y): Y = jnp.zeros(Y.aval.shape, Y.aval.dtype)
-    if ad.is_undefined_primal(W): W = jnp.zeros(W.aval.shape, W.aval.dtype)
+    X, Y, W = clean_tensors(X, Y, W)
 
     grad_X, grad_Y, grad_W = conv_bwd_p.bind(
         X, Y, W, ct, 
@@ -156,10 +137,7 @@ def conv_fwd_jvp_rule(primals, tangents, *, L3_dim, kernel, hash):
     X, Y, W, rows, cols, workspace, sender_perm = primals
     dX, dY, dW, drows, dcols, dworkspace, dsender_perm = tangents
 
-    dX = ensure_array(dX, X)
-    dY = ensure_array(dY, Y)
-    dW = ensure_array(dW, W)
-
+    dX, dY, dW = clean_tensors(dX, dY, dW)
     out_primal = conv_fwd_p.bind(X, Y, W, rows, cols, workspace, sender_perm, L3_dim=L3_dim, kernel=kernel, hash=hash)
     out_tangent = conv_fwd_jvp_p.bind(X, Y, W, dX, dY, dW, rows, cols, workspace, sender_perm, L3_dim=L3_dim, kernel=kernel, hash=hash)
 
@@ -270,8 +248,8 @@ def conv_bwd_jvp_rule(primals, tangents, *, kernel, hash):
     X, Y, W, dZ, rows, cols, workspace, sender_perm = primals
     tX, tY, tW, tdZ, drows, dcols, dworkspace, dsender_perm = tangents
 
-    tX, tY, tW, tdZ = [ensure_array(t, p) for t, p in zip((tX, tY, tW, tdZ), (X, Y, W, dZ))]
-    
+    tX, tY, tW, tdZ = clean_tensors(tX, tY, tW, tdZ)
+
     out_primal = conv_bwd_p.bind(
         X, Y, W, dZ, rows, cols, workspace, sender_perm, 
         kernel=kernel, hash=hash
@@ -317,8 +295,7 @@ def conv_dbwd_slow(X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_per
 # ==============================================================================
 
 def conv_dbwd_jvp_rule(primals, tangents, *, kernel, hash):
-    # Infer L3_dim from dZ (4th input)
-    dZ = primals[3]
+    dZ = primals[3] # Infer L3_dim from dZ (4th input)
     L3_dim = dZ.shape[1]
 
     def func(x, y, w, dz, ddx, ddy, ddw, r, c, ws, sp):
@@ -338,16 +315,9 @@ ad.primitive_jvps[conv_dbwd_p] = conv_dbwd_jvp_rule
 # ==============================================================================
 
 def conv_dbwd_transpose(ct, X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, *, kernel, hash):
-    # Infer L3_dim from dZ
     L3_dim = dZ.shape[1]
 
-    if ad.is_undefined_primal(X): X = jnp.zeros(X.aval.shape, X.aval.dtype)
-    if ad.is_undefined_primal(Y): Y = jnp.zeros(Y.aval.shape, Y.aval.dtype)
-    if ad.is_undefined_primal(W): W = jnp.zeros(W.aval.shape, W.aval.dtype)
-    if ad.is_undefined_primal(dZ): dZ = jnp.zeros(dZ.aval.shape, dZ.aval.dtype)
-    if ad.is_undefined_primal(ddX): ddX = jnp.zeros(ddX.aval.shape, ddX.aval.dtype)
-    if ad.is_undefined_primal(ddY): ddY = jnp.zeros(ddY.aval.shape, ddY.aval.dtype)
-    if ad.is_undefined_primal(ddW): ddW = jnp.zeros(ddW.aval.shape, ddW.aval.dtype)
+    X, Y, W, dZ, ddX, ddY, ddW = clean_tensors(X, Y, W, dZ, ddX, ddY, ddW)
 
     def func(x, y, w, dz, ddx, ddy, ddw, r, c, ws, sp):
         return conv_dbwd_slow(

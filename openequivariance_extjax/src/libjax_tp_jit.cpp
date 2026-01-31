@@ -294,7 +294,6 @@ ffi::Error tp_forward_impl(
         ffi::AnyBuffer W,
         ffi::Result<ffi::AnyBuffer> L3_out,
         stream_t stream,
-        int64_t L3_dim,
         std::string_view kernel_json,
         int64_t hash) {
    
@@ -429,7 +428,6 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Arg<ffi::AnyBuffer>()
         .Ret<ffi::AnyBuffer>()
         .Ctx<ffi::PlatformStream<stream_t>>()
-        .Attr<int64_t>("L3_dim")
         .Attr<std::string_view>("kernel")
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});  // cudaGraph enabled
