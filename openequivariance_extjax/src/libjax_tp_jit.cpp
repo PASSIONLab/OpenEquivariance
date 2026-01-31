@@ -8,9 +8,11 @@
 
 #include "nanobind/nanobind.h"
 #include "xla/ffi/api/ffi.h"
+#include "json11/json11.hpp"
 
 namespace nb = nanobind;
 namespace ffi = xla::ffi;
+using json = json11::Json;
 
 #ifdef CUDA_BACKEND
     #include <cuda.h>
@@ -131,6 +133,14 @@ void zero_buffer(ffi::AnyBuffer &buffer, stream_t stream) {
 }
 #endif
 
+std::unordered_map<std::string, int64_t> parse_json_config(const json &j_obj) {
+    std::unordered_map<std::string, int64_t> result;
+    for (const auto &kv : j_obj.object_items()) {
+        result[kv.first] = static_cast<int64_t>(kv.second.number_value());
+    }
+    return result;
+}
+
 struct KernelProp {
     int64_t L1_dim, L2_dim, L3_dim, weight_numel;
     bool shared_weights;
@@ -175,39 +185,8 @@ std::unordered_map<int64_t,
     >> conv_cache;
 std::mutex mut;
 
-std::vector<std::string> launch_config_keys = {
-    "num_blocks", 
-    "num_threads", 
-    "smem"};
-std::vector<std::string> kernel_prop_keys = {
-    "L1_dim", 
-    "L2_dim", 
-    "L3_dim", 
-    "weight_numel", 
-    "shared_weights", 
-    "opt_level", 
-    "irrep_dtype", 
-    "weight_dtype",
-
-    // Convolution only
-    "workspace_size",
-    "deterministic",
-    "idx_dtype"};
-
-std::unordered_map<string, int64_t> parse_ffi_dict(ffi::Dictionary &dict, const std::vector<string> &keys) {
-    std::unordered_map<string, int64_t> result;
-    for (const auto &key : keys) {
-        result[key] = dict.get<int64_t>(key).value();
-    }
-    return result;
-}
-
 std::pair<JITTPImpl<JITKernel>*, KernelProp> 
-    compile_tp_with_caching(std::string_view kernel,
-                    ffi::Dictionary forward_config, 
-                    ffi::Dictionary backward_config, 
-                    ffi::Dictionary double_backward_config, 
-                    ffi::Dictionary kernel_prop,
+    compile_tp_with_caching(std::string_view json_payload,
                     int64_t hash,
                     bool is_convolution) {
     
@@ -215,12 +194,21 @@ std::pair<JITTPImpl<JITKernel>*, KernelProp>
         const std::lock_guard<std::mutex> lock(mut);
         auto it = tp_cache.find(hash); 
         if (it == tp_cache.end()) {
-            auto kernel_prop_map = parse_ffi_dict(kernel_prop, kernel_prop_keys);
+            std::string err;
+            json root = json::parse(std::string(json_payload), err);
+            if (!err.empty()) throw std::runtime_error("JSON Parse Error: " + err);
+
+            std::string kernel_src = root["kernel"].string_value();
+            auto forward_cfg = parse_json_config(root["forward_config"]);
+            auto backward_cfg = parse_json_config(root["backward_config"]);
+            auto dbackward_cfg = parse_json_config(root["double_backward_config"]);
+            auto kernel_prop_map = parse_json_config(root["kernel_prop"]);
+
             auto jit_tp_impl = std::make_unique<JITTPImpl<JITKernel>>(
-                std::string(kernel),
-                parse_ffi_dict(forward_config, launch_config_keys),
-                parse_ffi_dict(backward_config, launch_config_keys),
-                parse_ffi_dict(double_backward_config, launch_config_keys),
+                kernel_src,
+                forward_cfg,
+                backward_cfg,
+                dbackward_cfg,
                 kernel_prop_map);
             tp_cache.insert({hash,
                 std::make_pair(std::move(jit_tp_impl), 
@@ -232,11 +220,7 @@ std::pair<JITTPImpl<JITKernel>*, KernelProp>
 }
 
 std::pair<JITConvImpl<JITKernel>*, KernelProp> 
-    compile_conv_with_caching(std::string_view kernel,
-                    ffi::Dictionary forward_config, 
-                    ffi::Dictionary backward_config, 
-                    ffi::Dictionary double_backward_config, 
-                    ffi::Dictionary kernel_prop,
+    compile_conv_with_caching(std::string_view json_payload,
                     int64_t hash,
                     bool is_convolution) {
     
@@ -244,12 +228,21 @@ std::pair<JITConvImpl<JITKernel>*, KernelProp>
         const std::lock_guard<std::mutex> lock(mut);
         auto it = conv_cache.find(hash); 
         if (it == conv_cache.end()) {
-            auto kernel_prop_map = parse_ffi_dict(kernel_prop, kernel_prop_keys);
+            std::string err;
+            json root = json::parse(std::string(json_payload), err);
+            if (!err.empty()) throw std::runtime_error("JSON Parse Error: " + err);
+
+            std::string kernel_src = root["kernel"].string_value();
+            auto forward_cfg = parse_json_config(root["forward_config"]);
+            auto backward_cfg = parse_json_config(root["backward_config"]);
+            auto dbackward_cfg = parse_json_config(root["double_backward_config"]);
+            auto kernel_prop_map = parse_json_config(root["kernel_prop"]);
+
             auto jit_conv_impl = std::make_unique<JITConvImpl<JITKernel>>(
-                std::string(kernel),
-                parse_ffi_dict(forward_config, launch_config_keys),
-                parse_ffi_dict(backward_config, launch_config_keys),
-                parse_ffi_dict(double_backward_config, launch_config_keys),
+                kernel_src,
+                forward_cfg,
+                backward_cfg,
+                dbackward_cfg,
                 kernel_prop_map);
             conv_cache.insert({hash,
                 std::make_pair(std::move(jit_conv_impl), 
@@ -300,12 +293,12 @@ ffi::Error tp_forward_impl(
         ffi::AnyBuffer L2_in,
         ffi::AnyBuffer W,
         ffi::Result<ffi::AnyBuffer> L3_out,
-        stream_t stream, 
-        std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
+        stream_t stream,
+        std::string_view kernel_json,
         int64_t hash) {
    
     auto [jit_kernel, k] = compile_tp_with_caching(
-        kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, false);
+        kernel_json, hash, false);
     const int64_t num_batch = L1_in.dimensions()[0];
 
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
@@ -336,11 +329,11 @@ ffi::Error tp_backward_impl(
         ffi::Result<ffi::AnyBuffer> L2_grad,
         ffi::Result<ffi::AnyBuffer> W_grad, 
         stream_t stream, 
-        std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
+        std::string_view kernel_json,
         int64_t hash) {
     
     auto [jit_kernel, k] = compile_tp_with_caching(
-        kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, false);
+        kernel_json, hash, false);
     const int64_t num_batch = L1_in.dimensions()[0];
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_in");
@@ -386,11 +379,11 @@ ffi::Error tp_double_backward_impl(
         ffi::Result<ffi::AnyBuffer> W_grad,
         ffi::Result<ffi::AnyBuffer> L3_dgrad,
         stream_t stream, 
-        std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
+        std::string_view kernel_json,
         int64_t hash) {
     
     auto [jit_kernel, k] = compile_tp_with_caching(
-        kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, false);
+        kernel_json, hash, false);
     const int64_t num_batch = L1_in.dimensions()[0];
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_in");
@@ -435,7 +428,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Arg<ffi::AnyBuffer>()
         .Ret<ffi::AnyBuffer>()
         .Ctx<ffi::PlatformStream<stream_t>>()
-        .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
+        .Attr<std::string_view>("kernel")
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});  // cudaGraph enabled
 
@@ -450,7 +443,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Ret<ffi::AnyBuffer>()
         .Ret<ffi::AnyBuffer>()
         .Ctx<ffi::PlatformStream<stream_t>>()
-        .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
+        .Attr<std::string_view>("kernel")
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});
 
@@ -469,7 +462,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Ret<ffi::AnyBuffer>()
         .Ret<ffi::AnyBuffer>()
         .Ctx<ffi::PlatformStream<stream_t>>()
-        .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
+        .Attr<std::string_view>("kernel")
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});
 
@@ -484,11 +477,11 @@ ffi::Error conv_forward_impl(
         ffi::AnyBuffer transpose_perm,
         ffi::Result<ffi::AnyBuffer> L3_out,
         stream_t stream, 
-        std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
+        std::string_view kernel_json,
         int64_t hash) {
    
     auto [jit_kernel, k] = compile_conv_with_caching(
-        kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, true);
+        kernel_json, hash, true);
     const int64_t nnz = rows.dimensions()[0];
     const int64_t node_count = L1_in.dimensions()[0];
     void* workspace_ptr = data_ptr(workspace);
@@ -539,11 +532,11 @@ ffi::Error conv_backward_impl(
         ffi::AnyBuffer workspace,
         ffi::AnyBuffer transpose_perm,
         stream_t stream, 
-        std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
+        std::string_view kernel_json,
         int64_t hash) {
     
     auto [jit_kernel, k] = compile_conv_with_caching(
-        kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, true);
+        kernel_json, hash, true);
     const int64_t nnz = rows.dimensions()[0];
     const int64_t node_count = L1_in.dimensions()[0];
     void* workspace_ptr = data_ptr(workspace);
@@ -562,6 +555,8 @@ ffi::Error conv_backward_impl(
         workspace_ptr = nullptr;
     }
     zero_buffer(*L1_grad, stream);
+    zero_buffer(*L2_grad, stream);
+    zero_buffer(*W_grad, stream);
 
     if (k.shared_weights) {
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
@@ -571,8 +566,6 @@ ffi::Error conv_backward_impl(
         check_tensor(W, {nnz, k.weight_numel}, k.weight_dtype, "W");
         check_tensor(*W_grad, {nnz, k.weight_numel}, k.weight_dtype, "W_grad");
     }
-    if(k.shared_weights)
-        zero_buffer(*W_grad, stream);
 
     jit_kernel->backward(
             data_ptr(L1_in),
@@ -608,11 +601,11 @@ ffi::Error conv_double_backward_impl(
         ffi::AnyBuffer workspace,
         ffi::AnyBuffer transpose_perm,
         stream_t stream, 
-        std::string_view kernel, ffi::Dictionary forward_config, ffi::Dictionary backward_config, ffi::Dictionary double_backward_config, ffi::Dictionary kernel_prop,
+        std::string_view kernel_json,
         int64_t hash) {
     
     auto [jit_kernel, k] = compile_conv_with_caching(
-        kernel, forward_config, backward_config, double_backward_config, kernel_prop, hash, true);
+        kernel_json, hash, true);
     const int64_t nnz = rows.dimensions()[0];
     const int64_t node_count = L1_in.dimensions()[0];
     void* workspace_ptr = data_ptr(workspace);
@@ -633,8 +626,9 @@ ffi::Error conv_double_backward_impl(
         workspace_ptr = nullptr;
     }
     zero_buffer(*L1_grad, stream);
+    zero_buffer(*L2_grad, stream);
+    zero_buffer(*W_grad, stream);
     zero_buffer(*L3_dgrad, stream);
-
     
     if (k.shared_weights) {
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
@@ -643,8 +637,6 @@ ffi::Error conv_double_backward_impl(
         check_tensor(W, {nnz, k.weight_numel}, k.weight_dtype, "W");
         check_tensor(W_dgrad, {nnz, k.weight_numel}, k.weight_dtype, "W_dgrad");
     }
-    if(k.shared_weights)
-        zero_buffer(*W_grad, stream);
 
     jit_kernel->double_backward(
             data_ptr(L1_in),
@@ -689,7 +681,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Arg<ffi::AnyBuffer>()
         .Ret<ffi::AnyBuffer>()
         .Ctx<ffi::PlatformStream<stream_t>>()
-        .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
+        .Attr<std::string_view>("kernel")
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});
 
@@ -708,7 +700,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
         .Ctx<ffi::PlatformStream<stream_t>>()
-        .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
+        .Attr<std::string_view>("kernel")
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});
 
@@ -731,7 +723,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
         .Ctx<ffi::PlatformStream<stream_t>>()
-        .Attr<std::string_view>("kernel").Attr<ffi::Dictionary>("forward_config").Attr<ffi::Dictionary>("backward_config").Attr<ffi::Dictionary>("double_backward_config").Attr<ffi::Dictionary>("kernel_prop")
+        .Attr<std::string_view>("kernel")
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});
 
@@ -764,10 +756,4 @@ NB_MODULE(openequivariance_extjax, m) {
         .def("start", &GPUTimer::start)
         .def("stop_clock_get_elapsed", &GPUTimer::stop_clock_get_elapsed)
         .def("clear_L2_cache", &GPUTimer::clear_L2_cache);
-
-    /*nb::class_<PyDeviceBuffer<GPU_Allocator>>(m, "DeviceBuffer")
-        .def(nb::init<uint64_t>())
-        .def(nb::init<nb::buffer>())
-        .def("copy_to_host", &PyDeviceBuffer<GPU_Allocator>::copy_to_host)
-        .def("data_ptr", &PyDeviceBuffer<GPU_Allocator>::data_ptr);*/
 }

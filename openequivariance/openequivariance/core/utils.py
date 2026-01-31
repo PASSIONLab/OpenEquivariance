@@ -7,7 +7,6 @@ from openequivariance.core.e3nn_lite import Instruction, TPProblem, wigner_3j
 
 import json
 import tempfile
-import hashlib
 
 from enum import IntEnum
 
@@ -200,13 +199,3 @@ def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
             time_millis[i] = kernel_time
 
     return time_millis
-
-
-def hash_attributes(attrs):
-    m = hashlib.sha256()
-
-    for key in sorted(attrs.keys()):
-        m.update(attrs[key].__repr__().encode("utf-8"))
-
-    hash = int(m.hexdigest()[:16], 16) >> 1
-    attrs["hash"] = hash

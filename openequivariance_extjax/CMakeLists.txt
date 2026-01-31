@@ -52,6 +52,7 @@ endif()
 set(HEADER_DIR "src/extension")
 set(OEQ_JAX_SOURCES
     src/libjax_tp_jit.cpp
+    ${HEADER_DIR}/json11/json11.cpp
 )
 
 set(OEQ_JAX_HEADERS
@@ -60,6 +61,7 @@ set(OEQ_JAX_HEADERS
   ${HEADER_DIR}/util/backend_cuda.hpp
   ${HEADER_DIR}/util/backend_hip.hpp
   ${HEADER_DIR}/util/buffer.hpp
+  ${HEADER_DIR}/json11/json11.hpp
 )
 
 nanobind_add_module(openequivariance_extjax NB_STATIC ${OEQ_JAX_SOURCES} ${OEQ_JAX_HEADERS})

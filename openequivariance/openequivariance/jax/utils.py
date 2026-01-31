@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax.interpreters import ad
 
 
 def reorder_jax_helper(schedule, weights_in, direction, has_batch_dim):
@@ -61,3 +62,13 @@ def reorder_jax(schedule, weights_in, direction, has_batch_dim):
         return reorder_jax_helper(schedule, weights_in, direction, has_batch_dim)
     else:
         return reorder_numpy_jax_helper(schedule, weights_in, direction, has_batch_dim)
+
+
+def clean_tensors(*tensors):
+    tensors_clean = []
+    for t in tensors:
+        result = t
+        if type(t) is ad.Zero or ad.is_undefined_primal(t):
+            result = jnp.zeros(t.aval.shape, t.aval.dtype)
+        tensors_clean.append(result)
+    return tensors_clean

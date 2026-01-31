@@ -1,5 +1,22 @@
 ## Latest Changes
 
+### v0.5.4 (2025-02-01) 
+Improvements to JAX frontend.
+
+**Added**:
+- Jacobian Vector Products (JVP) 
+  for both `TensorProduct` and `TensorProductConv` via custom primitives, in addition to VJP.
+- Arbitrary higher-order derivatives in JAX.
+- JAX JIT support; in particular, support for
+  Phonon Fine Tuning in [Nequix](https://github.com/atomicarchitects/nequix).
+
+**Fixed**:
+- Zero'd all output buffers in the backwards and double-backwards implementations of convolution
+before calling kernels. 
+
+### v0.5.1-0.5.3 (2025-02-01) 
+Minor bugfixes related to packaging and JAX. 
+
 ### v0.5.0 (2025-12-25) 
 JAX support is now available in 
 OpenEquivariance for BOTH NVIDIA and

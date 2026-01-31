@@ -320,7 +320,7 @@ class LaunchConfig:
         self.num_blocks = num_blocks
         self.num_threads = num_threads
         self.warp_size = warp_size
-        self.smem = smem
+        self.smem = int(smem)
 
 
 class ComputationSchedule:
