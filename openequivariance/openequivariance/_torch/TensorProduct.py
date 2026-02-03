@@ -4,7 +4,7 @@ from openequivariance._torch import extlib
 import torch
 from openequivariance.core.utils import torch_to_oeq_dtype
 from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance._torch.utils import reorder_torch
+from openequivariance._torch.utils import reorder_torch, string_to_tensor
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
 
 import numpy as np
@@ -45,7 +45,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
             self.input_args["torch_op"],
         )
 
-        self.kernel = json.dumps(
+        kernel_string = json.dumps(
             {
                 "kernel": self.jit_kernel,
                 "forward_config": vars(self.forward_schedule.launch_config),
@@ -56,13 +56,15 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
                 "kernel_prop": self.kernelProp,
             }
         )
+
+        self.kernel= string_to_tensor(kernel_string)
         self.hash = self.kernel.__hash__()
         logger.info(f"Kernel File Size: {len(self.jit_kernel) // 1024} KB")
 
         self.weight_numel = self.input_args["problem"].weight_numel
-        self._setup_notorchbind()
 
         if (not extlib.TORCH_COMPILE) or self.input_args["use_opaque"]:
+            print(extlib.TORCH_COMPILE_ERROR)
             self.forward = self.forward_opaque
 
     def to(self, *args, **kwargs):
@@ -119,7 +121,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
 
         :return: Tensor of shape ``[batch_size, problem.irreps_out.dim()]``, datatype ``problem.irrep_dtype``.
         """
-        return torch.ops.libtorch_tp_jit.jit_tp_forward(self.internal, x, y, W)
+        return torch.ops.libtorch_tp_jit.jit_tp_forward(self.kernel, self.hash, x, y, W)
 
 
     @classmethod

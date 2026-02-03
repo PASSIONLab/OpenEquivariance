@@ -51,7 +51,7 @@ elif torch.version.cuda or torch.version.hip:
 
         extra_cflags = ["-O3"]
         generic_sources = ["generic_module.cpp"]
-        torch_sources = ["libtorch_tp_jit.cpp"]
+        torch_sources = ["libtorch_tp_jit.cpp", "json11/json11.cpp"]
 
         include_dirs, extra_link_args = (["util"], ["-Wl,--no-as-needed"])
 

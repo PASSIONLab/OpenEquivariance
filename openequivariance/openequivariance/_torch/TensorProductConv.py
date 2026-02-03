@@ -439,61 +439,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
         global torch
         import torch
 
-        @torch._library.register_fake_class("libtorch_tp_jit::TorchJITConv")
-        class TorchJITConv:
-            def __init__(
-                self,
-                kernel_plaintext: str,
-                fwd_config: dict[str, int],
-                bwd_config: dict[str, int],
-                dbl_bwd_config: dict[str, int],
-                kernel_dims: dict[str, int],
-            ) -> None:
-                (
-                    self.kernel_plaintext,
-                    self.fwd_config,
-                    self.bwd_config,
-                    self.dbl_bwd_config,
-                    self.kernel_dims,
-                ) = (
-                    kernel_plaintext,
-                    fwd_config,
-                    bwd_config,
-                    dbl_bwd_config,
-                    kernel_dims,
-                )
-
-            @classmethod
-            def __obj_unflatten__(cls, flattened_product):
-                return cls(**dict(flattened_product))
-
-            def __len__(self):
-                return 0
-
-            def __setstate__(self, state):
-                (
-                    self.kernel_plaintext,
-                    self.fwd_config,
-                    self.bwd_config,
-                    self.dbl_bwd_config,
-                    self.kernel_dims,
-                ) = state
-
-            def exec_conv_rawptrs(*args, **kwargs):
-                pass
-
-            def backward_rawptrs(*args, **kwargs):
-                pass
-
-            def double_backward_rawptrs(*args, **kwargs):
-                pass
-
-            def L3_dim_getter(self):
-                return self.kernel_dims["L3_dim"]
-
-            def irrep_dtype_getter(self):
-                return self.kernel_dims["irrep_dtype"]
-
         @torch.library.register_fake("libtorch_tp_jit::jit_conv_forward")
         def fake_forward(
             jit, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm
