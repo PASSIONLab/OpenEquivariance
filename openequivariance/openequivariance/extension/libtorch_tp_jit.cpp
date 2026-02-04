@@ -38,7 +38,6 @@
     }
 #endif
 
-#include "buffer.hpp"
 #include "tensorproducts.hpp"
 #include "convolution.hpp"
 

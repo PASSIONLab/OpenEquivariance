@@ -154,7 +154,6 @@ if BUILT_EXTENSION:
         GroupMM_F32,
         GroupMM_F64,
         DeviceProp,
-        DeviceBuffer,
         GPUTimer,
     )
 else:
@@ -173,9 +172,6 @@ else:
 
     def DeviceProp(*args, **kwargs):
         _raise_import_error_helper("DeviceProp")
-
-    def DeviceBuffer(*args, **kwargs):
-        _raise_import_error_helper("DeviceBuffer")
 
     def GPUTimer(*args, **kwargs):
         _raise_import_error_helper("GPUTimer")

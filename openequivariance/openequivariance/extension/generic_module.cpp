@@ -24,7 +24,6 @@
     using GroupMM = GroupMMHIP<T>; 
 #endif
 
-#include "buffer.hpp"
 #include "tensorproducts.hpp"
 #include "convolution.hpp"
 
@@ -67,12 +66,6 @@ PYBIND11_MODULE(generic_module, m) {
         .def_readonly("minor", &DeviceProp::minor)
         .def_readonly("multiprocessorCount", &DeviceProp::multiprocessorCount)
         .def_readonly("maxSharedMemPerBlock", &DeviceProp::maxSharedMemPerBlock); 
-
-    py::class_<PyDeviceBuffer<GPU_Allocator>>(m, "DeviceBuffer")
-        .def(py::init<uint64_t>())
-        .def(py::init<py::buffer>())
-        .def("copy_to_host", &PyDeviceBuffer<GPU_Allocator>::copy_to_host)
-        .def("data_ptr", &PyDeviceBuffer<GPU_Allocator>::data_ptr);
 
     py::class_<GPUTimer>(m, "GPUTimer")
         .def(py::init<>())
