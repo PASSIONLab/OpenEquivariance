@@ -47,9 +47,6 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
         self.kernel= string_to_tensor(self.kernel_string)
         self.weight_numel = self.input_args["problem"].weight_numel
 
-        if (not extlib.TORCH_COMPILE) or self.input_args["use_opaque"]:
-            print(extlib.TORCH_COMPILE_ERROR)
-            self.forward = self.forward_opaque
 
     def to(self, *args, **kwargs):
         r"""

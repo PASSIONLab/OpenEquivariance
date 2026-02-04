@@ -348,7 +348,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
         torch_cols = torch.tensor(graph.cols, device="cuda")
 
         if self.deterministic:
-            torch_sender_perm = torch.tensor(graph.sender_perm, device="cuda")
+            torch_sender_perm = torch.tensor(graph.transpose_perm, device="cuda")
         else:
             torch_sender_perm = None
 
@@ -382,7 +382,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
         torch_cols = torch.tensor(graph.cols, device="cuda")
 
         if self.deterministic:
-            torch_sender_perm = torch.tensor(graph.sender_perm, device="cuda")
+            torch_sender_perm = torch.tensor(graph.transpose_perm, device="cuda")
         else:
             torch_sender_perm = None
         
