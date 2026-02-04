@@ -8,7 +8,6 @@ from openequivariance._torch.utils import reorder_torch, string_to_tensor
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
 
 import numpy as np
-import json
 
 logger = getLogger()
 
@@ -45,22 +44,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
             self.input_args["torch_op"],
         )
 
-        kernel_string = json.dumps(
-            {
-                "kernel": self.jit_kernel,
-                "forward_config": vars(self.forward_schedule.launch_config),
-                "backward_config": vars(self.backward_schedule.launch_config),
-                "double_backward_config": vars(
-                    self.double_backward_schedule.launch_config
-                ),
-                "kernel_prop": self.kernelProp,
-            }
-        )
-
-        self.kernel= string_to_tensor(kernel_string)
-        self.hash = self.kernel.__hash__()
-        logger.info(f"Kernel File Size: {len(self.jit_kernel) // 1024} KB")
-
+        self.kernel= string_to_tensor(self.kernel_string)
         self.weight_numel = self.input_args["problem"].weight_numel
 
         if (not extlib.TORCH_COMPILE) or self.input_args["use_opaque"]:
@@ -151,7 +135,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
             L1_grad, L2_grad, W_grad = backward_op(
                 ctx.kernel, ctx.hash, ctx.L1_in, ctx.L2_in, ctx.weights, grad_output
             )
-            return None, L1_grad, L2_grad, W_grad
+            return None, None, L1_grad, L2_grad, W_grad
 
         torch.library.register_autograd(
             "libtorch_tp_jit::jit_tp_forward", backward, setup_context=setup_context
@@ -164,7 +148,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
             result = torch.ops.libtorch_tp_jit.jit_tp_double_backward(
                 ctx.kernel, ctx.hash, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad, E, F, G
             )
-            return None, result[0], result[1], result[2], result[3]
+            return None, None, result[0], result[1], result[2], result[3]
 
         torch.library.register_autograd(
             "libtorch_tp_jit::jit_tp_backward",
@@ -205,7 +189,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
         torch_L1_in = torch.tensor(L1_in, device="cuda")
         torch_L2_in = torch.tensor(L2_in, device="cuda")
         torch_weights = torch.tensor(weights_chunked, device="cuda")
-        torch_L3_out = self.e3nn_tp(torch_L1_in, torch_L2_in, torch_weights)
+        torch_L3_out = self.forward(torch_L1_in, torch_L2_in, torch_weights)
 
         L3_out[:] = torch_L3_out.numpy(force=True)
 
@@ -220,7 +204,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
         torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
         torch_weights = torch.tensor(weights_chunked, requires_grad=True, device="cuda")
 
-        torch_out = self.e3nn_tp(torch_L1_in, torch_L2_in, torch_weights)
+        torch_out = self.forward(torch_L1_in, torch_L2_in, torch_weights)
 
         torch_L3_grad_in = torch.tensor(L3_grad, device="cuda")
 

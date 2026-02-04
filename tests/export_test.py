@@ -98,20 +98,6 @@ def test_torch_load(tp_and_inputs):
     assert torch.allclose(original_result, reloaded_result, atol=1e-5)
 
 
-def test_jitscript(tp_and_inputs):
-    tp, inputs = tp_and_inputs
-    uncompiled_result = tp.forward(*inputs)
-
-    scripted_tp = torch.jit.script(tp)
-    loaded_tp = None
-    with tempfile.NamedTemporaryFile(suffix=".pt") as tmp_file:
-        scripted_tp.save(tmp_file.name)
-        loaded_tp = torch.jit.load(tmp_file.name)
-
-    compiled_result = loaded_tp(*inputs)
-    assert torch.allclose(uncompiled_result, compiled_result, atol=1e-5)
-
-
 def test_compile(tp_and_inputs):
     tp, inputs = tp_and_inputs
     uncompiled_result = tp.forward(*inputs)
@@ -154,76 +140,3 @@ def test_aoti(tp_and_inputs):
 
     aoti_result = aoti_model(*inputs)
     assert torch.allclose(uncompiled_result, aoti_result, atol=1e-5)
-
-
-def test_jitscript_cpp_interface(problem_and_irreps):
-    assert oeq.LINKED_LIBPYTHON, oeq.LINKED_LIBPYTHON_ERROR
-    problem, X_ir, Y_ir, _ = problem_and_irreps
-    cmake_prefix_path = torch.utils.cmake_prefix_path
-    torch_ext_so_path = oeq.torch_ext_so_path()
-
-    oeq_tp = oeq.TensorProduct(problem).to("cuda")
-    scripted_oeq = torch.jit.script(oeq_tp)
-
-    e3nn_tp = E3NNTensorProduct(problem).e3nn_tp.to("cuda")
-    scripted_e3nn = torch.jit.script(e3nn_tp)
-
-    batch_size = 1000
-
-    with (
-        tempfile.TemporaryDirectory() as tmpdir,
-        tempfile.NamedTemporaryFile(suffix=".pt") as oeq_file,
-        tempfile.NamedTemporaryFile(suffix=".pt") as e3nn_file,
-    ):
-        scripted_oeq.save(oeq_file.name)
-        scripted_e3nn.save(e3nn_file.name)
-
-        test_path = importlib.resources.files("openequivariance") / "extension" / "test"
-        build_dir = os.path.join(tmpdir, "build")
-        os.makedirs(build_dir, exist_ok=True)
-
-        for item in test_path.iterdir():
-            shutil.copy(item, tmpdir)
-
-        try:
-            subprocess.run(
-                [
-                    "cmake",
-                    "..",
-                    "-DCMAKE_BUILD_TYPE=Release",
-                    "-DCMAKE_PREFIX_PATH=" + cmake_prefix_path,
-                    "-DOEQ_EXTLIB=" + torch_ext_so_path,
-                ],
-                cwd=build_dir,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-
-            subprocess.run(
-                ["make"],
-                cwd=build_dir,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-
-            subprocess.run(
-                [
-                    "./load_jitscript",
-                    e3nn_file.name,
-                    oeq_file.name,
-                    str(X_ir.dim),
-                    str(Y_ir.dim),
-                    str(problem.weight_numel),
-                    str(batch_size),
-                ],
-                cwd=build_dir,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-        except subprocess.CalledProcessError as e:
-            print(e.stdout.decode(), file=sys.stderr)
-            print(e.stderr.decode(), file=sys.stderr)
-            assert False

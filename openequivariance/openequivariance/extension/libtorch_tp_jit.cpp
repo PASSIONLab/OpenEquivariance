@@ -51,8 +51,6 @@ using json = json11::Json;
 #include <c10/macros/Macros.h>
 #include <c10/util/Exception.h>
 
-// --------------------- Utilities --------------------------
-
 torch::Dtype enum_to_torch_dtype(int64_t i){
     switch(i) {
         case 1: return torch::kFloat; 
@@ -99,8 +97,6 @@ std::unordered_map<std::string, int64_t> parse_json_config(const json &j_obj) {
     return result;
 }
 
-// --------------------- Compilation & Caching --------------------------
-
 struct KernelProp {
     int64_t L1_dim, L2_dim, L3_dim, weight_numel;
     bool shared_weights;
@@ -137,7 +133,6 @@ struct KernelProp {
     }
 };
 
-// Global Caches
 std::unordered_map<int64_t,
     std::pair<
         std::unique_ptr<JITTPImpl<JITKernel>>,
@@ -159,7 +154,6 @@ std::pair<JITTPImpl<JITKernel>*, KernelProp>
         const std::lock_guard<std::mutex> lock(mut);
         auto it = tp_cache.find(hash); 
         if (it == tp_cache.end()) {
-            // Cache Miss: Extract String
             torch::Tensor cpu_tensor = json_bytes.to(torch::kCPU).contiguous();
             std::string json_payload(
                 reinterpret_cast<const char*>(cpu_tensor.data_ptr<uint8_t>()), 
@@ -199,7 +193,6 @@ std::pair<JITConvImpl<JITKernel>*, KernelProp>
         const std::lock_guard<std::mutex> lock(mut);
         auto it = conv_cache.find(hash); 
         if (it == conv_cache.end()) {
-             // Cache Miss: Extract String
             torch::Tensor cpu_tensor = json_bytes.to(torch::kCPU).contiguous();
             std::string json_payload(
                 reinterpret_cast<const char*>(cpu_tensor.data_ptr<uint8_t>()), 
@@ -595,7 +588,6 @@ TORCH_LIBRARY_IMPL(libtorch_tp_jit, CUDA, m) {
     m.impl("jit_conv_double_backward", &jit_conv_double_backward);
 };
 
-// Define headers for the library (without implementations)
 TORCH_LIBRARY(libtorch_tp_jit, m) {
     m.def("jit_tp_forward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W) -> Tensor");
     m.def("jit_tp_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad) -> (Tensor, Tensor, Tensor)");

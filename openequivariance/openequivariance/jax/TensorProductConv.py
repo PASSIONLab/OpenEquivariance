@@ -49,19 +49,7 @@ class TensorProductConv(LoopUnrollConv):
             kahan=kahan,
         )
 
-        self.kernel = json.dumps(
-            {
-                "kernel": self.jit_kernel,
-                "forward_config": vars(self.forward_schedule.launch_config),
-                "backward_config": vars(self.backward_schedule.launch_config),
-                "double_backward_config": vars(
-                    self.double_backward_schedule.launch_config
-                ),
-                "kernel_prop": self.kernel_prop,
-            }
-        )
-        self.hash = self.kernel.__hash__()
-
+        self.kernel = self.kernel_string
         self.weight_numel = config.weight_numel
         self.L3_dim = self.config.irreps_out.dim
 
