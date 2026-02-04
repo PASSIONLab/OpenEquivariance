@@ -129,10 +129,7 @@ def test_aoti(tp_and_inputs):
             )
         except Exception as e:
             err_msg = (
-                "AOTI compile_and_package failed. NOTE: OpenEquivariance only supports AOTI for "
-                + "PyTorch version >= 2.8.0.dev20250410+cu126 due to incomplete TorchBind support "
-                + "in prior versions. "
-                + f"{e}"
+                f"AOTI compile_and_package failed. Error: {e}" 
             )
             assert False, err_msg
 

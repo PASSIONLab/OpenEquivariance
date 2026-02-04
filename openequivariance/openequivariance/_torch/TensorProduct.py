@@ -22,7 +22,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
     * The provided tensor product specification is unsupported.
 
     :param problem: Specification of the tensor product.
-    :param use_opaque: If ``True``, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``.
+    :param use_opaque: This parameter is deprecated. 
     """
 
     def __init__(self, problem: TPProblem, torch_op=True, use_opaque=False):
