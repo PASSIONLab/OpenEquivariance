@@ -8,6 +8,7 @@ from openequivariance._torch.utils import reorder_torch, string_to_tensor
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
 
 import numpy as np
+import json
 
 logger = getLogger()
 
@@ -105,69 +106,6 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
         return torch.ops.libtorch_tp_jit.jit_tp_forward(self.kernel, self.hash, x, y, W)
 
 
-    @classmethod
-    def register_torch_fakes(cls):
-        @torch.library.register_fake("libtorch_tp_jit::jit_tp_forward")
-        def fake_forward(jit, L1_in, L2_in, W):
-            L3_dim = None
-            if hasattr(jit, "wrapped_obj"):
-                L3_dim = jit.wrapped_obj.kernel_dims["L3_dim"]
-            else:
-                L3_dim = jit.L3_dim
-
-            return L1_in.new_empty(L1_in.shape[0], L3_dim)
-
-        @torch.library.register_fake("libtorch_tp_jit::jit_tp_backward")
-        def fake_backward(jit, L1_in, L2_in, W, L3_grad):
-            return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W)
-
-    @classmethod
-    def register_autograd(cls):
-        backward_op = torch.ops.libtorch_tp_jit.jit_tp_backward
-
-        def setup_context(ctx, inputs, output):
-            ctx.kernel, ctx.hash, ctx.L1_in, ctx.L2_in, ctx.weights = inputs
-
-        def backward(ctx, grad_output):
-            L1_grad, L2_grad, W_grad = backward_op(
-                ctx.kernel, ctx.hash, ctx.L1_in, ctx.L2_in, ctx.weights, grad_output
-            )
-            return None, None, L1_grad, L2_grad, W_grad
-
-        torch.library.register_autograd(
-            "libtorch_tp_jit::jit_tp_forward", backward, setup_context=setup_context
-        )
-
-        def setup_context_double_backward(ctx, inputs, output):
-            ctx.kernel, ctx.hash, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad = inputs
-
-        def double_backward(ctx, E, F, G):
-            result = torch.ops.libtorch_tp_jit.jit_tp_double_backward(
-                ctx.kernel, ctx.hash, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad, E, F, G
-            )
-            return None, None, result[0], result[1], result[2], result[3]
-
-        torch.library.register_autograd(
-            "libtorch_tp_jit::jit_tp_backward",
-            double_backward,
-            setup_context=setup_context_double_backward,
-        )
-
-    @classmethod
-    def register_autocast(cls):
-        global torch
-        import torch
-
-        torch.library.register_autocast(
-            "libtorch_tp_jit::jit_tp_forward", "cuda", torch.float32
-        )
-        torch.library.register_autocast(
-            "libtorch_tp_jit::jit_tp_backward", "cuda", torch.float32
-        )
-        torch.library.register_autocast(
-            "libtorch_tp_jit::jit_tp_double_backward", "cuda", torch.float32
-        )
-
     @staticmethod
     def name():
         return "LoopUnrollTP"
@@ -216,7 +154,73 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
         )
 
 
-if extlib.TORCH_COMPILE:
-    TensorProduct.register_torch_fakes()
-    TensorProduct.register_autograd()
-    TensorProduct.register_autocast()
+def register_torch_fakes():
+    @torch.library.register_fake("libtorch_tp_jit::jit_tp_forward")
+    def fake_forward(kernel, hash, L1_in, L2_in, W):
+        info = json.loads(kernel) 
+        L3_dim = info["kernel_prop"]["L3_dim"]
+
+        return L1_in.new_empty(L1_in.shape[0], L3_dim)
+
+    @torch.library.register_fake("libtorch_tp_jit::jit_tp_backward")
+    def fake_backward(kernel, hash, L1_in, L2_in, W, L3_grad):
+        return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W)
+
+    @torch.library.register_fake("libtorch_tp_jit::jit_tp_double_backward")
+    def fake_double_backward(kernel, hash, L1_in, L2_in, W, L3_grad, E, F, G):
+        return (
+            torch.empty_like(L1_in),
+            torch.empty_like(L2_in),
+            torch.empty_like(W),
+            torch.empty_like(L3_grad),
+        )
+
+
+def register_autograd():
+    backward_op = torch.ops.libtorch_tp_jit.jit_tp_backward
+
+    def setup_context(ctx, inputs, output):
+        ctx.kernel, ctx.hash, ctx.L1_in, ctx.L2_in, ctx.weights = inputs
+
+    def backward(ctx, grad_output):
+        L1_grad, L2_grad, W_grad = backward_op(
+            ctx.kernel, ctx.hash, ctx.L1_in, ctx.L2_in, ctx.weights, grad_output
+        )
+        return None, None, L1_grad, L2_grad, W_grad
+
+    torch.library.register_autograd(
+        "libtorch_tp_jit::jit_tp_forward", backward, setup_context=setup_context
+    )
+
+    def setup_context_double_backward(ctx, inputs, output):
+        ctx.kernel, ctx.hash, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad = inputs
+
+    def double_backward(ctx, E, F, G):
+        result = torch.ops.libtorch_tp_jit.jit_tp_double_backward(
+            ctx.kernel, ctx.hash, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad, E, F, G
+        )
+        return None, None, result[0], result[1], result[2], result[3]
+
+    torch.library.register_autograd(
+        "libtorch_tp_jit::jit_tp_backward",
+        double_backward,
+        setup_context=setup_context_double_backward,
+    )
+
+def register_autocast():
+    global torch
+    import torch
+
+    torch.library.register_autocast(
+        "libtorch_tp_jit::jit_tp_forward", "cuda", torch.float32
+    )
+    torch.library.register_autocast(
+        "libtorch_tp_jit::jit_tp_backward", "cuda", torch.float32
+    )
+    torch.library.register_autocast(
+        "libtorch_tp_jit::jit_tp_double_backward", "cuda", torch.float32
+    )
+
+register_torch_fakes()
+register_autograd()
+register_autocast()

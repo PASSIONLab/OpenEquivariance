@@ -94,7 +94,7 @@ class LoopUnrollTP(TensorProductBase):
             )
         )
 
-        self.kernelProp = {
+        self.kernel_prop = {
             "L1_dim": self.L1.dim,
             "L2_dim": self.L2.dim,
             "L3_dim": self.L3.dim,
@@ -117,7 +117,7 @@ class LoopUnrollTP(TensorProductBase):
                 "double_backward_config": vars(
                     self.double_backward_schedule.launch_config
                 ),
-                "kernel_prop": self.kernelProp,
+                "kernel_prop": self.kernel_prop,
             }
         )
         self.hash = hash_str_64(self.kernel_string)
