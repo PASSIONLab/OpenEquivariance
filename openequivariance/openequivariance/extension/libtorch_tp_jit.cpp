@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "json11/json11.hpp"
+#include <pybind11/pybind11.h>
 
 #ifdef CUDA_BACKEND
     #include <ATen/cuda/CUDAContext.h>
@@ -230,7 +231,8 @@ torch::Tensor jit_tp_forward(
         torch::Tensor json_bytes, int64_t hash,
         torch::Tensor L1_in,
         torch::Tensor L2_in,
-        torch::Tensor W) {
+        torch::Tensor W,
+        int64_t L3_dim) {
     
     auto [jit_kernel, k] = compile_tp_with_caching(json_bytes, hash);
     Stream stream = get_current_stream(); 
@@ -378,6 +380,7 @@ torch::Tensor jit_conv_forward(
         torch::Tensor L1_in,
         torch::Tensor L2_in,
         torch::Tensor W,
+        int64_t L3_dim,
         torch::Tensor rows,
         torch::Tensor cols,
         torch::Tensor workspace,
@@ -588,13 +591,13 @@ TORCH_LIBRARY_IMPL(libtorch_tp_jit, CUDA, m) {
 };
 
 TORCH_LIBRARY(libtorch_tp_jit, m) {
-    m.def("jit_tp_forward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W) -> Tensor");
+    m.def("jit_tp_forward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, int L3_dim) -> Tensor");
     m.def("jit_tp_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad) -> (Tensor, Tensor, Tensor)");
     m.def("jit_tp_double_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad) -> (Tensor, Tensor, Tensor, Tensor)");
 
-    m.def("jit_conv_forward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> Tensor");
+    m.def("jit_conv_forward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, int L3_dim, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> Tensor");
     m.def("jit_conv_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor)");
     m.def("jit_conv_double_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor, Tensor)");
-}
+};
 
 PYBIND11_MODULE(libtorch_tp_jit, m) {}

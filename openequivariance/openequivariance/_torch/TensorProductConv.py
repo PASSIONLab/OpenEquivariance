@@ -152,6 +152,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             X,
             Y,
             W,
+            self.L3.dim,
             rows,
             cols,
             self.workspace_buffer,
@@ -259,17 +260,13 @@ def register_torch_fakes():
 
     @torch.library.register_fake("libtorch_tp_jit::jit_conv_forward")
     def fake_forward(
-        kernel, hash, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm
+        kernel, hash, L1_in, L2_in, W, L3_dim, rows, cols, workspace_buffer, sender_perm
     ):
-        info = json.loads(kernel)
-        L3_dim = info["kernel_prop"]["L3_dim"]
-        irrep_dtype = info["kernel_prop"]["irrep_dtype"]
-
         return torch.empty(
             L1_in.shape[0],
             L3_dim,
             device="cuda",
-            dtype=enum_to_torch_dtype[irrep_dtype],
+            dtype=L1_in.dtype
         )
 
     @torch.library.register_fake("libtorch_tp_jit::jit_conv_backward")
@@ -311,6 +308,7 @@ def register_autograd():
             ctx.L1_in,
             ctx.L2_in,
             ctx.W,
+            ctx.L3_dim,
             ctx.rows,
             ctx.cols,
             ctx.workspace_buffer,
@@ -330,7 +328,7 @@ def register_autograd():
             ctx.workspace_buffer,
             ctx.sender_perm,
         )
-        return None, None, L1_grad, L2_grad, W_grad, None, None, None, None
+        return None, None, L1_grad, L2_grad, W_grad, None, None, None, None, None
 
     torch.library.register_autograd(
         "libtorch_tp_jit::jit_conv_forward", backward, setup_context=setup_context

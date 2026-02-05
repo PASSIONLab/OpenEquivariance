@@ -71,4 +71,10 @@ enum_to_torch_dtype = MappingProxyType(
 def string_to_tensor(text: str) -> torch.Tensor:
     bytes_data = text.encode('utf-8')
     np_bytes = np.frombuffer(bytes_data, dtype=np.uint8)
-    return torch.from_numpy(np_bytes).clone()
+    result = torch.from_numpy(np_bytes).clone()
+    result.requires_grad = False
+    return result
+
+def tensor_to_string(tensor: torch.Tensor) -> str:
+    bytes_data = tensor.numpy().tobytes()
+    return bytes_data.decode('utf-8')
