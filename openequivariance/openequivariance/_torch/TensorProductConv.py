@@ -83,10 +83,11 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
         )
 
         self.allocate_workspace(self.workspace_size)
+
         self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device="cuda")
         self.weight_numel = self.config.weight_numel
         self.kernel= string_to_tensor(self.kernel_string)
-
+        self.L3_dim = self.kernel_prop["L3_dim"]
 
     def to(self, *args, **kwargs):
         r"""
@@ -152,7 +153,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             X,
             Y,
             W,
-            self.L3.dim,
+            self.L3_dim,
             rows,
             cols,
             self.workspace_buffer,

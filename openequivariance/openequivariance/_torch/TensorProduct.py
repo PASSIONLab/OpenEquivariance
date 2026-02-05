@@ -4,7 +4,7 @@ from openequivariance._torch import extlib
 import torch
 from openequivariance.core.utils import torch_to_oeq_dtype
 from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance._torch.utils import reorder_torch, string_to_tensor, tensor_to_string
+from openequivariance._torch.utils import reorder_torch, string_to_tensor 
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
 
 import numpy as np
@@ -45,6 +45,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
             self.input_args["torch_op"],
         )
 
+        self.L3_dim = self.kernel_prop["L3_dim"]
         self.kernel= string_to_tensor(self.kernel_string)
         self.weight_numel = self.input_args["problem"].weight_numel
 
@@ -103,7 +104,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
 
         :return: Tensor of shape ``[batch_size, problem.irreps_out.dim()]``, datatype ``problem.irrep_dtype``.
         """
-        return torch.ops.libtorch_tp_jit.jit_tp_forward(self.kernel, self.hash, x, y, W, self.L3.dim)
+        return torch.ops.libtorch_tp_jit.jit_tp_forward(self.kernel, self.hash, x, y, W, self.L3_dim)
 
 
     @staticmethod
