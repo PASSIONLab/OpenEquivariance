@@ -2,9 +2,7 @@ from typing import Optional
 
 import numpy as np
 import torch
-import json
 
-import openequivariance._torch.extlib as extlib
 from openequivariance._torch.extlib import (
     postprocess_kernel,
     DeviceProp,
@@ -18,7 +16,10 @@ from openequivariance.core.LoopUnrollConv import LoopUnrollConv
 from openequivariance._torch.TensorProduct import TensorProduct
 from openequivariance import TPProblem
 from openequivariance.core.utils import torch_to_oeq_dtype
-from openequivariance._torch.utils import enum_to_torch_dtype, reorder_torch, string_to_tensor
+from openequivariance._torch.utils import (
+    reorder_torch,
+    string_to_tensor,
+)
 
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixinConv
@@ -47,7 +48,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
            fixup-based algorithm. `Default`: ``False``.
     :param kahan: If ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
            the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
-    :param use_opaque: This parameter is deprecated. 
+    :param use_opaque: This parameter is deprecated.
     """
 
     def __init__(
@@ -86,7 +87,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
 
         self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device="cuda")
         self.weight_numel = self.config.weight_numel
-        self.kernel= string_to_tensor(self.kernel_string)
+        self.kernel = string_to_tensor(self.kernel_string)
         self.L3_dim = self.kernel_prop["L3_dim"]
 
     def to(self, *args, **kwargs):
@@ -223,9 +224,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
 
         torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
         torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
-        torch_weights = torch.tensor(
-            weights_chunked, requires_grad=True, device="cuda"
-        )
+        torch_weights = torch.tensor(weights_chunked, requires_grad=True, device="cuda")
         torch_L3_grad = torch.tensor(L3_grad, device="cuda")
         torch_rows = torch.tensor(graph.rows, device="cuda")
         torch_cols = torch.tensor(graph.cols, device="cuda")
@@ -234,7 +233,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             torch_sender_perm = torch.tensor(graph.transpose_perm, device="cuda")
         else:
             torch_sender_perm = None
-        
+
         torch_out = self.forward(
             torch_L1_in,
             torch_L2_in,
@@ -263,22 +262,27 @@ def register_torch_fakes():
     def fake_forward(
         kernel, hash, L1_in, L2_in, W, L3_dim, rows, cols, workspace_buffer, sender_perm
     ):
-        return torch.empty(
-            L1_in.shape[0],
-            L3_dim,
-            device="cuda",
-            dtype=L1_in.dtype
-        )
+        return torch.empty(L1_in.shape[0], L3_dim, device="cuda", dtype=L1_in.dtype)
 
     @torch.library.register_fake("libtorch_tp_jit::jit_conv_backward")
     def fake_backward(
-        kernel, hash, L1_in, L2_in, W, L3_grad, rows, cols, workspace_buffer, sender_perm
+        kernel,
+        hash,
+        L1_in,
+        L2_in,
+        W,
+        L3_grad,
+        rows,
+        cols,
+        workspace_buffer,
+        sender_perm,
     ):
         return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W)
 
     @torch.library.register_fake("libtorch_tp_jit::jit_conv_double_backward")
     def fake_double_backward(
-        kernel, hash,
+        kernel,
+        hash,
         L1_in,
         L2_in,
         W,
@@ -297,6 +301,7 @@ def register_torch_fakes():
             W.new_empty(*W.shape),
             L3_grad.new_empty(*L3_grad.shape),
         ]
+
 
 def register_autograd():
     backward_op = torch.ops.libtorch_tp_jit.jit_conv_backward
@@ -384,6 +389,7 @@ def register_autograd():
         double_backward,
         setup_context=setup_context_double_backward,
     )
+
 
 def register_autocast():
     torch.library.register_autocast(

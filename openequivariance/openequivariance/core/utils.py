@@ -201,5 +201,6 @@ def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
 
     return time_millis
 
+
 def hash_str_64(s: str) -> int:
-    return int.from_bytes(hashlib.sha256(s.encode()).digest()[:7], 'big')
+    return int.from_bytes(hashlib.sha256(s.encode()).digest()[:7], "big")

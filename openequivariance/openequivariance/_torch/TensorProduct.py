@@ -4,11 +4,10 @@ from openequivariance._torch import extlib
 import torch
 from openequivariance.core.utils import torch_to_oeq_dtype
 from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance._torch.utils import reorder_torch, string_to_tensor 
+from openequivariance._torch.utils import reorder_torch, string_to_tensor
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
 
 import numpy as np
-import json
 
 logger = getLogger()
 
@@ -23,7 +22,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
     * The provided tensor product specification is unsupported.
 
     :param problem: Specification of the tensor product.
-    :param use_opaque: This parameter is deprecated. 
+    :param use_opaque: This parameter is deprecated.
     """
 
     def __init__(self, problem: TPProblem, torch_op=True, use_opaque=False):
@@ -46,9 +45,8 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
         )
 
         self.L3_dim = self.kernel_prop["L3_dim"]
-        self.kernel= string_to_tensor(self.kernel_string)
+        self.kernel = string_to_tensor(self.kernel_string)
         self.weight_numel = self.input_args["problem"].weight_numel
-
 
     def to(self, *args, **kwargs):
         r"""
@@ -104,8 +102,9 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
 
         :return: Tensor of shape ``[batch_size, problem.irreps_out.dim()]``, datatype ``problem.irrep_dtype``.
         """
-        return torch.ops.libtorch_tp_jit.jit_tp_forward(self.kernel, self.hash, x, y, W, self.L3_dim)
-
+        return torch.ops.libtorch_tp_jit.jit_tp_forward(
+            self.kernel, self.hash, x, y, W, self.L3_dim
+        )
 
     @staticmethod
     def name():
@@ -162,7 +161,7 @@ def register_torch_fakes():
 
     @torch.library.register_fake("libtorch_tp_jit::jit_tp_backward")
     def fake_backward(kernel, hash, L1_in, L2_in, W, L3_grad):
-        return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W) 
+        return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W)
 
     @torch.library.register_fake("libtorch_tp_jit::jit_tp_double_backward")
     def fake_double_backward(kernel, hash, L1_in, L2_in, W, L3_grad, E, F, G):
@@ -195,7 +194,15 @@ def register_autograd():
 
     def double_backward(ctx, E, F, G):
         result = torch.ops.libtorch_tp_jit.jit_tp_double_backward(
-            ctx.kernel, ctx.hash, ctx.L1_in, ctx.L2_in, ctx.weights, ctx.L3_grad, E, F, G
+            ctx.kernel,
+            ctx.hash,
+            ctx.L1_in,
+            ctx.L2_in,
+            ctx.weights,
+            ctx.L3_grad,
+            E,
+            F,
+            G,
         )
         return None, None, result[0], result[1], result[2], result[3]
 
@@ -204,6 +211,7 @@ def register_autograd():
         double_backward,
         setup_context=setup_context_double_backward,
     )
+
 
 def register_autocast():
     global torch
@@ -218,6 +226,7 @@ def register_autocast():
     torch.library.register_autocast(
         "libtorch_tp_jit::jit_tp_double_backward", "cuda", torch.float32
     )
+
 
 register_torch_fakes()
 register_autograd()

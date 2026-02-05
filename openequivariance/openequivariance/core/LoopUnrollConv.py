@@ -7,9 +7,13 @@ from openequivariance.core.ComputationSchedule import (
     SMEMCapacityException,
 )
 
-from openequivariance.core.utils import dtype_to_enum
 from openequivariance.templates.jinja_utils import get_jinja_environment
-from openequivariance.core.utils import filter_and_analyze_problem, dtype_to_enum, hash_str_64
+from openequivariance.core.utils import (
+    filter_and_analyze_problem,
+    dtype_to_enum,
+    hash_str_64,
+)
+
 
 class LoopUnrollConv(ConvolutionBase):
     def __init__(

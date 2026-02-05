@@ -1,17 +1,10 @@
-import shutil
 import torch
 import pytest
 import tempfile
-import subprocess
-import os
-import sys
 
 import numpy as np
 import openequivariance as oeq
 from torch_geometric import EdgeIndex
-import importlib.resources
-
-from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
 
 
 @pytest.fixture(scope="session")
@@ -128,9 +121,7 @@ def test_aoti(tp_and_inputs):
                 exported_tp, package_path=tmp_file.name
             )
         except Exception as e:
-            err_msg = (
-                f"AOTI compile_and_package failed. Error: {e}" 
-            )
+            err_msg = f"AOTI compile_and_package failed. Error: {e}"
             assert False, err_msg
 
         aoti_model = torch._inductor.aoti_load_package(output_path)

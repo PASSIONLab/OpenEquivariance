@@ -14,6 +14,7 @@ from openequivariance.core.utils import (
 
 logger = getLogger()
 
+
 class LoopUnrollTP(TensorProductBase):
     def __init__(self, config, dp, postprocess_kernel, torch_op):
         super().__init__(config, torch_op=torch_op)
@@ -122,7 +123,6 @@ class LoopUnrollTP(TensorProductBase):
         )
         self.hash = hash_str_64(self.kernel_string)
         logger.info(f"Kernel File Size: {len(self.jit_kernel) // 1024} KB")
-
 
     def calculate_flops_forward(self, batch_size: int) -> dict:
         if self.is_uvw:

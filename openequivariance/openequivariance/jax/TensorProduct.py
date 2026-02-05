@@ -5,7 +5,6 @@ from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.LoopUnrollTP import LoopUnrollTP
 from openequivariance.jax.utils import reorder_jax
 from openequivariance.jax.jvp.tp_prim import tp_fwd_p
-import json
 
 
 class TensorProduct(LoopUnrollTP):
