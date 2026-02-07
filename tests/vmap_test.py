@@ -7,7 +7,7 @@ def with_jax(request):
 
 def test_tutorial_vmap(with_jax):
     if not with_jax:
-        pytest.skip("Skipping JAX tutorial when testing PyTorch")
+        pytest.skip("Skipping JAX VMAP when testing PyTorch")
 
     os.environ["OEQ_NOTORCH"] = "1"
     import openequivariance as oeq
@@ -31,7 +31,7 @@ def test_tutorial_vmap(with_jax):
             [0, 1, 1, 2],
             [1, 0, 2, 1],
         ],
-        dtype=jnp.int32,  # NOTE: This int32, not int64
+        dtype=jnp.int32 
     )
 
     node_ct, nonzero_ct = 3, 4

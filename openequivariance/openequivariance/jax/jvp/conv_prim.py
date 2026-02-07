@@ -542,7 +542,7 @@ def flatten_args(vector_arg_values, batch_axes):
     rows, cols, workspace, sender_perm = vector_arg_values[-4:]
     rows_offset, cols_offset, sender_perm_offset = rows, cols, sender_perm
     if B > 1:
-        batch_offsets = jnp.arange(B) * num_nodes
+        batch_offsets = (jnp.arange(B) * num_nodes).astype(rows.dtype)
         rows_offset = rows + batch_offsets[:, None]
         cols_offset = cols + batch_offsets[:, None]
 
