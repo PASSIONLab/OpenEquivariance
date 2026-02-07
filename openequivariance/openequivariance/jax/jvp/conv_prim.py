@@ -510,64 +510,80 @@ ad.primitive_transposes[conv_dbwd_p] = conv_dbwd_transpose
 # 14. Batching rules for all primitives 
 # ==============================================================================
 
-#def conv_fwd_batch(vector_arg_values, batch_axes, L3_dim, kernel, hash):
-#    X, Y, W, rows, cols, workspace, sender_perm = vector_arg_values
+def flatten_args(vector_arg_values, batch_axes):
+    X = vector_arg_values[0]
 
-#    B = X.shape[0]
-#    num_nodes = X.shape[1]
-
-#    rows_offset = rows
-#    cols_offset = cols
-#    if B > 1:
-#        batch_offsets = jnp.arange(B) * num_nodes
-#        rows_offset = rows + batch_offsets[:, None]
-#        cols_offset = cols + batch_offsets[:, None]
-
-#    X_flat = X.reshape(-1, *X.shape[2:])
-#    Y_flat = Y.reshape(-1, *Y.shape[2:])
-#    W_flat = W.reshape(-1, *W.shape[2:])
-
-#    rows_flat = rows_offset.reshape(-1)
-#    cols_flat = cols_offset.reshape(-1)
-
-#    return conv_fwd_p.bind(
-#        X_flat, 
-#        Y_flat, 
-#        W_flat, 
-#        rows_flat, 
-#        cols_flat, 
-#        workspace, 
-#        sender_perm,
-#        L3_dim=L3_dim, 
-#        kernel=kernel, 
-#        hash=hash
-#    ).reshape(B, num_nodes, -1), 0
-# batching.primitive_batchers[conv_fwd_p] = conv_fwd_batch
-
-for primitive in [conv_fwd_p, conv_bwd_p, conv_dbwd_p, conv_fwd_jvp_p, conv_bwd_jvp_p]:
-    def batch_fn(vector_arg_values, batch_axes, **kwargs):
-        X = vector_arg_values[0]
-        B = X.shape[0]
+    if len(X.shape) == 2:
+        num_nodes = X.shape[0]
+    elif len(X.shape) == 3:
         num_nodes = X.shape[1]
+    else:
+        raise ValueError("Unexpected input shape for X: {}".format(X.shape))
 
-        rows, cols, workspace, sender_perm = vector_arg_values[-4:]
-        rows_offset, cols_offset, sender_perm_offset = rows, cols, sender_perm
-        if B > 1:
-            batch_offsets = jnp.arange(B) * num_nodes
-            rows_offset = rows + batch_offsets[:, None]
-            cols_offset = cols + batch_offsets[:, None]
-            sender_perm_offset = (sender_perm + batch_offsets[:, None]).reshape(-1)
+    B = None    
+    for arg, ba in zip(vector_arg_values, batch_axes):
+        if ba is not None:
+            if B is None:
+                B = arg.shape[ba]
+            else:
+                assert B == arg.shape[ba], "Batch size mismatch among arguments"
 
-        new_args = [
-            arg.reshape(-1, *arg.shape[2:]) for arg in vector_arg_values[:-4] 
-        ] + [rows_offset, cols_offset, workspace, sender_perm_offset]
+    new_args = []
+    for i, (arg, batch_axis) in enumerate(zip(vector_arg_values, batch_axes)):
+        if i != len(vector_arg_values) - 2:
+            if batch_axis is not None:
+                assert batch_axis == 0, "Batch axis must be 0 for all arguments"
+            if batch_axis is None and arg is not None:
+                arg = jnp.broadcast_to(arg, (B,) + arg.shape)
+        new_args.append(arg)
 
-        result = primitive.bind(*new_args, **kwargs)
-        if isinstance(result, tuple):
-            return tuple(r.reshape(B, -1, result.shape[-1]) for r in result), 0
-        else:
-            return result.reshape(B, -1, result.shape[-1]), 0
+    vector_arg_values = new_args
 
-    batching.primitive_batchers[primitive] = batch_fn
+    rows, cols, workspace, sender_perm = vector_arg_values[-4:]
+    rows_offset, cols_offset, sender_perm_offset = rows, cols, sender_perm
+    if B > 1:
+        batch_offsets = jnp.arange(B) * num_nodes
+        rows_offset = rows + batch_offsets[:, None]
+        cols_offset = cols + batch_offsets[:, None]
+
+        if sender_perm is not None:
+            sender_perm_offset = (sender_perm + batch_offsets[:, None])
+
+    new_args = [
+        arg.reshape(-1, *arg.shape[2:]) for arg in vector_arg_values[:-4] 
+    ] + [jnp.ravel(rows_offset), jnp.ravel(cols_offset), workspace, jnp.ravel(sender_perm_offset)]
+
+    return new_args
+
+def unflatten_results(result, batch_size):
+    if not isinstance(result, tuple) and not isinstance(result, list):
+        return result.reshape(batch_size, -1, result.shape[-1]), 0
+    else:
+        return tuple(r.reshape(batch_size, -1, r.shape[-1]) for r in result), (0 for _ in result)
 
 
+def fwd_batch(vector_arg_values, batch_axes, L3_dim, kernel, hash):
+    B = vector_arg_values[0].shape[0]
+    new_args = flatten_args(vector_arg_values, batch_axes)
+    result = conv_fwd_p.bind(*new_args, L3_dim=L3_dim, kernel=kernel, hash=hash)
+    return unflatten_results(result, B) 
+
+batching.primitive_batchers[conv_fwd_p] = fwd_batch
+
+
+def batch_bwd(vector_arg_values, batch_axes, *, kernel, hash):
+    B = vector_arg_values[0].shape[0]
+    new_args = flatten_args(vector_arg_values, batch_axes)
+    result = conv_bwd_p.bind(*new_args, kernel=kernel, hash=hash)
+    return unflatten_results(result, B)
+
+batching.primitive_batchers[conv_bwd_p] = batch_bwd
+
+
+def batch_dbwd(vector_arg_values, batch_axes, *, kernel, hash):
+    B = vector_arg_values[0].shape[0]
+    new_args = flatten_args(vector_arg_values, batch_axes)
+    result = conv_dbwd_p.bind(*new_args, kernel=kernel, hash=hash)
+    return unflatten_results(result, B)
+
+batching.primitive_batchers[conv_dbwd_p] = batch_dbwd
