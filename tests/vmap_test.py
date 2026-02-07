@@ -5,60 +5,50 @@ import os
 def with_jax(request):
     return request.config.getoption("--jax")
 
-def test_tutorial_vmap(with_jax):
+@pytest.fixture
+def ctx(with_jax):
     if not with_jax:
-        pytest.skip("Skipping JAX VMAP when testing PyTorch")
-
+        pytest.skip("Skipping JAX tests")
     os.environ["OEQ_NOTORCH"] = "1"
     import openequivariance as oeq
     import jax
     import jax.numpy as jnp
 
-    seed = 42
-    key = jax.random.PRNGKey(seed)
-
-    vmap_dim = 10
-    batch_size = 1000
-    X_ir, Y_ir, Z_ir = oeq.Irreps("1x2e"), oeq.Irreps("1x3e"), oeq.Irreps("1x2e")
-    instructions = [(0, 0, 0, "uvu", True)]
-
+    key = jax.random.PRNGKey(42)
+    dim, n_nodes, n_nz = 10, 3, 4
+    
     problem = oeq.TPProblem(
-        X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
+        oeq.Irreps("1x2e"), oeq.Irreps("1x3e"), oeq.Irreps("1x2e"), 
+        [(0, 0, 0, "uvu", True)], shared_weights=False, internal_weights=False
     )
+    edge = jnp.array([[0, 1, 1, 2], [1, 0, 2, 1]], dtype=jnp.int32)
+    
+    X = jax.random.uniform(key, (dim, n_nodes, problem.irreps_in1.dim), dtype=jnp.float32)
+    Y = jax.random.uniform(key, (dim, n_nz, problem.irreps_in2.dim), dtype=jnp.float32)
+    W = jax.random.uniform(key, (dim, n_nz, problem.weight_numel), dtype=jnp.float32)
+    
+    return {
+        "X": X, "Y": Y, "W": W, "r": edge[0], "c": edge[1],
+        "conv": oeq.jax.TensorProductConv(problem, deterministic=False),
+        "jax": jax, "jnp": jnp, "dim": dim
+    }
 
-    edge_index = jnp.array(
-        [
-            [0, 1, 1, 2],
-            [1, 0, 2, 1],
-        ],
-        dtype=jnp.int32 
-    )
+def verify(ctx, in_axes, args):
+    jax, jnp = ctx["jax"], ctx["jnp"]
+    res_vmap = jax.vmap(ctx["conv"].forward, in_axes)(*args)
+    
+    res_loop = []
+    for i in range(ctx["dim"]):
+        i_args = [a[i] if ax == 0 else a for a, ax in zip(args, in_axes)]
+        res_loop.append(ctx["conv"].forward(*i_args))
+    
+    assert jnp.allclose(res_vmap, jnp.stack(res_loop), atol=1e-5)
 
-    node_ct, nonzero_ct = 3, 4
-    X = jax.random.uniform(
-        key, shape=(node_ct, X_ir.dim), minval=0.0, maxval=1.0, dtype=jnp.float32
-    )
-    Y = jax.random.uniform(
-        key,
-        shape=(vmap_dim, nonzero_ct, Y_ir.dim),
-        minval=0.0,
-        maxval=1.0,
-        dtype=jnp.float32,
-    )
-    W = jax.random.uniform(
-        key,
-        shape=(vmap_dim, nonzero_ct, problem.weight_numel),
-        minval=0.0,
-        maxval=1.0,
-        dtype=jnp.float32,
-    )
-    tp_conv = oeq.jax.TensorProductConv(problem, deterministic=False)
-    Z_vmap = jax.vmap(tp_conv.forward, in_axes=(None, 0, 0, None, None))(X, Y, W, edge_index[0], edge_index[1])
+def test_vmap_std(ctx):
+    verify(ctx, (0, 0, 0, None, None), (ctx["X"], ctx["Y"], ctx["W"], ctx["r"], ctx["c"]))
 
-    Z_loop = jnp.empty_like(Z_vmap)
-    for i in range(vmap_dim):
-        Z_loop = tp_conv.forward(X, Y[i], W[i], edge_index[0], edge_index[1])
-        Z_vmap_i = Z_vmap[i]
+def test_vmap_bcast_X(ctx):
+    verify(ctx, (None, 0, 0, None, None), (ctx["X"][0], ctx["Y"], ctx["W"], ctx["r"], ctx["c"]))
 
-    assert jnp.allclose(Z_vmap, Z_loop, atol=1e-5), "vmap and loop results do not match"
-
+def test_vmap_bcast_XW(ctx):
+    verify(ctx, (None, 0, None, None, None), (ctx["X"][0], ctx["Y"], ctx["W"][0], ctx["r"], ctx["c"]))

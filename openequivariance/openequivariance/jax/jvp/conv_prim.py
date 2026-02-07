@@ -510,6 +510,16 @@ ad.primitive_transposes[conv_dbwd_p] = conv_dbwd_transpose
 # 14. Batching rules for all primitives 
 # ==============================================================================
 
+def find_batch_size(vector_arg_values, batch_axes):
+    B = None
+    for arg, ba in zip(vector_arg_values, batch_axes):
+        if ba is not None:
+            if B is None:
+                B = arg.shape[ba]
+            else:
+                assert B == arg.shape[ba], "Batch size mismatch among arguments"
+    return B
+
 def flatten_args(vector_arg_values, batch_axes):
     X = vector_arg_values[0]
 
@@ -520,21 +530,15 @@ def flatten_args(vector_arg_values, batch_axes):
     else:
         raise ValueError("Unexpected input shape for X: {}".format(X.shape))
 
-    B = None    
-    for arg, ba in zip(vector_arg_values, batch_axes):
-        if ba is not None:
-            if B is None:
-                B = arg.shape[ba]
-            else:
-                assert B == arg.shape[ba], "Batch size mismatch among arguments"
+    B = find_batch_size(vector_arg_values, batch_axes)
 
     new_args = []
     for i, (arg, batch_axis) in enumerate(zip(vector_arg_values, batch_axes)):
         if i != len(vector_arg_values) - 2:
-            if batch_axis is not None:
-                assert batch_axis == 0, "Batch axis must be 0 for all arguments"
             if batch_axis is None and arg is not None:
                 arg = jnp.broadcast_to(arg, (B,) + arg.shape)
+            elif batch_axis is not None and batch_axis != 0:
+                arg = jnp.moveaxis(arg, batch_axis, 0)
         new_args.append(arg)
 
     vector_arg_values = new_args
@@ -563,7 +567,7 @@ def unflatten_results(result, batch_size):
 
 
 def fwd_batch(vector_arg_values, batch_axes, L3_dim, kernel, hash):
-    B = vector_arg_values[0].shape[0]
+    B = find_batch_size(vector_arg_values, batch_axes) 
     new_args = flatten_args(vector_arg_values, batch_axes)
     result = conv_fwd_p.bind(*new_args, L3_dim=L3_dim, kernel=kernel, hash=hash)
     return unflatten_results(result, B) 
@@ -572,7 +576,7 @@ batching.primitive_batchers[conv_fwd_p] = fwd_batch
 
 
 def batch_bwd(vector_arg_values, batch_axes, *, kernel, hash):
-    B = vector_arg_values[0].shape[0]
+    B = find_batch_size(vector_arg_values, batch_axes) 
     new_args = flatten_args(vector_arg_values, batch_axes)
     result = conv_bwd_p.bind(*new_args, kernel=kernel, hash=hash)
     return unflatten_results(result, B)
@@ -581,9 +585,26 @@ batching.primitive_batchers[conv_bwd_p] = batch_bwd
 
 
 def batch_dbwd(vector_arg_values, batch_axes, *, kernel, hash):
-    B = vector_arg_values[0].shape[0]
+    B = find_batch_size(vector_arg_values, batch_axes) 
     new_args = flatten_args(vector_arg_values, batch_axes)
     result = conv_dbwd_p.bind(*new_args, kernel=kernel, hash=hash)
     return unflatten_results(result, B)
 
 batching.primitive_batchers[conv_dbwd_p] = batch_dbwd
+
+def fwd_jvp_batch(vector_arg_values, batch_axes, L3_dim, kernel, hash):
+    B = find_batch_size(vector_arg_values, batch_axes) 
+    new_args = flatten_args(vector_arg_values, batch_axes)
+    result = conv_fwd_jvp_p.bind(*new_args, L3_dim=L3_dim, kernel=kernel, hash=hash)
+    return unflatten_results(result, B)
+
+batching.primitive_batchers[conv_fwd_jvp_p] = fwd_jvp_batch
+
+
+def bwd_jvp_batch(vector_arg_values, batch_axes, *, kernel, hash):
+    B = find_batch_size(vector_arg_values, batch_axes) 
+    new_args = flatten_args(vector_arg_values, batch_axes)
+    result = conv_bwd_jvp_p.bind(*new_args, kernel=kernel, hash=hash)
+    return unflatten_results(result, B)
+
+batching.primitive_batchers[conv_bwd_jvp_p] = bwd_jvp_batch
