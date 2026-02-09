@@ -10,7 +10,11 @@ template<typename JIT_IMPL>
 class __attribute__ ((visibility ("default"))) JITTPImpl {
 public:
     JIT_IMPL jit;
-    KernelLaunchConfig forward_config, backward_config, double_backward_config; 
+
+    // Configs are suffixed with _ref because they
+    // need to be copied and modified with the stream. In-place
+    // modification not possible due to concurrency requirements. 
+    KernelLaunchConfig forward_config_ref, backward_config_ref, double_backward_config_ref; 
     int opt_level;
 
     JITTPImpl(
@@ -20,25 +24,25 @@ public:
         KernelLaunchConfig double_backward_config_i,
         int opt_level_i) :
             jit(jit_kernel),
-            forward_config(forward_config_i),  
-            backward_config(backward_config_i),
-            double_backward_config(double_backward_config_i),
+            forward_config_ref(forward_config_i),  
+            backward_config_ref(backward_config_i),
+            double_backward_config_ref(double_backward_config_i),
             opt_level(opt_level_i) {
 
         vector<string> kernels = {"forward", "backward", "double_backward_A", "double_backward_B"};
         jit.compile(kernels, {{}, {}, {}, {}}, opt_level); 
 
-        if(forward_config.smem > 0) {
-            jit.set_max_smem(0, forward_config.smem);
-            jit.set_max_smem(2, forward_config.smem);
+        if(forward_config_ref.smem > 0) {
+            jit.set_max_smem(0, forward_config_ref.smem);
+            jit.set_max_smem(2, forward_config_ref.smem);
         }
 
-        if(backward_config.smem > 0) {
-            jit.set_max_smem(1, backward_config.smem);
+        if(backward_config_ref.smem > 0) {
+            jit.set_max_smem(1, backward_config_ref.smem);
         
         }
-        if(double_backward_config.smem > 0) {
-            jit.set_max_smem(3, double_backward_config.smem);
+        if(double_backward_config_ref.smem > 0) {
+            jit.set_max_smem(3, double_backward_config_ref.smem);
         }
     }
 
@@ -77,8 +81,7 @@ public:
         Stream stream) {
 
         void *args[] = { &num_products, &L1_in, &L2_in, &L3_out, &weights};
-        forward_config.hStream = stream; 
-        jit.execute(0, args, forward_config);
+        jit.execute(0, args, with_stream(forward_config_ref, stream));
     }
 
     void backward(
@@ -88,8 +91,7 @@ public:
             void* weight, void* weight_grad,
             void* L3_grad, Stream stream) {
         void *args[] = { &num_products, &L1_in, &L1_grad, &L2_in, &L2_grad, &weight, &weight_grad, &L3_grad};
-        backward_config.hStream = stream; 
-        jit.execute(1, args, backward_config);
+        jit.execute(1, args, with_stream(backward_config_ref, stream));
     }
 
     void double_backward(
@@ -102,9 +104,9 @@ public:
             &num_products, &L1_in, &L2_in, &W, &L3_grad, &L1_dgrad, &L2_dgrad, &w_dgrad, 
             &L1_grad, &L2_grad, &W_grad, &L3_dgrad
         };
-        double_backward_config.hStream = stream; 
-        jit.execute(2, args, forward_config);
-        jit.execute(3, args, double_backward_config);
+        double_backward_config_ref.hStream = stream; 
+        jit.execute(2, args, with_stream(forward_config_ref, stream));
+        jit.execute(3, args, with_stream(double_backward_config_ref, stream));
     }
 
     ~JITTPImpl() = default; 
