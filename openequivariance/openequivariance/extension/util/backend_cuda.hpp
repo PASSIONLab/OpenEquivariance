@@ -359,3 +359,9 @@ public:
         NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
     }
 };
+
+KernelLaunchConfig with_stream(const KernelLaunchConfig& config, Stream stream) {
+    KernelLaunchConfig new_config = config;
+    new_config.hStream = stream;
+    return new_config;
+}

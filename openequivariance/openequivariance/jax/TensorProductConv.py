@@ -5,6 +5,8 @@ import numpy as np
 from typing import Optional
 from openequivariance.jax import extlib
 
+
+from openequivariance.core.utils import hash_str_64
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.LoopUnrollConv import LoopUnrollConv
 from openequivariance.jax.utils import reorder_jax
@@ -60,7 +62,7 @@ class TensorProductConv(LoopUnrollConv):
                 "kernel_prop": self.kernel_prop,
             }
         )
-        self.hash = self.kernel.__hash__()
+        self.hash = hash_str_64(self.kernel)
 
         self.weight_numel = config.weight_numel
         self.L3_dim = self.config.irreps_out.dim

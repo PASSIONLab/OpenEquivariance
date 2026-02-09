@@ -42,6 +42,7 @@ To set up an editable install and run our tests, use the following code:
         pytest --jax tests/example_test.py
         pytest --jax tests/batch_test.py
         pytest --jax tests/conv_test.py
+        pytest --jax tests/vmap_test.py
 
 Browse the ``tests`` directory to run specific components. 
 

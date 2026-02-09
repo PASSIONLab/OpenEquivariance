@@ -3,6 +3,7 @@ import numpy as np
 from openequivariance.jax import extlib
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.LoopUnrollTP import LoopUnrollTP
+from openequivariance.core.utils import hash_str_64
 from openequivariance.jax.utils import reorder_jax
 from openequivariance.jax.jvp.tp_prim import tp_fwd_p
 import json
@@ -30,7 +31,7 @@ class TensorProduct(LoopUnrollTP):
                 "kernel_prop": self.kernelProp,
             }
         )
-        self.hash = self.kernel.__hash__()
+        self.hash = hash_str_64(self.kernel)
 
         self.weight_numel = problem.weight_numel
         self.L3_dim = self.config.irreps_out.dim
