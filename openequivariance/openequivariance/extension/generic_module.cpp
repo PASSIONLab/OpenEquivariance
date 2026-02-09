@@ -31,26 +31,6 @@ using namespace std;
 namespace py=pybind11;
 
 PYBIND11_MODULE(generic_module, m) {
-    //=========== Batch tensor products =========
-    py::class_<JITTPImpl<JITKernel>>(m, "JITTPImpl")
-        .def(py::init<  std::string, 
-                        std::unordered_map<string, int64_t>, 
-                        std::unordered_map<string, int64_t>, 
-                        std::unordered_map<string, int64_t>, 
-                        std::unordered_map<string, int64_t>>())                
-        .def("exec_tensor_product_rawptr", &JITTPImpl<JITKernel>::exec_tensor_product_device_rawptrs)
-        .def("backward_rawptr", &JITTPImpl<JITKernel>::backward_device_rawptrs);
-
-    py::class_<JITConvImpl<JITKernel>>(m, "JITConvImpl")
-        .def(py::init<  std::string, 
-                        std::unordered_map<string, int64_t>, 
-                        std::unordered_map<string, int64_t>, 
-                        std::unordered_map<string, int64_t>, 
-                        std::unordered_map<string, int64_t>>())
-        .def("exec_conv_rawptrs", &JITConvImpl<JITKernel>::exec_conv_rawptrs)
-        .def("backward_rawptrs", &JITConvImpl<JITKernel>::backward_rawptrs)
-        .def("double_backward_rawptrs", &JITConvImpl<JITKernel>::double_backward_rawptrs);
-
     py::class_<GroupMM<float>>(m, "GroupMM_F32")
         .def(py::init<int, int>())
         .def("group_gemm", &GroupMM<float>::group_gemm_intptr);

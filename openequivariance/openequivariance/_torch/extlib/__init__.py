@@ -149,20 +149,12 @@ def torch_ext_so_path():
 
 if BUILT_EXTENSION:
     from generic_module import (
-        JITTPImpl,
-        JITConvImpl,
         GroupMM_F32,
         GroupMM_F64,
         DeviceProp,
         GPUTimer,
     )
 else:
-
-    def JITTPImpl(*args, **kwargs):
-        _raise_import_error_helper("JITTPImpl")
-
-    def JITConvImpl(*args, **kwargs):
-        _raise_import_error_helper("JITConvImpl")
 
     def GroupMM_F32(*args, **kwargs):
         _raise_import_error_helper("GroupMM_F32")
