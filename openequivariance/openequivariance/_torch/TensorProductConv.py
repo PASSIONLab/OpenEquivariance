@@ -21,7 +21,7 @@ from openequivariance.core.utils import torch_to_oeq_dtype
 from openequivariance._torch.utils import enum_to_torch_dtype
 from openequivariance._torch.utils import reorder_torch
 
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.logging_utils import getLogger
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixinConv
 from openequivariance._torch.extlib import DeviceBuffer
 

@@ -2,14 +2,14 @@ from typing import Optional, Union
 
 from openequivariance.core.TensorProductBase import TensorProductBase
 from openequivariance.core.e3nn_lite import TPProblem
-from openequivariance._torch.CUETensorProduct import CUETensorProduct
-from openequivariance.benchmark.random_buffer_utils import (
+from ._torch.CUETensorProduct import CUETensorProduct
+from openequivariance.core.random_buffer_utils import (
     get_random_buffers_forward,
     get_random_buffers_backward,
     get_random_buffers_double_backward,
 )
 
-from openequivariance.benchmark.logging_utils import getLogger, bcolors
+from openequivariance.core.logging_utils import getLogger, bcolors
 import numpy as np
 import numpy.linalg as la
 
@@ -73,7 +73,7 @@ def correctness_forward(
     prng_seed: int,
 ) -> dict:
     if reference_implementation is None:
-        from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
+        from ._torch.E3NNTensorProduct import E3NNTensorProduct
 
         reference_implementation = E3NNTensorProduct
 
@@ -117,7 +117,7 @@ def correctness_backward(
     prng_seed: int,
 ) -> dict:
     if reference_implementation is None:
-        from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
+        from ._torch.E3NNTensorProduct import E3NNTensorProduct
 
         reference_implementation = E3NNTensorProduct
 
@@ -203,7 +203,7 @@ def correctness_double_backward(
     )
 
     if reference_implementation is None:
-        from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
+        from ._torch.E3NNTensorProduct import E3NNTensorProduct
 
         reference_implementation = E3NNTensorProduct
 

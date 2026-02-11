@@ -1,7 +1,7 @@
 import numpy as np
 
 from openequivariance.core.e3nn_lite import TPProblem
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.logging_utils import getLogger
 from openequivariance.core.utils import benchmark
 
 logger = getLogger()

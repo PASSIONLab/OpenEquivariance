@@ -3,13 +3,13 @@ from pytest_check import check
 
 import numpy as np
 import openequivariance as oeq
-from openequivariance.benchmark.correctness_utils import (
+from tests.benchmarks.correctness_utils import (
     correctness_forward,
     correctness_backward,
     correctness_double_backward,
 )
 
-from openequivariance.benchmark.problems import (
+from tests.benchmarks.problems import (
     e3nn_torch_tetris_poly_problems,
     diffdock_problems,
     mace_problems,
@@ -98,6 +98,7 @@ class TPCorrectness:
         self.check_result(result, "weights_grad")
 
 
+@pytest.mark.production_configs
 class TestProductionModels(TPCorrectness):
     production_model_tpps = (
         mace_problems()

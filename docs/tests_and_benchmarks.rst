@@ -44,7 +44,8 @@ To set up an editable install and run our tests, use the following code:
         pytest --jax tests/conv_test.py
         pytest --jax tests/vmap_test.py
 
-Browse the ``tests`` directory to run specific components. 
+Browse the ``tests`` directory to run specific components. Benchmark utilities
+now live under ``tests/benchmarks`` and are not part of the installable package.
 
 
 
@@ -58,7 +59,8 @@ and generate plots from our paper.
 
     git clone https://github.com/PASSIONLab/OpenEquivariance 
     cd OpenEquivariance
-    pip install -e .[bench] 
+    pip install -e "./openequivariance[bench]"
+    # Benchmark helpers live in tests/benchmarks (repo-only), so run from repo root.
     python tests/benchmark.py -o outputs/uvu uvu --plot
     python tests/benchmark.py -o outputs/uvw uvw --plot
     python tests/benchmark.py -o outputs/roofline roofline --plot

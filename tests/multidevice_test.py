@@ -35,7 +35,7 @@ if __name__ == "__main__":
     import openequivariance as oeq
 
     # Use MACE-large to test >64KB shared memory allocation
-    from openequivariance.benchmark.problems import mace_problems
+    from tests.benchmarks.problems import mace_problems
 
     problem = mace_problems()[0]
 

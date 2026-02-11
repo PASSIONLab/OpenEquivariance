@@ -1,11 +1,11 @@
 import numpy as np
 
-from openequivariance.benchmark.random_buffer_utils import (
+from openequivariance.core.random_buffer_utils import (
     get_random_buffers_forward,
     get_random_buffers_backward,
     get_random_buffers_double_backward,
 )
-from openequivariance.benchmark.perf_metrics_utils import (
+from .perf_metrics_utils import (
     calculate_minimum_flops_forward,
     calculate_minimum_memory_streamed_forward,
     calculate_minimum_memory_streamed_backward,
@@ -13,8 +13,8 @@ from openequivariance.benchmark.perf_metrics_utils import (
 from openequivariance.core.utils import calculate_total_nnz
 from openequivariance.core.TensorProductBase import TensorProductBase
 from openequivariance.core.e3nn_lite import TPProblem
-from openequivariance._torch.CUETensorProduct import CUETensorProduct
-from openequivariance.benchmark.logging_utils import getLogger, bcolors
+from ._torch.CUETensorProduct import CUETensorProduct
+from openequivariance.core.logging_utils import getLogger, bcolors
 
 logger = getLogger()
 

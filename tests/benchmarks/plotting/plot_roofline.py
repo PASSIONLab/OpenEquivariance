@@ -1,6 +1,6 @@
 import numpy as np
 import pathlib
-from openequivariance.benchmark.plotting.plotting_utils import (
+from .plotting_utils import (
     colormap,
     labelmap,
     load_benchmarks,

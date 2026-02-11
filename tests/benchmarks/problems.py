@@ -1,7 +1,7 @@
-from openequivariance.benchmark.tpp_creation_utils import (
+from .tpp_creation_utils import (
     FullyConnectedTPProblem as FCTPP,
 )
-from openequivariance.benchmark.tpp_creation_utils import ChannelwiseTPP as CTPP
+from .tpp_creation_utils import ChannelwiseTPP as CTPP
 
 # source: https://github.com/e3nn/e3nn/blob/main/examples/tetris.py
 # running tetris will output the layers. I've only extracted the fully connected layers here.

@@ -4,7 +4,7 @@ from openequivariance._torch import extlib
 import torch
 import typing
 from openequivariance.core.utils import torch_to_oeq_dtype
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.logging_utils import getLogger
 from openequivariance._torch.utils import reorder_torch
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
 

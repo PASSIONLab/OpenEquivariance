@@ -10,21 +10,21 @@ import urllib.request
 
 import numpy as np
 
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.logging_utils import getLogger
 from openequivariance._torch.extlib import DeviceProp
-from openequivariance._torch.E3NNTensorProduct import (
+from tests.benchmarks._torch.E3NNTensorProduct import (
     E3NNTensorProduct,
     E3NNTensorProductCompiledCUDAGraphs,
     E3NNTensorProductCompiledMaxAutotuneCUDAGraphs,
 )
 from openequivariance._torch.TensorProduct import TensorProduct
-from openequivariance._torch.CUETensorProduct import CUETensorProduct
-from openequivariance.benchmark.TestBenchmarkSuite import (
+from tests.benchmarks._torch.CUETensorProduct import CUETensorProduct
+from tests.benchmarks.TestBenchmarkSuite import (
     TestBenchmarkSuite,
     TestDefinition,
     Direction,
 )
-from openequivariance.benchmark.tpp_creation_utils import (
+from tests.benchmarks.tpp_creation_utils import (
     ChannelwiseTPP,
     FullyConnectedTPProblem,
     SingleInstruction,
@@ -37,11 +37,12 @@ from openequivariance._torch.TensorProductConv import (
     TensorProductConvScatterSum,
 )
 
-from openequivariance._torch.CUEConv import CUEConv, CUEConvFused
+from tests.benchmarks._torch.CUEConv import CUEConv, CUEConvFused
+from tests.benchmarks._torch.E3NNConv import E3NNConv
 from openequivariance._torch.FlashTPConv import FlashTPConv
-from openequivariance.benchmark.ConvBenchmarkSuite import ConvBenchmarkSuite, load_graph
+from tests.benchmarks.ConvBenchmarkSuite import ConvBenchmarkSuite, load_graph
 
-from openequivariance.benchmark.problems import (
+from tests.benchmarks.problems import (
     e3nn_torch_tetris_poly_problems,
     diffdock_problems,
     mace_problems,
@@ -213,7 +214,7 @@ def benchmark_uvw(params) -> pathlib.Path:
     data_folder = bench_suite.run(tests, output_folder=params.output_folder)
 
     if params.plot:
-        import openequivariance.benchmark.plotting as plotting
+        import tests.benchmarks.plotting as plotting
 
         plotting.plot_uvw(data_folder)
 
@@ -366,7 +367,10 @@ def benchmark_kahan_accuracy(params):
     problems = [mace_problems()[0]]
 
     bench = ConvBenchmarkSuite(
-        problems, test_name="kahan_convolution_accuracy", correctness_threshold=1e-4
+        problems,
+        test_name="kahan_convolution_accuracy",
+        correctness_threshold=1e-4,
+        reference_impl=E3NNConv,
     )
     directions = ["forward", "backward"]
     if params.double_backward:
@@ -386,7 +390,7 @@ def benchmark_kahan_accuracy(params):
 
 
 def plot(params):
-    import openequivariance.benchmark.plotting as plotting
+    import tests.benchmarks.plotting as plotting
 
     data_folder, test_name = None, None
     if isinstance(params, dict):

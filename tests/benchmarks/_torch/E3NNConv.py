@@ -4,7 +4,7 @@ from openequivariance.core.ConvolutionBase import (
     ConvolutionBase,
     scatter_add_wrapper,
 )
-from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
+from .E3NNTensorProduct import E3NNTensorProduct
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixinConv
 
 

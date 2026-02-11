@@ -1,7 +1,7 @@
 import numpy as np
 from openequivariance.core.e3nn_lite import Irreps, TPProblem, wigner_3j
 from itertools import accumulate
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.logging_utils import getLogger
 
 logger = getLogger()
 

@@ -5,11 +5,18 @@ from pytest_check import check
 
 import numpy as np
 import openequivariance as oeq
-from openequivariance.benchmark.ConvBenchmarkSuite import load_graph
+from tests.benchmarks.ConvBenchmarkSuite import load_graph
 from itertools import product
 import torch
 
-from openequivariance.benchmark.problems import (
+from tests.benchmarks._torch.E3NNConv import E3NNConv
+from tests.benchmarks.conv_correctness_utils import (
+    conv_correctness_forward,
+    conv_correctness_backward,
+    conv_correctness_double_backward,
+)
+
+from tests.benchmarks.problems import (
     mace_problems,
     diffdock_problems,
     e3tools_problems,
@@ -88,11 +95,12 @@ class ConvCorrectness:
         if conv_object is None:
             pytest.skip("'conv_object' fixture returned None, skipping")
 
-        result = conv_object.test_correctness_forward(
+        result = conv_correctness_forward(
+            conv_object,
             graph,
             thresh=self.thresh("fwd"),
             prng_seed=12345,
-            reference_implementation=None,
+            reference_implementation=E3NNConv,
         )
 
         self.check_result(result, "output")
@@ -101,11 +109,12 @@ class ConvCorrectness:
         if conv_object is None:
             pytest.skip("'conv_object' fixture returned None, skipping")
 
-        result = conv_object.test_correctness_backward(
+        result = conv_correctness_backward(
+            conv_object,
             graph,
             thresh=self.thresh("bwd"),
             prng_seed=12345,
-            reference_implementation=None,
+            reference_implementation=E3NNConv,
         )
 
         self.check_result(result, "weight_grad")
@@ -116,11 +125,12 @@ class ConvCorrectness:
         if conv_object is None:
             pytest.skip("'conv_object' fixture returned None, skipping")
 
-        result = conv_object.test_correctness_double_backward(
+        result = conv_correctness_double_backward(
+            conv_object,
             graph,
             thresh=self.thresh("double_bwd"),
             prng_seed=12345,
-            reference_implementation=None,
+            reference_implementation=E3NNConv,
         )
 
         self.check_result(result, "output_grad")
@@ -129,6 +139,7 @@ class ConvCorrectness:
         self.check_result(result, "weights_grad")
 
 
+@pytest.mark.production_configs
 class TestProductionModels(ConvCorrectness):
     production_model_tpps = (
         mace_problems() + diffdock_problems() + [e3tools_problems()[0]]

@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pathlib
-from openequivariance.benchmark.plotting.plotting_utils import (
+from .plotting_utils import (
     set_grid,
     colormap,
     labelmap,

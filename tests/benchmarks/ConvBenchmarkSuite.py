@@ -6,8 +6,14 @@ import pathlib
 import numpy as np
 
 import openequivariance as oeq
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.logging_utils import getLogger
 from openequivariance.core.ConvolutionBase import CoordGraph
+
+from .conv_correctness_utils import (
+    conv_correctness_forward,
+    conv_correctness_backward,
+    conv_correctness_double_backward,
+)
 
 logger = getLogger()
 
@@ -89,7 +95,8 @@ class ConvBenchmarkSuite:
 
                 if direction == "forward":
                     if correctness:
-                        correctness = conv.test_correctness_forward(
+                        correctness = conv_correctness_forward(
+                            conv,
                             graph,
                             thresh=self.correctness_threshold,
                             prng_seed=self.prng_seed,
@@ -104,7 +111,8 @@ class ConvBenchmarkSuite:
 
                 if direction == "backward":
                     if correctness:
-                        correctness = conv.test_correctness_backward(
+                        correctness = conv_correctness_backward(
+                            conv,
                             graph,
                             thresh=self.correctness_threshold,
                             prng_seed=self.prng_seed,
@@ -119,8 +127,9 @@ class ConvBenchmarkSuite:
 
                 if direction == "double_backward":
                     if correctness:
-                        correctness = conv.test_correctness_double_backward(
-                            self.graph,
+                        correctness = conv_correctness_double_backward(
+                            conv,
+                            graph,
                             thresh=self.correctness_threshold,
                             prng_seed=self.prng_seed,
                             reference_implementation=self.reference_impl,

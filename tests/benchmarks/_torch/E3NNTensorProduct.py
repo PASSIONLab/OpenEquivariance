@@ -11,7 +11,7 @@ import numpy as np
 
 from openequivariance.core.TensorProductBase import TensorProductBase
 from openequivariance.core.e3nn_lite import TPProblem
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.logging_utils import getLogger
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
 
 TORCH_COMPILE_AUTOTUNING_DIR = pathlib.Path("triton_autotuning")

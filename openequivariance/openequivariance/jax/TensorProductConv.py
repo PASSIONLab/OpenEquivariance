@@ -11,7 +11,7 @@ from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.LoopUnrollConv import LoopUnrollConv
 from openequivariance.jax.utils import reorder_jax
 
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.logging_utils import getLogger
 from openequivariance.jax.jvp import conv_prim
 from openequivariance.jax.vjp import conv_func
 

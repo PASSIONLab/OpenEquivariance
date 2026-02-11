@@ -6,7 +6,7 @@ from openequivariance.core.utils import (
 )
 
 from openequivariance.core.e3nn_lite import TPProblem, wigner_3j
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.logging_utils import getLogger
 import numpy as np
 
 logger = getLogger()
