@@ -1,14 +1,18 @@
 import numpy as np
+import json
 
 from openequivariance.templates.jinja_utils import get_jinja_environment
 from openequivariance.core.ComputationSchedule import ComputationSchedule
 from openequivariance.core.TensorProductBase import TensorProductBase
-from openequivariance.core.utils import dtype_to_enum
+from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.utils import dtype_to_enum, hash_str_64
 
 from openequivariance.core.utils import (
     filter_and_analyze_problem,
     count_cg_non_zero,
 )
+
+logger = getLogger()
 
 
 class LoopUnrollTP(TensorProductBase):
@@ -91,7 +95,7 @@ class LoopUnrollTP(TensorProductBase):
             )
         )
 
-        self.kernelProp = {
+        self.kernel_prop = {
             "L1_dim": self.L1.dim,
             "L2_dim": self.L2.dim,
             "L3_dim": self.L3.dim,
@@ -105,6 +109,20 @@ class LoopUnrollTP(TensorProductBase):
             "deterministic": 1,
             "idx_dtype": 0,
         }
+
+        self.kernel_string = json.dumps(
+            {
+                "kernel": self.jit_kernel,
+                "forward_config": vars(self.forward_schedule.launch_config),
+                "backward_config": vars(self.backward_schedule.launch_config),
+                "double_backward_config": vars(
+                    self.double_backward_schedule.launch_config
+                ),
+                "kernel_prop": self.kernel_prop,
+            }
+        )
+        self.hash = hash_str_64(self.kernel_string)
+        logger.info(f"Kernel File Size: {len(self.jit_kernel) // 1024} KB")
 
     def calculate_flops_forward(self, batch_size: int) -> dict:
         if self.is_uvw:

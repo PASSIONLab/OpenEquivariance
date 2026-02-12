@@ -51,7 +51,7 @@ elif torch.version.cuda or torch.version.hip:
 
         extra_cflags = ["-O3"]
         generic_sources = ["generic_module.cpp"]
-        torch_sources = ["libtorch_tp_jit.cpp"]
+        torch_sources = ["libtorch_tp_jit.cpp", "json11/json11.cpp"]
 
         include_dirs, extra_link_args = (["util"], ["-Wl,--no-as-needed"])
 
@@ -149,21 +149,12 @@ def torch_ext_so_path():
 
 if BUILT_EXTENSION:
     from generic_module import (
-        JITTPImpl,
-        JITConvImpl,
         GroupMM_F32,
         GroupMM_F64,
         DeviceProp,
-        DeviceBuffer,
         GPUTimer,
     )
 else:
-
-    def JITTPImpl(*args, **kwargs):
-        _raise_import_error_helper("JITTPImpl")
-
-    def JITConvImpl(*args, **kwargs):
-        _raise_import_error_helper("JITConvImpl")
 
     def GroupMM_F32(*args, **kwargs):
         _raise_import_error_helper("GroupMM_F32")
@@ -173,9 +164,6 @@ else:
 
     def DeviceProp(*args, **kwargs):
         _raise_import_error_helper("DeviceProp")
-
-    def DeviceBuffer(*args, **kwargs):
-        _raise_import_error_helper("DeviceBuffer")
 
     def GPUTimer(*args, **kwargs):
         _raise_import_error_helper("GPUTimer")
