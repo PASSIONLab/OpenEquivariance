@@ -8,6 +8,7 @@ import numpy as np
 import openequivariance as oeq
 from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.core.ConvolutionBase import CoordGraph
+from openequivariance.benchmark.benchmark_utils import NpEncoder
 
 logger = getLogger()
 
@@ -145,7 +146,7 @@ class ConvBenchmarkSuite:
                     f"{output_folder}/{self.exp_count}_{impl.name()}_{graph.name}.json"
                 )
                 with open(fname, "w") as f:
-                    json.dump(result, f, indent=2)
+                    json.dump(result, f, indent=2, cls=NpEncoder)
                 self.exp_count += 1
 
                 logger.info(f"Finished {tc_name}, graph {graph.name}")
