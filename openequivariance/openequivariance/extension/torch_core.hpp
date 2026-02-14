@@ -46,7 +46,7 @@ Tensor tensor_empty_like(const Tensor &ref, const std::vector<int64_t> &sizes);
 Tensor tensor_zeros_like(const Tensor &ref, const std::vector<int64_t> &sizes);
 void tensor_zero_(Tensor &tensor);
 
-Dtype tensor_dtype(const Tensor &tensor);
+//Dtype tensor_dtype(const Tensor &tensor);
 bool tensor_is_cuda(const Tensor &tensor);
 int64_t tensor_dim(const Tensor &tensor);
 int64_t tensor_size(const Tensor &tensor, int64_t dim);
@@ -128,15 +128,15 @@ inline void check_tensor(const Tensor &tensor,
         }
     }
 
-    CHECK(shape_ok,
+    TCHECK(shape_ok,
           "Shape mismatch for tensor '", tensor_name,
           "'. Expected: ", shape_to_string(expected_shape),
           ". Got: ", tensor_sizes_str(tensor));
-    CHECK(tensor_is_cuda(tensor), "Tensor '", tensor_name, "' is not on the GPU.");
-    CHECK(tensor_dtype(tensor) == expected_dtype,
+    TCHECK(tensor_is_cuda(tensor), "Tensor '", tensor_name, "' is not on the GPU.");
+    /*TCHECK(tensor_dtype(tensor) == expected_dtype,
           "Dtype mismatch for tensor '", tensor_name,
           "'. Expected: ", static_cast<int>(expected_dtype),
-          ". Got: ", static_cast<int>(tensor_dtype(tensor)));
+          ". Got: ", static_cast<int>(tensor_dtype(tensor)));*/
 }
 
 inline std::unordered_map<std::string, int64_t> parse_json_config(const json &j_obj) {

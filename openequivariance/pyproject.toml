@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
+requires = ["setuptools", "setuptools-scm", "scikit-build-core"]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "openequivariance"

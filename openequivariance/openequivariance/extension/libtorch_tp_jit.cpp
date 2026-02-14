@@ -23,7 +23,7 @@ constexpr Dtype kInt = torch::kInt;
 constexpr Dtype kLong = torch::kLong;
 constexpr Dtype kByte = torch::kByte;
 
-#define CHECK TORCH_CHECK
+#define TCHECK TORCH_CHECK
 #define BOX(x) x
 #define REGISTER_LIBRARY_IMPL TORCH_LIBRARY_IMPL
 #define REGISTER_LIBRARY TORCH_LIBRARY

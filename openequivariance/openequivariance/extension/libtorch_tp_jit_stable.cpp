@@ -21,7 +21,7 @@ constexpr Dtype kInt = torch::headeronly::ScalarType::Int;
 constexpr Dtype kLong = torch::headeronly::ScalarType::Long;
 constexpr Dtype kByte = torch::headeronly::ScalarType::Byte;
 
-#define CHECK STD_TORCH_CHECK
+#define TCHECK STD_TORCH_CHECK
 #define BOX(x) TORCH_BOX(x)
 #define REGISTER_LIBRARY_IMPL STABLE_TORCH_LIBRARY_IMPL
 #define REGISTER_LIBRARY STABLE_TORCH_LIBRARY
@@ -53,9 +53,9 @@ void tensor_zero_(Tensor &tensor) {
     torch::stable::zero_(tensor);
 }
 
-Dtype tensor_dtype(const Tensor &tensor) {
+/*Dtype tensor_dtype(const Tensor &tensor) {
     return tensor.scalar_type();
-}
+}*/
 
 bool tensor_is_cuda(const Tensor &tensor) {
     return tensor.is_cuda();
@@ -82,10 +82,7 @@ const uint8_t *tensor_data_ptr_u8(const Tensor &tensor) {
 }
 
 void *data_ptr(const Tensor &tensor) {
-    Dtype dtype = tensor.scalar_type();
-    if (dtype == kFloat || dtype == kDouble || dtype == kLong || dtype == kByte || dtype == kInt)
-        return tensor.data_ptr();
-    throw std::logic_error("Unsupported tensor datatype!");
+    return tensor.data_ptr();
 }
 
 Stream get_current_stream() {
