@@ -50,7 +50,7 @@ void tensor_zero_(Tensor &tensor) {
     tensor.zero_();
 }
 
-Dtype tensor_dtype(const Tensor &tensor) {
+caffe2::TypeMeta tensor_dtype(const Tensor &tensor) {
     return tensor.dtype();
 }
 
