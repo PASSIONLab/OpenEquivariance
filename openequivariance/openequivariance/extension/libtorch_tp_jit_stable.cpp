@@ -2,7 +2,6 @@
 #include <torch/csrc/stable/library.h>
 #include <torch/csrc/stable/ops.h>
 #include <torch/csrc/stable/tensor_struct.h>
-#include <torch/headeronly/core/ArrayRef.h>
 #include <torch/headeronly/core/DeviceType.h>
 #include <torch/headeronly/core/ScalarType.h>
 #include <torch/headeronly/util/Exception.h>
@@ -16,11 +15,11 @@
 using Tensor = torch::stable::Tensor;
 using Dtype = torch::headeronly::ScalarType;
 
-constexpr Dtype kFloat = torch::headeronly::kFloat;
-constexpr Dtype kDouble = torch::headeronly::kDouble;
-constexpr Dtype kInt = torch::headeronly::kInt;
-constexpr Dtype kLong = torch::headeronly::kLong;
-constexpr Dtype kByte = torch::headeronly::kUInt8;
+constexpr Dtype kFloat = torch::headeronly::ScalarType::Float;
+constexpr Dtype kDouble = torch::headeronly::ScalarType::Double;
+constexpr Dtype kInt = torch::headeronly::ScalarType::Int;
+constexpr Dtype kLong = torch::headeronly::ScalarType::Long;
+constexpr Dtype kByte = torch::headeronly::ScalarType::Byte;
 
 #define CHECK STD_TORCH_CHECK
 #define BOX(x) TORCH_BOX(x)
@@ -90,15 +89,13 @@ void *data_ptr(const Tensor &tensor) {
 }
 
 Stream get_current_stream() {
-#ifdef CUDA_BACKEND
-    void *stream_ptr = nullptr;
-    auto device_index = torch::stable::accelerator::getCurrentDeviceIndex();
+    int32_t device_index;
+    StreamOpaque* stream_ptr; 
+
     TORCH_ERROR_CODE_CHECK(
-        aoti_torch_get_current_cuda_stream(device_index, &stream_ptr));
-    return static_cast<Stream>(stream_ptr);
-#endif
-#ifdef HIP_BACKEND
-    return c10::hip::getCurrentHIPStream();
-#endif
+        aoti_torch_get_current_device_index(&device_index))
+    TORCH_ERROR_CODE_CHECK(
+        aoti_torch_get_current_stream(device_index, &stream_ptr))
+    return (Stream) stream_ptr; 
 }
 
