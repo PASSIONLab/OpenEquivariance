@@ -405,7 +405,7 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_tp_double_backward(
 
     if (k.shared_weights) {
         tensor_zero_(W_grad);
-        CHECK(tensor_dim(W) == 1);
+        TCHECK(tensor_dim(W) == 1);
     }
 
     jit_kernel->double_backward(

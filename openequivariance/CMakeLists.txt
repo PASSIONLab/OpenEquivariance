@@ -57,12 +57,16 @@ if(CUDAToolkit_FOUND)
     message(STATUS "Building stable extension with CUDA backend.")
     add_stable_extension(torch_tp_jit_stable_cuda CUDA_BACKEND)
     target_link_libraries(torch_tp_jit_stable_cuda PRIVATE CUDA::cudart CUDA::cuda_driver)
+
+    install(TARGETS torch_tp_jit_stable_cuda LIBRARY DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/openequivariance/_torch/extlib")
 endif()
 
 if(hip_FOUND)
     message(STATUS "Building stable extension with HIP backend.")
     add_stable_extension(torch_tp_jit_stable_hip HIP_BACKEND)
     target_link_libraries(torch_tp_jit_stable_hip PRIVATE hiprtc)
+
+    install(TARGETS torch_tp_jit_stable_hip LIBRARY DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/openequivariance/_torch/extlib")
 endif()
 
 if(NOT CUDAToolkit_FOUND AND NOT hip_FOUND)
