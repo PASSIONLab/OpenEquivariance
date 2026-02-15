@@ -46,12 +46,6 @@ Tensor tensor_empty_like(const Tensor &ref, const std::vector<int64_t> &sizes);
 Tensor tensor_zeros_like(const Tensor &ref, const std::vector<int64_t> &sizes);
 void tensor_zero_(Tensor &tensor);
 
-//Dtype tensor_dtype(const Tensor &tensor);
-bool tensor_is_cuda(const Tensor &tensor);
-int64_t tensor_dim(const Tensor &tensor);
-int64_t tensor_size(const Tensor &tensor, int64_t dim);
-int64_t tensor_numel(const Tensor &tensor);
-
 void alert_not_deterministic(const char *name);
 Stream get_current_stream();
 
@@ -76,23 +70,23 @@ inline std::string shape_to_string(std::initializer_list<int64_t> shape) {
 inline std::string tensor_sizes_str(const Tensor &tensor) {
     std::ostringstream oss;
     oss << "[";
-    int64_t dims = tensor_dim(tensor);
+    int64_t dims = tensor.dim();
     for (int64_t i = 0; i < dims; ++i) {
         if (i > 0) {
             oss << ", ";
         }
-        oss << tensor_size(tensor, i);
+        oss << tensor.size(i);
     }
     oss << "]";
     return oss.str();
 }
 
 inline std::vector<int64_t> tensor_sizes_vec(const Tensor &tensor) {
-    int64_t dims = tensor_dim(tensor);
+    int64_t dims = tensor.dim();
     std::vector<int64_t> sizes;
     sizes.reserve(static_cast<size_t>(dims));
     for (int64_t i = 0; i < dims; ++i) {
-        sizes.push_back(tensor_size(tensor, i));
+        sizes.push_back(tensor.size(i));
     }
     return sizes;
 }
@@ -116,11 +110,11 @@ inline void check_tensor(const Tensor &tensor,
                          std::initializer_list<int64_t> expected_shape,
                          Dtype expected_dtype,
                          std::string tensor_name) {
-    bool shape_ok = (tensor_dim(tensor) == static_cast<int64_t>(expected_shape.size()));
+    bool shape_ok = (tensor.dim() == static_cast<int64_t>(expected_shape.size()));
     if (shape_ok) {
         int64_t i = 0;
         for (int64_t dim : expected_shape) {
-            if (tensor_size(tensor, i) != dim) {
+            if (tensor.size(i) != dim) {
                 shape_ok = false;
                 break;
             }
@@ -132,11 +126,11 @@ inline void check_tensor(const Tensor &tensor,
           "Shape mismatch for tensor '", tensor_name,
           "'. Expected: ", shape_to_string(expected_shape),
           ". Got: ", tensor_sizes_str(tensor));
-    TCHECK(tensor_is_cuda(tensor), "Tensor '", tensor_name, "' is not on the GPU.");
-    /*TCHECK(tensor_dtype(tensor) == expected_dtype,
+    TCHECK(tensor.is_cuda(), "Tensor '", tensor_name, "' is not on the GPU.");
+    TCHECK(tensor.scalar_type() == expected_dtype,
           "Dtype mismatch for tensor '", tensor_name,
           "'. Expected: ", static_cast<int>(expected_dtype),
-          ". Got: ", static_cast<int>(tensor_dtype(tensor)));*/
+          ". Got: ", static_cast<int>(tensor.scalar_type()));
 }
 
 inline std::unordered_map<std::string, int64_t> parse_json_config(const json &j_obj) {
@@ -207,7 +201,7 @@ inline std::pair<JITTPImpl<JITKernel>*, KernelProp>
             Tensor cpu_tensor = tensor_to_cpu_contiguous(json_bytes);
             std::string json_payload(
                 reinterpret_cast<const char *>(tensor_data_ptr_u8(cpu_tensor)),
-                tensor_numel(cpu_tensor)
+                cpu_tensor.numel()
             );
 
             std::string err;
@@ -246,7 +240,7 @@ inline std::pair<JITConvImpl<JITKernel>*, KernelProp>
             Tensor cpu_tensor = tensor_to_cpu_contiguous(json_bytes);
             std::string json_payload(
                 reinterpret_cast<const char *>(tensor_data_ptr_u8(cpu_tensor)),
-                tensor_numel(cpu_tensor)
+                cpu_tensor.numel()
             );
 
             std::string err;
@@ -287,7 +281,7 @@ inline Tensor jit_tp_forward(
     auto [jit_kernel, k] = compile_tp_with_caching(json_bytes, hash);
     Stream stream = get_current_stream();
 
-    const int64_t num_batch = tensor_size(L1_in, 0);
+    const int64_t num_batch = L1_in.size(0);
 
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_in");
@@ -325,7 +319,7 @@ inline tuple<Tensor, Tensor, Tensor> jit_tp_backward(
     auto [jit_kernel, k] = compile_tp_with_caching(json_bytes, hash);
     Stream stream = get_current_stream();
 
-    const int64_t num_batch = tensor_size(L1_in, 0);
+    const int64_t num_batch = L1_in.size(0);
 
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_in");
@@ -373,7 +367,7 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_tp_double_backward(
     auto [jit_kernel, k] = compile_tp_with_caching(json_bytes, hash);
     Stream stream = get_current_stream();
 
-    const int64_t num_batch = tensor_size(L1_in, 0);
+    const int64_t num_batch = L1_in.size(0);
 
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_in");
@@ -405,7 +399,7 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_tp_double_backward(
 
     if (k.shared_weights) {
         tensor_zero_(W_grad);
-        TCHECK(tensor_dim(W) == 1);
+        TCHECK(W.dim() == 1);
     }
 
     jit_kernel->double_backward(
@@ -439,8 +433,8 @@ inline Tensor jit_conv_forward(
     auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
     Stream stream = get_current_stream();
 
-    const int64_t nnz = tensor_size(rows, 0);
-    const int64_t node_count = tensor_size(L1_in, 0);
+    const int64_t nnz = rows.size(0);
+    const int64_t node_count = L1_in.size(0);
 
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
@@ -495,8 +489,8 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
     auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
     Stream stream = get_current_stream();
 
-    const int64_t nnz = tensor_size(rows, 0);
-    const int64_t node_count = tensor_size(L1_in, 0);
+    const int64_t nnz = rows.size(0);
+    const int64_t node_count = L1_in.size(0);
 
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
@@ -564,8 +558,8 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
     auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
     Stream stream = get_current_stream();
 
-    const int64_t nnz = tensor_size(rows, 0);
-    const int64_t node_count = tensor_size(L1_in, 0);
+    const int64_t nnz = rows.size(0);
+    const int64_t node_count = L1_in.size(0);
 
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");

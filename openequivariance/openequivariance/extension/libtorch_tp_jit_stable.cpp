@@ -2,6 +2,7 @@
 #include <torch/csrc/stable/library.h>
 #include <torch/csrc/stable/ops.h>
 #include <torch/csrc/stable/tensor_struct.h>
+#include <torch/csrc/stable/tensor_inl.h>
 #include <torch/headeronly/core/DeviceType.h>
 #include <torch/headeronly/core/ScalarType.h>
 #include <torch/headeronly/util/Exception.h>
@@ -54,26 +55,6 @@ void tensor_zero_(Tensor &tensor) {
     torch::stable::zero_(tensor);
 }
 
-/*Dtype tensor_dtype(const Tensor &tensor) {
-    return tensor.scalar_type();
-}*/
-
-bool tensor_is_cuda(const Tensor &tensor) {
-    return tensor.is_cuda();
-}
-
-int64_t tensor_dim(const Tensor &tensor) {
-    return tensor.dim();
-}
-
-int64_t tensor_size(const Tensor &tensor, int64_t dim) {
-    return tensor.size(dim);
-}
-
-int64_t tensor_numel(const Tensor &tensor) {
-    return tensor.numel();
-}
-
 void alert_not_deterministic(const char *name) {
     (void)name;
 }
@@ -98,8 +79,15 @@ Stream get_current_stream() {
     return (Stream) 0; 
 }
 
+#ifdef CUDA_BACKEND
+    #define EXTENSION_NAME torch_tp_jit_stable_cuda
+#endif
+#ifdef HIP_BACKEND
+    #define EXTENSION_NAME torch_tp_jit_stable_hip
+#endif 
+
 namespace nb = nanobind;
-NB_MODULE(litbtorch_tp_jit_stable, m) {
+NB_MODULE(EXTENSION_NAME, m) {
     nb::class_<DeviceProp>(m, "DeviceProp")
         .def(nb::init<int>())
         .def_ro("name", &DeviceProp::name)

@@ -50,26 +50,6 @@ void tensor_zero_(Tensor &tensor) {
     tensor.zero_();
 }
 
-caffe2::TypeMeta tensor_dtype(const Tensor &tensor) {
-    return tensor.dtype();
-}
-
-bool tensor_is_cuda(const Tensor &tensor) {
-    return tensor.device().is_cuda();
-}
-
-int64_t tensor_dim(const Tensor &tensor) {
-    return tensor.dim();
-}
-
-int64_t tensor_size(const Tensor &tensor, int64_t dim) {
-    return tensor.size(dim);
-}
-
-int64_t tensor_numel(const Tensor &tensor) {
-    return tensor.numel();
-}
-
 void alert_not_deterministic(const char *name) {
     at::globalContext().alertNotDeterministic(name);
 }
