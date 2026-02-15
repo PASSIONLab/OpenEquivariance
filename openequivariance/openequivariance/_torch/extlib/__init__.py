@@ -4,6 +4,7 @@ import os
 import warnings
 import sysconfig
 from pathlib import Path
+from packaging.version import Version
 
 import torch
 
@@ -20,6 +21,7 @@ LINKED_LIBPYTHON_ERROR = None
 extension_module = None
 
 assert torch.version.cuda or torch.version.hip, "Only CUDA and HIP backends are supported"
+
 def postprocess_kernel(kernel):
     if torch.version.hip:
         kernel = kernel.replace("__syncwarp();", "__threadfence_block();")
@@ -44,66 +46,86 @@ try:
 except Exception as e:
     LINKED_LIBPYTHON_ERROR = f"Error linking libpython:\n{e}\nSysconfig variables:\n{sysconfig.get_config_vars()}"
 
-try:
-    from torch.utils.cpp_extension import library_paths, include_paths
+def jit_compile_extension():
+    global BUILT_EXTENSION, BUILT_EXTENSION_ERROR, extension_module
+    try:
+        from torch.utils.cpp_extension import library_paths, include_paths
 
-    extra_cflags = ["-O3"]
-    torch_sources = ["libtorch_tp_jit.cpp", "json11/json11.cpp"]
+        extra_cflags = ["-O3"]
+        torch_sources = ["libtorch_tp_jit.cpp", "json11/json11.cpp"]
 
-    include_dirs, extra_link_args = (["util"], ["-Wl,--no-as-needed"])
+        include_dirs, extra_link_args = (["util"], ["-Wl,--no-as-needed"])
 
-    if LINKED_LIBPYTHON:
-        extra_link_args.pop()
-        extra_link_args.extend(
-            [
-                f"-Wl,--no-as-needed,-rpath,{python_lib_dir}",
-                f"-L{python_lib_dir}",
-                f"-l{python_lib_name}",
-            ],
-        )
-    if torch.version.cuda:
-        extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc"])
-
-        try:
-            torch_libs, cuda_libs = library_paths("cuda")
-            extra_link_args.append("-Wl,-rpath," + torch_libs)
-            extra_link_args.append("-L" + cuda_libs)
-            if os.path.exists(cuda_libs + "/stubs"):
-                extra_link_args.append("-L" + cuda_libs + "/stubs")
-        except Exception as e:
-            getLogger().info(str(e))
-
-        extra_cflags.append("-DCUDA_BACKEND")
-    elif torch.version.hip:
-        extra_link_args.extend(["-lhiprtc"])
-        torch_libs = library_paths("cuda")[0]
-        extra_link_args.append("-Wl,-rpath," + torch_libs)
-        extra_cflags.append("-DHIP_BACKEND")
-
-    torch_sources = [oeq_root + "/extension/" + src for src in torch_sources]
-    include_dirs = [
-        oeq_root + "/extension/" + d for d in include_dirs
-    ] + include_paths("cuda")
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-
-        try:
-            extension_module = torch.utils.cpp_extension.load(
-                "libtorch_tp_jit",
-                torch_sources,
-                extra_cflags=extra_cflags,
-                extra_include_paths=include_dirs,
-                extra_ldflags=extra_link_args,
+        if LINKED_LIBPYTHON:
+            extra_link_args.pop()
+            extra_link_args.extend(
+                [
+                    f"-Wl,--no-as-needed,-rpath,{python_lib_dir}",
+                    f"-L{python_lib_dir}",
+                    f"-l{python_lib_name}",
+                ],
             )
-            torch.ops.load_library(extension_module.__file__)
-            BUILT_EXTENSION = True
-        except Exception as e:
-            # If compiling torch fails (e.g. low gcc version), we should fall back to the
-            # version that takes integer pointers as args (but is untraceable to PyTorch JIT / export).
-            BUILT_EXTENSION_ERROR = e
-except Exception as e:
-    BUILT_EXTENSION_ERROR = f"Error JIT-compiling OpenEquivariance Extension: {e}"
+        if torch.version.cuda:
+            extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc"])
+
+            try:
+                torch_libs, cuda_libs = library_paths("cuda")
+                extra_link_args.append("-Wl,-rpath," + torch_libs)
+                extra_link_args.append("-L" + cuda_libs)
+                if os.path.exists(cuda_libs + "/stubs"):
+                    extra_link_args.append("-L" + cuda_libs + "/stubs")
+            except Exception as e:
+                getLogger().info(str(e))
+
+            extra_cflags.append("-DCUDA_BACKEND")
+        elif torch.version.hip:
+            extra_link_args.extend(["-lhiprtc"])
+            torch_libs = library_paths("cuda")[0]
+            extra_link_args.append("-Wl,-rpath," + torch_libs)
+            extra_cflags.append("-DHIP_BACKEND")
+
+        torch_sources = [oeq_root + "/extension/" + src for src in torch_sources]
+        include_dirs = [
+            oeq_root + "/extension/" + d for d in include_dirs
+        ] + include_paths("cuda")
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+
+            try:
+                extension_module = torch.utils.cpp_extension.load(
+                    "libtorch_tp_jit",
+                    torch_sources,
+                    extra_cflags=extra_cflags,
+                    extra_include_paths=include_dirs,
+                    extra_ldflags=extra_link_args,
+                )
+                torch.ops.load_library(extension_module.__file__)
+                BUILT_EXTENSION = True
+            except Exception as e:
+                # If compiling torch fails (e.g. low gcc version), we should fall back to the
+                # version that takes integer pointers as args (but is untraceable to PyTorch JIT / export).
+                BUILT_EXTENSION_ERROR = e
+    except Exception as e:
+        BUILT_EXTENSION_ERROR = f"Error JIT-compiling OpenEquivariance Extension: {e}"
+
+def use_precompiled_extension():
+    global BUILT_EXTENSION, BUILT_EXTENSION_ERROR, extension_module
+    try:
+        if torch.version.cuda:
+            import openequivariance._torch.extlib.libtorch_tp_jit_stable as extension_module
+        elif torch.version.hip:
+            import openequivariance._torch.extlib.libtorch_tp_jit_stable_hip as extension_module
+
+        torch.ops.load_library(extension_module.__file__)
+        BUILT_EXTENSION = True
+    except Exception as e:
+        BUILT_EXTENSION_ERROR = f"Error loading precompiled OpenEquivariance Extension: {e}"
+
+if Version(torch.__version__) > Version("2.9.0"):
+    use_precompiled_extension()
+else:
+    jit_compile_extension()
 
 
 def torch_ext_so_path():
