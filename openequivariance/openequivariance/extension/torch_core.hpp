@@ -37,7 +37,6 @@
 
 using namespace std;
 using json = json11::Json;
-namespace nb = nanobind;
 
 Dtype enum_to_torch_dtype(int64_t i);
 
@@ -649,20 +648,3 @@ REGISTER_LIBRARY(libtorch_tp_jit, m) {
     m.def("jit_conv_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor)");
     m.def("jit_conv_double_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor, Tensor)");
 };
-
-NB_MODULE(litbtorch_tp_jit_stable, m) {
-    nb::class_<DeviceProp>(m, "DeviceProp")
-        .def(nb::init<int>())
-        .def_ro("name", &DeviceProp::name)
-        .def_ro("warpsize", &DeviceProp::warpsize)
-        .def_ro("major", &DeviceProp::major)
-        .def_ro("minor", &DeviceProp::minor)
-        .def_ro("multiprocessorCount", &DeviceProp::multiprocessorCount)
-        .def_ro("maxSharedMemPerBlock", &DeviceProp::maxSharedMemPerBlock); 
-
-    nb::class_<GPUTimer>(m, "GPUTimer")
-        .def(nb::init<>())
-        .def("start", &GPUTimer::start)
-        .def("stop_clock_get_elapsed", &GPUTimer::stop_clock_get_elapsed)
-        .def("clear_L2_cache", &GPUTimer::clear_L2_cache);
-}

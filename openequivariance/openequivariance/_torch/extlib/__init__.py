@@ -18,7 +18,14 @@ LINKED_LIBPYTHON = False
 LINKED_LIBPYTHON_ERROR = None
 
 extension_module = None
-postprocess_kernel = lambda kernel: kernel  # noqa : E731
+
+assert torch.version.cuda or torch.version.hip, "Only CUDA and HIP backends are supported"
+def postprocess_kernel(kernel):
+    if torch.version.hip:
+        kernel = kernel.replace("__syncwarp();", "__threadfence_block();")
+        kernel = kernel.replace("__shfl_down_sync(FULL_MASK,", "__shfl_down(")
+        kernel = kernel.replace("atomicAdd", "unsafeAtomicAdd")
+    return kernel
 
 # Locate libpython (required for AOTI)
 try:
@@ -36,8 +43,6 @@ try:
     LINKED_LIBPYTHON = True
 except Exception as e:
     LINKED_LIBPYTHON_ERROR = f"Error linking libpython:\n{e}\nSysconfig variables:\n{sysconfig.get_config_vars()}"
-
-assert torch.version.cuda or torch.version.hip, "Only CUDA and HIP backends are supported"
 
 try:
     from torch.utils.cpp_extension import library_paths, include_paths
@@ -73,15 +78,6 @@ try:
         extra_link_args.extend(["-lhiprtc"])
         torch_libs = library_paths("cuda")[0]
         extra_link_args.append("-Wl,-rpath," + torch_libs)
-
-        def postprocess(kernel):
-            kernel = kernel.replace("__syncwarp();", "__threadfence_block();")
-            kernel = kernel.replace("__shfl_down_sync(FULL_MASK,", "__shfl_down(")
-            kernel = kernel.replace("atomicAdd", "unsafeAtomicAdd")
-            return kernel
-
-        postprocess_kernel = postprocess
-
         extra_cflags.append("-DHIP_BACKEND")
 
     torch_sources = [oeq_root + "/extension/" + src for src in torch_sources]
@@ -113,9 +109,10 @@ except Exception as e:
 def torch_ext_so_path():
     return extension_module.__file__
 
+sys.modules["oeq_utilities"] = extension_module
 
 if BUILT_EXTENSION:
-    from extension_module import (
+    from oeq_utilities import (
         #GroupMM_F32,
         #GroupMM_F64,
         DeviceProp,

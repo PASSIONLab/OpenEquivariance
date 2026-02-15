@@ -101,3 +101,21 @@ Stream get_current_stream() {
     return c10::hip::getCurrentHIPStream();
 #endif
 }
+
+namespace py=pybind11;
+PYBIND11_MODULE(libtorch_tp_jit, m) {
+    py::class_<DeviceProp>(m, "DeviceProp")
+        .def(py::init<int>())
+        .def_readonly("name", &DeviceProp::name)
+        .def_readonly("warpsize", &DeviceProp::warpsize)
+        .def_readonly("major", &DeviceProp::major)
+        .def_readonly("minor", &DeviceProp::minor)
+        .def_readonly("multiprocessorCount", &DeviceProp::multiprocessorCount)
+        .def_readonly("maxSharedMemPerBlock", &DeviceProp::maxSharedMemPerBlock); 
+
+    py::class_<GPUTimer>(m, "GPUTimer")
+        .def(py::init<>())
+        .def("start", &GPUTimer::start)
+        .def("stop_clock_get_elapsed", &GPUTimer::stop_clock_get_elapsed)
+        .def("clear_L2_cache", &GPUTimer::clear_L2_cache);
+}
