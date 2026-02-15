@@ -7,6 +7,7 @@
 #include <torch/headeronly/util/Exception.h>
 #include <torch/headeronly/util/shim_utils.h>
 #include <torch/csrc/inductor/aoti_torch/c/shim.h>
+#include "nanobind/nanobind.h"
 
 #ifdef HIP_BACKEND
     #include <c10/hip/HIPStream.h>
@@ -93,6 +94,6 @@ Stream get_current_stream() {
         aoti_torch_get_current_device_index(&device_index))
     TORCH_ERROR_CODE_CHECK(
         aoti_torch_get_current_stream(device_index, &stream_ptr))
-    return (Stream) stream_ptr; 
+    //return (Stream) stream_ptr; 
+    return (Stream) 0; 
 }
-
