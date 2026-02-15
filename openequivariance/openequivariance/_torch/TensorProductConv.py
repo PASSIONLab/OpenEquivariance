@@ -6,6 +6,7 @@ import torch
 from openequivariance._torch.extlib import (
     postprocess_kernel,
     DeviceProp,
+    BUILT_EXTENSION
 )
 
 from openequivariance.core.ConvolutionBase import (
@@ -14,7 +15,7 @@ from openequivariance.core.ConvolutionBase import (
 )
 from openequivariance.core.LoopUnrollConv import LoopUnrollConv
 from openequivariance._torch.TensorProduct import TensorProduct
-from openequivariance import TPProblem
+from openequivariance import TPProblem 
 from openequivariance.core.utils import torch_to_oeq_dtype
 from openequivariance._torch.utils import (
     reorder_torch,
@@ -403,9 +404,10 @@ def register_autocast():
     )
 
 
-register_torch_fakes()
-register_autograd()
-register_autocast()
+if BUILT_EXTENSION:
+    register_torch_fakes()
+    register_autograd()
+    register_autocast()
 
 
 # ==================================================================

@@ -101,5 +101,3 @@ Stream get_current_stream() {
     return c10::hip::getCurrentHIPStream();
 #endif
 }
-
-PYBIND11_MODULE(libtorch_tp_jit, m) {}

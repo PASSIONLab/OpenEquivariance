@@ -41,3 +41,4 @@ paper_benchmarks_v3
 
 get_node.sh
 *.egg-info
+_version.py
