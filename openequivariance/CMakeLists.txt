@@ -16,9 +16,14 @@ FetchContent_MakeAvailable(libtorch)
 
 set(LIBTORCH_INCLUDE_DIR "${libtorch_SOURCE_DIR}/include")
 set(LIBTORCH_LIB_DIR "${libtorch_SOURCE_DIR}/lib")
+find_library(TORCH_CPU_LIB NAMES torch_cpu PATHS "${LIBTORCH_LIB_DIR}" NO_DEFAULT_PATH)
+find_library(C10_LIB NAMES c10 PATHS "${LIBTORCH_LIB_DIR}" NO_DEFAULT_PATH)
 
 message(STATUS "LibTorch Include: ${LIBTORCH_INCLUDE_DIR}")
 message(STATUS "LibTorch Lib: ${LIBTORCH_LIB_DIR}")
+
+message(STATUS "Torch CPU Library: ${TORCH_CPU_LIB}")
+message(STATUS "Torch C10 Library: ${C10_LIB}")
 
 # Setup Nanobind
 execute_process(
@@ -60,7 +65,11 @@ function(add_stable_extension target_name backend_define)
         ${EXT_JSON_DIR}
         ${LIBTORCH_INCLUDE_DIR}
         ${LIBTORCH_API_INCLUDE_DIR}
-    )    
+    )
+    target_link_libraries(${target_name} PRIVATE
+        ${TORCH_CPU_LIB}
+        ${C10_LIB}
+    ) 
 endfunction()
 
 find_package(CUDAToolkit QUIET)
@@ -69,7 +78,7 @@ find_package(hip QUIET)
 if(CUDAToolkit_FOUND)
     message(STATUS "Building stable extension with CUDA backend.")
     add_stable_extension(torch_tp_jit_stable_cuda CUDA_BACKEND)
-    target_link_libraries(torch_tp_jit_stable_cuda PRIVATE CUDA::cudart CUDA::cuda_driver)
+    target_link_libraries(torch_tp_jit_stable_cuda PRIVATE CUDA::cudart CUDA::cuda_driver CUDA::nvrtc)
     
     install(TARGETS torch_tp_jit_stable_cuda LIBRARY DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/openequivariance/_torch/extlib")
 endif()

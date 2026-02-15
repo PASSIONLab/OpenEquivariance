@@ -9,6 +9,7 @@ __pycache__
 # working folders
 dist
 build
+cbuild
 outputs/*
 visualization/*
 figures/*

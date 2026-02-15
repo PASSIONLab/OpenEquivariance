@@ -113,16 +113,16 @@ def use_precompiled_extension():
     global BUILT_EXTENSION, BUILT_EXTENSION_ERROR, extension_module
     try:
         if torch.version.cuda:
-            import openequivariance._torch.extlib.libtorch_tp_jit_stable as extension_module
+            import openequivariance._torch.extlib.torch_tp_jit_stable_cuda as extension_module
         elif torch.version.hip:
-            import openequivariance._torch.extlib.libtorch_tp_jit_stable_hip as extension_module
+            import openequivariance._torch.extlib.torch_tp_jit_stable_hip as extension_module
 
         torch.ops.load_library(extension_module.__file__)
         BUILT_EXTENSION = True
     except Exception as e:
         BUILT_EXTENSION_ERROR = f"Error loading precompiled OpenEquivariance Extension: {e}"
 
-if Version(torch.__version__) > Version("2.9.0"):
+if Version(torch.__version__) > Version("2.9.9"):
     use_precompiled_extension()
 else:
     jit_compile_extension()
