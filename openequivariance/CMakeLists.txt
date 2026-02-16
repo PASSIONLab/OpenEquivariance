@@ -35,7 +35,7 @@ message(STATUS "nanobind cmake directory: ${nanobind_ROOT}")
 find_package(nanobind CONFIG REQUIRED)
 
 set(EXT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/openequivariance/extension")
-set(EXT_UTIL_DIR "${EXT_DIR}/util")
+set(EXT_BACKEND_DIR "${EXT_DIR}/backend")
 set(EXT_JSON_DIR "${EXT_DIR}/json11")
 
 # Source files
@@ -61,10 +61,9 @@ function(add_stable_extension target_name backend_define)
     
     target_include_directories(${target_name} PRIVATE
         ${EXT_DIR}
-        ${EXT_UTIL_DIR}
+        ${EXT_BACKEND_DIR}
         ${EXT_JSON_DIR}
         ${LIBTORCH_INCLUDE_DIR}
-        ${LIBTORCH_API_INCLUDE_DIR}
     )
     target_link_libraries(${target_name} PRIVATE
         ${TORCH_CPU_LIB}
@@ -77,8 +76,27 @@ find_package(hip QUIET)
 
 if(CUDAToolkit_FOUND)
     message(STATUS "Building stable extension with CUDA backend.")
+
+    add_library(cuda_stub_lib SHARED ${EXT_DIR}/stubs/libtorch_cuda.cpp)
+
+    target_include_directories(cuda_stub_lib PRIVATE
+        ${LIBTORCH_INCLUDE_DIR}
+    )
+
+    set_target_properties(cuda_stub_lib PROPERTIES 
+        OUTPUT_NAME "torch_cuda"  
+        POSITION_INDEPENDENT_CODE ON
+        CXX_STANDARD 17
+    )
+
     add_stable_extension(torch_tp_jit_stable_cuda CUDA_BACKEND)
-    target_link_libraries(torch_tp_jit_stable_cuda PRIVATE CUDA::cudart CUDA::cuda_driver CUDA::nvrtc)
+    
+    target_link_libraries(torch_tp_jit_stable_cuda PRIVATE 
+        CUDA::cudart 
+        CUDA::cuda_driver 
+        CUDA::nvrtc
+        cuda_stub_lib 
+    )
     
     install(TARGETS torch_tp_jit_stable_cuda LIBRARY DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/openequivariance/_torch/extlib")
 endif()

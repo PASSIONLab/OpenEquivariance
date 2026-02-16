@@ -13,6 +13,7 @@
 #include <c10/util/Exception.h>
 #include <torch/all.h>
 #include <torch/library.h>
+#include <torch/csrc/stable/accelerator.h>
 
 using Tensor = torch::Tensor;
 using Dtype = torch::Dtype;

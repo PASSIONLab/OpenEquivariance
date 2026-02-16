@@ -54,7 +54,7 @@ def jit_compile_extension():
         extra_cflags = ["-O3"]
         torch_sources = ["libtorch_tp_jit.cpp", "json11/json11.cpp"]
 
-        include_dirs, extra_link_args = (["util"], ["-Wl,--no-as-needed"])
+        include_dirs, extra_link_args = (["backend"], ["-Wl,--no-as-needed"])
 
         if LINKED_LIBPYTHON:
             extra_link_args.pop()

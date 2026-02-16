@@ -18,7 +18,7 @@ using json = json11::Json;
     #include <cuda.h>
     #include <cuda_runtime.h>
 
-    #include "util/backend_cuda.hpp"
+    #include "backend/backend_cuda.hpp"
     #include "group_mm_cuda.hpp"
     using JITKernel = CUJITKernel;
     using GPU_Allocator = CUDA_Allocator;
@@ -29,7 +29,7 @@ using json = json11::Json;
 #endif
 
 #ifdef HIP_BACKEND
-    #include "util/backend_hip.hpp"
+    #include "backend/backend_hip.hpp"
     #include "group_mm_hip.hpp"
     using JITKernel = HIPJITKernel;
     using GPU_Allocator = HIP_Allocator;

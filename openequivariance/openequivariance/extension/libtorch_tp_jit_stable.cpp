@@ -1,3 +1,5 @@
+#define USE_CUDA
+
 #include <torch/csrc/stable/accelerator.h>
 #include <torch/csrc/stable/library.h>
 #include <torch/csrc/stable/ops.h>
@@ -68,15 +70,15 @@ void *data_ptr(const Tensor &tensor) {
 }
 
 Stream get_current_stream() {
-    int32_t device_index;
-    StreamOpaque* stream_ptr; 
+    auto device_idx = torch::stable::accelerator::getCurrentDeviceIndex();
+    void* stream_ptr = nullptr;
+    TORCH_ERROR_CODE_CHECK(aoti_torch_get_current_cuda_stream(device_idx, &stream_ptr));
 
-    TORCH_ERROR_CODE_CHECK(
-        aoti_torch_get_current_device_index(&device_index))
-    TORCH_ERROR_CODE_CHECK(
-        aoti_torch_get_current_stream(device_index, &stream_ptr))
-    //return (Stream) stream_ptr; 
-    return (Stream) 0; 
+    #ifdef CUDA_BACKEND
+        return static_cast<Stream>(stream_ptr); 
+    #elif defined(HIP_BACKEND)
+        return static_cast<Stream>(stream_ptr);
+    #endif
 }
 
 #ifdef CUDA_BACKEND

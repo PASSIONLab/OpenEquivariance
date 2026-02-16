@@ -58,8 +58,8 @@ set(OEQ_JAX_SOURCES
 set(OEQ_JAX_HEADERS
   ${HEADER_DIR}/convolution.hpp
   ${HEADER_DIR}/tensorproducts.hpp
-  ${HEADER_DIR}/util/backend_cuda.hpp
-  ${HEADER_DIR}/util/backend_hip.hpp
+  ${HEADER_DIR}/backend/backend_cuda.hpp
+  ${HEADER_DIR}/backend/backend_hip.hpp
   ${HEADER_DIR}/json11/json11.hpp
 )
 
