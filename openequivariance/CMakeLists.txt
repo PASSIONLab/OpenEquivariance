@@ -77,7 +77,7 @@ find_package(hip QUIET)
 if(CUDAToolkit_FOUND)
     message(STATUS "Building stable extension with CUDA backend.")
 
-    add_library(cuda_stub_lib SHARED ${EXT_DIR}/stubs/libtorch_cuda.cpp)
+    add_library(cuda_stub_lib SHARED ${EXT_DIR}/stubs/stream.cpp)
 
     target_include_directories(cuda_stub_lib PRIVATE
         ${LIBTORCH_INCLUDE_DIR}
@@ -103,8 +103,21 @@ endif()
 
 if(hip_FOUND)
     message(STATUS "Building stable extension with HIP backend.")
+
+    add_library(hip_stub_lib SHARED ${EXT_DIR}/stubs/stream.cpp)
+
+    target_include_directories(hip_stub_lib PRIVATE
+        ${LIBTORCH_INCLUDE_DIR}
+    )
+
+    set_target_properties(hip_stub_lib PROPERTIES 
+        OUTPUT_NAME "torch_hip"  
+        POSITION_INDEPENDENT_CODE ON
+        CXX_STANDARD 17
+    )
+
     add_stable_extension(torch_tp_jit_stable_hip HIP_BACKEND)
-    target_link_libraries(torch_tp_jit_stable_hip PRIVATE hiprtc)
+    target_link_libraries(torch_tp_jit_stable_hip PRIVATE hiprtc hip_stub_lib)
 
     install(TARGETS torch_tp_jit_stable_hip LIBRARY DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/openequivariance/_torch/extlib")
 endif()
