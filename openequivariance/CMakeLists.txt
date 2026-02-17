@@ -53,7 +53,7 @@ function(add_stable_extension target_name backend_define)
         POSITION_INDEPENDENT_CODE ON
     )
     
-    # CRITICAL: Manually enforce CXX11 ABI to match the downloaded LibTorch
+    # Enforce CXX11 ABI to match LibTorch
     target_compile_definitions(${target_name} PRIVATE 
         ${backend_define}=1
         _GLIBCXX_USE_CXX11_ABI=1 
