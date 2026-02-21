@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15...3.30)
-project(openequivariance_stable_ext LANGUAGES CXX)
+project(openequivariance_stable_ext)
 
 find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
 
