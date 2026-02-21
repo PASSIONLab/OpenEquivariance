@@ -9,7 +9,6 @@
 #include <torch/headeronly/core/ScalarType.h>
 #include <torch/headeronly/util/Exception.h>
 #include <torch/headeronly/util/shim_utils.h>
-#include <torch/csrc/inductor/aoti_torch/c/shim.h>
 
 #ifdef HIP_BACKEND
     #include <c10/hip/HIPStream.h>
@@ -30,6 +29,8 @@ constexpr Dtype kByte = torch::headeronly::ScalarType::Byte;
 #define REGISTER_LIBRARY STABLE_TORCH_LIBRARY
 
 #include "torch_core.hpp"
+
+AOTITorchError aoti_torch_get_current_cuda_stream(int32_t device_index, void** ret_stream);
 
 Tensor tensor_to_cpu_contiguous(const Tensor &tensor) {
     torch::stable::Device device(torch::headeronly::DeviceType::CPU);
