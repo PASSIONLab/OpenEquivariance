@@ -3,9 +3,11 @@
 #include <initializer_list>
 #include <string>
 #include <stdexcept>
+#include <mutex>
+#include <memory>
 
-#include <pybind11/pybind11.h> 
-#include <pybind11/numpy.h>
+#include "json11/json11.hpp"
+#include <pybind11/pybind11.h>
 
 #ifdef CUDA_BACKEND
     #include <ATen/cuda/CUDAContext.h>
@@ -37,12 +39,11 @@
     }
 #endif
 
-#include "buffer.hpp"
 #include "tensorproducts.hpp"
 #include "convolution.hpp"
 
 using namespace std;
-namespace py=pybind11;
+using json = json11::Json;
 
 #include <ATen/Operators.h>
 #include <torch/all.h>
@@ -50,28 +51,13 @@ namespace py=pybind11;
 #include <c10/macros/Macros.h>
 #include <c10/util/Exception.h>
 
-using Map_t=torch::Dict<string, int64_t>;
-
-std::unordered_map<string, int64_t> to_map(const Map_t &map) {
-    std::unordered_map<string, int64_t> result;
-    for(auto it = map.begin(); it != map.end(); ++it) {
-        result[it->key()] = it->value();
-    }
-    return result;
-} 
-
 torch::Dtype enum_to_torch_dtype(int64_t i){
     switch(i) {
-        case 1:
-            return torch::kFloat; 
-        case 2: 
-            return torch::kDouble;
-        case 3: 
-            return torch::kInt;
-        case 4: 
-            return torch::kLong;
-        case 5: 
-            return torch::kUInt8;
+        case 1: return torch::kFloat; 
+        case 2: return torch::kDouble;
+        case 3: return torch::kInt;
+        case 4: return torch::kLong;
+        case 5: return torch::kUInt8;
     }
     throw logic_error("Unsupported tensor datatype!");
 } 
@@ -96,9 +82,19 @@ inline void* data_ptr(const torch::Tensor &tensor) {
     else if(tensor.dtype() == torch::kLong) 
         return reinterpret_cast<void*>(tensor.data_ptr<int64_t>());
     else if(tensor.dtype() == torch::kByte) 
-        return reinterpret_cast<void*>(tensor.data_ptr<uint8_t>());
+        return reinterpret_cast<void*>(tensor.data_ptr<uint8_t>()); // Replaces kUInt8
+    else if(tensor.dtype() == torch::kInt)
+        return reinterpret_cast<void*>(tensor.data_ptr<int32_t>());
     else
         throw logic_error("Unsupported tensor datatype!");
+}
+
+std::unordered_map<std::string, int64_t> parse_json_config(const json &j_obj) {
+    std::unordered_map<std::string, int64_t> result;
+    for (const auto &kv : j_obj.object_items()) {
+        result[kv.first] = static_cast<int64_t>(kv.second.number_value());
+    }
+    return result;
 }
 
 struct KernelProp {
@@ -112,7 +108,15 @@ struct KernelProp {
     torch::Dtype idx_dtype;
     torch::Dtype workspace_dtype;
 
-    KernelProp(Map_t &kernel_dims, bool is_convolution):
+    KernelProp() : 
+        L1_dim(0), L2_dim(0), L3_dim(0), weight_numel(0), 
+        shared_weights(false), 
+        irrep_dtype(torch::kFloat), weight_dtype(torch::kFloat),
+        workspace_size(0), deterministic(false), 
+        idx_dtype(torch::kInt), workspace_dtype(torch::kByte) {}
+
+    KernelProp(
+        std::unordered_map<string, int64_t> &kernel_dims, bool is_convolution):
             L1_dim(kernel_dims.at("L1_dim")),
             L2_dim(kernel_dims.at("L2_dim")),    
             L3_dim(kernel_dims.at("L3_dim")),
@@ -126,81 +130,114 @@ struct KernelProp {
             deterministic = kernel_dims.at("deterministic");
             idx_dtype = enum_to_torch_dtype(kernel_dims.at("idx_dtype"));
         }
-    }    
-};
-
-class __attribute__ ((visibility ("default"))) TorchJITProduct : public torch::CustomClassHolder {
-public:
-    Map_t fwd_dict, bwd_dict, dbl_bwd_dict, kernel_dims;
-    JITTPImpl<JITKernel> internal;
-    KernelProp kernelProp;
-    int64_t L3_dim, irrep_dtype; 
-
-    TorchJITProduct(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t dbl_bwd_dict_i, Map_t kernel_dims_i) :
-        fwd_dict(fwd_dict_i.copy()),
-        bwd_dict(bwd_dict_i.copy()),
-        dbl_bwd_dict(dbl_bwd_dict_i.copy()),
-        kernel_dims(kernel_dims_i.copy()),
-        internal(kernel_plaintext, 
-                to_map(fwd_dict_i),
-                to_map(bwd_dict_i),
-                to_map(dbl_bwd_dict_i),
-                to_map(kernel_dims_i)
-            ),
-        kernelProp(kernel_dims, false),
-        L3_dim(kernelProp.L3_dim),
-        irrep_dtype(kernel_dims_i.at("irrep_dtype")) 
-        { }
-
-    tuple<  tuple<string, string>, 
-            tuple<string, Map_t>, 
-            tuple<string, Map_t>, 
-            tuple<string, Map_t>, 
-            tuple<string, Map_t>> __obj_flatten__() {
-        return tuple(tuple("kernel_plaintext", internal.jit.kernel_plaintext),
-            tuple("fwd_config", fwd_dict),
-            tuple("bwd_config", bwd_dict),
-            tuple("dbl_bwd_config", dbl_bwd_dict),
-            tuple("kernel_dims", kernel_dims));
-    }
-
-    void exec_tensor_product_device_rawptrs(int64_t num_batch, int64_t L1_in, int64_t L2_in, int64_t L3_out, int64_t weights) { 
-        Stream stream = get_current_stream(); 
-        internal.exec_tensor_product(
-                num_batch,
-                reinterpret_cast<void*>(L1_in), 
-                reinterpret_cast<void*>(L2_in), 
-                reinterpret_cast<void*>(L3_out), 
-                reinterpret_cast<void*>(weights),
-                stream
-            ); 
-    } 
-
-    void backward_device_rawptrs(int64_t num_batch,
-            int64_t L1_in, int64_t L1_grad,
-            int64_t L2_in, int64_t L2_grad, 
-            int64_t weight, int64_t weight_grad,
-            int64_t L3_grad) {
-        Stream stream = get_current_stream(); 
-        internal.backward(num_batch,
-            reinterpret_cast<void*>(L1_in), reinterpret_cast<void*>(L1_grad),
-            reinterpret_cast<void*>(L2_in), reinterpret_cast<void*>(L2_grad),
-            reinterpret_cast<void*>(weight), reinterpret_cast<void*>(weight_grad),
-            reinterpret_cast<void*>(L3_grad), stream
-        );
     }
 };
+
+std::unordered_map<int64_t,
+    std::pair<
+        std::unique_ptr<JITTPImpl<JITKernel>>,
+        KernelProp
+    >> tp_cache;
+
+std::unordered_map<int64_t,
+    std::pair<
+        std::unique_ptr<JITConvImpl<JITKernel>>,
+        KernelProp
+    >> conv_cache;
+
+std::mutex mut;
+
+std::pair<JITTPImpl<JITKernel>*, KernelProp> 
+    compile_tp_with_caching(const torch::Tensor &json_bytes,
+                            int64_t hash) {
+    {
+        const std::lock_guard<std::mutex> lock(mut);
+        auto it = tp_cache.find(hash); 
+        if (it == tp_cache.end()) {
+            torch::Tensor cpu_tensor = json_bytes.to(torch::kCPU).contiguous();
+            std::string json_payload(
+                reinterpret_cast<const char*>(cpu_tensor.data_ptr<uint8_t>()), 
+                cpu_tensor.numel()
+            );
+
+            std::string err;
+            json root = json::parse(json_payload, err);
+            if (!err.empty()) throw std::runtime_error("JSON Parse Error: " + err);
+
+            std::string kernel_src = root["kernel"].string_value();
+            auto forward_cfg = parse_json_config(root["forward_config"]);
+            auto backward_cfg = parse_json_config(root["backward_config"]);
+            auto dbackward_cfg = parse_json_config(root["double_backward_config"]);
+            auto kernel_prop_map = parse_json_config(root["kernel_prop"]);
+
+            auto jit_tp_impl = std::make_unique<JITTPImpl<JITKernel>>(
+                kernel_src,
+                forward_cfg,
+                backward_cfg,
+                dbackward_cfg,
+                kernel_prop_map);
+            
+            tp_cache.insert({hash,
+                std::make_pair(std::move(jit_tp_impl), 
+                KernelProp(kernel_prop_map, false))});
+            it = tp_cache.find(hash);
+        }
+        return {it->second.first.get(), it->second.second};
+    }
+}
+
+std::pair<JITConvImpl<JITKernel>*, KernelProp> 
+    compile_conv_with_caching(const torch::Tensor &json_bytes,
+                              int64_t hash) {
+    {
+        const std::lock_guard<std::mutex> lock(mut);
+        auto it = conv_cache.find(hash); 
+        if (it == conv_cache.end()) {
+            torch::Tensor cpu_tensor = json_bytes.to(torch::kCPU).contiguous();
+            std::string json_payload(
+                reinterpret_cast<const char*>(cpu_tensor.data_ptr<uint8_t>()), 
+                cpu_tensor.numel()
+            );
+
+            std::string err;
+            json root = json::parse(json_payload, err);
+            if (!err.empty()) throw std::runtime_error("JSON Parse Error: " + err);
+
+            std::string kernel_src = root["kernel"].string_value();
+            auto forward_cfg = parse_json_config(root["forward_config"]);
+            auto backward_cfg = parse_json_config(root["backward_config"]);
+            auto dbackward_cfg = parse_json_config(root["double_backward_config"]);
+            auto kernel_prop_map = parse_json_config(root["kernel_prop"]);
+
+            auto jit_conv_impl = std::make_unique<JITConvImpl<JITKernel>>(
+                kernel_src,
+                forward_cfg,
+                backward_cfg,
+                dbackward_cfg,
+                kernel_prop_map);
+            
+            conv_cache.insert({hash,
+                std::make_pair(std::move(jit_conv_impl), 
+                KernelProp(kernel_prop_map, true))});
+            it = conv_cache.find(hash);
+        }
+        return {it->second.first.get(), it->second.second};
+    }
+}
+
+// --------------------- Tensor Products --------------------------
 
 torch::Tensor jit_tp_forward(
-        const c10::intrusive_ptr<TorchJITProduct> &jit_instance,
-        const torch::Tensor &L1_in,
-        const torch::Tensor &L2_in,
-        const torch::Tensor &W) {
+        torch::Tensor json_bytes, int64_t hash,
+        torch::Tensor L1_in,
+        torch::Tensor L2_in,
+        torch::Tensor W,
+        int64_t L3_dim) {
     
+    auto [jit_kernel, k] = compile_tp_with_caching(json_bytes, hash);
     Stream stream = get_current_stream(); 
 
     const int64_t num_batch = L1_in.size(0);
-    const KernelProp &k = jit_instance->kernelProp;
 
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_in"); 
@@ -216,7 +253,7 @@ torch::Tensor jit_tp_forward(
     at::Tensor L2_contig = L2_in.contiguous();
     at::Tensor W_contig = W.contiguous();
     
-    jit_instance->internal.exec_tensor_product(
+    jit_kernel->exec_tensor_product(
             num_batch,
             data_ptr(L1_contig), 
             data_ptr(L2_contig), 
@@ -229,16 +266,16 @@ torch::Tensor jit_tp_forward(
 }
 
 tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_backward(
-        const c10::intrusive_ptr<TorchJITProduct> &jit_instance,
-        const torch::Tensor &L1_in,
-        const torch::Tensor &L2_in,
-        const torch::Tensor &W, 
-        const torch::Tensor &L3_grad) {
+        torch::Tensor json_bytes, int64_t hash,
+        torch::Tensor L1_in,
+        torch::Tensor L2_in,
+        torch::Tensor W, 
+        torch::Tensor L3_grad) {
 
+    auto [jit_kernel, k] = compile_tp_with_caching(json_bytes, hash);
     Stream stream = get_current_stream();
 
     const int64_t num_batch = L1_in.size(0);
-    const KernelProp &k = jit_instance->kernelProp;
 
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_in");
@@ -261,7 +298,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_backward(
     torch::Tensor W_contig = W.contiguous();
     torch::Tensor L3_grad_contig = L3_grad.contiguous();
 
-    jit_instance->internal.backward(
+    jit_kernel->backward(
             num_batch, 
             data_ptr(L1_in_contig), data_ptr(L1_grad),
             data_ptr(L2_in_contig), data_ptr(L2_grad),
@@ -274,19 +311,19 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_backward(
 }
 
 tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_backward(
-        const c10::intrusive_ptr<TorchJITProduct> &jit_instance,
-        const torch::Tensor &L1_in, 
-        const torch::Tensor &L2_in, 
-        const torch::Tensor &W, 
-        const torch::Tensor &L3_grad, 
-        const torch::Tensor &L1_dgrad, 
-        const torch::Tensor &L2_dgrad, 
-        const torch::Tensor &W_dgrad) {
+        torch::Tensor json_bytes, int64_t hash,
+        torch::Tensor L1_in, 
+        torch::Tensor L2_in, 
+        torch::Tensor W, 
+        torch::Tensor L3_grad, 
+        torch::Tensor L1_dgrad, 
+        torch::Tensor L2_dgrad, 
+        torch::Tensor W_dgrad) {
     
+    auto [jit_kernel, k] = compile_tp_with_caching(json_bytes, hash);
     Stream stream = get_current_stream();
 
     const int64_t num_batch = L1_in.size(0);
-    const KernelProp &k = jit_instance->kernelProp;
 
     check_tensor(L1_in, {num_batch, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {num_batch, k.L2_dim}, k.irrep_dtype, "L2_in");
@@ -321,7 +358,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_
         TORCH_CHECK(W.dim() == 1);
     } 
 
-    jit_instance->internal.double_backward(
+    jit_kernel->double_backward(
             num_batch,
             data_ptr(L1_in_contig), data_ptr(L2_in_contig),
             data_ptr(W_contig), data_ptr(L3_grad_contig),
@@ -336,127 +373,24 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_tp_double_
 }
 
 
-// =========================================================== 
-
-class TorchJITConv : public torch::CustomClassHolder {
-public:
-    Map_t fwd_dict, bwd_dict, dbl_bwd_dict, kernel_dims;
-    JITConvImpl<JITKernel> internal;
-    KernelProp kernelProp;
-    int64_t L3_dim, irrep_dtype;
-
-    TorchJITConv(string kernel_plaintext, Map_t fwd_dict_i, Map_t bwd_dict_i, Map_t dbl_bwd_dict_i, Map_t kernel_dims_i) :
-        fwd_dict(fwd_dict_i.copy()),
-        bwd_dict(bwd_dict_i.copy()),
-        dbl_bwd_dict(bwd_dict_i.copy()),
-        kernel_dims(kernel_dims_i.copy()),
-        internal(kernel_plaintext,
-                to_map(fwd_dict_i),
-                to_map(bwd_dict_i),
-                to_map(dbl_bwd_dict_i),
-                to_map(kernel_dims_i)
-            ),
-        kernelProp(kernel_dims, true),
-        L3_dim(kernelProp.L3_dim),
-        irrep_dtype(kernel_dims_i.at("irrep_dtype"))
-        { }
-
-    tuple<tuple<string, string>, 
-        tuple<string, Map_t>, 
-        tuple<string, Map_t>, 
-        tuple<string, Map_t>, 
-        tuple<string, Map_t>> __obj_flatten__() {
-        return tuple(tuple("kernel_plaintext", internal.jit.kernel_plaintext),
-            tuple("fwd_config", fwd_dict),
-            tuple("bwd_config", bwd_dict),
-            tuple("dbl_bwd_config", dbl_bwd_dict),
-            tuple("kernel_dims", kernel_dims));
-    }
-
-    void exec_conv_rawptrs(
-            int64_t L1_in, int64_t L2_in, int64_t weights, int64_t L3_out,
-            int64_t rows, int64_t cols,
-            int64_t nnz, int64_t node_count,
-            int64_t workspace) {
-        Stream stream = get_current_stream();
-        internal.exec_conv(
-            reinterpret_cast<void*>(L1_in), 
-            reinterpret_cast<void*>(L2_in), 
-            reinterpret_cast<void*>(weights), 
-            reinterpret_cast<void*>(L3_out),
-            reinterpret_cast<void*>(rows), 
-            reinterpret_cast<void*>(cols),
-            nnz, node_count,
-            reinterpret_cast<void*>(workspace),
-            stream);
-    }
-    void backward_rawptrs(
-            int64_t L1_in, int64_t L1_grad,
-            int64_t L2_in, int64_t L2_grad,
-            int64_t weight, int64_t weight_grad,
-            int64_t L3_grad,
-            int64_t rows, int64_t cols,
-            int64_t nnz, int64_t node_count,
-            int64_t workspace,
-            int64_t transpose_perm) {
-        Stream stream = get_current_stream();
-        internal.backward(
-            reinterpret_cast<void*>(L1_in), reinterpret_cast<void*>(L1_grad),
-            reinterpret_cast<void*>(L2_in), reinterpret_cast<void*>(L2_grad),
-            reinterpret_cast<void*>(weight), reinterpret_cast<void*>(weight_grad),
-            reinterpret_cast<void*>(L3_grad),
-            reinterpret_cast<void*>(rows), 
-            reinterpret_cast<void*>(cols),
-            nnz, node_count,
-            reinterpret_cast<void*>(workspace),
-            reinterpret_cast<void*>(transpose_perm),
-            stream);
-    }
-    void double_backward_rawptrs(
-            int64_t L1_in, int64_t L2_in, int64_t W, int64_t L3_grad,
-            int64_t L1_dgrad, int64_t L2_dgrad, int64_t w_dgrad,
-            int64_t L1_grad, int64_t L2_grad, int64_t W_grad, int64_t L3_dgrad,
-            int64_t rows, int64_t cols,
-            int64_t nnz, int64_t node_count,
-            int64_t wspace, int64_t transpose_perm) {
-       
-        Stream stream = get_current_stream();
-        internal.double_backward(
-            reinterpret_cast<void*>(L1_in), 
-            reinterpret_cast<void*>(L2_in), 
-            reinterpret_cast<void*>(W), 
-            reinterpret_cast<void*>(L3_grad),
-            reinterpret_cast<void*>(L1_dgrad), 
-            reinterpret_cast<void*>(L2_dgrad), 
-            reinterpret_cast<void*>(w_dgrad),
-            reinterpret_cast<void*>(L1_grad), 
-            reinterpret_cast<void*>(L2_grad),
-            reinterpret_cast<void*>(W_grad), 
-            reinterpret_cast<void*>(L3_dgrad),
-            reinterpret_cast<void*>(rows), 
-            reinterpret_cast<void*>(cols),
-            nnz, node_count,
-            reinterpret_cast<void*>(wspace),
-            reinterpret_cast<void*>(transpose_perm),
-            stream);
-    }
-};
+// ========================= Convolution ================================== 
 
 torch::Tensor jit_conv_forward(
-        const c10::intrusive_ptr<TorchJITConv> &jit_instance,
-        const torch::Tensor &L1_in,
-        const torch::Tensor &L2_in,
-        const torch::Tensor &W,
-        const torch::Tensor &rows,
-        const torch::Tensor &cols,
-        const torch::Tensor &workspace,
-        const torch::Tensor &transpose_perm) {
+        torch::Tensor json_bytes, int64_t hash,
+        torch::Tensor L1_in,
+        torch::Tensor L2_in,
+        torch::Tensor W,
+        int64_t L3_dim,
+        torch::Tensor rows,
+        torch::Tensor cols,
+        torch::Tensor workspace,
+        torch::Tensor transpose_perm) {
 
+    auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
     Stream stream = get_current_stream();
 
     const int64_t nnz = rows.size(0);
     const int64_t node_count = L1_in.size(0);
-    const KernelProp &k = jit_instance->kernelProp;
 
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
@@ -483,7 +417,7 @@ torch::Tensor jit_conv_forward(
     torch::Tensor cols_contig = cols.contiguous();
     torch::Tensor workspace_contig = workspace.contiguous();
 
-    jit_instance->internal.exec_conv(
+    jit_kernel->exec_conv(
             data_ptr(L1_contig), 
             data_ptr(L2_contig), 
             data_ptr(W_contig), 
@@ -498,21 +432,21 @@ torch::Tensor jit_conv_forward(
 }
 
 tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
-        const c10::intrusive_ptr<TorchJITConv> &jit_instance,
-        const torch::Tensor &L1_in,
-        const torch::Tensor &L2_in,
-        const torch::Tensor &W,
-        const torch::Tensor &L3_grad,
-        const torch::Tensor &rows,
-        const torch::Tensor &cols,
-        const torch::Tensor &workspace,
-        const torch::Tensor &transpose_perm) {
+        torch::Tensor json_bytes, int64_t hash,
+        torch::Tensor L1_in,
+        torch::Tensor L2_in,
+        torch::Tensor W,
+        torch::Tensor L3_grad,
+        torch::Tensor rows,
+        torch::Tensor cols,
+        torch::Tensor workspace,
+        torch::Tensor transpose_perm) {
     
+    auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
     Stream stream = get_current_stream();
 
     const int64_t nnz = rows.size(0);
     const int64_t node_count = L1_in.size(0);
-    const KernelProp &k = jit_instance->kernelProp;
 
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
@@ -549,7 +483,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
     if(k.shared_weights)
         W_grad.zero_();
 
-    jit_instance->internal.backward(
+    jit_kernel->backward(
             data_ptr(L1_in_contig), data_ptr(L1_grad),
             data_ptr(L2_in_contig), data_ptr(L2_grad),
             data_ptr(W_contig), data_ptr(W_grad),
@@ -564,24 +498,24 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_backward(
 }
 
 tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_double_backward(
-        const c10::intrusive_ptr<TorchJITConv> &jit_instance,
-        const torch::Tensor &L1_in, 
-        const torch::Tensor &L2_in, 
-        const torch::Tensor &W, 
-        const torch::Tensor &L3_grad, 
-        const torch::Tensor &L1_dgrad, 
-        const torch::Tensor &L2_dgrad, 
-        const torch::Tensor &W_dgrad, 
-        const torch::Tensor &rows,
-        const torch::Tensor &cols,
-        const torch::Tensor &workspace,
-        const torch::Tensor &transpose_perm) {
+        torch::Tensor json_bytes, int64_t hash,
+        torch::Tensor L1_in, 
+        torch::Tensor L2_in, 
+        torch::Tensor W, 
+        torch::Tensor L3_grad, 
+        torch::Tensor L1_dgrad, 
+        torch::Tensor L2_dgrad, 
+        torch::Tensor W_dgrad, 
+        torch::Tensor rows,
+        torch::Tensor cols,
+        torch::Tensor workspace,
+        torch::Tensor transpose_perm) {
     
+    auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
     Stream stream = get_current_stream();
 
     const int64_t nnz = rows.size(0);
     const int64_t node_count = L1_in.size(0);
-    const KernelProp &k = jit_instance->kernelProp;
 
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in"); 
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in"); 
@@ -628,7 +562,7 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_doubl
     if(k.shared_weights)
         W_grad.zero_();
 
-    jit_instance->internal.double_backward(
+    jit_kernel->double_backward(
             data_ptr(L1_in_contig), data_ptr(L2_in_contig),
             data_ptr(W_contig), data_ptr(L3_grad_contig),
             data_ptr(L1_dgrad_contig), data_ptr(L2_dgrad_contig),
@@ -646,68 +580,6 @@ tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> jit_conv_doubl
 
 // =========================================================== 
 
-TORCH_LIBRARY_FRAGMENT(libtorch_tp_jit, m) { 
-    m.class_<TorchJITProduct>("TorchJITProduct")
-        .def(torch::init<string, Map_t, Map_t, Map_t, Map_t>())
-        .def("__obj_flatten__", &TorchJITProduct::__obj_flatten__)
-        .def("exec_tensor_product_rawptr", &TorchJITProduct::exec_tensor_product_device_rawptrs)
-        .def("backward_rawptr", &TorchJITProduct::backward_device_rawptrs)
-        .def("__len__", [](const c10::intrusive_ptr<TorchJITProduct>& test) -> int64_t {
-            return 0;
-        })
-        .def_readonly("L3_dim", &TorchJITProduct::L3_dim)
-        .def_readonly("irrep_dtype", &TorchJITProduct::irrep_dtype)
-        .def("__eq__", [](const c10::IValue & self, const c10::IValue& other) -> bool {
-            return self.is(other); 
-        })
-        .def_pickle(
-            // __getstate__
-            [](const c10::intrusive_ptr<TorchJITProduct>& self)
-                -> tuple<string, Map_t, Map_t, Map_t, Map_t> {
-                return tuple(self->internal.jit.kernel_plaintext, self->fwd_dict, self->bwd_dict, self->dbl_bwd_dict, self->kernel_dims);
-            },
-            // __setstate__
-            [](tuple<string, Map_t, Map_t, Map_t, Map_t> state)
-                -> c10::intrusive_ptr<TorchJITProduct> {
-                return c10::make_intrusive<TorchJITProduct>(get<0>(state), get<1>(state), get<2>(state), get<3>(state), get<4>(state));
-            });
-
-    m.def("jit_tp_forward(__torch__.torch.classes.libtorch_tp_jit.TorchJITProduct jit, Tensor L1_in, Tensor L2_in, Tensor W) -> Tensor");
-    m.def("jit_tp_backward(__torch__.torch.classes.libtorch_tp_jit.TorchJITProduct jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad) -> (Tensor, Tensor, Tensor)");
-    m.def("jit_tp_double_backward(__torch__.torch.classes.libtorch_tp_jit.TorchJITProduct jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad) -> (Tensor, Tensor, Tensor, Tensor)");
-
-
-    m.class_<TorchJITConv>("TorchJITConv")
-        .def(torch::init<string, Map_t, Map_t, Map_t, Map_t>())
-        .def("__obj_flatten__", &TorchJITConv::__obj_flatten__)
-        .def("exec_conv_rawptrs", &TorchJITConv::exec_conv_rawptrs)
-        .def("backward_rawptrs", &TorchJITConv::backward_rawptrs)
-        .def("double_backward_rawptrs", &TorchJITConv::double_backward_rawptrs)
-        .def("__len__", [](const c10::intrusive_ptr<TorchJITConv>& test) -> int64_t {
-            return 0;
-        })
-        .def_readonly("L3_dim", &TorchJITConv::L3_dim)
-        .def_readonly("irrep_dtype", &TorchJITConv::irrep_dtype)
-        .def("__eq__", [](const c10::IValue & self, const c10::IValue& other) -> bool {
-            return self.is(other); 
-        })
-        .def_pickle(
-            // __getstate__
-            [](const c10::intrusive_ptr<TorchJITConv>& self)
-                -> tuple<string, Map_t, Map_t, Map_t, Map_t> {
-                return tuple(self->internal.jit.kernel_plaintext, self->fwd_dict, self->bwd_dict, self->dbl_bwd_dict, self->kernel_dims);
-            },
-            // __setstate__
-            [](tuple<string, Map_t, Map_t, Map_t, Map_t> state)
-                -> c10::intrusive_ptr<TorchJITConv> {
-                return c10::make_intrusive<TorchJITConv>(get<0>(state), get<1>(state), get<2>(state), get<3>(state), get<4>(state));
-            });
-
-    m.def("jit_conv_forward(__torch__.torch.classes.libtorch_tp_jit.TorchJITConv jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> Tensor");
-    m.def("jit_conv_backward(__torch__.torch.classes.libtorch_tp_jit.TorchJITConv jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor)");
-    m.def("jit_conv_double_backward(__torch__.torch.classes.libtorch_tp_jit.TorchJITConv jit, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor, Tensor)");
-};
-
 TORCH_LIBRARY_IMPL(libtorch_tp_jit, CUDA, m) { 
     m.impl("jit_tp_forward", &jit_tp_forward);
     m.impl("jit_tp_backward", &jit_tp_backward);
@@ -716,6 +588,16 @@ TORCH_LIBRARY_IMPL(libtorch_tp_jit, CUDA, m) {
     m.impl("jit_conv_forward", &jit_conv_forward);
     m.impl("jit_conv_backward", &jit_conv_backward);
     m.impl("jit_conv_double_backward", &jit_conv_double_backward);
+};
+
+TORCH_LIBRARY(libtorch_tp_jit, m) {
+    m.def("jit_tp_forward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, int L3_dim) -> Tensor");
+    m.def("jit_tp_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad) -> (Tensor, Tensor, Tensor)");
+    m.def("jit_tp_double_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad) -> (Tensor, Tensor, Tensor, Tensor)");
+
+    m.def("jit_conv_forward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, int L3_dim, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> Tensor");
+    m.def("jit_conv_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor)");
+    m.def("jit_conv_double_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor, Tensor)");
 };
 
 PYBIND11_MODULE(libtorch_tp_jit, m) {}

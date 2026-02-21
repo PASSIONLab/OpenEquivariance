@@ -21,6 +21,7 @@ from .benchmark_utils import (
     benchmark_forward,
     benchmark_backward,
     benchmark_double_backward,
+    NpEncoder,
 )
 
 logger = getLogger()
@@ -235,10 +236,12 @@ class TestBenchmarkSuite:
 
             fname = pathlib.Path(f"{output_folder}/{test_ID}_{impl.name()}.json")
 
-            pretty_result = json.dumps(obj=result, indent=2).replace("\\n", "\n")
+            pretty_result = json.dumps(obj=result, indent=2, cls=NpEncoder).replace(
+                "\\n", "\n"
+            )
             logger.debug(pretty_result)
             with open(fname, "w") as f:
-                json.dump(result, f, indent=2)
+                json.dump(result, f, indent=2, cls=NpEncoder)
 
             self.results.append(result)
             logger.info(f"Finished Test ID: {test_ID}")

@@ -1,11 +1,9 @@
-from typing import Optional, List
+from typing import Optional
 
 import numpy as np
 import torch
 
-import openequivariance._torch.extlib as extlib
 from openequivariance._torch.extlib import (
-    JITConvImpl,
     postprocess_kernel,
     DeviceProp,
 )
@@ -18,12 +16,13 @@ from openequivariance.core.LoopUnrollConv import LoopUnrollConv
 from openequivariance._torch.TensorProduct import TensorProduct
 from openequivariance import TPProblem
 from openequivariance.core.utils import torch_to_oeq_dtype
-from openequivariance._torch.utils import enum_to_torch_dtype
-from openequivariance._torch.utils import reorder_torch
+from openequivariance._torch.utils import (
+    reorder_torch,
+    string_to_tensor,
+)
 
 from openequivariance.core.logging_utils import getLogger
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixinConv
-from openequivariance._torch.extlib import DeviceBuffer
 
 logger = getLogger()
 
@@ -49,7 +48,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
            fixup-based algorithm. `Default`: ``False``.
     :param kahan: If ``True``, uses Kahan summation to improve accuracy during aggregation. To use this option,
            the input tensors must be in float32 precision AND you must set ``deterministic=True``. *Default*: ``False``.
-    :param use_opaque: If ``True``, uses an opaque forward pass that cannot be symbolically traced. *Default*: ``False``.
+    :param use_opaque: This parameter is deprecated.
     """
 
     def __init__(
@@ -85,27 +84,11 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
         )
 
         self.allocate_workspace(self.workspace_size)
-        if extlib.TORCH_COMPILE:
-            internal_cls = torch.classes.libtorch_tp_jit.TorchJITConv
-        else:
-            internal_cls = JITConvImpl
-
-        logger.info("Starting kernel compiler...")
-        self.internal = internal_cls(
-            self.jit_kernel,
-            vars(self.forward_schedule.launch_config),
-            vars(self.backward_schedule.launch_config),
-            vars(self.double_backward_schedule.launch_config),
-            self.kernel_prop,
-        )
-        logger.info("Kernel compiled!")
 
         self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device="cuda")
         self.weight_numel = self.config.weight_numel
-        self._setup_notorchbind()
-
-        if (not extlib.TORCH_COMPILE) or self.input_args["use_opaque"]:
-            self.forward = self.forward_opaque
+        self.kernel = string_to_tensor(self.kernel_string)
+        self.L3_dim = self.kernel_prop["L3_dim"]
 
     def to(self, *args, **kwargs):
         r"""
@@ -163,262 +146,28 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
         :return: Tensor of shape ``[|V|, problem.irreps_out.dim()]``, datatype ``problem.irrep_dtype``.
         """
         if sender_perm is None:
-            return torch.ops.libtorch_tp_jit.jit_conv_forward(
-                self.internal,
-                X,
-                Y,
-                W,
-                rows,
-                cols,
-                self.workspace_buffer,
-                self.dummy_transpose_perm,
-            )
-        else:
-            return torch.ops.libtorch_tp_jit.jit_conv_forward(
-                self.internal,
-                X,
-                Y,
-                W,
-                rows,
-                cols,
-                self.workspace_buffer,
-                sender_perm,
-            )
+            sender_perm = self.dummy_transpose_perm
+
+        return torch.ops.libtorch_tp_jit.jit_conv_forward(
+            self.kernel,
+            self.hash,
+            X,
+            Y,
+            W,
+            self.L3_dim,
+            rows,
+            cols,
+            self.workspace_buffer,
+            sender_perm,
+        )
 
     def allocate_workspace(self, size_bytes):
         self.workspace_size = size_bytes
-        if self.torch_op:
-            self.workspace_buffer = torch.zeros(
-                size_bytes, dtype=torch.uint8, device="cuda"
-            )
-        else:
-            self.workspace_buffer = extlib.DeviceBuffer(size_bytes)
+        self.workspace_buffer = torch.zeros(
+            size_bytes, dtype=torch.uint8, device="cuda"
+        )
         self.workspace_ptr = self.workspace_buffer.data_ptr()
         logger.info(f"Convolution requires {size_bytes // 1000000}MB of workspace.")
-
-    def _setup_notorchbind(self):
-        @torch.library.custom_op(
-            f"openequivariance::conv_forward{self.conv_id}",
-            mutates_args=(),
-            device_types="cuda",
-        )
-        def forward(
-            L1_in: torch.Tensor,
-            L2_in: torch.Tensor,
-            weights: torch.Tensor,
-            rows: torch.Tensor,
-            cols: torch.Tensor,
-            transpose_perm: Optional[torch.Tensor] = None,
-        ) -> torch.Tensor:
-            L1_in_c, L2_in_c, weights_c = (
-                L1_in.contiguous(),
-                L2_in.contiguous(),
-                weights.contiguous(),
-            )
-            L3_out = torch.zeros(
-                (L1_in_c.shape[0], self.L3.dim), dtype=L1_in.dtype, device="cuda"
-            )
-
-            self.internal.exec_conv_rawptrs(
-                L1_in_c.data_ptr(),
-                L2_in_c.data_ptr(),
-                weights_c.data_ptr(),
-                L3_out.data_ptr(),
-                rows.contiguous().data_ptr(),
-                cols.contiguous().data_ptr(),
-                rows.shape[0],
-                L1_in.shape[0],
-                self.workspace_ptr,
-            )
-
-            return L3_out
-
-        @forward.register_fake
-        def _(L1_in, L2_in, weights, rows, cols, transpose_perm=None):
-            return L1_in.new_empty(L1_in.shape[0], self.L3.dim)
-
-        self.forward_opaque = forward
-
-        @torch.library.custom_op(
-            f"openequivariance::conv_backward{self.conv_id}",
-            mutates_args=(),
-            device_types="cuda",
-        )
-        def backward_helper(
-            L1_in: torch.Tensor,
-            L2_in: torch.Tensor,
-            weights: torch.Tensor,
-            L3_grad: torch.Tensor,
-            rows: torch.Tensor,
-            cols: torch.Tensor,
-            transpose_perm: Optional[torch.Tensor] = None,
-        ) -> List[torch.Tensor]:
-            L1_grad = torch.zeros_like(L1_in)
-            L2_grad = torch.zeros_like(L2_in)
-            weights_grad = torch.empty_like(weights)
-
-            if self.config.shared_weights:
-                weights_grad[:] = 0.0
-
-            transpose_perm_ptr = 0
-            if transpose_perm is not None:
-                transpose_perm_ptr = transpose_perm.data_ptr()
-
-            self.internal.backward_rawptrs(
-                L1_in.contiguous().data_ptr(),
-                L1_grad.data_ptr(),
-                L2_in.contiguous().data_ptr(),
-                L2_grad.data_ptr(),
-                weights.contiguous().data_ptr(),
-                weights_grad.data_ptr(),
-                L3_grad.contiguous().data_ptr(),
-                rows.contiguous().data_ptr(),
-                cols.contiguous().data_ptr(),
-                rows.shape[0],
-                L1_in.shape[0],
-                self.workspace_ptr,
-                transpose_perm_ptr,
-            )
-
-            return [L1_grad, L2_grad, weights_grad]
-
-        @backward_helper.register_fake
-        def _(L1_in, L2_in, weights, L3_grad, rows, cols, transpose_perm=None):
-            return [
-                L1_in.new_empty(*L1_in.shape),
-                L2_in.new_empty(*L2_in.shape),
-                weights.new_empty(*weights.shape),
-            ]
-
-        def setup_context(ctx, inputs, output):
-            (
-                ctx.L1_in,
-                ctx.L2_in,
-                ctx.weights,
-                ctx.rows,
-                ctx.cols,
-                ctx.transpose_perm,
-            ) = inputs
-
-        def backward(ctx, grad_output):
-            result = backward_helper(
-                ctx.L1_in,
-                ctx.L2_in,
-                ctx.weights,
-                grad_output,
-                ctx.rows,
-                ctx.cols,
-                ctx.transpose_perm,
-            )
-            return result[0], result[1], result[2], None, None, None
-
-        self.forward_opaque.register_autograd(backward, setup_context=setup_context)
-
-        def setup_context_double_backward(ctx, inputs, output):
-            (
-                ctx.L1_in,
-                ctx.L2_in,
-                ctx.weights,
-                ctx.L3_grad,
-                ctx.rows,
-                ctx.cols,
-                ctx.transpose_perm,
-            ) = inputs
-
-        @torch.library.custom_op(
-            f"openequivariance::conv_double_backward{self.conv_id}",
-            mutates_args=(),
-            device_types="cuda",
-        )
-        def double_backward_helper(
-            L1_in: torch.Tensor,
-            L2_in: torch.Tensor,
-            W: torch.Tensor,
-            L3_grad: torch.Tensor,
-            L1_dgrad: torch.Tensor,
-            L2_dgrad: torch.Tensor,
-            w_dgrad: torch.Tensor,
-            rows: torch.Tensor,
-            cols: torch.Tensor,
-            transpose_perm: Optional[torch.Tensor] = None,
-        ) -> List[torch.Tensor]:
-            L1_grad = torch.zeros_like(L1_in)
-            L2_grad = torch.zeros_like(L2_in)
-            W_grad = torch.empty_like(W)
-            L3_dgrad = torch.zeros_like(L3_grad)
-
-            if self.config.shared_weights:
-                W_grad[:] = 0.0
-
-            transpose_perm_ptr = 0
-            if transpose_perm is not None:
-                transpose_perm_ptr = transpose_perm.data_ptr()
-
-            self.internal.double_backward_rawptrs(
-                L1_in.contiguous().data_ptr(),
-                L2_in.contiguous().data_ptr(),
-                W.contiguous().data_ptr(),
-                L3_grad.contiguous().data_ptr(),
-                L1_dgrad.contiguous().data_ptr(),
-                L2_dgrad.contiguous().data_ptr(),
-                w_dgrad.contiguous().data_ptr(),
-                L1_grad.data_ptr(),
-                L2_grad.data_ptr(),
-                W_grad.data_ptr(),
-                L3_dgrad.data_ptr(),
-                rows.contiguous().data_ptr(),
-                cols.contiguous().data_ptr(),
-                rows.shape[0],
-                L1_in.shape[0],
-                self.workspace_ptr,
-                transpose_perm_ptr,
-            )
-            return [L1_grad, L2_grad, W_grad, L3_dgrad]
-
-        @double_backward_helper.register_fake
-        def _(
-            L1_in,
-            L2_in,
-            W,
-            L3_grad,
-            L1_dgrad,
-            L2_dgrad,
-            w_dgrad,
-            rows,
-            cols,
-            transpose_perm=None,
-        ):
-            return [
-                L1_in.new_empty(*L1_in.shape),
-                L2_in.new_empty(*L2_in.shape),
-                W.new_empty(*W.shape),
-                L3_grad.new_empty(*L3_grad.shape),
-            ]
-
-        def double_backward(ctx, grad_output):
-            L1_dgrad, L2_dgrad, w_dgrad = grad_output[0], grad_output[1], grad_output[2]
-
-            L1_grad, L2_grad, W_grad, L3_dgrad = double_backward_helper(
-                ctx.L1_in,
-                ctx.L2_in,
-                ctx.weights,
-                ctx.L3_grad,
-                L1_dgrad,
-                L2_dgrad,
-                w_dgrad,
-                ctx.rows,
-                ctx.cols,
-                ctx.transpose_perm,
-            )
-
-            if ctx.transpose_perm is None:
-                return L1_grad, L2_grad, W_grad, L3_dgrad, None, None
-            else:
-                return L1_grad, L2_grad, W_grad, L3_dgrad, None, None, None
-
-        backward_helper.register_autograd(
-            double_backward, setup_context=setup_context_double_backward
-        )
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
         return reorder_torch(
@@ -434,210 +183,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
     def name():
         return "LoopUnrollConv"
 
-    @classmethod
-    def register_torch_fakes(cls):
-        global torch
-        import torch
-
-        @torch._library.register_fake_class("libtorch_tp_jit::TorchJITConv")
-        class TorchJITConv:
-            def __init__(
-                self,
-                kernel_plaintext: str,
-                fwd_config: dict[str, int],
-                bwd_config: dict[str, int],
-                dbl_bwd_config: dict[str, int],
-                kernel_dims: dict[str, int],
-            ) -> None:
-                (
-                    self.kernel_plaintext,
-                    self.fwd_config,
-                    self.bwd_config,
-                    self.dbl_bwd_config,
-                    self.kernel_dims,
-                ) = (
-                    kernel_plaintext,
-                    fwd_config,
-                    bwd_config,
-                    dbl_bwd_config,
-                    kernel_dims,
-                )
-
-            @classmethod
-            def __obj_unflatten__(cls, flattened_product):
-                return cls(**dict(flattened_product))
-
-            def __len__(self):
-                return 0
-
-            def __setstate__(self, state):
-                (
-                    self.kernel_plaintext,
-                    self.fwd_config,
-                    self.bwd_config,
-                    self.dbl_bwd_config,
-                    self.kernel_dims,
-                ) = state
-
-            def exec_conv_rawptrs(*args, **kwargs):
-                pass
-
-            def backward_rawptrs(*args, **kwargs):
-                pass
-
-            def double_backward_rawptrs(*args, **kwargs):
-                pass
-
-            def L3_dim_getter(self):
-                return self.kernel_dims["L3_dim"]
-
-            def irrep_dtype_getter(self):
-                return self.kernel_dims["irrep_dtype"]
-
-        @torch.library.register_fake("libtorch_tp_jit::jit_conv_forward")
-        def fake_forward(
-            jit, L1_in, L2_in, W, rows, cols, workspace_buffer, sender_perm
-        ):
-            L3_dim, irrep_dtype = None, None
-            if hasattr(jit, "wrapped_obj"):
-                L3_dim = jit.wrapped_obj.kernel_dims["L3_dim"]
-                irrep_dtype = jit.wrapped_obj.kernel_dims["irrep_dtype"]
-            else:
-                L3_dim = jit.L3_dim
-                irrep_dtype = jit.irrep_dtype
-
-            return torch.empty(
-                L1_in.shape[0],
-                L3_dim,
-                device="cuda",
-                dtype=enum_to_torch_dtype[irrep_dtype],
-            )
-
-        @torch.library.register_fake("libtorch_tp_jit::jit_conv_backward")
-        def fake_backward(
-            jit, L1_in, L2_in, W, L3_grad, rows, cols, workspace_buffer, sender_perm
-        ):
-            return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W)
-
-        @torch.library.register_fake("libtorch_tp_jit::jit_conv_double_backward")
-        def fake_double_backward(
-            jit,
-            L1_in,
-            L2_in,
-            W,
-            L3_grad,
-            L1_dgrad,
-            L2_dgrad,
-            w_dgrad,
-            rows,
-            cols,
-            workspace_buffer,
-            transpose_perm=None,
-        ):
-            return [
-                L1_in.new_empty(*L1_in.shape),
-                L2_in.new_empty(*L2_in.shape),
-                W.new_empty(*W.shape),
-                L3_grad.new_empty(*L3_grad.shape),
-            ]
-
-    @classmethod
-    def register_autograd(cls):
-        backward_op = torch.ops.libtorch_tp_jit.jit_conv_backward
-        double_backward_op = torch.ops.libtorch_tp_jit.jit_conv_double_backward
-
-        def setup_context(ctx, inputs, output):
-            (
-                ctx.jit,
-                ctx.L1_in,
-                ctx.L2_in,
-                ctx.W,
-                ctx.rows,
-                ctx.cols,
-                ctx.workspace_buffer,
-                ctx.sender_perm,
-            ) = inputs
-
-        def backward(ctx, grad_output):
-            L1_grad, L2_grad, W_grad = backward_op(
-                ctx.jit,
-                ctx.L1_in,
-                ctx.L2_in,
-                ctx.W,
-                grad_output,
-                ctx.rows,
-                ctx.cols,
-                ctx.workspace_buffer,
-                ctx.sender_perm,
-            )
-            return None, L1_grad, L2_grad, W_grad, None, None, None, None
-
-        torch.library.register_autograd(
-            "libtorch_tp_jit::jit_conv_forward", backward, setup_context=setup_context
-        )
-
-        def setup_context_double_backward(ctx, inputs, output):
-            (
-                ctx.jit,
-                ctx.L1_in,
-                ctx.L2_in,
-                ctx.W,
-                ctx.grad_output,
-                ctx.rows,
-                ctx.cols,
-                ctx.workspace_buffer,
-                ctx.sender_perm,
-            ) = inputs
-            ctx.inputs = inputs
-
-        def double_backward(ctx, E, F, G):
-            result = double_backward_op(
-                ctx.jit,
-                ctx.L1_in,
-                ctx.L2_in,
-                ctx.W,
-                ctx.grad_output,
-                E,
-                F,
-                G,
-                ctx.rows,
-                ctx.cols,
-                ctx.workspace_buffer,
-                ctx.sender_perm,
-            )
-            return (
-                None,
-                result[0],
-                result[1],
-                result[2],
-                result[3],
-                None,
-                None,
-                None,
-                None,
-            )
-
-        torch.library.register_autograd(
-            "libtorch_tp_jit::jit_conv_backward",
-            double_backward,
-            setup_context=setup_context_double_backward,
-        )
-
-    @classmethod
-    def register_autocast(cls):
-        global torch
-        import torch
-
-        torch.library.register_autocast(
-            "libtorch_tp_jit::jit_conv_forward", "cuda", torch.float32
-        )
-        torch.library.register_autocast(
-            "libtorch_tp_jit::jit_conv_backward", "cuda", torch.float32
-        )
-        torch.library.register_autocast(
-            "libtorch_tp_jit::jit_conv_double_backward", "cuda", torch.float32
-        )
-
     def forward_cpu(self, L1_in, L2_in, weights, L3_out, graph):
         assert graph.rows.dtype == self.idx_dtype
         assert graph.cols.dtype == self.idx_dtype
@@ -646,29 +191,26 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             weights, not self.config.shared_weights
         )
 
-        L1_d, L2_d, weights_d = (
-            DeviceBuffer(L1_in),
-            DeviceBuffer(L2_in),
-            DeviceBuffer(weights_chunked),
+        torch_L1_in = torch.tensor(L1_in, device="cuda")
+        torch_L2_in = torch.tensor(L2_in, device="cuda")
+        torch_weights = torch.tensor(weights_chunked, device="cuda")
+        torch_rows = torch.tensor(graph.rows, device="cuda")
+        torch_cols = torch.tensor(graph.cols, device="cuda")
+
+        if self.deterministic:
+            torch_sender_perm = torch.tensor(graph.transpose_perm, device="cuda")
+        else:
+            torch_sender_perm = None
+
+        result = self.forward(
+            torch_L1_in,
+            torch_L2_in,
+            torch_weights,
+            torch_rows,
+            torch_cols,
+            torch_sender_perm,
         )
-        L3_d = DeviceBuffer(L3_out)
-
-        rows_d = DeviceBuffer(graph.rows)
-        cols_d = DeviceBuffer(graph.cols)
-
-        self.internal.exec_conv_rawptrs(
-            L1_d.data_ptr(),
-            L2_d.data_ptr(),
-            weights_d.data_ptr(),
-            L3_d.data_ptr(),
-            rows_d.data_ptr(),
-            cols_d.data_ptr(),
-            graph.nnz,
-            graph.node_count,
-            self.workspace_ptr,
-        )
-
-        L3_d.copy_to_host()
+        L3_out[:] = result.numpy(force=True)
 
     def backward_cpu(
         self, L1_in, L1_grad, L2_in, L2_grad, weights, weights_grad, L3_grad, graph
@@ -680,42 +222,30 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             weights, not self.config.shared_weights
         )
 
-        L1_d = DeviceBuffer(L1_in)
-        L2_d = DeviceBuffer(L2_in)
-        weights_d = DeviceBuffer(weights_chunked)
-        L3_d = DeviceBuffer(L3_grad)
-        rows_d = DeviceBuffer(graph.rows)
-        cols_d = DeviceBuffer(graph.cols)
+        torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
+        torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
+        torch_weights = torch.tensor(weights_chunked, requires_grad=True, device="cuda")
+        torch_L3_grad = torch.tensor(L3_grad, device="cuda")
+        torch_rows = torch.tensor(graph.rows, device="cuda")
+        torch_cols = torch.tensor(graph.cols, device="cuda")
 
-        L1_grad_d = DeviceBuffer(L1_grad)
-        L2_grad_d = DeviceBuffer(L2_grad)
-        weights_grad_d = DeviceBuffer(weights_grad)
-
-        transpose_perm_d = None
-        transpose_perm_ptr = 0
         if self.deterministic:
-            transpose_perm_d = DeviceBuffer(graph.transpose_perm)
-            transpose_perm_ptr = transpose_perm_d.data_ptr()
+            torch_sender_perm = torch.tensor(graph.transpose_perm, device="cuda")
+        else:
+            torch_sender_perm = None
 
-        self.internal.backward_rawptrs(
-            L1_d.data_ptr(),
-            L1_grad_d.data_ptr(),
-            L2_d.data_ptr(),
-            L2_grad_d.data_ptr(),
-            weights_d.data_ptr(),
-            weights_grad_d.data_ptr(),
-            L3_d.data_ptr(),
-            rows_d.data_ptr(),
-            cols_d.data_ptr(),
-            graph.nnz,
-            graph.node_count,
-            self.workspace_ptr,
-            transpose_perm_ptr,
+        torch_out = self.forward(
+            torch_L1_in,
+            torch_L2_in,
+            torch_weights,
+            torch_rows,
+            torch_cols,
+            torch_sender_perm,
         )
-
-        L1_grad_d.copy_to_host()
-        L2_grad_d.copy_to_host()
-        weights_grad_d.copy_to_host()
+        torch_out.backward(gradient=torch_L3_grad)
+        L1_grad[:] = torch_L1_in.grad.numpy(force=True)
+        L2_grad[:] = torch_L2_in.grad.numpy(force=True)
+        weights_grad[:] = torch_weights.grad.numpy(force=True)
 
         weights_grad[:] = self.reorder_weights_to_e3nn(
             weights_grad, not self.config.shared_weights
@@ -724,10 +254,158 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
         return L1_grad, L2_grad, weights_grad
 
 
-if extlib.TORCH_COMPILE:
-    TensorProductConv.register_torch_fakes()
-    TensorProductConv.register_autograd()
-    TensorProductConv.register_autocast()
+def register_torch_fakes():
+    global torch
+    import torch
+
+    @torch.library.register_fake("libtorch_tp_jit::jit_conv_forward")
+    def fake_forward(
+        kernel, hash, L1_in, L2_in, W, L3_dim, rows, cols, workspace_buffer, sender_perm
+    ):
+        return torch.empty(L1_in.shape[0], L3_dim, device="cuda", dtype=L1_in.dtype)
+
+    @torch.library.register_fake("libtorch_tp_jit::jit_conv_backward")
+    def fake_backward(
+        kernel,
+        hash,
+        L1_in,
+        L2_in,
+        W,
+        L3_grad,
+        rows,
+        cols,
+        workspace_buffer,
+        sender_perm,
+    ):
+        return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W)
+
+    @torch.library.register_fake("libtorch_tp_jit::jit_conv_double_backward")
+    def fake_double_backward(
+        kernel,
+        hash,
+        L1_in,
+        L2_in,
+        W,
+        L3_grad,
+        L1_dgrad,
+        L2_dgrad,
+        w_dgrad,
+        rows,
+        cols,
+        workspace_buffer,
+        transpose_perm=None,
+    ):
+        return [
+            L1_in.new_empty(*L1_in.shape),
+            L2_in.new_empty(*L2_in.shape),
+            W.new_empty(*W.shape),
+            L3_grad.new_empty(*L3_grad.shape),
+        ]
+
+
+def register_autograd():
+    backward_op = torch.ops.libtorch_tp_jit.jit_conv_backward
+    double_backward_op = torch.ops.libtorch_tp_jit.jit_conv_double_backward
+
+    def setup_context(ctx, inputs, output):
+        (
+            ctx.kernel,
+            ctx.hash,
+            ctx.L1_in,
+            ctx.L2_in,
+            ctx.W,
+            ctx.L3_dim,
+            ctx.rows,
+            ctx.cols,
+            ctx.workspace_buffer,
+            ctx.sender_perm,
+        ) = inputs
+
+    def backward(ctx, grad_output):
+        L1_grad, L2_grad, W_grad = backward_op(
+            ctx.kernel,
+            ctx.hash,
+            ctx.L1_in,
+            ctx.L2_in,
+            ctx.W,
+            grad_output,
+            ctx.rows,
+            ctx.cols,
+            ctx.workspace_buffer,
+            ctx.sender_perm,
+        )
+        return None, None, L1_grad, L2_grad, W_grad, None, None, None, None, None
+
+    torch.library.register_autograd(
+        "libtorch_tp_jit::jit_conv_forward", backward, setup_context=setup_context
+    )
+
+    def setup_context_double_backward(ctx, inputs, output):
+        (
+            ctx.kernel,
+            ctx.hash,
+            ctx.L1_in,
+            ctx.L2_in,
+            ctx.W,
+            ctx.grad_output,
+            ctx.rows,
+            ctx.cols,
+            ctx.workspace_buffer,
+            ctx.sender_perm,
+        ) = inputs
+        ctx.inputs = inputs
+
+    def double_backward(ctx, E, F, G):
+        result = double_backward_op(
+            ctx.kernel,
+            ctx.hash,
+            ctx.L1_in,
+            ctx.L2_in,
+            ctx.W,
+            ctx.grad_output,
+            E,
+            F,
+            G,
+            ctx.rows,
+            ctx.cols,
+            ctx.workspace_buffer,
+            ctx.sender_perm,
+        )
+        return (
+            None,
+            None,
+            result[0],
+            result[1],
+            result[2],
+            result[3],
+            None,
+            None,
+            None,
+            None,
+        )
+
+    torch.library.register_autograd(
+        "libtorch_tp_jit::jit_conv_backward",
+        double_backward,
+        setup_context=setup_context_double_backward,
+    )
+
+
+def register_autocast():
+    torch.library.register_autocast(
+        "libtorch_tp_jit::jit_conv_forward", "cuda", torch.float32
+    )
+    torch.library.register_autocast(
+        "libtorch_tp_jit::jit_conv_backward", "cuda", torch.float32
+    )
+    torch.library.register_autocast(
+        "libtorch_tp_jit::jit_conv_double_backward", "cuda", torch.float32
+    )
+
+
+register_torch_fakes()
+register_autograd()
+register_autocast()
 
 
 # ==================================================================
@@ -764,8 +442,6 @@ class TensorProductConvAtomic(TensorProductConv):
 class TensorProductConvScatterSum(ConvolutionBase):
     def __init__(self, config, *, torch_op=True):
         assert torch_op
-        global torch
-        import torch
 
         super().__init__(config, torch_op=torch_op, deterministic=False)
 

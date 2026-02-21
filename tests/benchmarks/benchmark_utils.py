@@ -1,3 +1,4 @@
+import json
 import numpy as np
 
 from openequivariance.core.random_buffer_utils import (
@@ -290,3 +291,14 @@ def benchmark_double_backward(
     )
 
     return result
+
+
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)

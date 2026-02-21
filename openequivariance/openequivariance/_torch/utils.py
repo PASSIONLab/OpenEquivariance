@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from types import MappingProxyType
 from openequivariance.core.utils import DTypeEnum
 
@@ -66,3 +67,11 @@ enum_to_torch_dtype = MappingProxyType(
         DTypeEnum.UINT8: torch.uint8,
     }
 )
+
+
+def string_to_tensor(text: str) -> torch.Tensor:
+    bytes_data = text.encode("utf-8")
+    np_bytes = np.frombuffer(bytes_data, dtype=np.uint8)
+    result = torch.tensor(np_bytes, device="cpu")
+    result.requires_grad = False
+    return result

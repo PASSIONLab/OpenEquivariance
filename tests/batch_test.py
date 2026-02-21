@@ -254,14 +254,6 @@ class TestSharedWeights(TPCorrectness):
         return problem
 
 
-class TestTorchbindDisable(TestProductionModels):
-    @pytest.fixture(scope="class")
-    def extra_tp_constructor_args(self, with_jax):
-        if with_jax:
-            pytest.skip("N/A for JAX")
-        return {"use_opaque": True}
-
-
 class TestTorchTo(TPCorrectness):
     problems = [mace_problems()[0]]
 

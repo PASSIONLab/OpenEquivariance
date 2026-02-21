@@ -1,4 +1,5 @@
 import numpy as np
+import json
 
 from openequivariance.core.ConvolutionBase import ConvolutionBase
 from openequivariance.core.ComputationSchedule import (
@@ -6,9 +7,12 @@ from openequivariance.core.ComputationSchedule import (
     SMEMCapacityException,
 )
 
-from openequivariance.core.utils import dtype_to_enum
 from openequivariance.templates.jinja_utils import get_jinja_environment
-from openequivariance.core.utils import filter_and_analyze_problem
+from openequivariance.core.utils import (
+    filter_and_analyze_problem,
+    dtype_to_enum,
+    hash_str_64,
+)
 
 
 class LoopUnrollConv(ConvolutionBase):
@@ -203,5 +207,15 @@ class LoopUnrollConv(ConvolutionBase):
         )
         self.jit_kernel = postprocess_kernel(self.jit_kernel)
 
-        # with open("scratch.txt", "w") as f:
-        #    f.write(self.jit_kernel)
+        self.kernel_string = json.dumps(
+            {
+                "kernel": self.jit_kernel,
+                "forward_config": vars(self.forward_schedule.launch_config),
+                "backward_config": vars(self.backward_schedule.launch_config),
+                "double_backward_config": vars(
+                    self.double_backward_schedule.launch_config
+                ),
+                "kernel_prop": self.kernel_prop,
+            }
+        )
+        self.hash = hash_str_64(self.kernel_string)
