@@ -127,15 +127,31 @@ def load_precompiled_extension():
         BUILT_EXTENSION_ERROR = f"Error loading precompiled OpenEquivariance Extension: {e}"
 
 
-USE_PRECOMPILED_EXTENSION = False
-if os.getenv("OEQ_JIT_EXTENSION", "0") != "1" \
-    and Version(torch.__version__) > Version("2.9.9") \
-    and torch.cuda.is_available() and torch.version.cuda:
-    USE_PRECOMPILED_EXTENSION = True
+USE_PRECOMPILED_EXTENSION = True
+WARNING_MESSAGE = "" 
 
-if Version(torch.__version__) > Version("2.9.9"):
+if os.getenv("OEQ_JIT_EXTENSION", "0") == "1":
+    WARNING_MESSAGE += "Environment variable OEQ_JIT_EXTENSION=1 is set.\n" 
+    USE_PRECOMPILED_EXTENSION = False
+
+if Version(torch.__version__) <= Version("2.9.9"):
+    WARNING_MESSAGE += f"PyTorch version {torch.__version__} is < 2.10, minimum required for precompiled extension. Please upgrade.\n" 
+    USE_PRECOMPILED_EXTENSION = False
+
+if torch.version.hip: 
+    WARNING_MESSAGE += "HIP does not support precompiled extension yet.\n" 
+    USE_PRECOMPILED_EXTENSION = False
+
+if not os.path.exists(os.path.join(os.path.dirname(__file__), "liboeq_stable_cuda_aoti.so")):
+    WARNING_MESSAGE += "Precompiled extension shared object not found.\n"
+    USE_PRECOMPILED_EXTENSION = False
+
+
+if USE_PRECOMPILED_EXTENSION: 
     load_precompiled_extension()
 else:
+    WARNING_MESSAGE += "Falling back to JIT compilation of OpenEquivariance extension, which may hang. If this happens, clear ./cache/torch_extensions and try again.\n"
+    warnings.warn(WARNING_MESSAGE)
     load_jit_extension()
 
 

@@ -157,5 +157,5 @@ if(hip_FOUND)
 endif()
 
 if(NOT CUDAToolkit_FOUND AND NOT hip_FOUND)
-    message(FATAL_ERROR "Neither CUDAToolkit nor HIP was found. Cannot build the stable extension.")
+    message(WARNING "Neither CUDAToolkit nor HIP was found. The stable extension will not be built.")
 endif()

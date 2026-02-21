@@ -17,8 +17,7 @@ dependencies = [
   "setuptools",
   "ninja",
   "jinja2",
-  "numpy",
-  "nanobind"
+  "numpy"
 ]
 readme = "README.md"
 
