@@ -147,7 +147,7 @@ if os.getenv("OEQ_JIT_EXTENSION", "0") == "1":
     USE_PRECOMPILED_EXTENSION = False
 
 if Version(torch.__version__) <= Version("2.9.9"):
-    WARNING_MESSAGE += f"PyTorch version {torch.__version__} is < 2.10, minimum required for precompiled extension. Please upgrade.\n"
+    WARNING_MESSAGE += f"PyTorch version {torch.__version__} is < 2.10, minimum required for precompiled extension. Please upgrade to 2.10.\n"
     USE_PRECOMPILED_EXTENSION = False
 
 if torch.version.hip:
