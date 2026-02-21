@@ -1,5 +1,5 @@
 from openequivariance.core.LoopUnrollTP import LoopUnrollTP
-from openequivariance import TPProblem 
+from openequivariance import TPProblem
 from openequivariance._torch import extlib
 import torch
 from openequivariance.core.utils import torch_to_oeq_dtype
@@ -226,6 +226,7 @@ def register_autocast():
     torch.library.register_autocast(
         "libtorch_tp_jit::jit_tp_double_backward", "cuda", torch.float32
     )
+
 
 if extlib.BUILT_EXTENSION:
     register_torch_fakes()

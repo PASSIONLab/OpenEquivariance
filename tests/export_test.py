@@ -13,6 +13,7 @@ from torch_geometric import EdgeIndex
 
 from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
 
+
 @pytest.fixture(scope="session")
 def problem_and_irreps():
     X_ir, Y_ir, Z_ir = oeq.Irreps("32x5e"), oeq.Irreps("1x3e"), oeq.Irreps("32x5e")
@@ -187,7 +188,7 @@ def test_aoti_cpp_inference(problem_and_irreps):
                     "-DCMAKE_BUILD_TYPE=Release",
                     "-DCMAKE_PREFIX_PATH=" + cmake_prefix_path,
                     "-DOEQ_EXTLIB=" + torch_ext_so_path,
-                    "-DCMAKE_CXX_COMPILER=g++"
+                    "-DCMAKE_CXX_COMPILER=g++",
                 ],
                 cwd=build_dir,
                 check=True,

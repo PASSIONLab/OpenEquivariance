@@ -20,7 +20,10 @@ LINKED_LIBPYTHON_ERROR = None
 
 extension_module = None
 
-assert torch.version.cuda or torch.version.hip, "Only CUDA and HIP backends are supported"
+assert torch.version.cuda or torch.version.hip, (
+    "Only CUDA and HIP backends are supported"
+)
+
 
 def postprocess_kernel(kernel):
     if torch.version.hip:
@@ -31,7 +34,12 @@ def postprocess_kernel(kernel):
 
 
 def load_jit_extension():
-    global BUILT_EXTENSION, BUILT_EXTENSION_ERROR, LINKED_LIBPYTHON, LINKED_LIBPYTHON_ERROR, extension_module
+    global \
+        BUILT_EXTENSION, \
+        BUILT_EXTENSION_ERROR, \
+        LINKED_LIBPYTHON, \
+        LINKED_LIBPYTHON_ERROR, \
+        extension_module
 
     # Locate libpython (required for AOTI)
     try:
@@ -49,7 +57,6 @@ def load_jit_extension():
         LINKED_LIBPYTHON = True
     except Exception as e:
         LINKED_LIBPYTHON_ERROR = f"Error linking libpython:\n{e}\nSysconfig variables:\n{sysconfig.get_config_vars()}"
-
 
     try:
         from torch.utils.cpp_extension import library_paths, include_paths
@@ -112,9 +119,12 @@ def load_jit_extension():
     except Exception as e:
         BUILT_EXTENSION_ERROR = f"Error JIT-compiling OpenEquivariance Extension: {e}"
 
+
 def load_precompiled_extension():
     global BUILT_EXTENSION, BUILT_EXTENSION_ERROR, LINKED_LIBPYTHON, extension_module
-    LINKED_LIBPYTHON = True # Doesn't actually use libpython, just set this as true anyway
+    LINKED_LIBPYTHON = (
+        True  # Doesn't actually use libpython, just set this as true anyway
+    )
     try:
         if torch.version.cuda:
             import openequivariance._torch.extlib.oeq_stable_cuda as extension_module
@@ -124,30 +134,34 @@ def load_precompiled_extension():
         torch.ops.load_library(extension_module.__file__)
         BUILT_EXTENSION = True
     except Exception as e:
-        BUILT_EXTENSION_ERROR = f"Error loading precompiled OpenEquivariance Extension: {e}"
+        BUILT_EXTENSION_ERROR = (
+            f"Error loading precompiled OpenEquivariance Extension: {e}"
+        )
 
 
 USE_PRECOMPILED_EXTENSION = True
-WARNING_MESSAGE = "" 
+WARNING_MESSAGE = ""
 
 if os.getenv("OEQ_JIT_EXTENSION", "0") == "1":
-    WARNING_MESSAGE += "Environment variable OEQ_JIT_EXTENSION=1 is set.\n" 
+    WARNING_MESSAGE += "Environment variable OEQ_JIT_EXTENSION=1 is set.\n"
     USE_PRECOMPILED_EXTENSION = False
 
 if Version(torch.__version__) <= Version("2.9.9"):
-    WARNING_MESSAGE += f"PyTorch version {torch.__version__} is < 2.10, minimum required for precompiled extension. Please upgrade.\n" 
+    WARNING_MESSAGE += f"PyTorch version {torch.__version__} is < 2.10, minimum required for precompiled extension. Please upgrade.\n"
     USE_PRECOMPILED_EXTENSION = False
 
-if torch.version.hip: 
-    WARNING_MESSAGE += "HIP does not support precompiled extension yet.\n" 
+if torch.version.hip:
+    WARNING_MESSAGE += "HIP does not support precompiled extension yet.\n"
     USE_PRECOMPILED_EXTENSION = False
 
-if not os.path.exists(os.path.join(os.path.dirname(__file__), "liboeq_stable_cuda_aoti.so")):
+if not os.path.exists(
+    os.path.join(os.path.dirname(__file__), "liboeq_stable_cuda_aoti.so")
+):
     WARNING_MESSAGE += "Precompiled extension shared object not found.\n"
     USE_PRECOMPILED_EXTENSION = False
 
 
-if USE_PRECOMPILED_EXTENSION: 
+if USE_PRECOMPILED_EXTENSION:
     load_precompiled_extension()
 else:
     WARNING_MESSAGE += "For these reasons, falling back to JIT compilation of OpenEquivariance extension, which may hang. If this happens, clear ~/.cache/torch_extensions or address the conditions above.\n"
@@ -170,15 +184,18 @@ sys.modules["oeq_utilities"] = extension_module
 
 if BUILT_EXTENSION:
     from oeq_utilities import (
-        #GroupMM_F32,
-        #GroupMM_F64,
+        # GroupMM_F32,
+        # GroupMM_F64,
         DeviceProp,
         GPUTimer,
     )
 else:
+
     def _raise_import_error_helper(import_target: str):
         if not BUILT_EXTENSION:
-            raise ImportError(f"Could not import {import_target}: {BUILT_EXTENSION_ERROR}")
+            raise ImportError(
+                f"Could not import {import_target}: {BUILT_EXTENSION_ERROR}"
+            )
 
     def GroupMM_F32(*args, **kwargs):
         _raise_import_error_helper("GroupMM_F32")
