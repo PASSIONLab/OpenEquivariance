@@ -150,8 +150,8 @@ if not os.path.exists(os.path.join(os.path.dirname(__file__), "liboeq_stable_cud
 if USE_PRECOMPILED_EXTENSION: 
     load_precompiled_extension()
 else:
-    WARNING_MESSAGE += "Falling back to JIT compilation of OpenEquivariance extension, which may hang. If this happens, clear ./cache/torch_extensions and try again.\n"
-    warnings.warn(WARNING_MESSAGE)
+    WARNING_MESSAGE += "For these reasons, falling back to JIT compilation of OpenEquivariance extension, which may hang. If this happens, clear ~/.cache/torch_extensions or address the conditions above.\n"
+    warnings.warn(WARNING_MESSAGE, stacklevel=3)
     load_jit_extension()
 
 
