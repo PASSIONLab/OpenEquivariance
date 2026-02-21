@@ -37,6 +37,12 @@ jobs:
           tests/import_test.py::test_extension_built \
           tests/import_test.py::test_torch_extension_built 
 
+        export OEQ_JIT_EXTENSION=1
+
+        pytest \
+          tests/import_test.py::test_extension_built \
+          tests/import_test.py::test_torch_extension_built 
+
     - name: Test JAX extension build
       run: |
         XLA_DIRECT_DOWNLOAD=1 pip install -e "./openequivariance_extjax" --no-build-isolation 
