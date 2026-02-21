@@ -1,11 +1,17 @@
 import torch
 import pytest
 import tempfile
+import subprocess
+import shutil
+import os
+import sys
+import importlib.resources
 
 import numpy as np
 import openequivariance as oeq
 from torch_geometric import EdgeIndex
 
+from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
 
 @pytest.fixture(scope="session")
 def problem_and_irreps():
@@ -128,3 +134,90 @@ def test_aoti(tp_and_inputs):
 
     aoti_result = aoti_model(*inputs)
     assert torch.allclose(uncompiled_result, aoti_result, atol=1e-5)
+
+
+def test_aoti_cpp_inference(problem_and_irreps):
+    assert oeq.LINKED_LIBPYTHON, oeq.LINKED_LIBPYTHON_ERROR
+    problem, X_ir, Y_ir, _ = problem_and_irreps
+    cmake_prefix_path = torch.utils.cmake_prefix_path
+    torch_ext_so_path = oeq.torch_ext_so_path()
+
+    gen = torch.Generator(device="cuda")
+    gen.manual_seed(0)
+    batch_size = 1000
+
+    # Create models
+    oeq_tp = oeq.TensorProduct(problem).to("cuda")
+    e3nn_tp = E3NNTensorProduct(problem).e3nn_tp.to("cuda")
+
+    # Prepare inputs for export
+    X = torch.rand(batch_size, X_ir.dim, device="cuda", generator=gen)
+    Y = torch.rand(batch_size, Y_ir.dim, device="cuda", generator=gen)
+    W = torch.rand(batch_size, problem.weight_numel, device="cuda", generator=gen)
+    inputs = (X, Y, W)
+
+    with (
+        tempfile.TemporaryDirectory() as tmpdir,
+        tempfile.NamedTemporaryFile(suffix=".pt2") as oeq_file,
+        tempfile.NamedTemporaryFile(suffix=".pt2") as e3nn_file,
+    ):
+        # Export and compile with AOTI
+        exported_oeq = torch.export.export(oeq_tp, args=inputs, strict=False)
+        torch._inductor.aoti_compile_and_package(
+            exported_oeq, package_path=oeq_file.name
+        )
+
+        exported_e3nn = torch.export.export(e3nn_tp, args=inputs, strict=False)
+        torch._inductor.aoti_compile_and_package(
+            exported_e3nn, package_path=e3nn_file.name
+        )
+
+        test_path = importlib.resources.files("openequivariance") / "extension" / "test"
+        build_dir = os.path.join(tmpdir, "build")
+        os.makedirs(build_dir, exist_ok=True)
+
+        for item in test_path.iterdir():
+            shutil.copy(item, tmpdir)
+
+        try:
+            subprocess.run(
+                [
+                    "cmake",
+                    "..",
+                    "-DCMAKE_BUILD_TYPE=Release",
+                    "-DCMAKE_PREFIX_PATH=" + cmake_prefix_path,
+                    "-DOEQ_EXTLIB=" + torch_ext_so_path,
+                ],
+                cwd=build_dir,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            subprocess.run(
+                ["make"],
+                cwd=build_dir,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            subprocess.run(
+                [
+                    "./load_aoti",
+                    e3nn_file.name,
+                    oeq_file.name,
+                    str(X_ir.dim),
+                    str(Y_ir.dim),
+                    str(problem.weight_numel),
+                    str(batch_size),
+                ],
+                cwd=build_dir,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except subprocess.CalledProcessError as e:
+            print(e.stdout.decode(), file=sys.stderr)
+            print(e.stderr.decode(), file=sys.stderr)
+            assert False
