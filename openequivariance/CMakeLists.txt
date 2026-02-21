@@ -44,7 +44,10 @@ set(OEQ_SOURCES
     ${EXT_JSON_DIR}/json11.cpp
 )
 
-function(add_stable_extension target_name backend_define)
+set(OEQ_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/openequivariance/_torch/extlib")
+
+function(add_stable_extension target_name backend_define link_libraries)
+    # Create nanobind extension
     nanobind_add_module(${target_name} NB_STATIC ${OEQ_SOURCES})
 
     set_target_properties(${target_name} PROPERTIES
@@ -56,7 +59,8 @@ function(add_stable_extension target_name backend_define)
     # Enforce CXX11 ABI to match LibTorch
     target_compile_definitions(${target_name} PRIVATE 
         ${backend_define}=1
-        _GLIBCXX_USE_CXX11_ABI=1 
+        _GLIBCXX_USE_CXX11_ABI=1
+        INCLUDE_NB_EXTENSION
     )
     
     target_include_directories(${target_name} PRIVATE
@@ -68,7 +72,39 @@ function(add_stable_extension target_name backend_define)
     target_link_libraries(${target_name} PRIVATE
         ${TORCH_CPU_LIB}
         ${C10_LIB}
-    ) 
+        ${link_libraries}
+    )
+    
+    install(TARGETS ${target_name} LIBRARY DESTINATION "${OEQ_INSTALL_DIR}")
+
+    # AOTI C++ library (identical except without nanobind and without INCLUDE_NB_EXTENSION)
+    set(aoti_target_name ${target_name}_aoti)
+    add_library(${aoti_target_name} SHARED ${OEQ_SOURCES})
+
+    set_target_properties(${aoti_target_name} PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        POSITION_INDEPENDENT_CODE ON
+    )
+    
+    target_compile_definitions(${aoti_target_name} PRIVATE 
+        ${backend_define}=1
+        _GLIBCXX_USE_CXX11_ABI=1
+    )
+    
+    target_include_directories(${aoti_target_name} PRIVATE
+        ${EXT_DIR}
+        ${EXT_BACKEND_DIR}
+        ${EXT_JSON_DIR}
+        ${LIBTORCH_INCLUDE_DIR}
+    )
+    target_link_libraries(${aoti_target_name} PRIVATE
+        ${TORCH_CPU_LIB}
+        ${C10_LIB}
+        ${link_libraries}
+    )
+    
+    install(TARGETS ${aoti_target_name} LIBRARY DESTINATION "${OEQ_INSTALL_DIR}")
 endfunction()
 
 find_package(CUDAToolkit QUIET)
@@ -89,16 +125,13 @@ if(CUDAToolkit_FOUND)
         CXX_STANDARD 17
     )
 
-    add_stable_extension(torch_tp_jit_stable_cuda CUDA_BACKEND)
-    
-    target_link_libraries(torch_tp_jit_stable_cuda PRIVATE 
-        CUDA::cudart 
-        CUDA::cuda_driver 
+    set(CUDA_LINK_LIBS
+        CUDA::cudart
+        CUDA::cuda_driver
         CUDA::nvrtc
-        cuda_stub_lib 
+        cuda_stub_lib
     )
-    
-    install(TARGETS torch_tp_jit_stable_cuda LIBRARY DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/openequivariance/_torch/extlib")
+    add_stable_extension(oeq_stable_cuda CUDA_BACKEND "${CUDA_LINK_LIBS}")
 endif()
 
 if(hip_FOUND)
@@ -116,10 +149,11 @@ if(hip_FOUND)
         CXX_STANDARD 17
     )
 
-    add_stable_extension(torch_tp_jit_stable_hip HIP_BACKEND)
-    target_link_libraries(torch_tp_jit_stable_hip PRIVATE hiprtc hip_stub_lib)
-
-    install(TARGETS torch_tp_jit_stable_hip LIBRARY DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/openequivariance/_torch/extlib")
+    set(HIP_LINK_LIBS
+        hiprtc
+        hip_stub_lib
+    )
+    add_stable_extension(torch_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
 endif()
 
 if(NOT CUDAToolkit_FOUND AND NOT hip_FOUND)

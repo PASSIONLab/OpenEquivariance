@@ -10,7 +10,6 @@
 #include <torch/headeronly/util/Exception.h>
 #include <torch/headeronly/util/shim_utils.h>
 #include <torch/csrc/inductor/aoti_torch/c/shim.h>
-#include "nanobind/nanobind.h"
 
 #ifdef HIP_BACKEND
     #include <c10/hip/HIPStream.h>
@@ -82,26 +81,29 @@ Stream get_current_stream() {
 }
 
 #ifdef CUDA_BACKEND
-    #define EXTENSION_NAME torch_tp_jit_stable_cuda
+    #define EXTENSION_NAME oeq_stable_cuda
 #endif
 #ifdef HIP_BACKEND
-    #define EXTENSION_NAME torch_tp_jit_stable_hip
+    #define EXTENSION_NAME oeq_stable_hip
 #endif 
 
-namespace nb = nanobind;
-NB_MODULE(EXTENSION_NAME, m) {
-    nb::class_<DeviceProp>(m, "DeviceProp")
-        .def(nb::init<int>())
-        .def_ro("name", &DeviceProp::name)
-        .def_ro("warpsize", &DeviceProp::warpsize)
-        .def_ro("major", &DeviceProp::major)
-        .def_ro("minor", &DeviceProp::minor)
-        .def_ro("multiprocessorCount", &DeviceProp::multiprocessorCount)
-        .def_ro("maxSharedMemPerBlock", &DeviceProp::maxSharedMemPerBlock); 
+#ifdef INCLUDE_NB_EXTENSION
+    #include "nanobind/nanobind.h"
+    namespace nb = nanobind;
+    NB_MODULE(EXTENSION_NAME, m) {
+        nb::class_<DeviceProp>(m, "DeviceProp")
+            .def(nb::init<int>())
+            .def_ro("name", &DeviceProp::name)
+            .def_ro("warpsize", &DeviceProp::warpsize)
+            .def_ro("major", &DeviceProp::major)
+            .def_ro("minor", &DeviceProp::minor)
+            .def_ro("multiprocessorCount", &DeviceProp::multiprocessorCount)
+            .def_ro("maxSharedMemPerBlock", &DeviceProp::maxSharedMemPerBlock); 
 
-    nb::class_<GPUTimer>(m, "GPUTimer")
-        .def(nb::init<>())
-        .def("start", &GPUTimer::start)
-        .def("stop_clock_get_elapsed", &GPUTimer::stop_clock_get_elapsed)
-        .def("clear_L2_cache", &GPUTimer::clear_L2_cache);
-}
+        nb::class_<GPUTimer>(m, "GPUTimer")
+            .def(nb::init<>())
+            .def("start", &GPUTimer::start)
+            .def("stop_clock_get_elapsed", &GPUTimer::stop_clock_get_elapsed)
+            .def("clear_L2_cache", &GPUTimer::clear_L2_cache);
+    }
+#endif

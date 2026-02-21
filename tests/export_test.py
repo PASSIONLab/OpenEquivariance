@@ -187,6 +187,7 @@ def test_aoti_cpp_inference(problem_and_irreps):
                     "-DCMAKE_BUILD_TYPE=Release",
                     "-DCMAKE_PREFIX_PATH=" + cmake_prefix_path,
                     "-DOEQ_EXTLIB=" + torch_ext_so_path,
+                    "-DCMAKE_CXX_COMPILER=g++"
                 ],
                 cwd=build_dir,
                 check=True,

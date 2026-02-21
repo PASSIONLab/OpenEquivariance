@@ -29,25 +29,28 @@ def postprocess_kernel(kernel):
         kernel = kernel.replace("atomicAdd", "unsafeAtomicAdd")
     return kernel
 
-# Locate libpython (required for AOTI)
-try:
-    python_lib_dir = sysconfig.get_config_var("LIBDIR")
-    major, minor = sys.version_info.major, sys.version_info.minor
-    python_lib_name = f"python{major}.{minor}"
 
-    libpython_so = os.path.join(python_lib_dir, f"lib{python_lib_name}.so")
-    libpython_a = os.path.join(python_lib_dir, f"lib{python_lib_name}.a")
-    if not (os.path.exists(libpython_so) or os.path.exists(libpython_a)):
-        raise FileNotFoundError(
-            f"libpython not found, tried {libpython_so} and {libpython_a}"
-        )
+def load_jit_extension():
+    global BUILT_EXTENSION, BUILT_EXTENSION_ERROR, LINKED_LIBPYTHON, LINKED_LIBPYTHON_ERROR, extension_module
 
-    LINKED_LIBPYTHON = True
-except Exception as e:
-    LINKED_LIBPYTHON_ERROR = f"Error linking libpython:\n{e}\nSysconfig variables:\n{sysconfig.get_config_vars()}"
+    # Locate libpython (required for AOTI)
+    try:
+        python_lib_dir = sysconfig.get_config_var("LIBDIR")
+        major, minor = sys.version_info.major, sys.version_info.minor
+        python_lib_name = f"python{major}.{minor}"
 
-def jit_compile_extension():
-    global BUILT_EXTENSION, BUILT_EXTENSION_ERROR, extension_module
+        libpython_so = os.path.join(python_lib_dir, f"lib{python_lib_name}.so")
+        libpython_a = os.path.join(python_lib_dir, f"lib{python_lib_name}.a")
+        if not (os.path.exists(libpython_so) or os.path.exists(libpython_a)):
+            raise FileNotFoundError(
+                f"libpython not found, tried {libpython_so} and {libpython_a}"
+            )
+
+        LINKED_LIBPYTHON = True
+    except Exception as e:
+        LINKED_LIBPYTHON_ERROR = f"Error linking libpython:\n{e}\nSysconfig variables:\n{sysconfig.get_config_vars()}"
+
+
     try:
         from torch.utils.cpp_extension import library_paths, include_paths
 
@@ -109,27 +112,43 @@ def jit_compile_extension():
     except Exception as e:
         BUILT_EXTENSION_ERROR = f"Error JIT-compiling OpenEquivariance Extension: {e}"
 
-def use_precompiled_extension():
-    global BUILT_EXTENSION, BUILT_EXTENSION_ERROR, extension_module
+def load_precompiled_extension():
+    global BUILT_EXTENSION, BUILT_EXTENSION_ERROR, LINKED_LIBPYTHON, extension_module
+    LINKED_LIBPYTHON = True # Doesn't actually use libpython, just set this as true anyway
     try:
         if torch.version.cuda:
-            import openequivariance._torch.extlib.torch_tp_jit_stable_cuda as extension_module
+            import openequivariance._torch.extlib.oeq_stable_cuda as extension_module
         elif torch.version.hip:
-            import openequivariance._torch.extlib.torch_tp_jit_stable_hip as extension_module
+            import openequivariance._torch.extlib.oeq_stable_hip as extension_module
 
         torch.ops.load_library(extension_module.__file__)
         BUILT_EXTENSION = True
     except Exception as e:
         BUILT_EXTENSION_ERROR = f"Error loading precompiled OpenEquivariance Extension: {e}"
 
+
+USE_PRECOMPILED_EXTENSION = False
+if os.getenv("OEQ_JIT_EXTENSION", "0") != "1" \
+    and Version(torch.__version__) > Version("2.9.9") \
+    and torch.cuda.is_available() and torch.version.cuda:
+    USE_PRECOMPILED_EXTENSION = True
+
 if Version(torch.__version__) > Version("2.9.9"):
-    use_precompiled_extension()
+    load_precompiled_extension()
 else:
-    jit_compile_extension()
+    load_jit_extension()
 
 
 def torch_ext_so_path():
-    return extension_module.__file__
+    if not USE_PRECOMPILED_EXTENSION:
+        return extension_module.__file__
+    else:
+        dirname = os.path.dirname(extension_module.__file__)
+        if torch.version.cuda:
+            return os.path.join(dirname, "liboeq_stable_cuda_aoti.so")
+        elif torch.version.hip:
+            return os.path.join(dirname, "liboeq_stable_hip_aoti.so")
+
 
 sys.modules["oeq_utilities"] = extension_module
 
