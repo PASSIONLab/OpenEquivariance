@@ -164,7 +164,7 @@ if not os.path.exists(
 if USE_PRECOMPILED_EXTENSION:
     load_precompiled_extension()
 else:
-    WARNING_MESSAGE += "For these reasons, falling back to JIT compilation of OpenEquivariance extension, which may hang. If this happens, clear ~/.cache/torch_extensions or address the conditions above.\n"
+    WARNING_MESSAGE += "For these reasons, falling back to JIT compilation of OpenEquivariance extension, which may hang. If waiting for >5 minutes, clear ~/.cache/torch_extensions or address the conditions above.\n"
     warnings.warn(WARNING_MESSAGE, stacklevel=3)
     load_jit_extension()
 
