@@ -61,7 +61,8 @@ dev = [
 
 jax = [
   "scikit-build-core",
-  "setuptools-scm"
+  "setuptools-scm",
+  "nanobind"
 ]
 
 [tool.setuptools.packages.find]
