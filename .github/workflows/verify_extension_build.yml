@@ -33,15 +33,11 @@ jobs:
 
     - name: Test CUDA extension build via import 
       run: |
-        pytest \
-          tests/import_test.py::test_extension_built \
-          tests/import_test.py::test_torch_extension_built 
+        pytest tests/import_test.py
 
         export OEQ_JIT_EXTENSION=1
 
-        pytest \
-          tests/import_test.py::test_extension_built \
-          tests/import_test.py::test_torch_extension_built 
+        pytest tests/import_test.py
 
     - name: Test JAX extension build
       run: |
