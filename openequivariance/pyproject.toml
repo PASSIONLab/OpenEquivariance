@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
+requires = ["setuptools", "setuptools-scm", "scikit-build-core", "nanobind"]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "openequivariance"
@@ -60,16 +60,13 @@ dev = [
 ]
 
 jax = [
-  "nanobind",
   "scikit-build-core",
-  "setuptools-scm"
+  "setuptools-scm",
+  "nanobind"
 ]
 
 [tool.setuptools.packages.find]
 include = ["openequivariance*"]
-
-[tool.setuptools_scm]
-root = ".."
 
 [tool.pytest.ini_options]
 addopts = [
@@ -78,3 +75,11 @@ addopts = [
 
 [tool.ruff]
 lint.ignore = ["E741"]
+
+[tool.scikit-build]
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+sdist.include = ["openequivariance/_version.py"]
+
+[tool.setuptools_scm]
+write_to = "openequivariance/_version.py"
+root = ".."

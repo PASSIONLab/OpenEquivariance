@@ -9,6 +9,7 @@ __pycache__
 # working folders
 dist
 build
+cbuild
 outputs/*
 visualization/*
 figures/*
@@ -41,3 +42,4 @@ paper_benchmarks_v3
 
 get_node.sh
 *.egg-info
+_version.py

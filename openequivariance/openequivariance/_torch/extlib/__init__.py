@@ -4,6 +4,7 @@ import os
 import warnings
 import sysconfig
 from pathlib import Path
+from packaging.version import Version
 
 import torch
 
@@ -14,46 +15,56 @@ oeq_root = str(Path(__file__).parent.parent.parent)
 BUILT_EXTENSION = False
 BUILT_EXTENSION_ERROR = None
 
-TORCH_COMPILE = False
-TORCH_COMPILE_ERROR = None
-
 LINKED_LIBPYTHON = False
 LINKED_LIBPYTHON_ERROR = None
 
-torch_module, generic_module = None, None
-postprocess_kernel = lambda kernel: kernel  # noqa : E731
+extension_module = None
 
-try:
-    python_lib_dir = sysconfig.get_config_var("LIBDIR")
-    major, minor = sys.version_info.major, sys.version_info.minor
-    python_lib_name = f"python{major}.{minor}"
-
-    libpython_so = os.path.join(python_lib_dir, f"lib{python_lib_name}.so")
-    libpython_a = os.path.join(python_lib_dir, f"lib{python_lib_name}.a")
-    if not (os.path.exists(libpython_so) or os.path.exists(libpython_a)):
-        raise FileNotFoundError(
-            f"libpython not found, tried {libpython_so} and {libpython_a}"
-        )
-
-    LINKED_LIBPYTHON = True
-except Exception as e:
-    LINKED_LIBPYTHON_ERROR = f"Error linking libpython:\n{e}\nSysconfig variables:\n{sysconfig.get_config_vars()}"
+assert torch.version.cuda or torch.version.hip, (
+    "Only CUDA and HIP backends are supported"
+)
 
 
-if BUILT_EXTENSION:
-    import openequivariance._torch.extlib.generic_module
+def postprocess_kernel(kernel):
+    if torch.version.hip:
+        kernel = kernel.replace("__syncwarp();", "__threadfence_block();")
+        kernel = kernel.replace("__shfl_down_sync(FULL_MASK,", "__shfl_down(")
+        kernel = kernel.replace("atomicAdd", "unsafeAtomicAdd")
+    return kernel
 
-    generic_module = openequivariance._torch.extlib.generic_module
 
-elif torch.version.cuda or torch.version.hip:
+def load_jit_extension():
+    global \
+        BUILT_EXTENSION, \
+        BUILT_EXTENSION_ERROR, \
+        LINKED_LIBPYTHON, \
+        LINKED_LIBPYTHON_ERROR, \
+        extension_module
+
+    # Locate libpython (required for AOTI)
+    try:
+        python_lib_dir = sysconfig.get_config_var("LIBDIR")
+        major, minor = sys.version_info.major, sys.version_info.minor
+        python_lib_name = f"python{major}.{minor}"
+
+        libpython_so = os.path.join(python_lib_dir, f"lib{python_lib_name}.so")
+        libpython_a = os.path.join(python_lib_dir, f"lib{python_lib_name}.a")
+        if not (os.path.exists(libpython_so) or os.path.exists(libpython_a)):
+            raise FileNotFoundError(
+                f"libpython not found, tried {libpython_so} and {libpython_a}"
+            )
+
+        LINKED_LIBPYTHON = True
+    except Exception as e:
+        LINKED_LIBPYTHON_ERROR = f"Error linking libpython:\n{e}\nSysconfig variables:\n{sysconfig.get_config_vars()}"
+
     try:
         from torch.utils.cpp_extension import library_paths, include_paths
 
         extra_cflags = ["-O3"]
-        generic_sources = ["generic_module.cpp"]
         torch_sources = ["libtorch_tp_jit.cpp", "json11/json11.cpp"]
 
-        include_dirs, extra_link_args = (["util"], ["-Wl,--no-as-needed"])
+        include_dirs, extra_link_args = (["backend"], ["-Wl,--no-as-needed"])
 
         if LINKED_LIBPYTHON:
             extra_link_args.pop()
@@ -81,18 +92,8 @@ elif torch.version.cuda or torch.version.hip:
             extra_link_args.extend(["-lhiprtc"])
             torch_libs = library_paths("cuda")[0]
             extra_link_args.append("-Wl,-rpath," + torch_libs)
-
-            def postprocess(kernel):
-                kernel = kernel.replace("__syncwarp();", "__threadfence_block();")
-                kernel = kernel.replace("__shfl_down_sync(FULL_MASK,", "__shfl_down(")
-                kernel = kernel.replace("atomicAdd", "unsafeAtomicAdd")
-                return kernel
-
-            postprocess_kernel = postprocess
-
             extra_cflags.append("-DHIP_BACKEND")
 
-        generic_sources = [oeq_root + "/extension/" + src for src in generic_sources]
         torch_sources = [oeq_root + "/extension/" + src for src in torch_sources]
         include_dirs = [
             oeq_root + "/extension/" + d for d in include_dirs
@@ -102,59 +103,99 @@ elif torch.version.cuda or torch.version.hip:
             warnings.simplefilter("ignore")
 
             try:
-                torch_module = torch.utils.cpp_extension.load(
+                extension_module = torch.utils.cpp_extension.load(
                     "libtorch_tp_jit",
                     torch_sources,
                     extra_cflags=extra_cflags,
                     extra_include_paths=include_dirs,
                     extra_ldflags=extra_link_args,
                 )
-                torch.ops.load_library(torch_module.__file__)
-                TORCH_COMPILE = True
+                torch.ops.load_library(extension_module.__file__)
+                BUILT_EXTENSION = True
             except Exception as e:
                 # If compiling torch fails (e.g. low gcc version), we should fall back to the
                 # version that takes integer pointers as args (but is untraceable to PyTorch JIT / export).
-                TORCH_COMPILE_ERROR = e
+                BUILT_EXTENSION_ERROR = e
+    except Exception as e:
+        BUILT_EXTENSION_ERROR = f"Error JIT-compiling OpenEquivariance Extension: {e}"
 
-            generic_module = torch.utils.cpp_extension.load(
-                "generic_module",
-                generic_sources,
-                extra_cflags=extra_cflags,
-                extra_include_paths=include_dirs,
-                extra_ldflags=extra_link_args,
-            )
-            if "generic_module" not in sys.modules:
-                sys.modules["generic_module"] = generic_module
 
-        if not TORCH_COMPILE:
-            warnings.warn(
-                "Could not compile integrated PyTorch wrapper. Falling back to Pybind11"
-                + f", but JITScript, compile fullgraph, and export will fail.\n {TORCH_COMPILE_ERROR}"
-            )
+def load_precompiled_extension():
+    global BUILT_EXTENSION, BUILT_EXTENSION_ERROR, LINKED_LIBPYTHON, extension_module
+    LINKED_LIBPYTHON = (
+        True  # Doesn't actually use libpython, just set this as true anyway
+    )
+    try:
+        if torch.version.cuda:
+            import openequivariance._torch.extlib.oeq_stable_cuda as extension_module
+        elif torch.version.hip:
+            import openequivariance._torch.extlib.oeq_stable_hip as extension_module
+
+        torch.ops.load_library(extension_module.__file__)
         BUILT_EXTENSION = True
     except Exception as e:
-        BUILT_EXTENSION_ERROR = f"Error building OpenEquivariance Extension: {e}"
+        BUILT_EXTENSION_ERROR = (
+            f"Error loading precompiled OpenEquivariance Extension: {e}"
+        )
+
+
+USE_PRECOMPILED_EXTENSION = True
+WARNING_MESSAGE = ""
+
+if os.getenv("OEQ_JIT_EXTENSION", "0") == "1":
+    WARNING_MESSAGE += "Environment variable OEQ_JIT_EXTENSION=1 is set.\n"
+    USE_PRECOMPILED_EXTENSION = False
+
+if Version(torch.__version__) <= Version("2.9.9"):
+    WARNING_MESSAGE += f"PyTorch version {torch.__version__} is < 2.10, minimum required for precompiled extension. Please upgrade to 2.10.\n"
+    USE_PRECOMPILED_EXTENSION = False
+
+if torch.version.hip:
+    WARNING_MESSAGE += "HIP does not support precompiled extension yet.\n"
+    USE_PRECOMPILED_EXTENSION = False
+
+if not os.path.exists(
+    os.path.join(os.path.dirname(__file__), "liboeq_stable_cuda_aoti.so")
+):
+    WARNING_MESSAGE += "Precompiled extension shared object not found.\n"
+    USE_PRECOMPILED_EXTENSION = False
+
+
+if USE_PRECOMPILED_EXTENSION:
+    load_precompiled_extension()
 else:
-    BUILT_EXTENSION_ERROR = "OpenEquivariance extension build not attempted"
-
-
-def _raise_import_error_helper(import_target: str):
-    if not BUILT_EXTENSION:
-        raise ImportError(f"Could not import {import_target}: {BUILT_EXTENSION_ERROR}")
+    WARNING_MESSAGE += "For these reasons, falling back to JIT compilation of OpenEquivariance extension, which may hang. If waiting for >5 minutes, clear ~/.cache/torch_extensions or address the conditions above.\n"
+    warnings.warn(WARNING_MESSAGE, stacklevel=3)
+    load_jit_extension()
 
 
 def torch_ext_so_path():
-    return torch_module.__file__
+    if not USE_PRECOMPILED_EXTENSION:
+        return extension_module.__file__
+    else:
+        dirname = os.path.dirname(extension_module.__file__)
+        if torch.version.cuda:
+            return os.path.join(dirname, "liboeq_stable_cuda_aoti.so")
+        elif torch.version.hip:
+            return os.path.join(dirname, "liboeq_stable_hip_aoti.so")
 
+
+sys.modules["oeq_utilities"] = extension_module
 
 if BUILT_EXTENSION:
-    from generic_module import (
-        GroupMM_F32,
-        GroupMM_F64,
+    from oeq_utilities import (
+        # GroupMM_F32,
+        # GroupMM_F64,
         DeviceProp,
         GPUTimer,
     )
 else:
+
+    def _raise_import_error_helper(import_target: str):
+        if not BUILT_EXTENSION:
+            raise ImportError(
+                f"Could not import {import_target}: {BUILT_EXTENSION_ERROR}"
+            )
 
     def GroupMM_F32(*args, **kwargs):
         _raise_import_error_helper("GroupMM_F32")

@@ -228,6 +228,7 @@ def register_autocast():
     )
 
 
-register_torch_fakes()
-register_autograd()
-register_autocast()
+if extlib.BUILT_EXTENSION:
+    register_torch_fakes()
+    register_autograd()
+    register_autocast()

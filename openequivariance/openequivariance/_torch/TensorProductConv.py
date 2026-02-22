@@ -6,6 +6,7 @@ import torch
 from openequivariance._torch.extlib import (
     postprocess_kernel,
     DeviceProp,
+    BUILT_EXTENSION,
 )
 
 from openequivariance.core.ConvolutionBase import (
@@ -403,9 +404,10 @@ def register_autocast():
     )
 
 
-register_torch_fakes()
-register_autograd()
-register_autocast()
+if BUILT_EXTENSION:
+    register_torch_fakes()
+    register_autograd()
+    register_autocast()
 
 
 # ==================================================================

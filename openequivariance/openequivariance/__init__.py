@@ -61,8 +61,7 @@ if "OEQ_NOTORCH" not in os.environ or os.environ["OEQ_NOTORCH"] != "1":
         LINKED_LIBPYTHON_ERROR,
         BUILT_EXTENSION,
         BUILT_EXTENSION_ERROR,
-        TORCH_COMPILE,
-        TORCH_COMPILE_ERROR,
+        USE_PRECOMPILED_EXTENSION,
     )
 
 
