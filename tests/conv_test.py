@@ -15,15 +15,15 @@ from openequivariance.benchmark.problems import (
     e3tools_problems,
 )
 
+
 @pytest.fixture(params=[np.float32, np.float64], ids=["F32", "F64"], scope="module")
 def dtype(request):
     return request.param
 
+
 @pytest.fixture(params=["1drf_radius3.5.pickle"], ids=["1drf"], scope="module")
 def graph(request):
-    download_prefix = (
-        "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
-    )
+    download_prefix = "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
     filename = request.param
 
     graph = None
@@ -34,9 +34,11 @@ def graph(request):
     # graph = load_graph("data/1drf_radius3.5.pickle")
     return graph
 
+
 @pytest.fixture(scope="module")
 def with_jax(request):
     return request.config.getoption("--jax")
+
 
 class ConvCorrectness:
     def thresh(self, direction):
@@ -281,16 +283,12 @@ class TestTorchTo(ConvCorrectness):
         )
         return module.to(switch_map[problem.irrep_dtype])
 
+
 class TestTorchToSubmodule:
     """Test that TensorProductConv works as a submodule when parent's .to() is called"""
 
     @pytest.fixture(params=["atomic", "deterministic"], scope="class")
-    def parent_module_and_problem(
-        self,
-        request,
-        dtype,
-        with_jax
-    ):
+    def parent_module_and_problem(self, request, dtype, with_jax):
         if with_jax:
             pytest.skip("N/A for JAX")
 
@@ -301,10 +299,7 @@ class TestTorchToSubmodule:
         class ParentModule(torch.nn.Module):
             def __init__(self, problem, deterministic):
                 super().__init__()
-                self.conv = oeq.TensorProductConv(
-                    problem,
-                    deterministic=deterministic
-                )
+                self.conv = oeq.TensorProductConv(problem, deterministic=deterministic)
 
             def forward(self, x, y, w, rows, cols, sender_perm=None):
                 return self.conv(x, y, w, rows, cols, sender_perm)
@@ -343,9 +338,7 @@ class TestTorchToSubmodule:
         rows = torch.tensor(graph.rows, device=device)
         cols = torch.tensor(graph.cols, device=device)
         sender_perm = (
-            torch.tensor(graph.transpose_perm, device=device)
-            if deterministic
-            else None
+            torch.tensor(graph.transpose_perm, device=device) if deterministic else None
         )
         return in1, in2, weights, rows, cols, sender_perm
 

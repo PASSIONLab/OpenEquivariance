@@ -80,6 +80,11 @@ jax = None
 try:
     import openequivariance_extjax
     import openequivariance.jax as jax
+
+    assert openequivariance_extjax.__version__ == __version__, (
+        f"openequivariance_extjax version {openequivariance_extjax.__version__} does not match "
+        f"openequivariance version {__version__}. Ensure both are the same."
+    )
 except Exception as e:
     error = e
 
