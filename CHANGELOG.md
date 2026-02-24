@@ -8,9 +8,9 @@ to PyTorch 2.10 and OEQ v0.6.0.
 **Added**:
 - OpenEquivariance triggers a build of the CUDA extension module
   at `pip` install time and will use this precompiled extension if
-  the user has PyTorch 2.10 installed. If PyTorch 2.10 is not installed,
+  the user has PyTorch >=2.10 installed. If PyTorch <2.10 is installed,
   the JIT-compiled extension is used instead.
-- PyTorch stable ABI support for C++ backend, using new features in PyTorch
+- PyTorch ABI support for C++ backend, using new features in PyTorch
   2.10 to support stable, forward-compatible ahead-of-time 
   extensions.
 - Dropped support for TorchBind classes and a new kernel cache in its
