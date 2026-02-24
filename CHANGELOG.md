@@ -16,6 +16,8 @@ to PyTorch 2.10 and OEQ v0.6.0.
 - Dropped support for TorchBind classes and a new kernel cache in its
   place, which greatly improves flexibility for automatic mixed precision
   and AOTI compilation. An inference test in C++ is included. 
+- `openequivariance_extjax` has a version number that synchronizes with
+  the main `openequivariance` package; ensure the two packages stay in sync.
 
 **Fixed**:
 - `torch.to()` is now called when either `TensorProduct`

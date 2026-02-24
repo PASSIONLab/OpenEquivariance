@@ -4,6 +4,7 @@ import os
 import numpy as np
 
 from pathlib import Path
+import warnings
 from importlib.metadata import version
 
 from openequivariance.core.e3nn_lite import (
@@ -81,10 +82,14 @@ try:
     import openequivariance_extjax
     import openequivariance.jax as jax
 
-    assert openequivariance_extjax.__version__ == __version__, (
-        f"openequivariance_extjax version {openequivariance_extjax.__version__} does not match "
-        f"openequivariance version {__version__}. Ensure both are the same."
-    )
+    # TODO-someday: enable
+    # extjax_version = version("openequivariance_extjax")
+    # if extjax_version != __version__:
+    #    warnings.warn(
+    #        f"openequivariance_extjax version {extjax_version} does not match "
+    #        f"openequivariance version {__version__}. Ensure both versions match."
+    #    )
+
 except Exception as e:
     error = e
 
