@@ -1,9 +1,9 @@
 ## Latest Changes
 
-### v0.6.0 (2025-02-23) 
-OpenEquivariance v0.6.0 brings long-needed improvements to the
+### v0.6.1 (2025-02-23) 
+OpenEquivariance v0.6.1 brings long-needed improvements to the
 PyTorch frontend. We strongly encourage all users to upgrade
-to PyTorch 2.10 and OEQ v0.6.0.
+to PyTorch 2.10 and OEQ v0.6.1.
 
 **Added**:
 - OpenEquivariance triggers a build of the CUDA extension module
