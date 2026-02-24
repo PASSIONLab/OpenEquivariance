@@ -325,7 +325,6 @@ class TestTorchToSubmodule:
         """Test that calling .to() on parent module properly converts TensorProduct submodule"""
         parent, problem = parent_module_and_problem
 
-        # Generate test inputs with the original dtype
         batch_size = 10
         rng = np.random.default_rng(12345)
         device = "cuda"
@@ -334,13 +333,11 @@ class TestTorchToSubmodule:
             problem, batch_size, rng, input_dtype, device
         )
 
-        # Run forward pass with original dtype
         output1 = parent(in1, in2, weights)
         assert output1.dtype == in1.dtype, (
             f"Expected output dtype {in1.dtype}, got {output1.dtype}"
         )
 
-        # Convert parent module to different dtype
         switch_map = {
             np.float32: torch.float64,
             np.float64: torch.float32,
@@ -348,12 +345,10 @@ class TestTorchToSubmodule:
         target_dtype = switch_map[problem.irrep_dtype]
         parent.to(target_dtype)
 
-        # Generate new test inputs with the target dtype
         in1_new, in2_new, weights_new = self._make_inputs(
             problem, batch_size, rng, target_dtype, device
         )
 
-        # This should work but will fail without _apply implementation
         output2 = parent(in1_new, in2_new, weights_new)
         assert output2.dtype == target_dtype, (
             f"Expected output dtype {target_dtype}, got {output2.dtype}"
