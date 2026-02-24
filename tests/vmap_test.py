@@ -3,11 +3,6 @@ import os
 
 
 @pytest.fixture
-def with_jax(request):
-    return request.config.getoption("--jax")
-
-
-@pytest.fixture
 def ctx(with_jax):
     if not with_jax:
         pytest.skip("Skipping JAX tests")

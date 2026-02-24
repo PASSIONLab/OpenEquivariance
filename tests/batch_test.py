@@ -18,6 +18,9 @@ from openequivariance.benchmark.problems import (
 from itertools import product
 import torch
 
+@pytest.fixture(params=[np.float32, np.float64], ids=["F32", "F64"], scope="module")
+def dtype(request):
+    return request.param
 
 class TPCorrectness:
     def thresh(self, direction):
@@ -31,17 +34,9 @@ class TPCorrectness:
                 f"{fieldname} observed error={error:.5f} >= {thresh}"
             )
 
-    @pytest.fixture(params=[np.float32, np.float64], ids=["F32", "F64"], scope="class")
-    def dtype(self, request):
-        return request.param
-
     @pytest.fixture(scope="class")
     def extra_tp_constructor_args(self):
         return {}
-
-    @pytest.fixture(scope="class")
-    def with_jax(self, request):
-        return request.config.getoption("--jax")
 
     @pytest.fixture(scope="class")
     def tp_and_problem(self, problem, extra_tp_constructor_args, with_jax):
@@ -274,3 +269,86 @@ class TestTorchTo(TPCorrectness):
             }
             tp.to(switch_map[problem.irrep_dtype])
             return tp, tp.config
+
+
+class TestTorchToSubmodule:
+    """Test that TensorProduct works correctly as a submodule when parent's .to() is called"""
+
+    @pytest.fixture(scope="class")
+    def parent_module_and_problem(self, dtype, with_jax):
+        if with_jax:
+            pytest.skip("N/A for JAX")
+
+        problem = mace_problems()[0].clone()
+        problem.irrep_dtype, problem.weight_dtype = dtype, dtype
+        
+        class ParentModule(torch.nn.Module):
+            def __init__(self, problem):
+                super().__init__()
+                self.tp = oeq.TensorProduct(problem)
+            
+            def forward(self, x, y, w):
+                return self.tp(x, y, w)
+        
+        parent = ParentModule(problem)
+        return parent, problem
+
+    def _problem_dtype(self, problem):
+        return torch.float32 if problem.irrep_dtype == np.float32 else torch.float64
+
+    def _make_inputs(self, problem, batch_size, rng, dtype, device):
+        in1 = torch.tensor(
+            rng.uniform(size=(batch_size, problem.irreps_in1.dim)),
+            dtype=dtype,
+            device=device,
+        )
+        in2 = torch.tensor(
+            rng.uniform(size=(batch_size, problem.irreps_in2.dim)),
+            dtype=dtype,
+            device=device,
+        )
+        weights_size = (
+            (problem.weight_numel,)
+            if problem.shared_weights
+            else (batch_size, problem.weight_numel)
+        )
+        weights = torch.tensor(
+            rng.uniform(size=weights_size),
+            dtype=dtype,
+            device=device,
+        )
+        return in1, in2, weights
+
+    def test_submodule_dtype_conversion(self, parent_module_and_problem):
+        """Test that calling .to() on parent module properly converts TensorProduct submodule"""
+        parent, problem = parent_module_and_problem
+        
+        # Generate test inputs with the original dtype
+        batch_size = 10
+        rng = np.random.default_rng(12345)
+        device = "cuda"
+        input_dtype = self._problem_dtype(problem)
+        in1, in2, weights = self._make_inputs(
+            problem, batch_size, rng, input_dtype, device
+        )
+        
+        # Run forward pass with original dtype
+        output1 = parent(in1, in2, weights)
+        assert output1.dtype == in1.dtype, f"Expected output dtype {in1.dtype}, got {output1.dtype}"
+        
+        # Convert parent module to different dtype
+        switch_map = {
+            np.float32: torch.float64,
+            np.float64: torch.float32,
+        }
+        target_dtype = switch_map[problem.irrep_dtype]
+        parent.to(target_dtype)
+        
+        # Generate new test inputs with the target dtype
+        in1_new, in2_new, weights_new = self._make_inputs(
+            problem, batch_size, rng, target_dtype, device
+        )
+        
+        # This should work but will fail without _apply implementation
+        output2 = parent(in1_new, in2_new, weights_new)
+        assert output2.dtype == target_dtype, f"Expected output dtype {target_dtype}, got {output2.dtype}"

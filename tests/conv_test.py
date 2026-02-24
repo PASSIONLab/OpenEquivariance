@@ -15,6 +15,28 @@ from openequivariance.benchmark.problems import (
     e3tools_problems,
 )
 
+@pytest.fixture(params=[np.float32, np.float64], ids=["F32", "F64"], scope="module")
+def dtype(request):
+    return request.param
+
+@pytest.fixture(params=["1drf_radius3.5.pickle"], ids=["1drf"], scope="module")
+def graph(request):
+    download_prefix = (
+        "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
+    )
+    filename = request.param
+
+    graph = None
+    with tempfile.NamedTemporaryFile() as temp_file:
+        urllib.request.urlretrieve(download_prefix + filename, temp_file.name)
+        graph = load_graph(temp_file.name)
+
+    # graph = load_graph("data/1drf_radius3.5.pickle")
+    return graph
+
+@pytest.fixture(scope="module")
+def with_jax(request):
+    return request.config.getoption("--jax")
 
 class ConvCorrectness:
     def thresh(self, direction):
@@ -28,32 +50,9 @@ class ConvCorrectness:
                 f"{fieldname} observed error={error:.5f} >= {thresh}"
             )
 
-    @pytest.fixture(params=[np.float32, np.float64], ids=["F32", "F64"], scope="class")
-    def dtype(self, request):
-        return request.param
-
-    @pytest.fixture(params=["1drf_radius3.5.pickle"], ids=["1drf"], scope="class")
-    def graph(self, request):
-        download_prefix = (
-            "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
-        )
-        filename = request.param
-
-        graph = None
-        with tempfile.NamedTemporaryFile() as temp_file:
-            urllib.request.urlretrieve(download_prefix + filename, temp_file.name)
-            graph = load_graph(temp_file.name)
-
-        # graph = load_graph("data/1drf_radius3.5.pickle")
-        return graph
-
     @pytest.fixture(scope="class")
     def extra_conv_constructor_args(self):
         return {}
-
-    @pytest.fixture(scope="class")
-    def with_jax(self, request):
-        return request.config.getoption("--jax")
 
     @pytest.fixture(params=["atomic", "deterministic", "kahan"], scope="class")
     def conv_object(self, request, problem, extra_conv_constructor_args, with_jax):
@@ -281,3 +280,112 @@ class TestTorchTo(ConvCorrectness):
             **extra_conv_constructor_args,
         )
         return module.to(switch_map[problem.irrep_dtype])
+
+class TestTorchToSubmodule:
+    """Test that TensorProductConv works as a submodule when parent's .to() is called"""
+
+    @pytest.fixture(params=["atomic", "deterministic"], scope="class")
+    def parent_module_and_problem(
+        self,
+        request,
+        dtype,
+        with_jax
+    ):
+        if with_jax:
+            pytest.skip("N/A for JAX")
+
+        problem = mace_problems()[0].clone()
+        problem.irrep_dtype, problem.weight_dtype = dtype, dtype
+        deterministic = request.param == "deterministic"
+
+        class ParentModule(torch.nn.Module):
+            def __init__(self, problem, deterministic):
+                super().__init__()
+                self.conv = oeq.TensorProductConv(
+                    problem,
+                    deterministic=deterministic
+                )
+
+            def forward(self, x, y, w, rows, cols, sender_perm=None):
+                return self.conv(x, y, w, rows, cols, sender_perm)
+
+        parent = ParentModule(problem, deterministic)
+        return parent, problem
+
+    def _problem_dtype(self, problem):
+        return torch.float32 if problem.irrep_dtype == np.float32 else torch.float64
+
+    def _make_inputs(self, problem, graph, rng, dtype, device, deterministic):
+        node_count = graph.node_count
+        nnz = graph.nnz
+
+        in1 = torch.tensor(
+            rng.uniform(size=(node_count, problem.irreps_in1.dim)),
+            dtype=dtype,
+            device=device,
+        )
+        in2 = torch.tensor(
+            rng.uniform(size=(nnz, problem.irreps_in2.dim)),
+            dtype=dtype,
+            device=device,
+        )
+        weights_size = (
+            (problem.weight_numel,)
+            if problem.shared_weights
+            else (nnz, problem.weight_numel)
+        )
+        weights = torch.tensor(
+            rng.uniform(size=weights_size),
+            dtype=dtype,
+            device=device,
+        )
+
+        rows = torch.tensor(graph.rows, device=device)
+        cols = torch.tensor(graph.cols, device=device)
+        sender_perm = (
+            torch.tensor(graph.transpose_perm, device=device)
+            if deterministic
+            else None
+        )
+        return in1, in2, weights, rows, cols, sender_perm
+
+    def test_submodule_dtype_conversion(self, parent_module_and_problem, graph):
+        parent, problem = parent_module_and_problem
+        device = "cuda"
+
+        rng = np.random.default_rng(12345)
+        input_dtype = self._problem_dtype(problem)
+        in1, in2, weights, rows, cols, sender_perm = self._make_inputs(
+            problem,
+            graph,
+            rng,
+            input_dtype,
+            device,
+            parent.conv.deterministic,
+        )
+
+        output1 = parent(in1, in2, weights, rows, cols, sender_perm)
+        assert output1.dtype == input_dtype, (
+            f"Expected output dtype {input_dtype}, got {output1.dtype}"
+        )
+
+        switch_map = {
+            np.float32: torch.float64,
+            np.float64: torch.float32,
+        }
+        target_dtype = switch_map[problem.irrep_dtype]
+        parent.to(target_dtype)
+
+        in1_new, in2_new, weights_new, rows, cols, sender_perm = self._make_inputs(
+            problem,
+            graph,
+            rng,
+            target_dtype,
+            device,
+            parent.conv.deterministic,
+        )
+
+        output2 = parent(in1_new, in2_new, weights_new, rows, cols, sender_perm)
+        assert output2.dtype == target_dtype, (
+            f"Expected output dtype {target_dtype}, got {output2.dtype}"
+        )
