@@ -1,5 +1,30 @@
 ## Latest Changes
 
+### v0.6.0 (2025-02-23) 
+OpenEquivariance v0.6.0 brings long-needed improvements to the
+PyTorch frontend. We strongly encourage all users to upgrade
+to PyTorch 2.10 and OEQ v0.6.0.
+
+**Added**:
+- OpenEquivariance triggers a build of the CUDA extension module
+  at `pip` install time and will use this precompiled extension if
+  the user has PyTorch >=2.10 installed. If PyTorch <2.10 is installed,
+  the JIT-compiled extension is used instead.
+- PyTorch ABI support for C++ backend, using new features in PyTorch
+  2.10 to support stable, forward-compatible ahead-of-time 
+  extensions.
+- Dropped support for TorchBind classes and a new kernel cache in its
+  place, which greatly improves flexibility for automatic mixed precision
+  and AOTI compilation. An inference test in C++ is included. 
+- `openequivariance_extjax` has a version number that synchronizes with
+  the main `openequivariance` package; ensure the two packages stay in sync.
+
+**Fixed**:
+- `torch.to()` is now called when either `TensorProduct`
+  or `TensorProductConv` is a submodule of another PyTorch 
+  module. 
+
+
 ### v0.5.4 (2025-02-01) 
 Improvements to JAX frontend.
 

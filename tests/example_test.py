@@ -2,11 +2,6 @@ import pytest
 import os
 
 
-@pytest.fixture
-def with_jax(request):
-    return request.config.getoption("--jax")
-
-
 def test_tutorial_torch(with_jax):
     if with_jax:
         pytest.skip("Skipping PyTorch tutorial when testing JAX")

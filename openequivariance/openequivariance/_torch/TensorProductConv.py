@@ -16,10 +16,11 @@ from openequivariance.core.ConvolutionBase import (
 from openequivariance.core.LoopUnrollConv import LoopUnrollConv
 from openequivariance._torch.TensorProduct import TensorProduct
 from openequivariance import TPProblem
-from openequivariance.core.utils import torch_to_oeq_dtype
+from openequivariance.core.utils import torch_to_oeq_dtype, dtype_to_enum
 from openequivariance._torch.utils import (
     reorder_torch,
     string_to_tensor,
+    enum_to_torch_dtype,
 )
 
 from openequivariance.benchmark.logging_utils import getLogger
@@ -108,6 +109,27 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
 
         torch.nn.Module.to(self, *args, **kwargs)
         return self
+
+    def _apply(self, fn, recurse=True):
+        if getattr(self, "_applying", False):
+            return super()._apply(fn, recurse)
+
+        problem: TPProblem = self.input_args["problem"]
+        irrep_dtype = problem.irrep_dtype
+
+        if irrep_dtype in dtype_to_enum:
+            irrep_dtype = dtype_to_enum[irrep_dtype]
+
+        current_dtype = enum_to_torch_dtype[irrep_dtype]
+        dummy = torch.tensor(0.0, dtype=current_dtype)
+        result = fn(dummy)
+
+        if result.dtype != current_dtype:
+            self._applying = True
+            self.to(result.dtype)
+            self._applying = False
+
+        return super()._apply(fn, recurse)
 
     def __getstate__(self):
         return self.input_args

@@ -1,4 +1,5 @@
 import os
+import pytest
 
 os.environ["JAX_ENABLE_X64"] = "True"
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "False"
@@ -12,3 +13,8 @@ def pytest_addoption(parser):
         default=False,
         help="Test the JAX frontend instead of PyTorch",
     )
+
+
+@pytest.fixture(scope="session")
+def with_jax(request):
+    return request.config.getoption("--jax")
