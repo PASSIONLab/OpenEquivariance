@@ -16,10 +16,6 @@ jobs:
     - name: install dependencies, then build source tarball
       run: |
         cd openequivariance
-        rm LICENSE
-        rm README.md
-        cp ../LICENSE .
-        cp ../README.md .
         python3 -m pip install build 
         python3 -m build --sdist
     - name: store the distribution packages 

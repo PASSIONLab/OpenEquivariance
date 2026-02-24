@@ -1,6 +1,6 @@
 ## Latest Changes
 
-### v0.6.1 (2025-02-23) 
+### v0.6.2 (2025-02-23) 
 OpenEquivariance v0.6.2 brings long-needed improvements to the
 PyTorch frontend. We strongly encourage all users to upgrade
 to PyTorch 2.10 and OEQ v0.6.2.
