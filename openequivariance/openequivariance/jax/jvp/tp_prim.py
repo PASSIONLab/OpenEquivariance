@@ -132,6 +132,16 @@ def tp_fwd_jvp_abstract_eval(X, Y, W, dX, dY, dW, *, L3_dim, kernel, hash):
 
 tp_fwd_jvp_p.def_impl(tp_fwd_jvp_impl)
 tp_fwd_jvp_p.def_abstract_eval(tp_fwd_jvp_abstract_eval)
+mlir.register_lowering(
+    tp_fwd_jvp_p,
+    mlir.lower_fun(tp_fwd_jvp_impl, multiple_results=False),
+    platform="cuda",
+)
+mlir.register_lowering(
+    tp_fwd_jvp_p,
+    mlir.lower_fun(tp_fwd_jvp_impl, multiple_results=False),
+    platform="rocm",
+)
 
 
 # ==============================================================================
@@ -225,7 +235,16 @@ def tp_bwd_jvp_abstract_eval(X, Y, W, dZ, tX, tY, tW, tdZ, *, kernel, hash):
 
 tp_bwd_jvp_p.def_impl(tp_bwd_jvp_impl)
 tp_bwd_jvp_p.def_abstract_eval(tp_bwd_jvp_abstract_eval)
-
+mlir.register_lowering(
+    tp_bwd_jvp_p,
+    mlir.lower_fun(tp_bwd_jvp_impl, multiple_results=True),
+    platform="cuda",
+)
+mlir.register_lowering(
+    tp_bwd_jvp_p,
+    mlir.lower_fun(tp_bwd_jvp_impl, multiple_results=True),
+    platform="rocm",
+)
 
 # ==============================================================================
 # 9. Transpose Rule for Backward JVP
