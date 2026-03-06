@@ -17,8 +17,9 @@ class IrrepMapping:
     Maps irreps from a source to a destination set.
     """
 
-    def __init__(self, src_irreps, idxs):
+    def __init__(self, src_irreps, src_views, idxs):
         self.src_irreps = src_irreps
+        self.src_views = src_views
         self.idxs = sorted(list(idxs))
         self.dst_irreps = Irreps([src_irreps[idx] for idx in self.idxs])
         self.src_dst_map = {idx: i for i, idx in enumerate(self.idxs)}
@@ -193,6 +194,11 @@ class ProblemSplitter:
         def __init__(self, instruction_tup, parent_idx):
             self.instruction_tup, self.parent_idx = instruction_tup, parent_idx
 
+    class ChildView:
+        layout: str
+        ir_mul_offset: int
+        ir_mul_stride: int
+
     def __init__(self, input, mult_threshold):
         self.input = input
         self.mult_threshold = mult_threshold
@@ -201,6 +207,7 @@ class ProblemSplitter:
         child_reps = [[], [], []]
 
         self.irrep_maps = {}  # Maps a (input_rep_idx #, mul_ir_idx) to a lst[ir_idx]
+        self.irrep_views = [[], [], []] # View 
 
         for input_rep_idx, input_rep in enumerate(input_reps):  # Loop over L1, L2, L3
             for mul_ir_idx, mul_ir in enumerate(
@@ -209,12 +216,26 @@ class ProblemSplitter:
                 self.irrep_maps[input_rep_idx, mul_ir_idx] = []
                 for mul_start in range(0, mul_ir.mul, mult_threshold):
                     mul = min(mult_threshold, mul_ir.mul - mul_start)
-                    child_reps[input_rep_idx] += [
+                    child_reps[input_rep_idx].append(
                         self.ChildIrrep((mul, mul_ir.ir), input_rep_idx, mul_start)
-                    ]
+                    )
                     self.irrep_maps[input_rep_idx, mul_ir_idx].append(
                         len(child_reps[input_rep_idx]) - 1
                     )
+                    if input.layout == "mul_ir":
+                        self.irrep_views.append(
+                            self.ChildView(
+                                layout="mul_ir",
+                                ir_mul_offset=-1,
+                                ir_mul_stride=-1
+                            ))
+                    elif input.layout == "ir_mul":
+                        self.irrep_views.append(
+                            self.ChildView(
+                                layout="ir_mul",
+                                ir_mul_offset=input_rep.slices()[mul_ir_idx].start + mul_start,
+                                ir_mul_stride=mul_ir.mul
+                            ))
 
         new_instructions = []
 

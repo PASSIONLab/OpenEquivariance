@@ -392,9 +392,9 @@ class TPProblem:
     internal_weights: bool
     weight_numel: int
     label: str
-    _profiling_str: str
     _in1_dim: int
     _in2_dim: int
+    layout: str
 
     def __init__(
         self,
@@ -412,12 +412,14 @@ class TPProblem:
         label: Optional[str] = None,
         irrep_dtype: type[np.generic] = np.float32,
         weight_dtype: type[np.generic] = np.float32,
+        layout: str = "mul_ir"
     ) -> None:
         # === Setup ===
         super().__init__()
 
         assert irrep_normalization in ["component", "norm", "none"]
         assert path_normalization in ["element", "path", "none"]
+        assert layout in ["mul_ir", "ir_mul"]
         assert issubclass(irrep_dtype, np.generic)
         assert issubclass(weight_dtype, np.generic)
 
