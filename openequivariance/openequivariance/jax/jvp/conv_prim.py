@@ -161,6 +161,12 @@ def conv_fwd_jvp_abstract_eval(
 
 conv_fwd_jvp_p.def_impl(conv_fwd_jvp_impl)
 conv_fwd_jvp_p.def_abstract_eval(conv_fwd_jvp_abstract_eval)
+mlir.register_lowering(
+    conv_fwd_jvp_p, mlir.lower_fun(conv_fwd_jvp_impl, multiple_results=False), platform="cuda"
+)
+mlir.register_lowering(
+    conv_fwd_jvp_p, mlir.lower_fun(conv_fwd_jvp_impl, multiple_results=False), platform="rocm"
+)
 
 
 # ==============================================================================
@@ -285,6 +291,12 @@ def conv_bwd_jvp_abstract_eval(
 
 conv_bwd_jvp_p.def_impl(conv_bwd_jvp_impl)
 conv_bwd_jvp_p.def_abstract_eval(conv_bwd_jvp_abstract_eval)
+mlir.register_lowering(
+    conv_bwd_jvp_p, mlir.lower_fun(conv_bwd_jvp_impl, multiple_results=True), platform="cuda"
+)
+mlir.register_lowering(
+    conv_bwd_jvp_p, mlir.lower_fun(conv_bwd_jvp_impl, multiple_results=True), platform="rocm"
+)
 
 
 # ==============================================================================
