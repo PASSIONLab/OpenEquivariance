@@ -1,17 +1,21 @@
-from openequivariance.core.LoopUnrollTP import LoopUnrollTP
+import numpy as np
+import torch
+
 from openequivariance import TPProblem
 from openequivariance._torch import extlib
-import torch
-from openequivariance.core.utils import torch_to_oeq_dtype, dtype_to_enum
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
 from openequivariance._torch.utils import (
+    enum_to_torch_dtype,
     reorder_torch,
     string_to_tensor,
-    enum_to_torch_dtype,
 )
-from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
-
-import numpy as np
+from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.LoopUnrollTP import LoopUnrollTP
+from openequivariance.core.utils import (
+    IrrepLayoutUtils,
+    dtype_to_enum,
+    torch_to_oeq_dtype,
+)
 
 logger = getLogger()
 
@@ -146,12 +150,24 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
             weights, not self.config.shared_weights
         )
 
-        torch_L1_in = torch.tensor(L1_in, device="cuda")
-        torch_L2_in = torch.tensor(L2_in, device="cuda")
+        layout = self.config.layout
+
+        L1_in_kernel = IrrepLayoutUtils.transpose_irrep_layout(
+            L1_in, self.config.irreps_in1, layout, "mul_ir"
+        )
+        L2_in_kernel = IrrepLayoutUtils.transpose_irrep_layout(
+            L2_in, self.config.irreps_in2, layout, "mul_ir"
+        )
+
+        torch_L1_in = torch.tensor(L1_in_kernel, device="cuda")
+        torch_L2_in = torch.tensor(L2_in_kernel, device="cuda")
         torch_weights = torch.tensor(weights_chunked, device="cuda")
         torch_L3_out = self.forward(torch_L1_in, torch_L2_in, torch_weights)
 
-        L3_out[:] = torch_L3_out.numpy(force=True)
+        L3_kernel = torch_L3_out.numpy(force=True)
+        L3_out[:] = IrrepLayoutUtils.transpose_irrep_layout(
+            L3_kernel, self.config.irreps_out, "mul_ir", layout
+        )
 
     def backward_cpu(
         self, L1_in, L1_grad, L2_in, L2_grad, L3_grad, weights, weights_grad
@@ -160,18 +176,37 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
             weights, not self.config.shared_weights
         )
 
-        torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
-        torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
+        layout = self.config.layout
+
+        L1_in_kernel = IrrepLayoutUtils.transpose_irrep_layout(
+            L1_in, self.config.irreps_in1, layout, "mul_ir"
+        )
+        L2_in_kernel = IrrepLayoutUtils.transpose_irrep_layout(
+            L2_in, self.config.irreps_in2, layout, "mul_ir"
+        )
+        L3_grad_kernel = IrrepLayoutUtils.transpose_irrep_layout(
+            L3_grad, self.config.irreps_out, layout, "mul_ir"
+        )
+
+        torch_L1_in = torch.tensor(L1_in_kernel, requires_grad=True, device="cuda")
+        torch_L2_in = torch.tensor(L2_in_kernel, requires_grad=True, device="cuda")
         torch_weights = torch.tensor(weights_chunked, requires_grad=True, device="cuda")
 
         torch_out = self.forward(torch_L1_in, torch_L2_in, torch_weights)
 
-        torch_L3_grad_in = torch.tensor(L3_grad, device="cuda")
+        torch_L3_grad_in = torch.tensor(L3_grad_kernel, device="cuda")
 
         torch_out.backward(gradient=torch_L3_grad_in)
 
-        L1_grad[:] = torch_L1_in.grad.numpy(force=True)
-        L2_grad[:] = torch_L2_in.grad.numpy(force=True)
+        L1_grad_kernel = torch_L1_in.grad.numpy(force=True)
+        L2_grad_kernel = torch_L2_in.grad.numpy(force=True)
+
+        L1_grad[:] = IrrepLayoutUtils.transpose_irrep_layout(
+            L1_grad_kernel, self.config.irreps_in1, "mul_ir", layout
+        )
+        L2_grad[:] = IrrepLayoutUtils.transpose_irrep_layout(
+            L2_grad_kernel, self.config.irreps_in2, "mul_ir", layout
+        )
         weights_grad[:] = torch_weights.grad.numpy(force=True)
 
         weights_grad[:] = self.reorder_weights_to_e3nn(

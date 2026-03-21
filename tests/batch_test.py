@@ -1,22 +1,22 @@
-import pytest
-from pytest_check import check
+from itertools import product
 
 import numpy as np
-import openequivariance as oeq
+import pytest
+import torch
 from openequivariance.benchmark.correctness_utils import (
-    correctness_forward,
     correctness_backward,
     correctness_double_backward,
+    correctness_forward,
 )
-
 from openequivariance.benchmark.problems import (
-    e3nn_torch_tetris_poly_problems,
     diffdock_problems,
+    e3nn_torch_tetris_poly_problems,
     mace_problems,
     nequip_problems,
 )
-from itertools import product
-import torch
+from pytest_check import check
+
+import openequivariance as oeq
 
 
 @pytest.fixture(params=[np.float32, np.float64], ids=["F32", "F64"], scope="module")
@@ -271,6 +271,17 @@ class TestTorchTo(TPCorrectness):
             }
             tp.to(switch_map[problem.irrep_dtype])
             return tp, tp.config
+
+
+class TestMulIrLayoutMACE(TPCorrectness):
+    production_model_tpps = mace_problems()
+
+    @pytest.fixture(params=production_model_tpps, ids=lambda x: x.label, scope="class")
+    def problem(self, request, dtype):
+        problem = request.param.clone()
+        problem.irrep_dtype, problem.weight_dtype = dtype, dtype
+        problem.layout = "mul_ir"
+        return problem
 
 
 class TestTorchToSubmodule:

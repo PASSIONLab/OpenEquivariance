@@ -1,7 +1,9 @@
-import numpy as np
-from openequivariance.core.e3nn_lite import Irreps, TPProblem, wigner_3j
 from itertools import accumulate
+
+import numpy as np
+
 from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.e3nn_lite import Irreps, TPProblem, wigner_3j
 
 logger = getLogger()
 
@@ -27,10 +29,13 @@ class IrrepMapping:
         src_ranges = [src_irreps.slices()[idx] for idx in self.src_dst_map]
         dst_ranges = [self.dst_irreps.slices()[i] for i in self.src_dst_map.values()]
 
+        if src_views[0].layout == "ir_mul":
+            return
+
+        # Merge adjacent src and dst ranges
         self.original_src_ranges = src_ranges
         self.original_dst_ranges = dst_ranges
 
-        # Merge adjacent src and dst ranges
         self.src_ranges = []
         self.dst_ranges = []
 
@@ -195,9 +200,10 @@ class ProblemSplitter:
             self.instruction_tup, self.parent_idx = instruction_tup, parent_idx
 
     class ChildView:
-        layout: str
-        ir_mul_offset: int
-        ir_mul_stride: int
+        def __init__(self, layout: str, ir_mul_offset: int, ir_mul_stride: int):
+            self.layout = layout
+            self.ir_mul_offset = ir_mul_offset
+            self.ir_mul_stride = ir_mul_stride
 
     def __init__(self, input, mult_threshold):
         self.input = input
@@ -207,7 +213,7 @@ class ProblemSplitter:
         child_reps = [[], [], []]
 
         self.irrep_maps = {}  # Maps a (input_rep_idx #, mul_ir_idx) to a lst[ir_idx]
-        self.irrep_views = [[], [], []] # View 
+        self.irrep_views = [[], [], []]  # View
 
         for input_rep_idx, input_rep in enumerate(input_reps):  # Loop over L1, L2, L3
             for mul_ir_idx, mul_ir in enumerate(
@@ -223,19 +229,20 @@ class ProblemSplitter:
                         len(child_reps[input_rep_idx]) - 1
                     )
                     if input.layout == "mul_ir":
-                        self.irrep_views.append(
+                        self.irrep_views[input_rep_idx].append(
                             self.ChildView(
-                                layout="mul_ir",
-                                ir_mul_offset=-1,
-                                ir_mul_stride=-1
-                            ))
+                                layout="mul_ir", ir_mul_offset=-1, ir_mul_stride=-1
+                            )
+                        )
                     elif input.layout == "ir_mul":
-                        self.irrep_views.append(
+                        self.irrep_views[input_rep_idx].append(
                             self.ChildView(
                                 layout="ir_mul",
-                                ir_mul_offset=input_rep.slices()[mul_ir_idx].start + mul_start,
-                                ir_mul_stride=mul_ir.mul
-                            ))
+                                ir_mul_offset=input_rep.slices()[mul_ir_idx].start
+                                + mul_start,
+                                ir_mul_stride=mul_ir.mul,
+                            )
+                        )
 
         new_instructions = []
 
@@ -564,9 +571,9 @@ class ComputationSchedule:
         for i in range(len(self.segments)):
             L1_idxs, L2_idxs, L3_idxs, inst_idxs = self.segments[i]
 
-            L1Map = IrrepMapping(self.L1, L1_idxs)
-            L2Map = IrrepMapping(self.L2, L2_idxs)
-            L3Map = IrrepMapping(self.L3, L3_idxs)
+            L1Map = IrrepMapping(self.L1, self.problem_splitter.irrep_views[0], L1_idxs)
+            L2Map = IrrepMapping(self.L2, self.problem_splitter.irrep_views[1], L2_idxs)
+            L3Map = IrrepMapping(self.L3, self.problem_splitter.irrep_views[2], L3_idxs)
 
             instructions = [
                 (
