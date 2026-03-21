@@ -1,5 +1,9 @@
 ## Latest Changes
 
+### v0.6.4 (2026-03-05) 
+Bugfix: added missing MLIR lowerings for
+a pair of JAX primitives (thanks @teddykoker!) 
+
 ### v0.6.3 (2025-02-23) 
 OpenEquivariance v0.6.3 brings long-needed improvements to the
 PyTorch frontend. We strongly encourage all users to upgrade
