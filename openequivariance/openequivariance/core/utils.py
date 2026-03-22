@@ -96,6 +96,11 @@ def filter_and_analyze_problem(problem):
         f"Connection mode must be 'uvu' or 'uvw', got {problem.instructions[0].connection_mode}"
     )
 
+    if problem.layout == "ir_mul":
+        assert problem.instructions[0].connection_mode == "uvu", (
+            "layout='ir_mul' is only supported for pure 'uvu' problems"
+        )
+
     assert problem.irrep_dtype == problem.weight_dtype, (
         f"irrep_dtype and weight_dtype must be the same, got {problem.irrep_dtype} and {problem.weight_dtype}"
     )
