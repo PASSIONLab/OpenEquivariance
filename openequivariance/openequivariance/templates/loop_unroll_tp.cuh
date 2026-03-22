@@ -1,4 +1,4 @@
-{%- from 'macros.jinja' import layout_load, layout_store with context %}
+{%- from 'macros.jinja' import layout_load, layout_store, reg_store with context %}
 {%- from 'wmm.cuh' import generate_matmul %}
 
 {%- macro generate_segment_kernel_forward(id, segment, warp_size) %}
@@ -248,7 +248,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                         {%- endif %}
                     {%- endfor %}
 
-                    {{ layout_store(problem.layout, L1[u].mul, L3[w].ir.dim, "scratch", "0", "l3_grad", "=", 1.0) }}
+                    {{ reg_store(L1[u].mul, L3[w].ir.dim, "scratch", "0", "l3_grad", "=", 1.0) }}
 
                     __syncwarp(); 
                     {{matmul_basename}}B_{{id}}_{{k}}(L3_grad_smem + offset, scratch, weights_smem);
