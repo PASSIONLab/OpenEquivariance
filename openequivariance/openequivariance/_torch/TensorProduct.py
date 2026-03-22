@@ -1,17 +1,17 @@
-import numpy as np
-import torch
-
+from openequivariance.core.LoopUnrollTP import LoopUnrollTP
 from openequivariance import TPProblem
 from openequivariance._torch import extlib
-from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
+import torch
+from openequivariance.core.utils import torch_to_oeq_dtype, dtype_to_enum
+from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance._torch.utils import (
-    enum_to_torch_dtype,
     reorder_torch,
     string_to_tensor,
+    enum_to_torch_dtype,
 )
-from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance.core.LoopUnrollTP import LoopUnrollTP
-from openequivariance.core.utils import dtype_to_enum, torch_to_oeq_dtype
+from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
+
+import numpy as np
 
 logger = getLogger()
 

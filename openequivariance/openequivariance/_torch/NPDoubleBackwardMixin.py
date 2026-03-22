@@ -36,12 +36,12 @@ class NumpyDoubleBackwardMixin:
             grad_outputs=[in1_dgrad_torch, in2_dgrad_torch, weights_dgrad_torch],
         )
 
-        a_np = a.detach().cpu().numpy()
-        b_np = b.detach().cpu().numpy()
-        c_np = c.detach().cpu().numpy()
-        d_np = d.detach().cpu().numpy()
-
-        return (a_np, b_np, c_np, d_np)
+        return (
+            a.detach().cpu().numpy(),
+            b.detach().cpu().numpy(),
+            c.detach().cpu().numpy(),
+            d.detach().cpu().numpy(),
+        )
 
 
 class NumpyDoubleBackwardMixinConv:
@@ -89,9 +89,9 @@ class NumpyDoubleBackwardMixinConv:
             grad_outputs=[in1_dgrad_torch, in2_dgrad_torch, weights_dgrad_torch],
         )
 
-        a_np = a.detach().cpu().numpy()
-        b_np = b.detach().cpu().numpy()
-        c_np = c.detach().cpu().numpy()
-        d_np = d.detach().cpu().numpy()
-
-        return (a_np, b_np, c_np, d_np)
+        return (
+            a.detach().cpu().numpy(),
+            b.detach().cpu().numpy(),
+            c.detach().cpu().numpy(),
+            d.detach().cpu().numpy(),
+        )
