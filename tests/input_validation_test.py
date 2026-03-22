@@ -138,3 +138,20 @@ def test_cpp_checks_forward_dtype(executable_and_buffers, subtests):
             with pytest.raises(RuntimeError, match=r"Dtype mismatch"):
                 buffers[i] = buffers[i].to(dtype=torch.bfloat16)
                 executable(*buffers)
+
+
+def test_ir_mul_rejects_uvw_problem(dtype):
+    problem = TPProblem(
+        "5x5e",
+        "1x3e",
+        "5x5e",
+        [(0, 0, 0, "uvw", True)],
+        shared_weights=False,
+        internal_weights=False,
+        irrep_dtype=dtype,
+        weight_dtype=dtype,
+        layout="ir_mul",
+    )
+
+    with pytest.raises(AssertionError, match="layout='ir_mul'"):
+        TensorProduct(problem)
