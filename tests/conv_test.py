@@ -284,8 +284,9 @@ class TestTorchTo(ConvCorrectness):
         return module.to(switch_map[problem.irrep_dtype])
 
 
-def ir_mul_representative_uvu_problems():
-    return [
+class TestIrMulLayout(ConvCorrectness):
+    production_model_tpps = mace_problems() + \
+        [
         oeq.TPProblem(
             "5x5e",
             "1x3e",
@@ -305,10 +306,6 @@ def ir_mul_representative_uvu_problems():
             label="ir_mul_repr_13x1x13_l535",
         ),
     ]
-
-
-class TestIrMulLayout(ConvCorrectness):
-    production_model_tpps = mace_problems() + ir_mul_representative_uvu_problems()
 
     @pytest.fixture(params=production_model_tpps, ids=lambda x: x.label, scope="class")
     def problem(self, request, dtype):
