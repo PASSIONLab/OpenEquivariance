@@ -6,7 +6,7 @@ import pathlib
 import numpy as np
 
 import openequivariance as oeq
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.benchmark.logging import getLogger
 from openequivariance.core.ConvolutionBase import CoordGraph
 from openequivariance.benchmark.benchmark_utils import NpEncoder
 

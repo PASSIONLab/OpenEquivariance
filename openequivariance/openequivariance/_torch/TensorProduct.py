@@ -3,7 +3,7 @@ from openequivariance import TPProblem
 from openequivariance._torch import extlib
 import torch
 from openequivariance.core.utils import torch_to_oeq_dtype, dtype_to_enum
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.benchmark.logging import getLogger
 from openequivariance._torch.utils import (
     reorder_torch,
     string_to_tensor,

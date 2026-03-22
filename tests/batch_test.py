@@ -3,7 +3,7 @@ from itertools import product
 import numpy as np
 import pytest
 import torch
-from openequivariance.benchmark.correctness_utils import (
+from openequivariance.benchmark.correctness import (
     correctness_backward,
     correctness_double_backward,
     correctness_forward,
