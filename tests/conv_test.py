@@ -6,6 +6,11 @@ from pytest_check import check
 import numpy as np
 import openequivariance as oeq
 from openequivariance.benchmark.ConvBenchmarkSuite import load_graph
+from openequivariance.benchmark.correctness import (
+    correctness_backward_conv,
+    correctness_double_backward_conv,
+    correctness_forward_conv,
+)
 from itertools import product
 import torch
 
@@ -89,7 +94,8 @@ class ConvCorrectness:
         if conv_object is None:
             pytest.skip("'conv_object' fixture returned None, skipping")
 
-        result = conv_object.test_correctness_forward(
+        result = correctness_forward_conv(
+            conv_object,
             graph,
             thresh=self.thresh("fwd"),
             prng_seed=12345,
@@ -102,7 +108,8 @@ class ConvCorrectness:
         if conv_object is None:
             pytest.skip("'conv_object' fixture returned None, skipping")
 
-        result = conv_object.test_correctness_backward(
+        result = correctness_backward_conv(
+            conv_object,
             graph,
             thresh=self.thresh("bwd"),
             prng_seed=12345,
@@ -117,7 +124,8 @@ class ConvCorrectness:
         if conv_object is None:
             pytest.skip("'conv_object' fixture returned None, skipping")
 
-        result = conv_object.test_correctness_double_backward(
+        result = correctness_double_backward_conv(
+            conv_object,
             graph,
             thresh=self.thresh("double_bwd"),
             prng_seed=12345,
