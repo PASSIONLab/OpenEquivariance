@@ -2,8 +2,8 @@ import copy
 
 import numpy as np
 
-from openequivariance.benchmark.correctness import check_similiarity
-from openequivariance.benchmark.logging import bcolors, getLogger
+from openequivariance.benchmark.correctness_utils import check_similiarity
+from openequivariance.benchmark.logging_utils import bcolors, getLogger
 from openequivariance.benchmark.random_buffer_utils import (
     get_random_buffers_backward_conv,
     get_random_buffers_double_backward_conv,

@@ -2,7 +2,7 @@ import json
 
 import numpy as np
 
-from openequivariance.benchmark.logging import getLogger
+from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.core.ComputationSchedule import (
     ComputationSchedule,
     SMEMCapacityException,

@@ -6,7 +6,7 @@ from typing import Iterator
 
 from openequivariance.core.TensorProductBase import TensorProductBase
 from openequivariance.core.e3nn_lite import TPProblem
-from openequivariance.benchmark.logging import getLogger
+from openequivariance.benchmark.logging_utils import getLogger
 from openequivariance.benchmark.tpp_creation_utils import (
     ChannelwiseTPP,
     FullyConnectedTPProblem,
