@@ -1,4 +1,4 @@
-{%- from 'macros.jinja' import transpose_load, transpose_store, reg_store with context %}
+{%- from 'macros.jinja' import layout_load, layout_store with context %}
 {%- from 'wmm.cuh' import generate_matmul %}
 
 {%- macro generate_segment_kernel_forward(id, segment, warp_size) %}
@@ -36,7 +36,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
         {%- if k == 0 or interactions[k][0] != interactions[k-1][0] %}
             offset = {{ L1.slices()[u].start}}; 
-            {{transpose_load(L1[u].mul, L1[u].ir.dim, 'L1_smem', 'offset', 'l1_vec')}}
+            {{layout_load(problem.layout, L1[u].mul, L1[u].ir.dim, 'L1_smem', 'offset', 'l1_vec')}}
         {%- endif %}
 
         #pragma unroll
@@ -72,7 +72,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
             // ----------------- CORE CALCULATION -----------------
 
             {%- if problem.instructions[k].connection_mode == "uvw" %}
-                {{transpose_store(L1[u].mul, L3[w].ir.dim, 'scratch', '0', 'l3_vec', '=', '1.0')}}
+                {{layout_store(problem.layout, L1[u].mul, L3[w].ir.dim, 'scratch', '0', 'l3_vec', '=', '1.0')}}
                 __syncwarp();
                 offset = {{ L3.slices()[w].start}}; 
                 matmul_fwd_{{id}}_{{k}}(weights_smem, scratch, L3_smem + offset);
@@ -85,7 +85,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
             {%- if problem.instructions[k].connection_mode != "uvw" %}
                 offset = {{ L3.slices()[w].start}}; 
-                {{transpose_store(L3[w].mul, L3[w].ir.dim, 'L3_smem', 'offset', 'l3_vec', '+=', '1.0')}}
+                {{layout_store(problem.layout, L3[w].mul, L3[w].ir.dim, 'L3_smem', 'offset', 'l3_vec', '+=', '1.0')}}
 
                 {%- if L2[v].mul > 1%}
                 #pragma unroll
@@ -168,15 +168,15 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
         {%- if k == 0 or interactions[k][0] != interactions[k-1][0] %}
             offset = {{ L1.slices()[u].start}};
-            {{transpose_load(L1[u].mul, L1[u].ir.dim, 'L1_smem', 'offset', 'l1_vec')}}
-            {{transpose_load(L1[u].mul, L1[u].ir.dim, 'L1_grad_smem', 'offset', 'l1_grad')}}
+            {{layout_load(problem.layout, L1[u].mul, L1[u].ir.dim, 'L1_smem', 'offset', 'l1_vec')}}
+            {{layout_load(problem.layout, L1[u].mul, L1[u].ir.dim, 'L1_grad_smem', 'offset', 'l1_grad')}}
         {%- endif %}
 
 
         {%- if problem.instructions[k].connection_mode != "uvw" %}
             {%- if k == 0 or interactions[k][2] != interactions[k-1][2] %}
                 offset = {{ L3.slices()[w].start}}; 
-                {{transpose_load(L3[w].mul, L3[w].ir.dim, 'L3_grad_smem', 'offset', 'l3_grad')}}
+                {{layout_load(problem.layout, L3[w].mul, L3[w].ir.dim, 'L3_grad_smem', 'offset', 'l3_grad')}}
             {%- endif %}
         {%- endif %}
 
@@ -225,7 +225,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                     {{matmul_basename}}A_{{id}}_{{k}}(weights_smem, L3_grad_smem + offset, scratch);
                     __syncwarp();
 
-                    {{transpose_load(L1[u].mul, L3[w].ir.dim, 'scratch', '0', 'l3_grad')}}
+                    {{layout_load(problem.layout, L1[u].mul, L3[w].ir.dim, 'scratch', '0', 'l3_grad')}}
 
                     {%- for i in range(tensor.nnz) %} 
                         {%- set coord1, coord2, coord3, value = tensor.tuples[i] %}
@@ -248,7 +248,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                         {%- endif %}
                     {%- endfor %}
 
-                    {{ reg_store(L1[u].mul, L3[w].ir.dim, "scratch", "0", "l3_grad", "=", 1.0) }}
+                    {{ layout_store(problem.layout, L1[u].mul, L3[w].ir.dim, "scratch", "0", "l3_grad", "=", 1.0) }}
 
                     __syncwarp(); 
                     {{matmul_basename}}B_{{id}}_{{k}}(L3_grad_smem + offset, scratch, weights_smem);
@@ -305,7 +305,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
         // Storeback
         {%- if k == num_interact - 1 or interactions[k][0] != interactions[k+1][0] %}
             offset = {{ L1.slices()[u].start}}; 
-            {{transpose_store(L1[u].mul, L1[u].ir.dim, 'L1_grad_smem', 'offset', 'l1_grad', '=', '1.0')}}
+            {{layout_store(problem.layout, L1[u].mul, L1[u].ir.dim, 'L1_grad_smem', 'offset', 'l1_grad', '=', '1.0')}}
         {%- endif %}
 
     {%- endfor %}

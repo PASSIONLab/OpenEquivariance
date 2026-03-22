@@ -1,16 +1,20 @@
-import numpy as np
 import json
 
-from openequivariance.templates.jinja_utils import get_jinja_environment
-from openequivariance.core.ComputationSchedule import ComputationSchedule
-from openequivariance.core.TensorProductBase import TensorProductBase
-from openequivariance.benchmark.logging_utils import getLogger
-from openequivariance.core.utils import dtype_to_enum, hash_str_64
+import numpy as np
 
-from openequivariance.core.utils import (
-    filter_and_analyze_problem,
-    count_cg_non_zero,
+from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.ComputationSchedule import (
+    ComputationSchedule,
+    SMEMCapacityException,
 )
+from openequivariance.core.TensorProductBase import TensorProductBase
+from openequivariance.core.utils import (
+    count_cg_non_zero,
+    dtype_to_enum,
+    filter_and_analyze_problem,
+    hash_str_64,
+)
+from openequivariance.templates.jinja_utils import get_jinja_environment
 
 logger = getLogger()
 
@@ -80,12 +84,14 @@ class LoopUnrollTP(TensorProductBase):
                 try:
                     generate_schedule(warp_count)
                     break
-                except Exception:
+                except SMEMCapacityException:
                     warp_count -= 2
                     if warp_count == 0:
                         raise RuntimeError(
                             "Tensor product schedule generation failed, shared memory inadequate!"
                         )
+                except Exception:
+                    raise
 
         self.jit_kernel = postprocess_kernel(
             template.render(
