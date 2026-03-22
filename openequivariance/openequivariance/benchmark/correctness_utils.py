@@ -79,47 +79,39 @@ def correctness_forward(
         reference_implementation = E3NNTensorProduct
 
     result = {"thresh": correctness_threshold, "batch_size": batch_size}
-
     in1, in2, weights, out = get_random_buffers_forward(problem, batch_size, prng_seed)
+    outputs = []
 
-    # run reference (always in mul_ir)
-    ref_tp = reference_implementation(problem)
+    for i, impl in enumerate([test_implementation, reference_implementation]):
+        is_test_impl = (i == 0)
+        tp = instantiate_implementation(impl, problem)
+        uses_cue = impl == CUETensorProduct or isinstance(tp, CUETensorProduct)
+        run_in1, run_in2, run_weights, run_out = [ buf.copy() for buf in (in1, in2, weights, out) ] 
 
-    ref_out = out.copy()
-    ref_tp.forward_cpu(
-        L1_in=in1.copy(), L2_in=in2.copy(), L3_out=ref_out, weights=weights.copy()
-    )
+        if problem.shared_weights and uses_cue:
+            run_weights = run_weights[np.newaxis, :]
 
-    weights_copy = weights.copy()
-    if problem.shared_weights and test_implementation == CUETensorProduct:
-        weights_copy = weights[np.newaxis, :]
+        # Transpose inputs, if necessary, for the test implementation 
+        if is_test_impl:
+            run_in1, run_in2 = [
+                IrrepLayoutUtils.transpose_irrep_layout(
+                    arr, irreps, "mul_ir", tp.config.layout 
+                )                for arr, irreps in zip(
+                    (run_in1, run_in2), 
+                    (problem.irreps_in1, problem.irreps_in2)
+                )
+            ]
 
-    # run test (may require ir_mul conversion)
-    test_tp = instantiate_implementation(test_implementation, problem)
-    test_layout = getattr(test_tp.config, "layout", "mul_ir")
+        tp.forward_cpu(L1_in=run_in1, L2_in=run_in2, L3_out=run_out, weights=run_weights)
 
-    test_in1 = in1.copy()
-    test_in2 = in2.copy()
-    test_out = out.copy()
+        if is_test_impl:
+            run_out = IrrepLayoutUtils.transpose_irrep_layout(
+                run_out, problem.irreps_out, tp.config.layout, "mul_ir"
+            )
 
-    if test_layout == "ir_mul":
-        test_in1 = IrrepLayoutUtils.transpose_irrep_layout(
-            test_in1, problem.irreps_in1, "mul_ir", "ir_mul"
-        )
-        test_in2 = IrrepLayoutUtils.transpose_irrep_layout(
-            test_in2, problem.irreps_in2, "mul_ir", "ir_mul"
-        )
+        outputs.append(run_out)
 
-    test_tp.forward_cpu(
-        L1_in=test_in1, L2_in=test_in2, L3_out=test_out, weights=weights_copy
-    )
-
-    if test_layout == "ir_mul":
-        test_out = IrrepLayoutUtils.transpose_irrep_layout(
-            test_out, problem.irreps_out, "ir_mul", "mul_ir"
-        )
-
-    for name, to_check, ground_truth in [("output", ref_out, test_out)]:
+    for name, to_check, ground_truth in [("output", outputs[0], outputs[1])]:
         result[name] = check_similiarity(
             name, to_check, ground_truth, correctness_threshold
         )
@@ -142,73 +134,61 @@ def correctness_backward(
 
     result = {"thresh": correctness_threshold, "batch_size": batch_size}
 
-    # run reference
     in1, in2, out_grad, weights, weights_grad, in1_grad, in2_grad = (
         get_random_buffers_backward(problem, batch_size, prng_seed)
     )
 
-    ref_tp = reference_implementation(problem)
+    grads = []
+    for i, impl in enumerate([test_implementation, reference_implementation]):
+        is_test_impl = i == 0
+        tp = instantiate_implementation(impl, problem)
 
-    ref_weights_grad = weights_grad.copy()
-    ref_in1_grad = in1_grad.copy()
-    ref_in2_grad = in2_grad.copy()
+        run_in1, run_in2, run_L3_grad, run_weights, run_weights_grad, run_in1_grad, run_in2_grad = [
+            buf.copy()
+            for buf in (in1, in2, out_grad, weights, weights_grad, in1_grad, in2_grad)
+        ]
 
-    ref_tp.backward_cpu(
-        L1_in=in1.copy(),
-        L1_grad=ref_in1_grad,
-        L2_in=in2.copy(),
-        L2_grad=ref_in2_grad,
-        L3_grad=out_grad.copy(),
-        weights=weights.copy(),
-        weights_grad=ref_weights_grad,
-    )
+        uses_cue = impl == CUETensorProduct or isinstance(tp, CUETensorProduct)
+        if problem.shared_weights and uses_cue:
+            run_weights = run_weights[np.newaxis, :]
+            run_weights_grad = run_weights_grad[np.newaxis, :]
 
-    # run test version (may require ir_mul conversion)
-    test_weights_grad = weights_grad.copy()
-    test_in1_grad = in1_grad.copy()
-    test_in2_grad = in2_grad.copy()
+        if is_test_impl:
+            run_in1, run_in2, run_L3_grad = [
+                IrrepLayoutUtils.transpose_irrep_layout(
+                    arr, irreps, "mul_ir", tp.config.layout
+                )
+                for arr, irreps in zip(
+                    (run_in1, run_in2, run_L3_grad),
+                    (problem.irreps_in1, problem.irreps_in2, problem.irreps_out),
+                )
+            ]
 
-    weights_copy = weights.copy()
-
-    if problem.shared_weights and test_implementation == CUETensorProduct:
-        weights_copy = weights[np.newaxis, :]
-        test_weights_grad = test_weights_grad[np.newaxis, :]
-
-    test_tp = instantiate_implementation(test_implementation, problem)
-    test_layout = getattr(test_tp.config, "layout", "mul_ir")
-
-    test_in1 = in1.copy()
-    test_in2 = in2.copy()
-    test_L3_grad = out_grad.copy()
-
-    if test_layout == "ir_mul":
-        test_in1 = IrrepLayoutUtils.transpose_irrep_layout(
-            test_in1, problem.irreps_in1, "mul_ir", "ir_mul"
-        )
-        test_in2 = IrrepLayoutUtils.transpose_irrep_layout(
-            test_in2, problem.irreps_in2, "mul_ir", "ir_mul"
-        )
-        test_L3_grad = IrrepLayoutUtils.transpose_irrep_layout(
-            test_L3_grad, problem.irreps_out, "mul_ir", "ir_mul"
+        tp.backward_cpu(
+            L1_in=run_in1,
+            L1_grad=run_in1_grad,
+            L2_in=run_in2,
+            L2_grad=run_in2_grad,
+            L3_grad=run_L3_grad,
+            weights=run_weights,
+            weights_grad=run_weights_grad,
         )
 
-    test_tp.backward_cpu(
-        L1_in=test_in1,
-        L1_grad=test_in1_grad,
-        L2_in=test_in2,
-        L2_grad=test_in2_grad,
-        L3_grad=test_L3_grad,
-        weights=weights_copy,
-        weights_grad=test_weights_grad,
-    )
+        if is_test_impl:
+            run_in1_grad, run_in2_grad = [
+                IrrepLayoutUtils.transpose_irrep_layout(
+                    arr, irreps, tp.config.layout, "mul_ir"
+                )
+                for arr, irreps in zip(
+                    (run_in1_grad, run_in2_grad),
+                    (problem.irreps_in1, problem.irreps_in2),
+                )
+            ]
 
-    if test_layout == "ir_mul":
-        test_in1_grad = IrrepLayoutUtils.transpose_irrep_layout(
-            test_in1_grad, problem.irreps_in1, "ir_mul", "mul_ir"
-        )
-        test_in2_grad = IrrepLayoutUtils.transpose_irrep_layout(
-            test_in2_grad, problem.irreps_in2, "ir_mul", "mul_ir"
-        )
+        if problem.shared_weights:
+            run_weights_grad = run_weights_grad.squeeze()
+
+        grads.append((run_weights_grad, run_in1_grad, run_in2_grad))
 
     weight_threshold = (
         correctness_threshold * batch_size
@@ -216,13 +196,10 @@ def correctness_backward(
         else correctness_threshold
     )
 
-    if problem.shared_weights:
-        test_weights_grad = test_weights_grad.squeeze()
-
     for name, to_check, ground_truth, threshold in [
-        ("weight_grad", test_weights_grad, ref_weights_grad, weight_threshold),
-        ("in1_grad", test_in1_grad, ref_in1_grad, correctness_threshold),
-        ("in2_grad", test_in2_grad, ref_in2_grad, correctness_threshold),
+        ("weight_grad", grads[0][0], grads[1][0], weight_threshold),
+        ("in1_grad", grads[0][1], grads[1][1], correctness_threshold),
+        ("in2_grad", grads[0][2], grads[1][2], correctness_threshold),
     ]:
         result[name] = check_similiarity(name, to_check, ground_truth, threshold)
 
@@ -254,9 +231,8 @@ def correctness_double_backward(
     result = {"thresh": correctness_threshold, "batch_size": batch_size}
 
     tensors = []
-    for is_test_impl, impl in enumerate(
-        [test_implementation, reference_implementation]
-    ):
+    for i, impl in enumerate([test_implementation, reference_implementation]):
+        is_test_impl = i == 0
         tp = instantiate_implementation(impl, problem)
         weights_reordered = tp.reorder_weights_from_e3nn(
             weights, has_batch_dim=not problem.shared_weights
@@ -268,31 +244,26 @@ def correctness_double_backward(
         if impl == CUETensorProduct and problem.shared_weights:
             weights_reordered = weights_reordered[np.newaxis, :]
 
-        tp_layout = getattr(tp.config, "layout", "mul_ir")
-        apply_test_layout = is_test_impl == 0 and tp_layout == "ir_mul"
+        db_in1, db_in2, db_out_grad, db_in1_dgrad, db_in2_dgrad = [
+            buf.copy() for buf in (in1, in2, out_grad, in1_dgrad, in2_dgrad)
+        ]
 
-        db_in1 = in1
-        db_in2 = in2
-        db_out_grad = out_grad
-        db_in1_dgrad = in1_dgrad
-        db_in2_dgrad = in2_dgrad
-
-        if apply_test_layout:
-            db_in1 = IrrepLayoutUtils.transpose_irrep_layout(
-                in1, problem.irreps_in1, "mul_ir", "ir_mul"
-            )
-            db_in2 = IrrepLayoutUtils.transpose_irrep_layout(
-                in2, problem.irreps_in2, "mul_ir", "ir_mul"
-            )
-            db_out_grad = IrrepLayoutUtils.transpose_irrep_layout(
-                out_grad, problem.irreps_out, "mul_ir", "ir_mul"
-            )
-            db_in1_dgrad = IrrepLayoutUtils.transpose_irrep_layout(
-                in1_dgrad, problem.irreps_in1, "mul_ir", "ir_mul"
-            )
-            db_in2_dgrad = IrrepLayoutUtils.transpose_irrep_layout(
-                in2_dgrad, problem.irreps_in2, "mul_ir", "ir_mul"
-            )
+        if is_test_impl:
+            db_in1, db_in2, db_out_grad, db_in1_dgrad, db_in2_dgrad = [
+                IrrepLayoutUtils.transpose_irrep_layout(
+                    arr, irreps, "mul_ir", tp.config.layout
+                )
+                for arr, irreps in zip(
+                    (db_in1, db_in2, db_out_grad, db_in1_dgrad, db_in2_dgrad),
+                    (
+                        problem.irreps_in1,
+                        problem.irreps_in2,
+                        problem.irreps_out,
+                        problem.irreps_in1,
+                        problem.irreps_in2,
+                    ),
+                )
+            ]
 
         in1_grad, in2_grad, weights_grad, out_dgrad = tp.double_backward_cpu(
             db_in1,
@@ -304,16 +275,16 @@ def correctness_double_backward(
             db_in2_dgrad,
         )
 
-        if apply_test_layout:
-            out_dgrad = IrrepLayoutUtils.transpose_irrep_layout(
-                out_dgrad, problem.irreps_out, "ir_mul", "mul_ir"
-            )
-            in1_grad = IrrepLayoutUtils.transpose_irrep_layout(
-                in1_grad, problem.irreps_in1, "ir_mul", "mul_ir"
-            )
-            in2_grad = IrrepLayoutUtils.transpose_irrep_layout(
-                in2_grad, problem.irreps_in2, "ir_mul", "mul_ir"
-            )
+        if is_test_impl:
+            out_dgrad, in1_grad, in2_grad = [
+                IrrepLayoutUtils.transpose_irrep_layout(
+                    arr, irreps, tp.config.layout, "mul_ir"
+                )
+                for arr, irreps in zip(
+                    (out_dgrad, in1_grad, in2_grad),
+                    (problem.irreps_out, problem.irreps_in1, problem.irreps_in2),
+                )
+            ]
 
         tensors.append(
             (
