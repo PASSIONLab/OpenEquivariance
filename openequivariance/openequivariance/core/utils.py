@@ -240,11 +240,11 @@ class IrrepLayoutUtils:
             if src_layout == "ir_mul" and dst_layout == "mul_ir":
                 out[..., seg.start : seg.stop] = block.reshape(
                     *block.shape[:-1], dim, mul
-                ).reshape(*block.shape[:-1], mul * dim)
+                ).swapaxes(-1, -2).reshape(*block.shape[:-1], mul * dim)
             elif src_layout == "mul_ir" and dst_layout == "ir_mul":
                 out[..., seg.start : seg.stop] = block.reshape(
                     *block.shape[:-1], mul, dim
-                ).reshape(*block.shape[:-1], dim * mul)
+                ).swapaxes(-1, -2).reshape(*block.shape[:-1], dim * mul)
             else:
                 raise ValueError(
                     f"Unsupported layout transpose: {src_layout} -> {dst_layout}"

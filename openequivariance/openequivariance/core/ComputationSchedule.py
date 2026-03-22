@@ -301,6 +301,7 @@ class ProblemSplitter:
             path_normalization="none",
             internal_weights=False,
             shared_weights=input.shared_weights,
+            layout=input.layout,
         )
 
         assert self.output.weight_numel == input.weight_numel
@@ -595,6 +596,7 @@ class ComputationSchedule:
                 path_normalization="none",
                 internal_weights=False,
                 shared_weights=config.shared_weights,
+                layout=config.layout,
             )
 
             weight_offset = 0

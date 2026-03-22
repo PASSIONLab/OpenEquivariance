@@ -273,14 +273,14 @@ class TestTorchTo(TPCorrectness):
             return tp, tp.config
 
 
-class TestMulIrLayoutMACE(TPCorrectness):
+class TestIrMulLayoutMACE(TPCorrectness):
     production_model_tpps = mace_problems()
 
     @pytest.fixture(params=production_model_tpps, ids=lambda x: x.label, scope="class")
     def problem(self, request, dtype):
         problem = request.param.clone()
         problem.irrep_dtype, problem.weight_dtype = dtype, dtype
-        problem.layout = "mul_ir"
+        problem.layout = "ir_mul"
         return problem
 
 
