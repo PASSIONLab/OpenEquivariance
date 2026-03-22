@@ -1,15 +1,16 @@
 import copy
+
 import numpy as np
+
+from openequivariance.benchmark.correctness_utils import check_similiarity
+from openequivariance.benchmark.logging_utils import bcolors, getLogger
 from openequivariance.benchmark.random_buffer_utils import (
-    get_random_buffers_forward_conv,
     get_random_buffers_backward_conv,
     get_random_buffers_double_backward_conv,
+    get_random_buffers_forward_conv,
 )
-
-from openequivariance.benchmark.logging_utils import getLogger, bcolors
-from openequivariance.benchmark.correctness_utils import check_similiarity
 from openequivariance.core.e3nn_lite import wigner_3j
-from openequivariance.core.utils import benchmark
+from openequivariance.core.utils import IrrepLayoutUtils, benchmark
 
 logger = getLogger()
 
@@ -143,6 +144,13 @@ class ConvolutionBase:
         check_reproducible=True,
         high_precision_ref=False,
     ):
+        def maybe_transpose_input_for_test_impl(x, irreps):
+            if self.config.layout == "ir_mul":
+                return IrrepLayoutUtils.transpose_irrep_layout(
+                    x, irreps, "mul_ir", "ir_mul"
+                )
+            return x
+
         if reference_implementation is None:
             from openequivariance._torch.E3NNConv import E3NNConv
 
@@ -186,12 +194,21 @@ class ConvolutionBase:
 
         test_out = out.copy()
         self.forward_cpu(
-            L1_in=in1.copy(),
-            L2_in=in2.copy(),
+            L1_in=maybe_transpose_input_for_test_impl(
+                in1.copy(), self.config.irreps_in1
+            ),
+            L2_in=maybe_transpose_input_for_test_impl(
+                in2.copy(), self.config.irreps_in2
+            ),
             weights=weights.copy(),
             L3_out=test_out,
             graph=graph,
         )
+
+        if self.config.layout == "ir_mul":
+            test_out = IrrepLayoutUtils.transpose_irrep_layout(
+                test_out, self.config.irreps_out, "ir_mul", "mul_ir"
+            )
 
         for name, to_check, ground_truth in [("output", ref_out, test_out)]:
             result[name] = check_similiarity(name, to_check, ground_truth, thresh)
@@ -205,12 +222,21 @@ class ConvolutionBase:
             for i in range(num_trials):
                 repeated_run = out.copy()
                 self.forward_cpu(
-                    L1_in=in1.copy(),
-                    L2_in=in2.copy(),
+                    L1_in=maybe_transpose_input_for_test_impl(
+                        in1.copy(), self.config.irreps_in1
+                    ),
+                    L2_in=maybe_transpose_input_for_test_impl(
+                        in2.copy(), self.config.irreps_in2
+                    ),
                     weights=weights.copy(),
                     L3_out=repeated_run,
                     graph=graph,
                 )
+
+                if self.config.layout == "ir_mul":
+                    repeated_run = IrrepLayoutUtils.transpose_irrep_layout(
+                        repeated_run, self.config.irreps_out, "ir_mul", "mul_ir"
+                    )
 
                 for name, to_check, ground_truth in [
                     ("output", repeated_run, test_out)
@@ -387,6 +413,13 @@ class ConvolutionBase:
         reference_implementation=None,
         high_precision_ref=False,
     ):
+        def maybe_transpose_input_for_test_impl(x, irreps):
+            if self.config.layout == "ir_mul":
+                return IrrepLayoutUtils.transpose_irrep_layout(
+                    x, irreps, "mul_ir", "ir_mul"
+                )
+            return x
+
         if reference_implementation is None:
             from openequivariance._torch.E3NNConv import E3NNConv
 
@@ -436,16 +469,34 @@ class ConvolutionBase:
         test_in1_grad = in1_grad.copy()
         test_in2_grad = in2_grad.copy()
 
+        test_L3_grad = out_grad.copy()
+        if self.config.layout == "ir_mul":
+            test_L3_grad = IrrepLayoutUtils.transpose_irrep_layout(
+                test_L3_grad, self.config.irreps_out, "mul_ir", "ir_mul"
+            )
+
         self.backward_cpu(
-            L1_in=in1.copy(),
+            L1_in=maybe_transpose_input_for_test_impl(
+                in1.copy(), self.config.irreps_in1
+            ),
             L1_grad=test_in1_grad,
-            L2_in=in2.copy(),
+            L2_in=maybe_transpose_input_for_test_impl(
+                in2.copy(), self.config.irreps_in2
+            ),
             L2_grad=test_in2_grad,
-            L3_grad=out_grad.copy(),
+            L3_grad=test_L3_grad,
             weights=weights.copy(),
             weights_grad=test_weights_grad,
             graph=graph,
         )
+
+        if self.config.layout == "ir_mul":
+            test_in1_grad = IrrepLayoutUtils.transpose_irrep_layout(
+                test_in1_grad, self.config.irreps_in1, "ir_mul", "mul_ir"
+            )
+            test_in2_grad = IrrepLayoutUtils.transpose_irrep_layout(
+                test_in2_grad, self.config.irreps_in2, "ir_mul", "mul_ir"
+            )
 
         for name, to_check, ground_truth, threshold in [
             ("weight_grad", test_weights_grad, ref_weights_grad, thresh),
@@ -464,6 +515,13 @@ class ConvolutionBase:
         reference_implementation=None,
         high_precision_ref=False,
     ):
+        def maybe_transpose_input_for_test_impl(tp, x, irreps):
+            if tp is self and tp.config.layout == "ir_mul":
+                return IrrepLayoutUtils.transpose_irrep_layout(
+                    x, irreps, "mul_ir", "ir_mul"
+                )
+            return x
+
         buffers = get_random_buffers_double_backward_conv(
             self.config, graph.node_count, graph.nnz, prng_seed
         )
@@ -500,16 +558,43 @@ class ConvolutionBase:
                 weights_dgrad, not tp.config.shared_weights
             )
 
+            db_in1 = maybe_transpose_input_for_test_impl(tp, in1, tp.config.irreps_in1)
+            db_in2 = maybe_transpose_input_for_test_impl(tp, in2, tp.config.irreps_in2)
+            db_out_grad = out_grad
+            db_in1_dgrad = in1_dgrad
+            db_in2_dgrad = in2_dgrad
+            if tp is self and tp.config.layout == "ir_mul":
+                db_out_grad = IrrepLayoutUtils.transpose_irrep_layout(
+                    out_grad, tp.config.irreps_out, "mul_ir", "ir_mul"
+                )
+                db_in1_dgrad = IrrepLayoutUtils.transpose_irrep_layout(
+                    in1_dgrad, tp.config.irreps_in1, "mul_ir", "ir_mul"
+                )
+                db_in2_dgrad = IrrepLayoutUtils.transpose_irrep_layout(
+                    in2_dgrad, tp.config.irreps_in2, "mul_ir", "ir_mul"
+                )
+
             in1_grad, in2_grad, weights_grad, out_dgrad = tp.double_backward_cpu(
-                in1,
-                in2,
-                out_grad,
+                db_in1,
+                db_in2,
+                db_out_grad,
                 weights_reordered,
                 weights_dgrad_reordered,
-                in1_dgrad,
-                in2_dgrad,
+                db_in1_dgrad,
+                db_in2_dgrad,
                 graph,
             )
+
+            if tp is self and tp.config.layout == "ir_mul":
+                out_dgrad = IrrepLayoutUtils.transpose_irrep_layout(
+                    out_dgrad, tp.config.irreps_out, "ir_mul", "mul_ir"
+                )
+                in1_grad = IrrepLayoutUtils.transpose_irrep_layout(
+                    in1_grad, tp.config.irreps_in1, "ir_mul", "mul_ir"
+                )
+                in2_grad = IrrepLayoutUtils.transpose_irrep_layout(
+                    in2_grad, tp.config.irreps_in2, "ir_mul", "mul_ir"
+                )
 
             tensors.append(
                 (

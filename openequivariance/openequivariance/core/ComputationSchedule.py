@@ -29,6 +29,10 @@ class IrrepMapping:
         src_ranges = [src_irreps.slices()[idx] for idx in self.src_dst_map]
         dst_ranges = [self.dst_irreps.slices()[i] for i in self.src_dst_map.values()]
 
+        self.storeback_procedure = {idx: "write" for idx in self.idxs}
+        self.persist_load = False
+        self.persist_store = False
+
         if src_views[0].layout == "ir_mul":
             return
 
@@ -54,11 +58,6 @@ class IrrepMapping:
         self.src_ranges.append(slice(src_start, src_end))
         self.dst_ranges.append(slice(dst_start, dst_end))
         self.copy_ranges = list(zip(self.src_ranges, self.dst_ranges))
-
-        self.persist_load = False
-        self.persist_store = False
-
-        self.storeback_procedure = {idx: "write" for idx in self.idxs}
 
 
 class CGTensor:
