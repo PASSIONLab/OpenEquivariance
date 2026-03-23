@@ -10,7 +10,7 @@ import urllib.request
 
 import numpy as np
 
-from openequivariance.benchmark.logging import getLogger
+from openequivariance.core.logging import getLogger
 from openequivariance._torch.extlib import DeviceProp
 from openequivariance._torch.E3NNTensorProduct import (
     E3NNTensorProduct,
@@ -24,7 +24,7 @@ from openequivariance.benchmark.TestBenchmarkSuite import (
     TestDefinition,
     Direction,
 )
-from openequivariance.benchmark.tpp_creation_utils import (
+from openequivariance.benchmark.problems import (
     ChannelwiseTPP,
     FullyConnectedTPProblem,
     SingleInstruction,

@@ -5,8 +5,8 @@ import numpy as np
 import numpy.linalg as la
 
 from openequivariance._torch.CUETensorProduct import CUETensorProduct
-from openequivariance.benchmark.logging import bcolors, getLogger
-from openequivariance.benchmark.random_buffer_utils import (
+from openequivariance.core.logging import bcolors, getLogger
+from openequivariance.benchmark.test_buffers import (
     get_random_buffers_backward_conv,
     get_random_buffers_backward,
     get_random_buffers_double_backward_conv,

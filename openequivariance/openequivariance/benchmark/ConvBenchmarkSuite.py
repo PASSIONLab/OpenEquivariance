@@ -11,7 +11,7 @@ from openequivariance.benchmark.correctness import (
     correctness_double_backward_conv,
     correctness_forward_conv,
 )
-from openequivariance.benchmark.logging import getLogger
+from openequivariance.core.logging import getLogger
 from openequivariance.core.ConvolutionBase import CoordGraph
 from openequivariance.benchmark.benchmark_utils import NpEncoder
 

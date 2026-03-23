@@ -1,21 +1,22 @@
 import json
 import numpy as np
 
-from openequivariance.benchmark.random_buffer_utils import (
+from openequivariance.benchmark.test_buffers import (
     get_random_buffers_forward,
     get_random_buffers_backward,
     get_random_buffers_double_backward,
 )
-from openequivariance.benchmark.perf_metrics_utils import (
-    calculate_minimum_flops_forward,
-    calculate_minimum_memory_streamed_forward,
-    calculate_minimum_memory_streamed_backward,
+from openequivariance.benchmark.metrics import (
+    flops_forward,
+    flops_backward,
+    memory_streamed_forward,
+    memory_streamed_backward,
 )
 from openequivariance.core.utils import calculate_total_nnz
 from openequivariance.core.TensorProductBase import TensorProductBase
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance._torch.CUETensorProduct import CUETensorProduct
-from openequivariance.benchmark.logging import getLogger, bcolors
+from openequivariance.core.logging import getLogger, bcolors
 
 logger = getLogger()
 
@@ -110,24 +111,12 @@ def benchmark_forward(
         time_millis = np.full(shape=num_iter, fill_value=-1)
 
     # FLOPS
-    try:
-        flops = tp.calculate_flops_forward(batch_size=batch_size)
-    except NotImplementedError:
-        logger.warning(
-            "Actual flop count not calculated, so minimum values are being used"
-        )
-        flops = calculate_minimum_flops_forward(problem, batch_size=batch_size)
+    flops = flops_forward(problem, batch_size=batch_size)
 
     # DATA
-    try:
-        memory_streamed = tp.calculate_memory_streamed_backward(batch_size=batch_size)
-    except NotImplementedError:
-        logger.warning(
-            "Actual memory streamed not calculated, so minimum values are being used"
-        )
-        memory_streamed = calculate_minimum_memory_streamed_forward(
-            problem, batch_size=batch_size
-        )
+    memory_streamed = memory_streamed_forward(
+        problem, batch_size=batch_size
+    )
 
     result |= calculate_performance_statistics(
         problem=problem,
@@ -181,29 +170,11 @@ def benchmark_backward(
         )
         time_millis = np.full(shape=num_iter, fill_value=-1)
 
-    try:
-        flops = tp.calculate_flops_backward(batch_size=batch_size)
-    except NotImplementedError:
-        try:
-            flops = calculate_minimum_flops_forward(tpp=problem, batch_size=batch_size)
-            logger.warning(
-                "Actual flops was not calculated, so minimum values are being used"
-            )
-        except NotImplementedError:
-            logger.warning(
-                "Minimum Backwards flops calculations are not implemented, -1 is a placeholder"
-            )
-            flops = {"total": -1}
+    flops = flops_backward(tpp=problem, batch_size=batch_size)
 
-    try:
-        memory_streamed = tp.calculate_memory_streamed_backward(batch_size=batch_size)
-    except NotImplementedError:
-        logger.warning(
-            "Actual memory streamed was not calculated, so minimum values are being"
-        )
-        memory_streamed = calculate_minimum_memory_streamed_backward(
-            tpp=problem, batch_size=batch_size
-        )
+    memory_streamed = memory_streamed_backward(
+        tpp=problem, batch_size=batch_size
+    )
 
     result |= calculate_performance_statistics(
         problem=problem,
@@ -258,29 +229,11 @@ def benchmark_double_backward(
         )
         time_millis = np.full(shape=num_iter, fill_value=-1)
 
-    try:
-        flops = tp.calculate_flops_backward(batch_size=batch_size)
-    except NotImplementedError:
-        try:
-            flops = calculate_minimum_flops_forward(tpp=problem, batch_size=batch_size)
-            logger.warning(
-                "Actual flops was not calculated, so minimum values are being used"
-            )
-        except NotImplementedError:
-            logger.warning(
-                "Minimum Backwards flops calculations are not implemented, -1 is a placeholder"
-            )
-            flops = {"total": -1}
+    flops = flops_backward(tpp=problem, batch_size=batch_size)
 
-    try:
-        memory_streamed = tp.calculate_memory_streamed_backward(batch_size=batch_size)
-    except NotImplementedError:
-        logger.warning(
-            "Actual memory streamed was not calculated, so minimum values are being"
-        )
-        memory_streamed = calculate_minimum_memory_streamed_backward(
-            tpp=problem, batch_size=batch_size
-        )
+    memory_streamed = memory_streamed_backward(
+        tpp=problem, batch_size=batch_size
+    )
 
     result |= calculate_performance_statistics(
         problem=problem,

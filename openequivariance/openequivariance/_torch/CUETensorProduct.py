@@ -6,13 +6,12 @@ from typing import Iterator
 
 from openequivariance.core.TensorProductBase import TensorProductBase
 from openequivariance.core.e3nn_lite import TPProblem
-from openequivariance.benchmark.logging import getLogger
-from openequivariance.benchmark.tpp_creation_utils import (
+from openequivariance.core.logging import getLogger
+from openequivariance.benchmark.problems import (
     ChannelwiseTPP,
     FullyConnectedTPProblem,
     SingleInstruction,
 )
-from openequivariance.core.utils import count_cg_non_zero
 
 os.environ["CUEQUIVARIANCE_OPS_USE_JIT"] = "1"
 
@@ -234,57 +233,6 @@ class CUETensorProduct(TensorProductBase):
             with_torch_overhead,
             kernel_names=self.kernel_names,
         )
-
-    # Copied over from loop unroller to match arithmetic intensity on roofline plots
-    def calculate_flops_forward(self, batch_size: int) -> dict:
-        if self.is_uvw:
-            return super().calculate_flops_forward(batch_size)
-        else:
-            tpp = self.config
-            flop_count = {
-                "CG_decomposition": 0,
-                "linear_combination": 0,
-                "outer_products": 0,
-            }
-            for ins in tpp.instructions:
-                l1, l2, l3 = (
-                    tpp.irreps_in1[ins.i_in1].ir.l,
-                    tpp.irreps_in2[ins.i_in2].ir.l,
-                    tpp.irreps_out[ins.i_out].ir.l,
-                )
-                flop_count["CG_decomposition"] += count_cg_non_zero(l1, l2, l3) * (
-                    ins.path_shape[0] * ins.path_shape[1]
-                )
-                flop_count["linear_combination"] += (
-                    (2 * l3 + 1) * np.prod(ins.path_shape) if ins.has_weight else 0
-                )
-
-            flop_count["CG_decomposition"] *= 3 * batch_size
-            flop_count["linear_combination"] *= (
-                batch_size  # Weights do not require FMA here
-            )
-            flop_count["total"] = sum(flop_count.values())
-            return flop_count
-
-    def calculate_flops_backward(self, batch_size: int) -> dict:
-        if self.is_uvw:
-            return super().calculate_flops_backward(batch_size)
-        else:
-            tpp = self.config
-            flop_count = {"backward": 0}
-            for ins in tpp.instructions:
-                l1, l2, l3 = (
-                    tpp.irreps_in1[ins.i_in1].ir.l,
-                    tpp.irreps_in2[ins.i_in2].ir.l,
-                    tpp.irreps_out[ins.i_out].ir.l,
-                )
-                flop_count["backward"] += count_cg_non_zero(l1, l2, l3) * (
-                    ins.path_shape[0] * ins.path_shape[1]
-                )
-
-            flop_count["backward"] *= 9 * batch_size
-            flop_count["total"] = sum(flop_count.values())
-            return flop_count
 
     @staticmethod
     def name():
