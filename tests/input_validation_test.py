@@ -140,7 +140,7 @@ def test_cpp_checks_forward_dtype(executable_and_buffers, subtests):
                 executable(*buffers)
 
 
-def test_ir_mul_rejects_uvw_problem(dtype):
+def test_ir_mul_rejects_uvw_problem():
     problem = TPProblem(
         "5x5e",
         "1x3e",
@@ -148,8 +148,6 @@ def test_ir_mul_rejects_uvw_problem(dtype):
         [(0, 0, 0, "uvw", True)],
         shared_weights=False,
         internal_weights=False,
-        irrep_dtype=dtype,
-        weight_dtype=dtype,
         layout="ir_mul",
     )
 

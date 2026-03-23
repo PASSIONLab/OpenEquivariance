@@ -180,4 +180,3 @@ class TensorProductBase:
             mode=mode,
             kernel_names=kernel_names,
         )
-

@@ -9,9 +9,7 @@ import numpy as np
 logger = getLogger()
 
 
-def memory_streamed_forward(
-    tpp: TPProblem, batch_size: int
-) -> dict[str, int]:
+def memory_streamed_forward(tpp: TPProblem, batch_size: int) -> dict[str, int]:
     """
     This represents an absolute minimum amount of memory that could be streamed on an ideal machine
     It returns the number of bytes streamed total and from each source
@@ -69,9 +67,7 @@ def flops_forward(tpp: TPProblem, batch_size: int) -> dict:
         )
 
     flops_count["CG_decomposition"] *= 3 * batch_size
-    flops_count["linear_combination"] *= (
-        batch_size  # Weights do not require FMA here
-    )
+    flops_count["linear_combination"] *= batch_size  # Weights do not require FMA here
 
     flops_count["total"] = sum(flops_count.values())
     return flops_count

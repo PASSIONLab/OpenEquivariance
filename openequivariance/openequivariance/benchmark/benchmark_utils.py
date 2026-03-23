@@ -114,9 +114,7 @@ def benchmark_forward(
     flops = flops_forward(problem, batch_size=batch_size)
 
     # DATA
-    memory_streamed = memory_streamed_forward(
-        problem, batch_size=batch_size
-    )
+    memory_streamed = memory_streamed_forward(problem, batch_size=batch_size)
 
     result |= calculate_performance_statistics(
         problem=problem,
@@ -172,9 +170,7 @@ def benchmark_backward(
 
     flops = flops_backward(tpp=problem, batch_size=batch_size)
 
-    memory_streamed = memory_streamed_backward(
-        tpp=problem, batch_size=batch_size
-    )
+    memory_streamed = memory_streamed_backward(tpp=problem, batch_size=batch_size)
 
     result |= calculate_performance_statistics(
         problem=problem,
@@ -231,9 +227,7 @@ def benchmark_double_backward(
 
     flops = flops_backward(tpp=problem, batch_size=batch_size)
 
-    memory_streamed = memory_streamed_backward(
-        tpp=problem, batch_size=batch_size
-    )
+    memory_streamed = memory_streamed_backward(tpp=problem, batch_size=batch_size)
 
     result |= calculate_performance_statistics(
         problem=problem,

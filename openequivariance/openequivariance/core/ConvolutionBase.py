@@ -1,5 +1,3 @@
-import copy
-
 import numpy as np
 
 from openequivariance.core.logging import bcolors, getLogger

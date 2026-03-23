@@ -49,7 +49,9 @@ def plot_layout(data_folder):
 
     dtype_order = sorted(dtype_order, key=_dtype_sort_key)
 
-    directions = [d for d in ["forward", "backward"] if any(d in grouped[x] for x in grouped)]
+    directions = [
+        d for d in ["forward", "backward"] if any(d in grouped[x] for x in grouped)
+    ]
     if not directions:
         raise ValueError("No forward/backward layout benchmark entries found to plot.")
 
@@ -98,7 +100,9 @@ def plot_layout(data_folder):
     fig.supxlabel("Problem")
 
     handles, labels = axs[0][0].get_legend_handles_labels()
-    unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
+    unique = [
+        (h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]
+    ]
     if unique:
         axs[0][0].legend(*zip(*unique))
 
@@ -114,6 +118,11 @@ def plot_layout(data_folder):
                 if values["mul_ir"] > 0:
                     ratios.append(values["ir_mul"] / values["mul_ir"])
             if ratios:
-                stats = [np.min(ratios), np.mean(ratios), np.median(ratios), np.max(ratios)]
+                stats = [
+                    np.min(ratios),
+                    np.mean(ratios),
+                    np.median(ratios),
+                    np.max(ratios),
+                ]
                 stats_fmt = [f"{val:.3f}" for val in stats]
                 print("\t".join([dtype, direction] + stats_fmt))

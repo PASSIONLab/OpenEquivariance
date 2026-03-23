@@ -1,7 +1,5 @@
 import json
 
-import numpy as np
-
 from openequivariance.core.logging import getLogger
 from openequivariance.core.ComputationSchedule import (
     ComputationSchedule,
