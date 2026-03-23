@@ -386,6 +386,7 @@ class TPProblem:
     :param internal_weights: Must be False; OpenEquivariance does not support internal weights. *Default*: False.
     :param irrep_normalization: One of ``["component", "norm", "none"]``. *Default*: "component".
     :param path_normalization: One of ``["element", "path", "none"]``. *Default*: "element".
+    :param layout: One of ``["mul_ir", "ir_mul"]``, giving the layout of irreps for all inputs and outputs. *Default*: "mul_ir".
     """
 
     instructions: List[Any]
