@@ -16,7 +16,7 @@ from openequivariance.benchmark.random_buffer_utils import (
 )
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.TensorProductBase import TensorProductBase
-from openequivariance.core.utils import IrrepLayoutUtils
+from openequivariance.core.utils import transpose_irrep_layout
 
 logger = getLogger()
 
@@ -87,29 +87,31 @@ def correctness_forward(
     outputs = []
 
     for i, impl in enumerate([test_implementation, reference_implementation]):
-        is_test_impl = (i == 0)
+        is_test_impl = i == 0
         tp = instantiate_implementation(impl, problem)
         uses_cue = impl == CUETensorProduct or isinstance(tp, CUETensorProduct)
-        run_in1, run_in2, run_weights, run_out = [ buf.copy() for buf in (in1, in2, weights, out) ] 
+        run_in1, run_in2, run_weights, run_out = [
+            buf.copy() for buf in (in1, in2, weights, out)
+        ]
 
         if problem.shared_weights and uses_cue:
             run_weights = run_weights[np.newaxis, :]
 
-        # Transpose inputs, if necessary, for the test implementation 
+        # Transpose inputs, if necessary, for the test implementation
         if is_test_impl:
             run_in1, run_in2 = [
-                IrrepLayoutUtils.transpose_irrep_layout(
-                    arr, irreps, "mul_ir", tp.config.layout 
-                )                for arr, irreps in zip(
-                    (run_in1, run_in2), 
-                    (problem.irreps_in1, problem.irreps_in2)
+                transpose_irrep_layout(arr, irreps, "mul_ir", tp.config.layout)
+                for arr, irreps in zip(
+                    (run_in1, run_in2), (problem.irreps_in1, problem.irreps_in2)
                 )
             ]
 
-        tp.forward_cpu(L1_in=run_in1, L2_in=run_in2, L3_out=run_out, weights=run_weights)
+        tp.forward_cpu(
+            L1_in=run_in1, L2_in=run_in2, L3_out=run_out, weights=run_weights
+        )
 
         if is_test_impl:
-            run_out = IrrepLayoutUtils.transpose_irrep_layout(
+            run_out = transpose_irrep_layout(
                 run_out, problem.irreps_out, tp.config.layout, "mul_ir"
             )
 
@@ -147,7 +149,15 @@ def correctness_backward(
         is_test_impl = i == 0
         tp = instantiate_implementation(impl, problem)
 
-        run_in1, run_in2, run_L3_grad, run_weights, run_weights_grad, run_in1_grad, run_in2_grad = [
+        (
+            run_in1,
+            run_in2,
+            run_L3_grad,
+            run_weights,
+            run_weights_grad,
+            run_in1_grad,
+            run_in2_grad,
+        ) = [
             buf.copy()
             for buf in (in1, in2, out_grad, weights, weights_grad, in1_grad, in2_grad)
         ]
@@ -159,9 +169,7 @@ def correctness_backward(
 
         if is_test_impl:
             run_in1, run_in2, run_L3_grad = [
-                IrrepLayoutUtils.transpose_irrep_layout(
-                    arr, irreps, "mul_ir", tp.config.layout
-                )
+                transpose_irrep_layout(arr, irreps, "mul_ir", tp.config.layout)
                 for arr, irreps in zip(
                     (run_in1, run_in2, run_L3_grad),
                     (problem.irreps_in1, problem.irreps_in2, problem.irreps_out),
@@ -180,9 +188,7 @@ def correctness_backward(
 
         if is_test_impl:
             run_in1_grad, run_in2_grad = [
-                IrrepLayoutUtils.transpose_irrep_layout(
-                    arr, irreps, tp.config.layout, "mul_ir"
-                )
+                transpose_irrep_layout(arr, irreps, tp.config.layout, "mul_ir")
                 for arr, irreps in zip(
                     (run_in1_grad, run_in2_grad),
                     (problem.irreps_in1, problem.irreps_in2),
@@ -254,9 +260,7 @@ def correctness_double_backward(
 
         if is_test_impl:
             db_in1, db_in2, db_out_grad, db_in1_dgrad, db_in2_dgrad = [
-                IrrepLayoutUtils.transpose_irrep_layout(
-                    arr, irreps, "mul_ir", tp.config.layout
-                )
+                transpose_irrep_layout(arr, irreps, "mul_ir", tp.config.layout)
                 for arr, irreps in zip(
                     (db_in1, db_in2, db_out_grad, db_in1_dgrad, db_in2_dgrad),
                     (
@@ -281,9 +285,7 @@ def correctness_double_backward(
 
         if is_test_impl:
             out_dgrad, in1_grad, in2_grad = [
-                IrrepLayoutUtils.transpose_irrep_layout(
-                    arr, irreps, tp.config.layout, "mul_ir"
-                )
+                transpose_irrep_layout(arr, irreps, tp.config.layout, "mul_ir")
                 for arr, irreps in zip(
                     (out_dgrad, in1_grad, in2_grad),
                     (problem.irreps_out, problem.irreps_in1, problem.irreps_in2),
@@ -359,9 +361,7 @@ def correctness_forward_conv(
 
         if is_test_impl:
             run_in1, run_in2 = [
-                IrrepLayoutUtils.transpose_irrep_layout(
-                    arr, irreps, "mul_ir", conv.config.layout
-                )
+                transpose_irrep_layout(arr, irreps, "mul_ir", conv.config.layout)
                 for arr, irreps in zip(
                     (run_in1, run_in2),
                     (conv.config.irreps_in1, conv.config.irreps_in2),
@@ -375,7 +375,7 @@ def correctness_forward_conv(
                 graph=graph,
             )
 
-            run_out = IrrepLayoutUtils.transpose_irrep_layout(
+            run_out = transpose_irrep_layout(
                 run_out, conv.config.irreps_out, conv.config.layout, "mul_ir"
             )
         else:
@@ -410,13 +410,9 @@ def correctness_forward_conv(
 
         for _ in range(num_trials):
             repeated_run = out.copy()
-            rep_in1, rep_in2, rep_weights = [
-                buf.copy() for buf in (in1, in2, weights)
-            ]
+            rep_in1, rep_in2, rep_weights = [buf.copy() for buf in (in1, in2, weights)]
             rep_in1, rep_in2 = [
-                IrrepLayoutUtils.transpose_irrep_layout(
-                    arr, irreps, "mul_ir", conv.config.layout
-                )
+                transpose_irrep_layout(arr, irreps, "mul_ir", conv.config.layout)
                 for arr, irreps in zip(
                     (rep_in1, rep_in2),
                     (conv.config.irreps_in1, conv.config.irreps_in2),
@@ -430,7 +426,7 @@ def correctness_forward_conv(
                 graph=graph,
             )
 
-            repeated_run = IrrepLayoutUtils.transpose_irrep_layout(
+            repeated_run = transpose_irrep_layout(
                 repeated_run, conv.config.irreps_out, conv.config.layout, "mul_ir"
             )
 
@@ -471,9 +467,15 @@ def correctness_backward_conv(
         is_test_impl = i == 0
         tp = impl if is_test_impl else impl(reference_problem)
 
-        run_in1, run_in2, run_out_grad, run_weights, run_weights_grad, run_in1_grad, run_in2_grad = [
-            buf.copy() for buf in buffers
-        ]
+        (
+            run_in1,
+            run_in2,
+            run_out_grad,
+            run_weights,
+            run_weights_grad,
+            run_in1_grad,
+            run_in2_grad,
+        ) = [buf.copy() for buf in buffers]
 
         if not is_test_impl and high_precision_ref:
             (
@@ -488,12 +490,14 @@ def correctness_backward_conv(
 
         if is_test_impl:
             run_in1, run_in2, run_out_grad = [
-                IrrepLayoutUtils.transpose_irrep_layout(
-                    arr, irreps, "mul_ir", conv.config.layout
-                )
+                transpose_irrep_layout(arr, irreps, "mul_ir", conv.config.layout)
                 for arr, irreps in zip(
                     (run_in1, run_in2, run_out_grad),
-                    (conv.config.irreps_in1, conv.config.irreps_in2, conv.config.irreps_out),
+                    (
+                        conv.config.irreps_in1,
+                        conv.config.irreps_in2,
+                        conv.config.irreps_out,
+                    ),
                 )
             ]
 
@@ -510,9 +514,7 @@ def correctness_backward_conv(
 
         if is_test_impl:
             run_in1_grad, run_in2_grad = [
-                IrrepLayoutUtils.transpose_irrep_layout(
-                    arr, irreps, conv.config.layout, "mul_ir"
-                )
+                transpose_irrep_layout(arr, irreps, conv.config.layout, "mul_ir")
                 for arr, irreps in zip(
                     (run_in1_grad, run_in2_grad),
                     (conv.config.irreps_in1, conv.config.irreps_in2),
@@ -581,9 +583,7 @@ def correctness_double_backward_conv(
         ]
         if is_test_impl:
             db_in1, db_in2, db_out_grad, db_in1_dgrad, db_in2_dgrad = [
-                IrrepLayoutUtils.transpose_irrep_layout(
-                    arr, irreps, "mul_ir", tp.config.layout
-                )
+                transpose_irrep_layout(arr, irreps, "mul_ir", tp.config.layout)
                 for arr, irreps in zip(
                     (db_in1, db_in2, db_out_grad, db_in1_dgrad, db_in2_dgrad),
                     (
@@ -609,9 +609,7 @@ def correctness_double_backward_conv(
 
         if is_test_impl:
             out_dgrad, in1_grad, in2_grad = [
-                IrrepLayoutUtils.transpose_irrep_layout(
-                    arr, irreps, tp.config.layout, "mul_ir"
-                )
+                transpose_irrep_layout(arr, irreps, tp.config.layout, "mul_ir")
                 for arr, irreps in zip(
                     (out_dgrad, in1_grad, in2_grad),
                     (tp.config.irreps_out, tp.config.irreps_in1, tp.config.irreps_in2),

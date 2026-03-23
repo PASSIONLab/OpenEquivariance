@@ -293,8 +293,7 @@ class TestTorchTo(ConvCorrectness):
 
 
 class TestIrMulLayout(ConvCorrectness):
-    production_model_tpps = mace_problems() + \
-        [
+    production_model_tpps = mace_problems() + [
         oeq.TPProblem(
             "5x5e",
             "1x3e",

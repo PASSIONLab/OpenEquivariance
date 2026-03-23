@@ -209,50 +209,52 @@ def hash_str_64(s: str) -> int:
     return int.from_bytes(hashlib.sha256(s.encode()).digest()[:7], "big")
 
 
-class IrrepLayoutUtils:
-    @staticmethod
-    def transpose_irrep_layout(
-        array: np.ndarray,
-        irreps: Irreps,
-        src_layout: str,
-        dst_layout: str,
-    ) -> np.ndarray:
-        """
-        Transpose irrep-packed feature arrays between `mul_ir` and `ir_mul` layouts.
+def transpose_irrep_layout(
+    array: np.ndarray,
+    irreps: Irreps,
+    src_layout: str,
+    dst_layout: str,
+) -> np.ndarray:
+    """
+    Transpose irrep-packed feature arrays between `mul_ir` and `ir_mul` layouts.
 
-        Expected input shape is `[..., irreps.dim]`. A new array is returned.
-        If `src_layout == dst_layout`, this returns a copy.
-        """
-        if src_layout not in ("mul_ir", "ir_mul"):
-            raise ValueError(f"Unsupported src_layout: {src_layout}")
-        if dst_layout not in ("mul_ir", "ir_mul"):
-            raise ValueError(f"Unsupported dst_layout: {dst_layout}")
+    Expected input shape is `[..., irreps.dim]`. A new array is returned.
+    If `src_layout == dst_layout`, this returns a copy.
+    """
+    if src_layout not in ("mul_ir", "ir_mul"):
+        raise ValueError(f"Unsupported src_layout: {src_layout}")
+    if dst_layout not in ("mul_ir", "ir_mul"):
+        raise ValueError(f"Unsupported dst_layout: {dst_layout}")
 
-        x = np.asarray(array)
-        out = np.empty_like(x)
+    x = np.asarray(array)
+    out = np.empty_like(x)
 
-        if src_layout == dst_layout:
-            out[...] = x
-            return out
-
-        slices = irreps.slices()
-        for ir_idx, mul_ir in enumerate(irreps):
-            mul = mul_ir.mul
-            dim = mul_ir.ir.dim
-            seg = slices[ir_idx]
-            block = x[..., seg.start : seg.stop]
-
-            if src_layout == "ir_mul" and dst_layout == "mul_ir":
-                out[..., seg.start : seg.stop] = block.reshape(
-                    *block.shape[:-1], dim, mul
-                ).swapaxes(-1, -2).reshape(*block.shape[:-1], mul * dim)
-            elif src_layout == "mul_ir" and dst_layout == "ir_mul":
-                out[..., seg.start : seg.stop] = block.reshape(
-                    *block.shape[:-1], mul, dim
-                ).swapaxes(-1, -2).reshape(*block.shape[:-1], dim * mul)
-            else:
-                raise ValueError(
-                    f"Unsupported layout transpose: {src_layout} -> {dst_layout}"
-                )
-
+    if src_layout == dst_layout:
+        out[...] = x
         return out
+
+    slices = irreps.slices()
+    for ir_idx, mul_ir in enumerate(irreps):
+        mul = mul_ir.mul
+        dim = mul_ir.ir.dim
+        seg = slices[ir_idx]
+        block = x[..., seg.start : seg.stop]
+
+        if src_layout == "ir_mul" and dst_layout == "mul_ir":
+            out[..., seg.start : seg.stop] = (
+                block.reshape(*block.shape[:-1], dim, mul)
+                .swapaxes(-1, -2)
+                .reshape(*block.shape[:-1], mul * dim)
+            )
+        elif src_layout == "mul_ir" and dst_layout == "ir_mul":
+            out[..., seg.start : seg.stop] = (
+                block.reshape(*block.shape[:-1], mul, dim)
+                .swapaxes(-1, -2)
+                .reshape(*block.shape[:-1], dim * mul)
+            )
+        else:
+            raise ValueError(
+                f"Unsupported layout transpose: {src_layout} -> {dst_layout}"
+            )
+
+    return out

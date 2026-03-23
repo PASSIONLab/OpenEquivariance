@@ -5,11 +5,10 @@ import numpy as np
 from openequivariance.benchmark.logging import bcolors, getLogger
 from openequivariance.benchmark.random_buffer_utils import (
     get_random_buffers_backward_conv,
-    get_random_buffers_double_backward_conv,
     get_random_buffers_forward_conv,
 )
 from openequivariance.core.e3nn_lite import wigner_3j
-from openequivariance.core.utils import IrrepLayoutUtils, benchmark
+from openequivariance.core.utils import benchmark
 
 logger = getLogger()
 

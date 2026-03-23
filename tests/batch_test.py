@@ -272,9 +272,9 @@ class TestTorchTo(TPCorrectness):
             tp.to(switch_map[problem.irrep_dtype])
             return tp, tp.config
 
+
 class TestIrMulLayoutMACE(TPCorrectness):
-    production_model_tpps = mace_problems() + \
-        [
+    production_model_tpps = mace_problems() + [
         oeq.TPProblem(
             "5x5e",
             "1x3e",
@@ -293,7 +293,7 @@ class TestIrMulLayoutMACE(TPCorrectness):
             internal_weights=False,
             label="ir_mul_repr_13x1x13_l535",
         ),
-        ] 
+    ]
 
     @pytest.fixture(params=production_model_tpps, ids=lambda x: x.label, scope="class")
     def problem(self, request, dtype):
