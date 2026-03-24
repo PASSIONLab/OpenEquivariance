@@ -8,6 +8,7 @@ from openequivariance.benchmark.correctness import (
     correctness_double_backward,
     correctness_forward,
 )
+from openequivariance.benchmark.test_buffers import get_random_buffers_forward
 from openequivariance.benchmark.problems import (
     diffdock_problems,
     e3nn_torch_tetris_poly_problems,
@@ -274,9 +275,10 @@ class TestTorchTo(TPCorrectness):
 
 
 class TestIrMul(TPCorrectness):
-    '''
-    Tests both the ir_mul layout and the transpose_irreps functions. 
-    '''
+    """
+    Tests both the ir_mul layout and the transpose_irreps functions.
+    """
+
     tpps = mace_problems() + [
         oeq.TPProblem(
             "5x5e",
@@ -323,6 +325,7 @@ class TestIrMul(TPCorrectness):
             tp = tp_base_cls(problem, **extra_tp_constructor_args)
             return tp, problem
         else:
+
             class TransposeWrapperTensorProduct(tp_base_cls):
                 def forward(self, x, y, W):
                     x_t = transpose_irreps(
@@ -370,40 +373,29 @@ class TestTorchToSubmodule:
     def _problem_dtype(self, problem):
         return torch.float32 if problem.irrep_dtype == np.float32 else torch.float64
 
-    def _make_inputs(self, problem, batch_size, rng, dtype, device):
-        in1 = torch.tensor(
-            rng.uniform(size=(batch_size, problem.irreps_in1.dim)),
-            dtype=dtype,
-            device=device,
+    def _make_inputs(self, problem, batch_size, dtype, device, prng_seed=12345):
+        dtype_map = {torch.float32: np.float32, torch.float64: np.float64}
+        buffer_problem = problem.clone()
+        buffer_problem.irrep_dtype = dtype_map[dtype]
+        buffer_problem.weight_dtype = dtype_map[dtype]
+
+        in1_np, in2_np, weights_np, _ = get_random_buffers_forward(
+            buffer_problem, batch_size=batch_size, prng_seed=prng_seed
         )
-        in2 = torch.tensor(
-            rng.uniform(size=(batch_size, problem.irreps_in2.dim)),
-            dtype=dtype,
-            device=device,
-        )
-        weights_size = (
-            (problem.weight_numel,)
-            if problem.shared_weights
-            else (batch_size, problem.weight_numel)
-        )
-        weights = torch.tensor(
-            rng.uniform(size=weights_size),
-            dtype=dtype,
-            device=device,
-        )
-        return in1, in2, weights
+
+        return [
+            torch.tensor(arr, dtype=dtype, device=device)
+            for arr in [in1_np, in2_np, weights_np]
+        ]
 
     def test_submodule_dtype_conversion(self, parent_module_and_problem):
         """Test that calling .to() on parent module properly converts TensorProduct submodule"""
         parent, problem = parent_module_and_problem
 
         batch_size = 10
-        rng = np.random.default_rng(12345)
         device = "cuda"
         input_dtype = self._problem_dtype(problem)
-        in1, in2, weights = self._make_inputs(
-            problem, batch_size, rng, input_dtype, device
-        )
+        in1, in2, weights = self._make_inputs(problem, batch_size, input_dtype, device)
 
         output1 = parent(in1, in2, weights)
         assert output1.dtype == in1.dtype, (
@@ -418,7 +410,7 @@ class TestTorchToSubmodule:
         parent.to(target_dtype)
 
         in1_new, in2_new, weights_new = self._make_inputs(
-            problem, batch_size, rng, target_dtype, device
+            problem, batch_size, target_dtype, device, prng_seed=23456
         )
 
         output2 = parent(in1_new, in2_new, weights_new)
