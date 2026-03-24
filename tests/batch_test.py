@@ -274,6 +274,10 @@ class TestTorchTo(TPCorrectness):
 
 
 class TestIrMul(TPCorrectness):
+    '''
+    Tests both the ir_mul layout and the transpose_irreps functions
+    via a wrapper.
+    '''
     tpps = mace_problems() + [
         oeq.TPProblem(
             "5x5e",
@@ -306,25 +310,20 @@ class TestIrMul(TPCorrectness):
     def tp_and_problem(self, request, problem, extra_tp_constructor_args, with_jax):
         mode = request.param
 
-        if mode == "native":
-            cls = oeq.TensorProduct
-            if with_jax:
-                import openequivariance.jax.TensorProduct as jax_tp
+        if with_jax:
+            import openequivariance.jax.TensorProduct as jax_tp
+            from openequivariance.jax import transpose_irreps
 
-                cls = jax_tp
-            tp = cls(problem, **extra_tp_constructor_args)
+            tp_base_cls = jax_tp
+        else:
+            from openequivariance._torch.utils import transpose_irreps
+
+            tp_base_cls = oeq.TensorProduct
+
+        if mode == "native":
+            tp = tp_base_cls(problem, **extra_tp_constructor_args)
             return tp, problem
         else:
-            if with_jax:
-                import openequivariance.jax.TensorProduct as jax_tp
-                from openequivariance.jax import transpose_irreps
-
-                tp_base_cls = jax_tp
-            else:
-                from openequivariance._torch.utils import transpose_irreps
-
-                tp_base_cls = oeq.TensorProduct
-
             class TransposeWrapperTensorProduct(tp_base_cls):
                 def forward(self, x, y, W):
                     x_t = transpose_irreps(
