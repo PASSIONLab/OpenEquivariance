@@ -6,6 +6,11 @@ from pytest_check import check
 import numpy as np
 import openequivariance as oeq
 from openequivariance.benchmark.ConvBenchmarkSuite import load_graph
+from openequivariance.benchmark.correctness import (
+    correctness_backward_conv,
+    correctness_double_backward_conv,
+    correctness_forward_conv,
+)
 from itertools import product
 import torch
 
@@ -89,7 +94,8 @@ class ConvCorrectness:
         if conv_object is None:
             pytest.skip("'conv_object' fixture returned None, skipping")
 
-        result = conv_object.test_correctness_forward(
+        result = correctness_forward_conv(
+            conv_object,
             graph,
             thresh=self.thresh("fwd"),
             prng_seed=12345,
@@ -102,7 +108,8 @@ class ConvCorrectness:
         if conv_object is None:
             pytest.skip("'conv_object' fixture returned None, skipping")
 
-        result = conv_object.test_correctness_backward(
+        result = correctness_backward_conv(
+            conv_object,
             graph,
             thresh=self.thresh("bwd"),
             prng_seed=12345,
@@ -117,7 +124,8 @@ class ConvCorrectness:
         if conv_object is None:
             pytest.skip("'conv_object' fixture returned None, skipping")
 
-        result = conv_object.test_correctness_double_backward(
+        result = correctness_double_backward_conv(
+            conv_object,
             graph,
             thresh=self.thresh("double_bwd"),
             prng_seed=12345,
@@ -282,6 +290,36 @@ class TestTorchTo(ConvCorrectness):
             **extra_conv_constructor_args,
         )
         return module.to(switch_map[problem.irrep_dtype])
+
+
+class TestIrMulLayout(ConvCorrectness):
+    production_model_tpps = mace_problems() + [
+        oeq.TPProblem(
+            "5x5e",
+            "1x3e",
+            "5x5e",
+            [(0, 0, 0, "uvu", True)],
+            shared_weights=False,
+            internal_weights=False,
+            label="ir_mul_repr_5x1x5_l535",
+        ),
+        oeq.TPProblem(
+            "13x5e",
+            "1x3e",
+            "13x5e",
+            [(0, 0, 0, "uvu", True)],
+            shared_weights=False,
+            internal_weights=False,
+            label="ir_mul_repr_13x1x13_l535",
+        ),
+    ]
+
+    @pytest.fixture(params=production_model_tpps, ids=lambda x: x.label, scope="class")
+    def problem(self, request, dtype):
+        problem = request.param.clone()
+        problem.irrep_dtype, problem.weight_dtype = dtype, dtype
+        problem.layout = "ir_mul"
+        return problem
 
 
 class TestTorchToSubmodule:

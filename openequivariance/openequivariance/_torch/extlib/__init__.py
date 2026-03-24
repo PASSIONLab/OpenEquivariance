@@ -8,7 +8,7 @@ from packaging.version import Version
 
 import torch
 
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.logging import getLogger
 
 oeq_root = str(Path(__file__).parent.parent.parent)
 

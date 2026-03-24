@@ -50,45 +50,110 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
     }
 {%- endmacro %}
 
+{%- macro layout_load(layout, mul, dim, smem, offset, reg) %}
+    {%- if layout == "ir_mul" %}
+        {{ reg_load(mul, dim, smem, offset, reg) }}
+    {%- else %}
+        {{ transpose_load(mul, dim, smem, offset, reg) }}
+    {%- endif %}
+{%- endmacro %}
+
+{%- macro layout_store(layout, mul, dim, smem, offset, reg, op, coeff) %}
+    {%- if layout == "ir_mul" %}
+        {{ reg_store(mul, dim, smem, offset, reg, op, coeff) }}
+    {%- else %}
+        {{ transpose_store(mul, dim, smem, offset, reg, op, coeff) }}
+    {%- endif %}
+{%- endmacro %}
+
 {%- macro declare_smem_variables(segment, smem_base) %}
     {%- for name in segment.smem %}
         {%- if name != "total" %}
             {%- set smem_rng = segment.smem[name] %}
-            {{ smem_rng["dtype"] }}* {{name}}_smem = ({{smem_rng["dtype"]}}*) ({{smem_base}} + {{smem_rng["offset"]}}); 
+            {{ smem_rng["dtype"] }}* {{name}}_smem = ({{smem_rng["dtype"]}}*) ({{smem_base}} + {{smem_rng["offset"]}});
         {%- endif %}
     {%- endfor %}
 {%- endmacro %}
 
 {%- macro load_ir_segments(map, glb_ptr_shft, smem_ptr, loop_var) %}
     {%- if not map.persist_load %}
-        {%- for (src_rng, dst_rng) in map.copy_ranges %}
-            {%- set range_len = src_rng.stop - src_rng.start %}
-            ROW_OPERATION({{range_len}}, {{loop_var}}, {{smem_ptr}}[{{loop_var}} + {{dst_rng.start}} + lane_id] = {{glb_ptr_shft}}[{{loop_var}} + {{src_rng.start}}];)
-        {%- endfor %} 
+        {%- if map.src_views[0].layout == "mul_ir" %}
+            {%- for (src_rng, dst_rng) in map.copy_ranges %}
+                {%- set range_len = src_rng.stop - src_rng.start %}
+                ROW_OPERATION({{range_len}}, {{loop_var}}, {{smem_ptr}}[{{loop_var}} + {{dst_rng.start}} + lane_id] = {{glb_ptr_shft}}[{{loop_var}} + {{src_rng.start}}];)
+            {%- endfor %}
+        {%- elif map.src_views[0].layout == "ir_mul" %}
+            {%- for idx in map.idxs %}
+                {%- set m = namespace(
+                    src_view=map.src_views[idx],
+                    src_mul_ir=map.src_irreps[idx],
+                    dst_rng=map.dst_irreps.slices()[map.src_dst_map[idx]]
+                ) %}
+                {%- for i in range(m.src_mul_ir.ir.dim) %}
+                    ROW_OPERATION({{m.src_mul_ir.mul}}, {{loop_var}}, {{smem_ptr}}[{{m.dst_rng.start + i * m.src_mul_ir.mul}} + {{loop_var}} + lane_id] = {{glb_ptr_shft}}[{{m.src_view.ir_mul_offset + i * m.src_view.ir_mul_stride}} + {{loop_var}}];)
+                {%- endfor %}
+            {%- endfor %}
+        {%- endif %}
     {%- endif %}
 {%- endmacro %}
 
 {%- macro load_ir_segments_force(map, glb_ptr_shft, smem_ptr, loop_var) %}
-    {%- for (src_rng, dst_rng) in map.copy_ranges %}
-        {%- set range_len = src_rng.stop - src_rng.start %}
-        ROW_OPERATION({{range_len}}, {{loop_var}}, {{smem_ptr}}[{{loop_var}} + {{dst_rng.start}} + lane_id] = {{glb_ptr_shft}}[{{loop_var}} + {{src_rng.start}}];)
-    {%- endfor %} 
+    {%- if map.src_views[0].layout == "mul_ir" %}
+        {%- for (src_rng, dst_rng) in map.copy_ranges %}
+            {%- set range_len = src_rng.stop - src_rng.start %}
+            ROW_OPERATION({{range_len}}, {{loop_var}}, {{smem_ptr}}[{{loop_var}} + {{dst_rng.start}} + lane_id] = {{glb_ptr_shft}}[{{loop_var}} + {{src_rng.start}}];)
+        {%- endfor %}
+    {%- elif map.src_views[0].layout == "ir_mul" %}
+        {%- for idx in map.idxs %}
+            {%- set m = namespace(
+                src_view=map.src_views[idx],
+                src_mul_ir=map.src_irreps[idx],
+                dst_rng=map.dst_irreps.slices()[map.src_dst_map[idx]]
+            ) %}
+            {%- for i in range(m.src_mul_ir.ir.dim) %}
+                ROW_OPERATION({{m.src_mul_ir.mul}}, {{loop_var}}, {{smem_ptr}}[{{m.dst_rng.start + i * m.src_mul_ir.mul}} + {{loop_var}} + lane_id] = {{glb_ptr_shft}}[{{m.src_view.ir_mul_offset + i * m.src_view.ir_mul_stride}} + {{loop_var}}];)
+            {%- endfor %}
+        {%- endfor %}
+    {%- endif %}
 {%- endmacro %}
 
 {%- macro store_ir_segments(map, glb_ptr_shft, smem_ptr, loop_var) %}
     {%- if not map.persist_store %}
-        {%- for i, src_rng in enumerate(map.original_src_ranges) %}
-            {%- set idx = map.idxs[i] %}
-            {%- set dst_rng = map.original_dst_ranges[i] %}
-            {%- set range_len = src_rng.stop - src_rng.start %}
-            {%- if map.storeback_procedure[idx] == "write" %}
-                ROW_OPERATION({{range_len}}, {{loop_var}}, {{glb_ptr_shft}}[{{loop_var}} + {{src_rng.start}}] = {{smem_ptr}}[{{loop_var}} + {{dst_rng.start}} + lane_id];)
-            {%- elif map.storeback_procedure[idx] == "accumulate" %}
-                ROW_OPERATION({{range_len}}, {{loop_var}}, {{glb_ptr_shft}}[{{loop_var}} + {{src_rng.start}}] += {{smem_ptr}}[{{loop_var}} + {{dst_rng.start}} + lane_id];)
-            {%- elif map.storeback_procedure[idx] == "atomic_accumulate" %}
-                ROW_OPERATION({{range_len}}, {{loop_var}}, atomicAdd({{glb_ptr_shft}} + {{src_rng.start}} + {{loop_var}}, {{smem_ptr}}[{{dst_rng.start}} + lane_id + {{loop_var}}]);)
-            {%- endif %}
-        {%- endfor %}
+        {%- if map.src_views[0].layout == "mul_ir" %}
+            {%- for i, src_rng in enumerate(map.original_src_ranges) %}
+                {%- set idx = map.idxs[i] %}
+                {%- set dst_rng = map.original_dst_ranges[i] %}
+                {%- set range_len = src_rng.stop - src_rng.start %}
+                {%- if map.storeback_procedure[idx] == "write" %}
+                    ROW_OPERATION({{range_len}}, {{loop_var}}, {{glb_ptr_shft}}[{{loop_var}} + {{src_rng.start}}] = {{smem_ptr}}[{{loop_var}} + {{dst_rng.start}} + lane_id];)
+                {%- elif map.storeback_procedure[idx] == "accumulate" %}
+                    ROW_OPERATION({{range_len}}, {{loop_var}}, {{glb_ptr_shft}}[{{loop_var}} + {{src_rng.start}}] += {{smem_ptr}}[{{loop_var}} + {{dst_rng.start}} + lane_id];)
+                {%- elif map.storeback_procedure[idx] == "atomic_accumulate" %}
+                    ROW_OPERATION({{range_len}}, {{loop_var}}, atomicAdd({{glb_ptr_shft}} + {{src_rng.start}} + {{loop_var}}, {{smem_ptr}}[{{dst_rng.start}} + lane_id + {{loop_var}}]);)
+                {%- endif %}
+            {%- endfor %}
+        {%- elif map.src_views[0].layout == "ir_mul" %}
+            {%- for idx in map.idxs %}
+                {%- set m = namespace(
+                    src_view=map.src_views[idx],
+                    src_mul_ir=map.src_irreps[idx],
+                    dst_rng=map.dst_irreps.slices()[map.src_dst_map[idx]]
+                ) %}
+                {%- if map.storeback_procedure[idx] == "write" %}
+                    {%- for i in range(m.src_mul_ir.ir.dim) %}
+                        ROW_OPERATION({{m.src_mul_ir.mul}}, {{loop_var}}, {{glb_ptr_shft}}[{{m.src_view.ir_mul_offset + i * m.src_view.ir_mul_stride}} + {{loop_var}}] = {{smem_ptr}}[{{m.dst_rng.start + i * m.src_mul_ir.mul}} + {{loop_var}} + lane_id];)
+                    {%- endfor %}
+                {%- elif map.storeback_procedure[idx] == "accumulate" %}
+                    {%- for i in range(m.src_mul_ir.ir.dim) %}
+                        ROW_OPERATION({{m.src_mul_ir.mul}}, {{loop_var}}, {{glb_ptr_shft}}[{{m.src_view.ir_mul_offset + i * m.src_view.ir_mul_stride}} + {{loop_var}}] += {{smem_ptr}}[{{m.dst_rng.start + i * m.src_mul_ir.mul}} + {{loop_var}} + lane_id];)
+                    {%- endfor %}
+                {%- elif map.storeback_procedure[idx] == "atomic_accumulate" %}
+                    {%- for i in range(m.src_mul_ir.ir.dim) %}
+                        ROW_OPERATION({{m.src_mul_ir.mul}}, {{loop_var}}, atomicAdd({{glb_ptr_shft}} + {{m.src_view.ir_mul_offset + i * m.src_view.ir_mul_stride}} + {{loop_var}}, {{smem_ptr}}[{{m.dst_rng.start + i * m.src_mul_ir.mul}} + {{loop_var}} + lane_id]);)
+                    {%- endfor %}
+                {%- endif %}
+            {%- endfor %}
+        {%- endif %}
     {% endif %}
 {%- endmacro %}
 
@@ -122,7 +187,7 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
                 {{smem_ptr}}[{{offset}} + lane_id + {{i * mul}}] = t_regs[{{i}}];
             {%- endfor %}
         }
-    } {%- endfor %} 
+    } {%- endfor %}
 {%- endmacro %}
 
 {%- macro transpose_smem_B(irreps, smem_ptr) %}
@@ -134,14 +199,14 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
         if(lane_id < {{mul}}) {
             {%- set offset = slices[i].start %}
             {%- for i in range(dim) %}
-                t_regs[{{i}}] = {{smem_ptr}}[{{offset}} + lane_id + {{i * mul}}]; 
+                t_regs[{{i}}] = {{smem_ptr}}[{{offset}} + lane_id + {{i * mul}}];
             {%- endfor %}
             __syncwarp();
             {%- for i in range(dim) %}
                 {{smem_ptr}}[{{offset}} + lane_id * {{dim}} + {{i}}] = t_regs[{{i}}];
             {%- endfor %}
         }
-    } {%- endfor %} 
+    } {%- endfor %}
 {%- endmacro %}
 
 {%- macro reg_load(mul, dim, smem, offset, reg) %}

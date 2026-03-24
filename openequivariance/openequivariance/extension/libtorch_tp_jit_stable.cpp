@@ -89,6 +89,7 @@ Stream get_current_stream() {
 
 #ifdef INCLUDE_NB_EXTENSION
     #include "nanobind/nanobind.h"
+    #include "nanobind/stl/string.h"
     namespace nb = nanobind;
     NB_MODULE(EXTENSION_NAME, m) {
         nb::class_<DeviceProp>(m, "DeviceProp")

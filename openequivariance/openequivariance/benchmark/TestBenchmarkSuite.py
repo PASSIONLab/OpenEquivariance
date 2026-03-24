@@ -10,9 +10,9 @@ import openequivariance as oeq
 from openequivariance._torch.extlib import DeviceProp
 from openequivariance.core.TensorProductBase import TensorProductBase
 
-from openequivariance.benchmark.logging_utils import getLogger, bcolors
+from openequivariance.core.logging import getLogger, bcolors
 from openequivariance.core.e3nn_lite import TPProblem
-from openequivariance.benchmark.correctness_utils import (
+from openequivariance.benchmark.correctness import (
     correctness_forward,
     correctness_backward,
     correctness_double_backward,

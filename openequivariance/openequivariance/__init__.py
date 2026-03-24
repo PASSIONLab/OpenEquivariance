@@ -37,6 +37,7 @@ if "OEQ_NOTORCH" not in os.environ or os.environ["OEQ_NOTORCH"] != "1":
 
     from openequivariance._torch.TensorProduct import TensorProduct
     from openequivariance._torch.TensorProductConv import TensorProductConv
+    from openequivariance._torch.utils import transpose_irreps
 
     from openequivariance._torch.extlib import (
         torch_ext_so_path as torch_ext_so_path_internal,
@@ -111,4 +112,5 @@ __all__ = [
     "_check_package_editable",
     "torch_ext_so_path",
     "jax",
+    "transpose_irreps",
 ]

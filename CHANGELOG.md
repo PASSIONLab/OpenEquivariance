@@ -1,5 +1,14 @@
 ## Latest Changes
 
+### v0.6.5 (2026-03-22) 
+This release brings `ir_mul` layout support for
+OpenEquivariance. Pass the parameter
+`layout='ir_mul'` to any `TPProblem` instance to use
+a transposed layout for the input and output
+irreps. To transpose input and output irreps use
+`oeq.transpose_irreps` or `oeq.jax.transpose_irreps`;
+see our API page for usage details. 
+
 ### v0.6.4 (2026-03-05) 
 Bugfix: added missing MLIR lowerings for
 a pair of JAX primitives (thanks @teddykoker!) 

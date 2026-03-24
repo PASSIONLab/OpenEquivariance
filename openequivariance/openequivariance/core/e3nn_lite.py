@@ -36,14 +36,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import itertools
-from typing import Tuple, NamedTuple, Union, List, Any, Optional
-from math import sqrt, prod
 import collections
+import copy
+import functools
+import itertools
+from math import prod, sqrt
+from typing import Any, List, NamedTuple, Optional, Tuple, Union
+
 import numpy as np
 import numpy.linalg as la
-import functools
-import copy
 
 
 def perm_inverse(p):
@@ -385,6 +386,7 @@ class TPProblem:
     :param internal_weights: Must be False; OpenEquivariance does not support internal weights. *Default*: False.
     :param irrep_normalization: One of ``["component", "norm", "none"]``. *Default*: "component".
     :param path_normalization: One of ``["element", "path", "none"]``. *Default*: "element".
+    :param layout: One of ``["mul_ir", "ir_mul"]``, giving the layout of irreps for all inputs and outputs. *Default*: "mul_ir".
     """
 
     instructions: List[Any]
@@ -392,9 +394,9 @@ class TPProblem:
     internal_weights: bool
     weight_numel: int
     label: str
-    _profiling_str: str
     _in1_dim: int
     _in2_dim: int
+    layout: str
 
     def __init__(
         self,
@@ -412,12 +414,14 @@ class TPProblem:
         label: Optional[str] = None,
         irrep_dtype: type[np.generic] = np.float32,
         weight_dtype: type[np.generic] = np.float32,
+        layout: str = "mul_ir",
     ) -> None:
         # === Setup ===
         super().__init__()
 
         assert irrep_normalization in ["component", "norm", "none"]
         assert path_normalization in ["element", "path", "none"]
+        assert layout in ["mul_ir", "ir_mul"]
         assert issubclass(irrep_dtype, np.generic)
         assert issubclass(weight_dtype, np.generic)
 
@@ -432,6 +436,7 @@ class TPProblem:
         self.irrep_normalization = irrep_normalization
         self.path_normalization = path_normalization
         self.label = label if label is not None else ""
+        self.layout = layout
         del irreps_in1, irreps_in2, irreps_out
 
         instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]

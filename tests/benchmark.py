@@ -10,7 +10,7 @@ import urllib.request
 
 import numpy as np
 
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.logging import getLogger
 from openequivariance._torch.extlib import DeviceProp
 from openequivariance._torch.E3NNTensorProduct import (
     E3NNTensorProduct,
@@ -24,7 +24,7 @@ from openequivariance.benchmark.TestBenchmarkSuite import (
     TestDefinition,
     Direction,
 )
-from openequivariance.benchmark.tpp_creation_utils import (
+from openequivariance.benchmark.problems import (
     ChannelwiseTPP,
     FullyConnectedTPProblem,
     SingleInstruction,
@@ -385,6 +385,47 @@ def benchmark_kahan_accuracy(params):
             )
 
 
+def benchmark_layouts(params):
+    base_problems = mace_problems() + nequip_problems()
+    directions = params.directions
+    dtypes = [datatype_map[dtype] for dtype in params.datatypes]
+
+    tests = []
+    for dtype in dtypes:
+        for base_problem in base_problems:
+            for layout in ["mul_ir", "ir_mul"]:
+                layout_problem = copy.deepcopy(base_problem)
+                layout_problem.layout = layout
+                base_label = layout_problem.label or "layout_problem"
+                layout_problem.label = f"{base_label} [{layout}]"
+                layout_problem.irrep_dtype = dtype
+                layout_problem.weight_dtype = dtype
+
+                for direction in directions:
+                    tests.append(
+                        TestDefinition(
+                            TensorProduct,
+                            layout_problem,
+                            direction,
+                            correctness=False,
+                            benchmark=True,
+                        )
+                    )
+
+    bench_suite = TestBenchmarkSuite(
+        num_warmup=100,
+        num_iter=100,
+        bench_batch_size=params.batch_size,
+        prng_seed=11111,
+        test_name="layouts",
+    )
+
+    data_folder = bench_suite.run(tests, params.output_folder)
+
+    if params.plot:
+        plot({"data_folder": data_folder})
+
+
 def plot(params):
     import openequivariance.benchmark.plotting as plotting
 
@@ -402,6 +443,8 @@ def plot(params):
         plotting.plot_uvu(data_folder)
     elif test_name == "uvw":
         plotting.plot_uvw(data_folder)
+    elif test_name == "layouts":
+        plotting.plot_layout(data_folder)
     elif test_name == "roofline":
         plotting.plot_roofline(data_folder)
     elif test_name == "convolution":
@@ -531,6 +574,33 @@ if __name__ == "__main__":
     )
     parser_uvw.add_argument("--plot", action="store_true", help="Plot the results.")
     parser_uvw.set_defaults(func=benchmark_uvw)
+
+    parser_layouts = subparsers.add_parser(
+        "layouts", help="Run benchmark comparing mul_ir vs ir_mul layouts"
+    )
+    parser_layouts.add_argument(
+        "--batch_size", "-b", type=int, default=50000, help="Batch size for benchmark"
+    )
+    parser_layouts.add_argument(
+        "--directions",
+        "-d",
+        type=str,
+        nargs="+",
+        default=["forward", "backward"],
+        help="Directions to benchmark",
+        choices=["forward", "backward"],
+    )
+    parser_layouts.add_argument(
+        "--datatypes",
+        "-t",
+        type=str,
+        nargs="+",
+        default=["float32", "float64"],
+        help="Data types to benchmark",
+        choices=["float32", "float64"],
+    )
+    parser_layouts.add_argument("--plot", action="store_true", help="Plot the results.")
+    parser_layouts.set_defaults(func=benchmark_layouts)
 
     parser_double_bwd = subparsers.add_parser(
         "double_backward", help="Run the higher derivative kernel benchmark"

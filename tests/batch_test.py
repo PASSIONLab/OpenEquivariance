@@ -1,22 +1,23 @@
-import pytest
-from pytest_check import check
+from itertools import product
 
 import numpy as np
-import openequivariance as oeq
-from openequivariance.benchmark.correctness_utils import (
-    correctness_forward,
+import pytest
+import torch
+from openequivariance.benchmark.correctness import (
     correctness_backward,
     correctness_double_backward,
+    correctness_forward,
 )
-
+from openequivariance.benchmark.test_buffers import get_random_buffers_forward
 from openequivariance.benchmark.problems import (
-    e3nn_torch_tetris_poly_problems,
     diffdock_problems,
+    e3nn_torch_tetris_poly_problems,
     mace_problems,
     nequip_problems,
 )
-from itertools import product
-import torch
+from pytest_check import check
+
+import openequivariance as oeq
 
 
 @pytest.fixture(params=[np.float32, np.float64], ids=["F32", "F64"], scope="module")
@@ -273,6 +274,80 @@ class TestTorchTo(TPCorrectness):
             return tp, tp.config
 
 
+class TestIrMul(TPCorrectness):
+    """
+    Tests both the ir_mul layout and the transpose_irreps functions.
+    """
+
+    tpps = mace_problems() + [
+        oeq.TPProblem(
+            "5x5e",
+            "1x3e",
+            "5x5e",
+            [(0, 0, 0, "uvu", True)],
+            shared_weights=False,
+            internal_weights=False,
+            label="ir_mul_repr_5x1x5_l535",
+        ),
+        oeq.TPProblem(
+            "13x5e",
+            "1x3e",
+            "13x5e",
+            [(0, 0, 0, "uvu", True)],
+            shared_weights=False,
+            internal_weights=False,
+            label="ir_mul_repr_13x1x13_l535",
+        ),
+    ]
+
+    @pytest.fixture(params=tpps, ids=lambda x: x.label, scope="class")
+    def problem(self, request, dtype):
+        problem = request.param.clone()
+        problem.irrep_dtype, problem.weight_dtype = dtype, dtype
+        problem.layout = "ir_mul"
+        return problem
+
+    @pytest.fixture(params=["native", "transpose_wrapper"], scope="class")
+    def tp_and_problem(self, request, problem, extra_tp_constructor_args, with_jax):
+        mode = request.param
+
+        if with_jax:
+            import openequivariance.jax.TensorProduct as jax_tp
+            from openequivariance.jax import transpose_irreps
+
+            tp_base_cls = jax_tp
+        else:
+            from openequivariance import transpose_irreps
+
+            tp_base_cls = oeq.TensorProduct
+
+        if mode == "native":
+            tp = tp_base_cls(problem, **extra_tp_constructor_args)
+            return tp, problem
+        else:
+
+            class TransposeWrapperTensorProduct(tp_base_cls):
+                def forward(self, x, y, W):
+                    x_t = transpose_irreps(
+                        x, self.config.irreps_in1, "ir_mul", "mul_ir"
+                    )
+                    y_t = transpose_irreps(
+                        y, self.config.irreps_in2, "ir_mul", "mul_ir"
+                    )
+                    out_mul_ir = super().forward(x_t, y_t, W)
+                    return transpose_irreps(
+                        out_mul_ir, self.config.irreps_out, "mul_ir", "ir_mul"
+                    )
+
+            wrapped_problem = problem.clone()
+            wrapped_problem.layout = "mul_ir"
+            tp = TransposeWrapperTensorProduct(
+                wrapped_problem, **extra_tp_constructor_args
+            )
+            tp.config.layout = "ir_mul"
+            return tp, problem
+
+
 class TestTorchToSubmodule:
     """Test that TensorProduct works correctly as a submodule when parent's .to() is called"""
 
@@ -298,40 +373,29 @@ class TestTorchToSubmodule:
     def _problem_dtype(self, problem):
         return torch.float32 if problem.irrep_dtype == np.float32 else torch.float64
 
-    def _make_inputs(self, problem, batch_size, rng, dtype, device):
-        in1 = torch.tensor(
-            rng.uniform(size=(batch_size, problem.irreps_in1.dim)),
-            dtype=dtype,
-            device=device,
+    def _make_inputs(self, problem, batch_size, dtype, device, prng_seed=12345):
+        dtype_map = {torch.float32: np.float32, torch.float64: np.float64}
+        buffer_problem = problem.clone()
+        buffer_problem.irrep_dtype = dtype_map[dtype]
+        buffer_problem.weight_dtype = dtype_map[dtype]
+
+        in1_np, in2_np, weights_np, _ = get_random_buffers_forward(
+            buffer_problem, batch_size=batch_size, prng_seed=prng_seed
         )
-        in2 = torch.tensor(
-            rng.uniform(size=(batch_size, problem.irreps_in2.dim)),
-            dtype=dtype,
-            device=device,
-        )
-        weights_size = (
-            (problem.weight_numel,)
-            if problem.shared_weights
-            else (batch_size, problem.weight_numel)
-        )
-        weights = torch.tensor(
-            rng.uniform(size=weights_size),
-            dtype=dtype,
-            device=device,
-        )
-        return in1, in2, weights
+
+        return [
+            torch.tensor(arr, dtype=dtype, device=device)
+            for arr in [in1_np, in2_np, weights_np]
+        ]
 
     def test_submodule_dtype_conversion(self, parent_module_and_problem):
         """Test that calling .to() on parent module properly converts TensorProduct submodule"""
         parent, problem = parent_module_and_problem
 
         batch_size = 10
-        rng = np.random.default_rng(12345)
         device = "cuda"
         input_dtype = self._problem_dtype(problem)
-        in1, in2, weights = self._make_inputs(
-            problem, batch_size, rng, input_dtype, device
-        )
+        in1, in2, weights = self._make_inputs(problem, batch_size, input_dtype, device)
 
         output1 = parent(in1, in2, weights)
         assert output1.dtype == in1.dtype, (
@@ -346,7 +410,7 @@ class TestTorchToSubmodule:
         parent.to(target_dtype)
 
         in1_new, in2_new, weights_new = self._make_inputs(
-            problem, batch_size, rng, target_dtype, device
+            problem, batch_size, target_dtype, device, prng_seed=23456
         )
 
         output2 = parent(in1_new, in2_new, weights_new)

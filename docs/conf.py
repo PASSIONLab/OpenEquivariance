@@ -38,6 +38,8 @@ autodoc_mock_imports = [
     "openequivariance._torch.extlib",
     "openequivariance.jax.extlib",
     "openequivariance_extjax",
+    "openequivariance.jax.jvp.tp_prim",
+    "openequivariance.jax.jvp.conv_prim",
     "jinja2",
     "numpy",
 ]

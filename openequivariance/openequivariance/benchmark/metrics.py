@@ -1,20 +1,15 @@
-import math
-
 from openequivariance.core.utils import (
     count_cg_non_zero,
-    sparse_outer_product_work,
 )
 
-from openequivariance.core.e3nn_lite import TPProblem, wigner_3j
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.e3nn_lite import TPProblem
+from openequivariance.core.logging import getLogger
 import numpy as np
 
 logger = getLogger()
 
 
-def calculate_minimum_memory_streamed_forward(
-    tpp: TPProblem, batch_size: int
-) -> dict[str, int]:
+def memory_streamed_forward(tpp: TPProblem, batch_size: int) -> dict[str, int]:
     """
     This represents an absolute minimum amount of memory that could be streamed on an ideal machine
     It returns the number of bytes streamed total and from each source
@@ -31,7 +26,7 @@ def calculate_minimum_memory_streamed_forward(
     return data_size
 
 
-def calculate_minimum_memory_streamed_backward(tpp: TPProblem, batch_size: int) -> dict:
+def memory_streamed_backward(tpp: TPProblem, batch_size: int) -> dict:
     """
     This represents an absolute minimum amount of memory that could be streamed on an ideal machine
     It returns the number of bytes streamed total and from each source
@@ -51,17 +46,12 @@ def calculate_minimum_memory_streamed_backward(tpp: TPProblem, batch_size: int) 
     return data_size
 
 
-def calculate_minimum_flops_forward(tpp: TPProblem, batch_size: int) -> dict:
+def flops_forward(tpp: TPProblem, batch_size: int) -> dict:
     """
-    This is not actually calcuating the minimum value.
-    Ideally you might share the outer product values between two inputs across multiple inputs.
-    This is assuming that you form those values and reuse them once per CG decomp.
+    Default FLOP estimate aligned with LoopUnrollTP's forward FLOP accounting.
     """
-    logger.warning("Minimum flops Calculation is not the true minimum")
-    flops_count = {}
-    flops_count["outer_products"] = 0
-    flops_count["CG_decomposition"] = 0
-    flops_count["linear_combination"] = 0
+    flops_count = {"CG_decomposition": 0, "linear_combination": 0, "outer_products": 0}
+
     for ins in tpp.instructions:  # type : Instruction
         l1, l2, l3 = (
             tpp.irreps_in1[ins.i_in1].ir.l,
@@ -69,28 +59,36 @@ def calculate_minimum_flops_forward(tpp: TPProblem, batch_size: int) -> dict:
             tpp.irreps_out[ins.i_out].ir.l,
         )
 
-        flops_count["outer_products"] += sparse_outer_product_work(
-            wigner_3j(l1, l2, l3)
-        )
         flops_count["CG_decomposition"] += count_cg_non_zero(l1, l2, l3) * (
             ins.path_shape[0] * ins.path_shape[1]
         )
         flops_count["linear_combination"] += (
-            (2 * l3 + 1) * math.prod(ins.path_shape) if ins.has_weight else 0
+            (2 * l3 + 1) * np.prod(ins.path_shape) if ins.has_weight else 0
         )
 
-    flops_count["outer_products"] *= batch_size
-    flops_count["CG_decomposition"] *= 2 * batch_size
-    flops_count["linear_combination"] *= 2 * batch_size
+    flops_count["CG_decomposition"] *= 3 * batch_size
+    flops_count["linear_combination"] *= batch_size  # Weights do not require FMA here
 
     flops_count["total"] = sum(flops_count.values())
     return flops_count
 
 
-def calculate_minimum_flops_backward(tpp: TPProblem, batch_size: int) -> dict:
+def flops_backward(tpp: TPProblem, batch_size: int) -> dict:
     """
-    This is not actually calcuating the minumum value.
-    Ideally you might share the outer product values between two inputs across multiple inputs.
-    This is assuming that you form those values and reuse them once per CG decomp.
+    Default FLOP estimate aligned with LoopUnrollTP's backward FLOP accounting.
     """
-    raise NotImplementedError("this needs to be implemented properly")
+    flops_count = {"backward": 0}
+
+    for ins in tpp.instructions:  # type : Instruction
+        l1, l2, l3 = (
+            tpp.irreps_in1[ins.i_in1].ir.l,
+            tpp.irreps_in2[ins.i_in2].ir.l,
+            tpp.irreps_out[ins.i_out].ir.l,
+        )
+        flops_count["backward"] += count_cg_non_zero(l1, l2, l3) * (
+            ins.path_shape[0] * ins.path_shape[1]
+        )
+
+    flops_count["backward"] *= 9 * batch_size
+    flops_count["total"] = sum(flops_count.values())
+    return flops_count
