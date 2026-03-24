@@ -317,7 +317,7 @@ class TestIrMul(TPCorrectness):
 
             tp_base_cls = jax_tp
         else:
-            from openequivariance._torch.utils import transpose_irreps
+            from openequivariance import transpose_irreps
 
             tp_base_cls = oeq.TensorProduct
 
