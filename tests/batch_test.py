@@ -273,8 +273,8 @@ class TestTorchTo(TPCorrectness):
             return tp, tp.config
 
 
-class TestIrMulLayoutMACE(TPCorrectness):
-    production_model_tpps = mace_problems() + [
+class TestIrMul(TPCorrectness):
+    tpps = mace_problems() + [
         oeq.TPProblem(
             "5x5e",
             "1x3e",
@@ -295,12 +295,56 @@ class TestIrMulLayoutMACE(TPCorrectness):
         ),
     ]
 
-    @pytest.fixture(params=production_model_tpps, ids=lambda x: x.label, scope="class")
+    @pytest.fixture(params=tpps, ids=lambda x: x.label, scope="class")
     def problem(self, request, dtype):
         problem = request.param.clone()
         problem.irrep_dtype, problem.weight_dtype = dtype, dtype
         problem.layout = "ir_mul"
         return problem
+
+    @pytest.fixture(params=["native", "transpose_wrapper"], scope="class")
+    def tp_and_problem(self, request, problem, extra_tp_constructor_args, with_jax):
+        mode = request.param
+
+        if mode == "native":
+            cls = oeq.TensorProduct
+            if with_jax:
+                import openequivariance.jax.TensorProduct as jax_tp
+
+                cls = jax_tp
+            tp = cls(problem, **extra_tp_constructor_args)
+            return tp, problem
+        else:
+            if with_jax:
+                import openequivariance.jax.TensorProduct as jax_tp
+                from openequivariance.jax import transpose_irreps
+
+                tp_base_cls = jax_tp
+            else:
+                from openequivariance._torch.utils import transpose_irreps
+
+                tp_base_cls = oeq.TensorProduct
+
+            class TransposeWrapperTensorProduct(tp_base_cls):
+                def forward(self, x, y, W):
+                    x_t = transpose_irreps(
+                        x, self.config.irreps_in1, "ir_mul", "mul_ir"
+                    )
+                    y_t = transpose_irreps(
+                        y, self.config.irreps_in2, "ir_mul", "mul_ir"
+                    )
+                    out_mul_ir = super().forward(x_t, y_t, W)
+                    return transpose_irreps(
+                        out_mul_ir, self.config.irreps_out, "mul_ir", "ir_mul"
+                    )
+
+            wrapped_problem = problem.clone()
+            wrapped_problem.layout = "mul_ir"
+            tp = TransposeWrapperTensorProduct(
+                wrapped_problem, **extra_tp_constructor_args
+            )
+            tp.config.layout = "ir_mul"
+            return tp, problem
 
 
 class TestTorchToSubmodule:
