@@ -1,15 +1,13 @@
 import functools
+import hashlib
+import json
 import math
+import tempfile
+from enum import IntEnum
 
 import numpy as np
 
-from openequivariance.core.e3nn_lite import Instruction, TPProblem, wigner_3j
-
-import json
-import tempfile
-import hashlib
-
-from enum import IntEnum
+from openequivariance.core.e3nn_lite import Instruction, Irreps, TPProblem, wigner_3j
 
 
 class DTypeEnum(IntEnum):
@@ -98,6 +96,11 @@ def filter_and_analyze_problem(problem):
         f"Connection mode must be 'uvu' or 'uvw', got {problem.instructions[0].connection_mode}"
     )
 
+    if problem.layout == "ir_mul":
+        assert problem.instructions[0].connection_mode == "uvu", (
+            "layout='ir_mul' is only supported for pure 'uvu' problems"
+        )
+
     assert problem.irrep_dtype == problem.weight_dtype, (
         f"irrep_dtype and weight_dtype must be the same, got {problem.irrep_dtype} and {problem.weight_dtype}"
     )
@@ -168,7 +171,7 @@ def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
             time_millis[i] = timer.stop_clock_get_elapsed()
 
     else:
-        from torch.profiler import profile, record_function, ProfilerActivity
+        from torch.profiler import ProfilerActivity, profile, record_function
 
         trace_file = tempfile.NamedTemporaryFile().name
 
@@ -204,3 +207,54 @@ def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
 
 def hash_str_64(s: str) -> int:
     return int.from_bytes(hashlib.sha256(s.encode()).digest()[:7], "big")
+
+
+def transpose_irrep_layout(
+    array: np.ndarray,
+    irreps: Irreps,
+    src_layout: str,
+    dst_layout: str,
+) -> np.ndarray:
+    """
+    Transpose irrep-packed feature arrays between `mul_ir` and `ir_mul` layouts.
+
+    Expected input shape is `[..., irreps.dim]`. A new array is returned.
+    If `src_layout == dst_layout`, this returns a copy.
+    """
+    if src_layout not in ("mul_ir", "ir_mul"):
+        raise ValueError(f"Unsupported src_layout: {src_layout}")
+    if dst_layout not in ("mul_ir", "ir_mul"):
+        raise ValueError(f"Unsupported dst_layout: {dst_layout}")
+
+    x = np.asarray(array)
+    out = np.empty_like(x)
+
+    if src_layout == dst_layout:
+        out[...] = x
+        return out
+
+    slices = irreps.slices()
+    for ir_idx, mul_ir in enumerate(irreps):
+        mul = mul_ir.mul
+        dim = mul_ir.ir.dim
+        seg = slices[ir_idx]
+        block = x[..., seg.start : seg.stop]
+
+        if src_layout == "ir_mul" and dst_layout == "mul_ir":
+            out[..., seg.start : seg.stop] = (
+                block.reshape(*block.shape[:-1], dim, mul)
+                .swapaxes(-1, -2)
+                .reshape(*block.shape[:-1], mul * dim)
+            )
+        elif src_layout == "mul_ir" and dst_layout == "ir_mul":
+            out[..., seg.start : seg.stop] = (
+                block.reshape(*block.shape[:-1], mul, dim)
+                .swapaxes(-1, -2)
+                .reshape(*block.shape[:-1], dim * mul)
+            )
+        else:
+            raise ValueError(
+                f"Unsupported layout transpose: {src_layout} -> {dst_layout}"
+            )
+
+    return out

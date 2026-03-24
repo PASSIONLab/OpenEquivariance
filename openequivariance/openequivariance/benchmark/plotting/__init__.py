@@ -5,6 +5,7 @@ from openequivariance.benchmark.plotting.plot_convolution import plot_convolutio
 from openequivariance.benchmark.plotting.plot_double_backward import (
     plot_double_backward,
 )
+from openequivariance.benchmark.plotting.plot_layout import plot_layout
 
 __all__ = [
     "plot_uvu",
@@ -12,4 +13,5 @@ __all__ = [
     "plot_roofline",
     "plot_convolution",
     "plot_double_backward",
+    "plot_layout",
 ]

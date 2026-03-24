@@ -1,7 +1,7 @@
 import numpy as np
 
 from openequivariance.core.e3nn_lite import TPProblem
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.logging import getLogger
 from openequivariance.core.utils import benchmark
 
 logger = getLogger()
@@ -180,21 +180,3 @@ class TensorProductBase:
             mode=mode,
             kernel_names=kernel_names,
         )
-
-    def calculate_memory_streamed_forward(self, batch_size: int) -> dict:
-        raise NotImplementedError("This needs to be implemented in your class")
-
-    def calculate_memory_streamed_backward(self, batch_size: int) -> dict:
-        raise NotImplementedError("This needs to be implemented in your class")
-
-    def calculate_memory_streamed_double_backward(self, batch_size: int) -> dict:
-        raise NotImplementedError("This needs to be implemented in your class")
-
-    def calculate_flops_forward(self, batch_size: int) -> dict:
-        raise NotImplementedError("This needs to be implemented in your class")
-
-    def calculate_flops_backward(self, batch_size: int) -> dict:
-        raise NotImplementedError("This needs to be implemented in your class")
-
-    def calculate_flops_double_backward(self, batch_size: int) -> dict:
-        raise NotImplementedError("This needs to be implemented in your class")

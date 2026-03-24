@@ -1,18 +1,18 @@
-import numpy as np
 import json
 
-from openequivariance.core.ConvolutionBase import ConvolutionBase
+import numpy as np
+
 from openequivariance.core.ComputationSchedule import (
     ComputationSchedule,
     SMEMCapacityException,
 )
-
-from openequivariance.templates.jinja_utils import get_jinja_environment
+from openequivariance.core.ConvolutionBase import ConvolutionBase
 from openequivariance.core.utils import (
-    filter_and_analyze_problem,
     dtype_to_enum,
+    filter_and_analyze_problem,
     hash_str_64,
 )
+from openequivariance.templates.jinja_utils import get_jinja_environment
 
 
 class LoopUnrollConv(ConvolutionBase):
@@ -114,9 +114,11 @@ class LoopUnrollConv(ConvolutionBase):
                 except SMEMCapacityException:
                     warp_count -= 1
                     if warp_count == 0:
-                        raise SMEMCapacityException(
+                        raise RuntimeError(
                             "Tensor product schedule generation failed, shared memory inadequate!"
                         )
+                except Exception:
+                    raise
 
         if not deterministic:
             for segment in self.forward_schedule.segments:

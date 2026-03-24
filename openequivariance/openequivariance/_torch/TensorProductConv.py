@@ -23,7 +23,7 @@ from openequivariance._torch.utils import (
     enum_to_torch_dtype,
 )
 
-from openequivariance.benchmark.logging_utils import getLogger
+from openequivariance.core.logging import getLogger
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixinConv
 
 logger = getLogger()
