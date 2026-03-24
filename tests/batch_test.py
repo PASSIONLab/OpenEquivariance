@@ -275,8 +275,7 @@ class TestTorchTo(TPCorrectness):
 
 class TestIrMul(TPCorrectness):
     '''
-    Tests both the ir_mul layout and the transpose_irreps functions
-    via a wrapper.
+    Tests both the ir_mul layout and the transpose_irreps functions. 
     '''
     tpps = mace_problems() + [
         oeq.TPProblem(
