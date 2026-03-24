@@ -30,6 +30,8 @@ PyTorch API
     :undoc-members:
     :exclude-members: name
 
+.. autofunction:: openequivariance.transpose_irreps
+
 .. autofunction:: openequivariance.torch_to_oeq_dtype
 
 .. autofunction:: openequivariance.torch_ext_so_path
@@ -54,7 +56,9 @@ breaking the PyTorch version of OpenEquivariance.
 .. autoclass:: openequivariance.jax.TensorProductConv
     :members: forward, reorder_weights_from_e3nn, reorder_weights_to_e3nn
     :undoc-members:
-    :exclude-members: 
+    :exclude-members:
+
+.. autofunction:: openequivariance.jax.transpose_irreps
 
 Common API
 ---------------------
