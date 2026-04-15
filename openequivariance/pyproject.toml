@@ -75,3 +75,6 @@ addopts = [
 
 [tool.ruff]
 lint.ignore = ["E741"]
+
+[tool.scikit-build.cmake.define]
+AARCH64 = {env="AARCH64", default="0"}
