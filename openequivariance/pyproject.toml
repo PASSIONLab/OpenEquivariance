@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "openequivariance"
-version = "0.6.5"
+version = "0.6.6"
 authors = [
   { name="Austin Glover" },
   { name="Vivek Bharadwaj" },
@@ -75,3 +75,6 @@ addopts = [
 
 [tool.ruff]
 lint.ignore = ["E741"]
+
+[tool.scikit-build.cmake.define]
+AARCH64 = {env="AARCH64", default="0"}

@@ -6,9 +6,17 @@ find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
 # Download LibTorch 
 include(FetchContent)
 
+if (AARCH64 OR CMAKE_SYSTEM_PROCESSOR MATCHES "(arm)|(ARM)|(aarch64)")
+    message(STATUS "Targeting ARM architecture (AARCH64 override or processor match)")
+    set(LIBTORCH_URL "https://github.com/PASSIONLab/libtorch_aarch64/raw/refs/heads/main/pkg-libtorch.tar.zst")
+else()
+    message(STATUS "Did not match arm/aarch64, performing x86 install")
+    set(LIBTORCH_URL "https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.10.0%2Bcpu.zip")
+endif()
+
 FetchContent_Declare(
     libtorch
-    URL "https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.10.0%2Bcpu.zip"
+    URL "${LIBTORCH_URL}"
 )
 
 message(STATUS "Downloading LibTorch...")
