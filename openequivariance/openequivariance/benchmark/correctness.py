@@ -13,6 +13,8 @@ from openequivariance.benchmark.test_buffers import (
     get_random_buffers_double_backward,
     get_random_buffers_forward_conv,
     get_random_buffers_forward,
+    get_random_buffers_triple_backward,
+    get_random_buffers_triple_backward_conv,
 )
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.TensorProductBase import TensorProductBase
@@ -308,6 +310,175 @@ def correctness_double_backward(
         ("in1_grad", tensors[0][1], tensors[1][1]),
         ("in2_grad", tensors[0][2], tensors[1][2]),
         ("weights_grad", tensors[0][3], tensors[1][3]),
+    ]:
+        result[name] = check_similiarity(
+            name, to_check, ground_truth, correctness_threshold
+        )
+
+    return result
+
+
+def correctness_triple_backward(
+    problem: TPProblem,
+    test_implementation: Union[type[TensorProductBase], TensorProductBase],
+    reference_implementation: Optional[type[TensorProductBase]],
+    batch_size: int,
+    correctness_threshold: float,
+    prng_seed: int,
+):
+    buffers = get_random_buffers_triple_backward(
+        problem, batch_size=batch_size, prng_seed=prng_seed
+    )
+
+    if reference_implementation is None:
+        from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
+
+        reference_implementation = E3NNTensorProduct
+
+    result = {"thresh": correctness_threshold, "batch_size": batch_size}
+    tensors = []
+    for i, impl in enumerate([test_implementation, reference_implementation]):
+        is_test_impl = i == 0
+        tp = instantiate_implementation(impl, problem)
+        buffers_copy = [buf.copy() for buf in buffers]
+        (
+            in1,
+            in2,
+            out_grad,
+            weights,
+            weights_dgrad,
+            in1_dgrad,
+            in2_dgrad,
+            out_tgrad,
+            weights_tgrad,
+            in1_tgrad,
+            in2_tgrad,
+        ) = buffers_copy
+
+        weights_reordered = tp.reorder_weights_from_e3nn(
+            weights, has_batch_dim=not problem.shared_weights
+        )
+        weights_dgrad_reordered = tp.reorder_weights_from_e3nn(
+            weights_dgrad, has_batch_dim=not problem.shared_weights
+        )
+        weights_tgrad_reordered = tp.reorder_weights_from_e3nn(
+            weights_tgrad, has_batch_dim=not problem.shared_weights
+        )
+
+        if impl == CUETensorProduct and problem.shared_weights:
+            weights_reordered = weights_reordered[np.newaxis, :]
+            weights_dgrad_reordered = weights_dgrad_reordered[np.newaxis, :]
+            weights_tgrad_reordered = weights_tgrad_reordered[np.newaxis, :]
+
+        if is_test_impl:
+            (
+                in1,
+                in2,
+                out_grad,
+                in1_dgrad,
+                in2_dgrad,
+                out_tgrad,
+                in1_tgrad,
+                in2_tgrad,
+            ) = [
+                transpose_irrep_layout(arr, irreps, "mul_ir", tp.config.layout)
+                for arr, irreps in zip(
+                    (
+                        in1,
+                        in2,
+                        out_grad,
+                        in1_dgrad,
+                        in2_dgrad,
+                        out_tgrad,
+                        in1_tgrad,
+                        in2_tgrad,
+                    ),
+                    (
+                        problem.irreps_in1,
+                        problem.irreps_in2,
+                        problem.irreps_out,
+                        problem.irreps_in1,
+                        problem.irreps_in2,
+                        problem.irreps_out,
+                        problem.irreps_in1,
+                        problem.irreps_in2,
+                    ),
+                )
+            ]
+
+        (
+            in1_grad,
+            in2_grad,
+            weights_grad,
+            out_grad_grad,
+            in1_dgrad_grad,
+            in2_dgrad_grad,
+            weights_dgrad_grad,
+        ) = tp.triple_backward_cpu(
+            in1,
+            in2,
+            out_grad,
+            weights_reordered,
+            weights_dgrad_reordered,
+            in1_dgrad,
+            in2_dgrad,
+            out_tgrad,
+            weights_tgrad_reordered,
+            in1_tgrad,
+            in2_tgrad,
+        )
+
+        if is_test_impl:
+            (
+                in1_grad,
+                in2_grad,
+                out_grad_grad,
+                in1_dgrad_grad,
+                in2_dgrad_grad,
+            ) = [
+                transpose_irrep_layout(arr, irreps, tp.config.layout, "mul_ir")
+                for arr, irreps in zip(
+                    (
+                        in1_grad,
+                        in2_grad,
+                        out_grad_grad,
+                        in1_dgrad_grad,
+                        in2_dgrad_grad,
+                    ),
+                    (
+                        problem.irreps_in1,
+                        problem.irreps_in2,
+                        problem.irreps_out,
+                        problem.irreps_in1,
+                        problem.irreps_in2,
+                    ),
+                )
+            ]
+
+        tensors.append(
+            (
+                in1_grad,
+                in2_grad,
+                tp.reorder_weights_to_e3nn(
+                    weights_grad, has_batch_dim=not problem.shared_weights
+                ),
+                out_grad_grad,
+                in1_dgrad_grad,
+                in2_dgrad_grad,
+                tp.reorder_weights_to_e3nn(
+                    weights_dgrad_grad, has_batch_dim=not problem.shared_weights
+                ),
+            )
+        )
+
+    for name, to_check, ground_truth in [
+        ("in1_grad", tensors[0][0], tensors[1][0]),
+        ("in2_grad", tensors[0][1], tensors[1][1]),
+        ("weights_grad", tensors[0][2], tensors[1][2]),
+        ("output_grad", tensors[0][3], tensors[1][3]),
+        ("in1_double_grad", tensors[0][4], tensors[1][4]),
+        ("in2_double_grad", tensors[0][5], tensors[1][5]),
+        ("weights_double_grad", tensors[0][6], tensors[1][6]),
     ]:
         result[name] = check_similiarity(
             name, to_check, ground_truth, correctness_threshold
@@ -632,6 +803,180 @@ def correctness_double_backward_conv(
         ("in1_grad", tensors[0][1], tensors[1][1]),
         ("in2_grad", tensors[0][2], tensors[1][2]),
         ("weights_grad", tensors[0][3], tensors[1][3]),
+    ]:
+        result[name] = check_similiarity(name, to_check, ground_truth, thresh)
+
+    return result
+
+
+def correctness_triple_backward_conv(
+    conv,
+    graph,
+    thresh,
+    prng_seed,
+    reference_implementation=None,
+    high_precision_ref=False,
+):
+    buffers = get_random_buffers_triple_backward_conv(
+        conv.config, graph.node_count, graph.nnz, prng_seed
+    )
+
+    if reference_implementation is None:
+        from openequivariance._torch.E3NNConv import E3NNConv
+
+        reference_implementation = E3NNConv
+
+    reference_problem = conv.config
+    if high_precision_ref:
+        reference_problem = copy.deepcopy(conv.config)
+        reference_problem.irrep_dtype = np.float64
+        reference_problem.weight_dtype = np.float64
+
+    reference_tp = reference_implementation(reference_problem, torch_op=True)
+
+    result = {"thresh": thresh}
+    tensors = []
+    for i, tp in enumerate([conv, reference_tp]):
+        is_test_impl = i == 0
+        buffers_copy = [buf.copy() for buf in buffers]
+
+        if i == 1 and high_precision_ref:
+            buffers_copy = [np.array(el, dtype=np.float64) for el in buffers]
+
+        (
+            in1,
+            in2,
+            out_grad,
+            weights,
+            weights_dgrad,
+            in1_dgrad,
+            in2_dgrad,
+            out_tgrad,
+            weights_tgrad,
+            in1_tgrad,
+            in2_tgrad,
+        ) = buffers_copy
+
+        weights_reordered = tp.reorder_weights_from_e3nn(
+            weights, has_batch_dim=not conv.config.shared_weights
+        )
+        weights_dgrad_reordered = tp.reorder_weights_from_e3nn(
+            weights_dgrad, has_batch_dim=not conv.config.shared_weights
+        )
+        weights_tgrad_reordered = tp.reorder_weights_from_e3nn(
+            weights_tgrad, has_batch_dim=not conv.config.shared_weights
+        )
+
+        if is_test_impl:
+            (
+                in1,
+                in2,
+                out_grad,
+                in1_dgrad,
+                in2_dgrad,
+                out_tgrad,
+                in1_tgrad,
+                in2_tgrad,
+            ) = [
+                transpose_irrep_layout(arr, irreps, "mul_ir", tp.config.layout)
+                for arr, irreps in zip(
+                    (
+                        in1,
+                        in2,
+                        out_grad,
+                        in1_dgrad,
+                        in2_dgrad,
+                        out_tgrad,
+                        in1_tgrad,
+                        in2_tgrad,
+                    ),
+                    (
+                        tp.config.irreps_in1,
+                        tp.config.irreps_in2,
+                        tp.config.irreps_out,
+                        tp.config.irreps_in1,
+                        tp.config.irreps_in2,
+                        tp.config.irreps_out,
+                        tp.config.irreps_in1,
+                        tp.config.irreps_in2,
+                    ),
+                )
+            ]
+
+        (
+            in1_grad,
+            in2_grad,
+            weights_grad,
+            out_grad_grad,
+            in1_dgrad_grad,
+            in2_dgrad_grad,
+            weights_dgrad_grad,
+        ) = tp.triple_backward_cpu(
+            in1,
+            in2,
+            out_grad,
+            weights_reordered,
+            weights_dgrad_reordered,
+            in1_dgrad,
+            in2_dgrad,
+            out_tgrad,
+            weights_tgrad_reordered,
+            in1_tgrad,
+            in2_tgrad,
+            graph,
+        )
+
+        if is_test_impl:
+            (
+                in1_grad,
+                in2_grad,
+                out_grad_grad,
+                in1_dgrad_grad,
+                in2_dgrad_grad,
+            ) = [
+                transpose_irrep_layout(arr, irreps, tp.config.layout, "mul_ir")
+                for arr, irreps in zip(
+                    (
+                        in1_grad,
+                        in2_grad,
+                        out_grad_grad,
+                        in1_dgrad_grad,
+                        in2_dgrad_grad,
+                    ),
+                    (
+                        tp.config.irreps_in1,
+                        tp.config.irreps_in2,
+                        tp.config.irreps_out,
+                        tp.config.irreps_in1,
+                        tp.config.irreps_in2,
+                    ),
+                )
+            ]
+
+        tensors.append(
+            (
+                in1_grad,
+                in2_grad,
+                tp.reorder_weights_to_e3nn(
+                    weights_grad, has_batch_dim=not conv.config.shared_weights
+                ),
+                out_grad_grad,
+                in1_dgrad_grad,
+                in2_dgrad_grad,
+                tp.reorder_weights_to_e3nn(
+                    weights_dgrad_grad, has_batch_dim=not conv.config.shared_weights
+                ),
+            )
+        )
+
+    for name, to_check, ground_truth in [
+        ("in1_grad", tensors[0][0], tensors[1][0]),
+        ("in2_grad", tensors[0][1], tensors[1][1]),
+        ("weights_grad", tensors[0][2], tensors[1][2]),
+        ("output_grad", tensors[0][3], tensors[1][3]),
+        ("in1_double_grad", tensors[0][4], tensors[1][4]),
+        ("in2_double_grad", tensors[0][5], tensors[1][5]),
+        ("weights_double_grad", tensors[0][6], tensors[1][6]),
     ]:
         result[name] = check_similiarity(name, to_check, ground_truth, thresh)
 

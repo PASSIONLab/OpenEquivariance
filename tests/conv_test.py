@@ -10,7 +10,12 @@ from openequivariance.benchmark.correctness import (
     correctness_backward_conv,
     correctness_double_backward_conv,
     correctness_forward_conv,
+    correctness_triple_backward_conv,
 )
+from openequivariance.benchmark.test_buffers import (
+    get_random_buffers_triple_backward_conv,
+)
+from openequivariance.core.ConvolutionBase import CoordGraph
 from itertools import product
 import torch
 
@@ -38,6 +43,14 @@ def graph(request):
 
     # graph = load_graph("data/1drf_radius3.5.pickle")
     return graph
+
+
+@pytest.fixture(scope="module")
+def small_graph():
+    coords = np.zeros((3, 3), dtype=np.float32)
+    rows = np.array([0, 1, 1, 2], dtype=np.int64)
+    cols = np.array([1, 0, 2, 1], dtype=np.int64)
+    return CoordGraph(coords, rows, cols, "small")
 
 
 @pytest.fixture(scope="module")
@@ -136,6 +149,179 @@ class ConvCorrectness:
         self.check_result(result, "in1_grad")
         self.check_result(result, "in2_grad")
         self.check_result(result, "weights_grad")
+
+
+class ConvTripleBackwardCorrectness:
+    def thresh(self, direction):
+        return {"triple_bwd": 5e-4}[direction]
+
+    def check_result(self, result, fieldname):
+        with check:
+            error = result[fieldname]["diff_Linf_norm"]
+            thresh = result["thresh"]
+            assert result[fieldname]["pass"], (
+                f"{fieldname} observed error={error:.5f} >= {thresh}"
+            )
+
+    @pytest.fixture(scope="class")
+    def extra_conv_constructor_args(self):
+        return {}
+
+    @pytest.fixture(params=["atomic", "deterministic"], scope="class")
+    def conv_object(self, request, problem, extra_conv_constructor_args, with_jax):
+        if with_jax:
+            pytest.skip("N/A for JAX")
+
+        if request.param == "atomic":
+            return oeq.TensorProductConv(
+                problem, deterministic=False, **extra_conv_constructor_args
+            )
+        elif request.param == "deterministic":
+            if not problem.shared_weights:
+                return oeq.TensorProductConv(
+                    problem, deterministic=True, **extra_conv_constructor_args
+                )
+            else:
+                pytest.skip("Shared weights not supported with deterministic")
+
+    def test_tp_triple_bwd(self, conv_object, small_graph):
+        if conv_object is None:
+            pytest.skip("'conv_object' fixture returned None, skipping")
+
+        result = correctness_triple_backward_conv(
+            conv_object,
+            small_graph,
+            thresh=self.thresh("triple_bwd"),
+            prng_seed=12345,
+            reference_implementation=None,
+        )
+
+        for fieldname in [
+            "in1_grad",
+            "in2_grad",
+            "weights_grad",
+            "output_grad",
+            "in1_double_grad",
+            "in2_double_grad",
+            "weights_double_grad",
+        ]:
+            self.check_result(result, fieldname)
+
+
+class TestTripleBackwardConvUVU(ConvTripleBackwardCorrectness):
+    def id_func(m, i):
+        return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
+
+    @pytest.fixture(
+        params=[((2, 1, 2), (1, 1, 1))],
+        ids=lambda x: TestTripleBackwardConvUVU.id_func(x[0], x[1]),
+        scope="class",
+    )
+    def problem(self, request, dtype):
+        m, i = request.param[0], request.param[1]
+        instructions = [(0, 0, 0, "uvu", True)]
+        return oeq.TPProblem(
+            f"{m[0]}x{i[0]}e",
+            f"{m[1]}x{i[1]}e",
+            f"{m[2]}x{i[2]}e",
+            instructions,
+            shared_weights=False,
+            internal_weights=False,
+            irrep_dtype=dtype,
+            weight_dtype=dtype,
+        )
+
+
+class TestTripleBackwardConvDirectOps:
+    @pytest.fixture(scope="class")
+    def problem(self, dtype, with_jax):
+        if with_jax:
+            pytest.skip("N/A for JAX")
+
+        return oeq.TPProblem(
+            "2x1e",
+            "1x1e",
+            "2x1e",
+            [(0, 0, 0, "uvu", True)],
+            shared_weights=False,
+            internal_weights=False,
+            irrep_dtype=dtype,
+            weight_dtype=dtype,
+        )
+
+    @pytest.fixture(scope="class")
+    def conv_object(self, problem):
+        return oeq.TensorProductConv(problem, deterministic=True)
+
+    def test_direct_conv_double_backward_op_is_differentiable(
+        self, conv_object, small_graph
+    ):
+        problem = conv_object.config
+        buffers = get_random_buffers_triple_backward_conv(
+            problem, small_graph.node_count, small_graph.nnz, prng_seed=12345
+        )
+        (
+            in1,
+            in2,
+            out_grad,
+            weights,
+            weights_dgrad,
+            in1_dgrad,
+            in2_dgrad,
+            out_tgrad,
+            weights_tgrad,
+            in1_tgrad,
+            in2_tgrad,
+        ) = buffers
+
+        weights = conv_object.reorder_weights_from_e3nn(
+            weights, has_batch_dim=not problem.shared_weights
+        )
+        weights_dgrad = conv_object.reorder_weights_from_e3nn(
+            weights_dgrad, has_batch_dim=not problem.shared_weights
+        )
+        weights_tgrad = conv_object.reorder_weights_from_e3nn(
+            weights_tgrad, has_batch_dim=not problem.shared_weights
+        )
+
+        tensors = [
+            torch.tensor(arr, device="cuda", requires_grad=True)
+            for arr in [
+                in1,
+                in2,
+                weights,
+                out_grad,
+                in1_dgrad,
+                in2_dgrad,
+                weights_dgrad,
+            ]
+        ]
+        grad_outputs = [
+            torch.tensor(arr, device="cuda")
+            for arr in [in1_tgrad, in2_tgrad, weights_tgrad, out_tgrad]
+        ]
+        rows = torch.tensor(small_graph.rows, device="cuda")
+        cols = torch.tensor(small_graph.cols, device="cuda")
+        transpose_perm = torch.tensor(small_graph.transpose_perm, device="cuda")
+
+        outputs = torch.ops.libtorch_tp_jit.jit_conv_double_backward(
+            conv_object.kernel,
+            conv_object.hash,
+            *tensors,
+            rows,
+            cols,
+            conv_object.workspace_buffer,
+            transpose_perm,
+        )
+        grads = torch.autograd.grad(
+            outputs=outputs,
+            inputs=tensors,
+            grad_outputs=grad_outputs,
+            allow_unused=True,
+        )
+
+        assert len(grads) == 7
+        assert all(grad is not None for grad in grads)
 
 
 class TestProductionModels(ConvCorrectness):
