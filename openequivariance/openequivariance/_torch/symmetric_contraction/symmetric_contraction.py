@@ -239,6 +239,7 @@ class Contraction(torch.nn.Module):
         internal_weights: bool = True,
         num_elements: Optional[int] = None,
         weights: Optional[torch.Tensor] = None,
+        dtype: Optional[torch.dtype] = None,
     ) -> None:
         super().__init__()
 
@@ -246,7 +247,9 @@ class Contraction(torch.nn.Module):
         self.num_features = irreps_in.count((0, 1))
         self.coupling_irreps = o3.Irreps([irrep.ir for irrep in irreps_in])
         self.correlation = correlation
-        dtype = torch.get_default_dtype()
+        if dtype is None:
+            dtype = torch.get_default_dtype()
+
         for nu in range(1, correlation + 1):
             U_matrix = U_matrix_real(
                 irreps_in=self.coupling_irreps,
@@ -262,9 +265,7 @@ class Contraction(torch.nn.Module):
 
         # Create weight for product basis
         self.weights = torch.nn.ParameterList([])
-        self.groupMM = GroupMM(
-            torch.get_default_dtype(), num_elements, self.num_features
-        )
+        self.groupMM = GroupMM(dtype, num_elements, self.num_features)
         self.num_equivariance = 2 * irrep_out.lmax + 1
 
         for i in range(correlation, 0, -1):
@@ -274,14 +275,18 @@ class Contraction(torch.nn.Module):
             if i == correlation:
                 # Parameters for the product basis
                 w = torch.nn.Parameter(
-                    torch.randn((num_elements, num_params, self.num_features))
+                    torch.randn(
+                        (num_elements, num_params, self.num_features), dtype=dtype
+                    )
                     / num_params
                 )
                 self.weights_max = w
             else:
                 # Parameters for the product basis
                 w = torch.nn.Parameter(
-                    torch.randn((num_elements, num_params, self.num_features))
+                    torch.randn(
+                        (num_elements, num_params, self.num_features), dtype=dtype
+                    )
                     / num_params
                 )
                 self.weights.append(w)
@@ -352,10 +357,12 @@ class SymmetricContraction(CodeGenMixin, torch.nn.Module):
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
         num_elements: Optional[int] = None,
+        dtype: Optional[torch.dtype] = None,
     ) -> None:
         super().__init__()
 
         self.num_elements = num_elements
+        self.dtype = dtype if dtype is not None else torch.get_default_dtype()
         if irrep_normalization is None:
             irrep_normalization = "component"
 
@@ -396,6 +403,7 @@ class SymmetricContraction(CodeGenMixin, torch.nn.Module):
                     internal_weights=self.internal_weights,
                     num_elements=num_elements,
                     weights=self.shared_weights,
+                    dtype=self.dtype,
                 )
             )
 
@@ -412,136 +420,3 @@ class SymmetricContraction(CodeGenMixin, torch.nn.Module):
         ]
         outs_cat = torch.cat(outs, dim=-1)[inverse_perm]
         return outs_cat
-
-
-# --------------------------------------------------------------------------
-
-
-def test_group_matmul():
-    torch.manual_seed(0)
-    num_elements = 10
-    vpe = 30  # Vectors per element, uniform just for testing
-    num_features = 20
-
-    M = 64
-    K = 123
-    ragged_counts = torch.zeros(num_elements, dtype=torch.int64, device="cpu")
-
-    for i in range(num_elements):
-        ragged_counts[i] = vpe
-
-    def test_backward_0():
-        group_mm = GroupMM(torch.float32, num_elements, num_features)
-        A = torch.randn(num_elements, num_features, M, K).to("cuda")
-        B = torch.randn(num_elements * vpe, num_features, K).to("cuda")
-
-        A.requires_grad = True
-        B.requires_grad = True
-
-        ground_truth = torch.zeros(num_elements * vpe, num_features, M, device="cuda")
-
-        # Test the forward pass
-        for i in range(num_elements):
-            B_slice = B[vpe * i : vpe * (i + 1)]
-            ground_truth[vpe * i : vpe * (i + 1)] = (
-                A[i] @ B_slice.permute(1, 2, 0)
-            ).permute(2, 0, 1)
-
-        C_g = torch.randn(num_elements * vpe, num_features, M).to("cuda")
-        C_g.requires_grad = True
-
-        ground_truth.backward(C_g, inputs=[A, B])
-
-        A_grad_gt = A.grad.detach().clone()
-        B_grad_gt = B.grad.detach().clone()
-
-        A.grad[:] = 0.0
-        B.grad[:] = 0.0
-
-        C = group_mm.group_gemm(A, B, ragged_counts, M, K, 0)
-
-        print(torch.norm(ground_truth - C))
-
-        C.backward(C_g, inputs=[A, B])
-        print(torch.norm(A_grad_gt - A.grad))
-        print(torch.norm(B_grad_gt - B.grad))
-
-    def test_backward_1():
-        print("TESTING BACKWARD_1!")
-        group_mm = GroupMM(torch.float32, num_elements, num_features)
-
-        A = torch.zeros(num_elements * vpe, num_features, M, device="cuda")
-        B = torch.randn(num_elements * vpe, num_features, K).to("cuda")
-        A.requires_grad = True
-        B.requires_grad = True
-
-        ground_truth = torch.zeros(num_elements, num_features, M, K).to("cuda")
-
-        for i in range(num_elements):
-            A_slice = A[vpe * i : vpe * (i + 1)]
-            B_slice = B[vpe * i : vpe * (i + 1)]
-
-            ground_truth[i] = A_slice.permute(1, 2, 0) @ B_slice.permute(1, 0, 2)
-
-        C = group_mm.group_gemm(A, B, ragged_counts, M, K, 1)
-
-        print(torch.norm(C - ground_truth))
-
-        C_g = torch.randn(num_elements, num_features, M, K).to("cuda")
-        C_g.requires_grad = True
-
-        ground_truth.backward(C_g, inputs=[A, B])
-
-        A_grad_gt = A.grad.detach().clone()
-        B_grad_gt = B.grad.detach().clone()
-
-        A.grad[:] = 0.0
-        B.grad[:] = 0.0
-
-        C.backward(C_g, inputs=[A, B])
-
-        print(torch.norm(A.grad - A_grad_gt))
-        print(torch.norm(B.grad - B_grad_gt))
-
-    def test_double_backward():
-        torch.autograd.set_detect_anomaly(True)
-        GroupMM(torch.float32, num_elements, num_features)
-        A = torch.randn(num_elements, num_features, M, K).to("cuda")
-        B = torch.randn(num_elements * vpe, num_features, K).to("cuda")
-
-        A.requires_grad = True
-        B.requires_grad = True
-
-        ground_truth = torch.zeros(num_elements * vpe, num_features, M, device="cuda")
-
-        # Test the forward pass
-        for i in range(num_elements):
-            B_slice = B[vpe * i : vpe * (i + 1)]
-            ground_truth[vpe * i : vpe * (i + 1)] = (
-                A[i] @ B_slice.permute(1, 2, 0)
-            ).permute(2, 0, 1)
-
-        C_g = torch.randn(num_elements * vpe, num_features, M).to("cuda")
-        C_g.requires_grad = True
-
-        ground_truth.backward(C_g, inputs=[A, B], create_graph=True, retain_graph=True)
-        dummy = torch.norm(A.grad) + torch.norm(B.grad)
-        dummy_grad = torch.randn_like(dummy)
-
-        dummy.backward(gradient=dummy_grad, inputs=[C_g, A, B])
-
-        A_grad_gt = A.grad
-        B_grad_gt = B.grad
-        C_grad_gt = C_g.grad
-
-        print(torch.norm(A_grad_gt))
-        print(torch.norm(B_grad_gt))
-        print(torch.norm(C_grad_gt))
-
-    test_backward_0()
-    test_backward_1()
-    test_double_backward()
-
-
-if __name__ == "__main__":
-    test_group_matmul()
