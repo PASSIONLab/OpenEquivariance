@@ -6,7 +6,6 @@ import torch.nn.functional as F
 
 from e3nn import o3
 
-import openequivariance as oeq
 from openequivariance._torch.symmetric_contraction import SymmetricContraction
 
 mace_symmetric_contraction = pytest.importorskip("mace.modules.symmetric_contraction")
@@ -18,6 +17,7 @@ IRREPS_OUT = o3.Irreps("2x0e + 2x1o")
 CORRELATION = 2
 NUM_ELEMENTS = 4
 LABEL_VALUES = [0, 2, 3, 2, 0, 0, 2, 3, 2, 2]
+DEVICE = torch.device("cuda")
 
 
 @pytest.fixture(params=[torch.float32, torch.float64], ids=["F32", "F64"])
@@ -26,21 +26,8 @@ def dtype(request):
 
 
 @pytest.fixture
-def device():
-    if not torch.cuda.is_available():
-        pytest.skip(
-            "SymmetricContraction requires a CUDA/HIP device exposed through torch.cuda"
-        )
-    if not oeq.BUILT_EXTENSION:
-        pytest.skip(
-            f"OpenEquivariance extension is not built: {oeq.BUILT_EXTENSION_ERROR}"
-        )
-    return torch.device("cuda")
-
-
-@pytest.fixture
-def labels(device):
-    return torch.tensor(LABEL_VALUES, device=device, dtype=torch.long)
+def labels():
+    return torch.tensor(LABEL_VALUES, device=DEVICE, dtype=torch.long)
 
 
 @pytest.fixture
@@ -49,14 +36,14 @@ def node_attrs(labels, dtype):
 
 
 @pytest.fixture
-def node_feats(device, dtype):
-    gen = torch.Generator(device=device)
+def node_feats(dtype):
+    gen = torch.Generator(device=DEVICE)
     gen.manual_seed(2468)
     return torch.randn(
         len(LABEL_VALUES),
         IRREPS_IN.count((0, 1)),
         IRREPS_IN.dim // IRREPS_IN.count((0, 1)),
-        device=device,
+        device=DEVICE,
         dtype=dtype,
         generator=gen,
         requires_grad=True,
@@ -64,7 +51,7 @@ def node_feats(device, dtype):
 
 
 @pytest.fixture
-def modules(device, dtype):
+def modules(dtype):
     torch.manual_seed(12345)
     oeq_module = SymmetricContraction(
         IRREPS_IN,
@@ -72,7 +59,7 @@ def modules(device, dtype):
         correlation=CORRELATION,
         num_elements=NUM_ELEMENTS,
         dtype=dtype,
-    ).to(device)
+    ).to(DEVICE)
 
     # MACE's original e3nn implementation reads torch.get_default_dtype()
     # during construction, so patch that lookup instead of mutating global state.
@@ -85,7 +72,7 @@ def modules(device, dtype):
             IRREPS_OUT,
             correlation=CORRELATION,
             num_elements=NUM_ELEMENTS,
-        ).to(device=device, dtype=dtype)
+        ).to(device=DEVICE, dtype=dtype)
 
     copy_matching_state(oeq_module, mace_module)
     return oeq_module, mace_module
