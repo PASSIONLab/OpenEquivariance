@@ -72,7 +72,11 @@ def load_jit_extension():
 
             extra_include_dirs.append(pybind11.get_include())
         except Exception as e:
-            getLogger().info(f"Could not locate pybind11 include path: {e}")
+            BUILT_EXTENSION_ERROR = (
+                "Could not locate pybind11 include path required for JIT "
+                f"OpenEquivariance extension compilation: {e}"
+            )
+            return
 
         if LINKED_LIBPYTHON:
             extra_link_args.pop()
