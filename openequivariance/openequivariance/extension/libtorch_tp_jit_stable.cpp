@@ -89,6 +89,13 @@ Stream get_current_stream() {
     #include "nanobind/stl/string.h"
     namespace nb = nanobind;
     NB_MODULE(EXTENSION_NAME, m) {
+        nb::class_<GroupMM<float>>(m, "GroupMM_F32")
+            .def(nb::init<int, int>())
+            .def("group_gemm", &GroupMM<float>::group_gemm_intptr);
+        nb::class_<GroupMM<double>>(m, "GroupMM_F64")
+            .def(nb::init<int, int>())
+            .def("group_gemm", &GroupMM<double>::group_gemm_intptr);
+
         nb::class_<DeviceProp>(m, "DeviceProp")
             .def(nb::init<int>())
             .def_ro("name", &DeviceProp::name)

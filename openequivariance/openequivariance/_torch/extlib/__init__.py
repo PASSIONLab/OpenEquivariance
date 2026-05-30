@@ -65,6 +65,18 @@ def load_jit_extension():
         torch_sources = ["libtorch_tp_jit.cpp", "json11/json11.cpp"]
 
         include_dirs, extra_link_args = (["backend"], ["-Wl,--no-as-needed"])
+        extra_include_dirs = []
+
+        try:
+            import pybind11
+
+            extra_include_dirs.append(pybind11.get_include())
+        except Exception as e:
+            BUILT_EXTENSION_ERROR = (
+                "Could not locate pybind11 include path required for JIT "
+                f"OpenEquivariance extension compilation: {e}"
+            )
+            return
 
         if LINKED_LIBPYTHON:
             extra_link_args.pop()
@@ -76,7 +88,7 @@ def load_jit_extension():
                 ],
             )
         if torch.version.cuda:
-            extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc"])
+            extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc", "-lcublas"])
 
             try:
                 torch_libs, cuda_libs = library_paths("cuda")
@@ -94,9 +106,11 @@ def load_jit_extension():
             extra_cflags.append("-DHIP_BACKEND")
 
         torch_sources = [oeq_root + "/extension/" + src for src in torch_sources]
-        include_dirs = [
-            oeq_root + "/extension/" + d for d in include_dirs
-        ] + include_paths("cuda")
+        include_dirs = (
+            [oeq_root + "/extension/" + d for d in include_dirs]
+            + extra_include_dirs
+            + include_paths("cuda")
+        )
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -183,8 +197,8 @@ sys.modules["oeq_utilities"] = extension_module
 
 if BUILT_EXTENSION:
     from oeq_utilities import (
-        # GroupMM_F32,
-        # GroupMM_F64,
+        GroupMM_F32,
+        GroupMM_F64,
         DeviceProp,
         GPUTimer,
     )

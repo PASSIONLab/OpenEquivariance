@@ -84,6 +84,13 @@ Stream get_current_stream() {
 
 namespace py=pybind11;
 PYBIND11_MODULE(libtorch_tp_jit, m) {
+    py::class_<GroupMM<float>>(m, "GroupMM_F32")
+        .def(py::init<int, int>())
+        .def("group_gemm", &GroupMM<float>::group_gemm_intptr);
+    py::class_<GroupMM<double>>(m, "GroupMM_F64")
+        .def(py::init<int, int>())
+        .def("group_gemm", &GroupMM<double>::group_gemm_intptr);
+
     py::class_<DeviceProp>(m, "DeviceProp")
         .def(py::init<int>())
         .def_readonly("name", &DeviceProp::name)
