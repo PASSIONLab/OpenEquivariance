@@ -11,9 +11,6 @@
 #include <torch/headeronly/util/shim_utils.h>
 #include <torch/csrc/inductor/aoti_torch/c/shim.h>
 
-#ifdef HIP_BACKEND
-    #include <c10/hip/HIPStream.h>
-#endif
 
 using Tensor = torch::stable::Tensor;
 using Dtype = torch::headeronly::ScalarType;

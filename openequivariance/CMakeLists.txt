@@ -166,9 +166,9 @@ if(hip_FOUND)
     endif()
 
     set(HIP_LINK_LIBS
-        hiprtc
-        ${HIP_BLAS_LIB}
         hip_stub_lib
+	    hip::host
+        ${HIP_BLAS_LIB}
     )
     add_stable_extension(torch_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
 endif()

@@ -101,7 +101,6 @@ def load_jit_extension():
 
             extra_cflags.append("-DCUDA_BACKEND")
         elif torch.version.hip:
-            extra_link_args.extend(["-lhiprtc", "-lrocblas"])
             torch_libs = library_paths("cuda")[0]
             extra_link_args.append("-Wl,-rpath," + torch_libs)
             extra_cflags.append("-DHIP_BACKEND")
