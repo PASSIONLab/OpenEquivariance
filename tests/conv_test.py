@@ -60,7 +60,12 @@ def with_jax(request):
 
 class ConvCorrectness:
     def thresh(self, direction):
-        return {"fwd": 3e-4, "bwd": 3e-4, "double_bwd": 3e-4}[direction]
+        return {
+            "fwd": 3e-4,
+            "bwd": 3e-4,
+            "double_bwd": 3e-4,
+            "triple_bwd": 5e-4,
+        }[direction]
 
     def check_result(self, result, fieldname):
         with check:
@@ -150,47 +155,16 @@ class ConvCorrectness:
         self.check_result(result, "in2_grad")
         self.check_result(result, "weights_grad")
 
-
-class ConvTripleBackwardCorrectness:
-    def thresh(self, direction):
-        return {"triple_bwd": 5e-4}[direction]
-
-    def check_result(self, result, fieldname):
-        with check:
-            error = result[fieldname]["diff_Linf_norm"]
-            thresh = result["thresh"]
-            assert result[fieldname]["pass"], (
-                f"{fieldname} observed error={error:.5f} >= {thresh}"
-            )
-
-    @pytest.fixture(scope="class")
-    def extra_conv_constructor_args(self):
-        return {}
-
-    @pytest.fixture(params=["atomic", "deterministic"], scope="class")
-    def conv_object(self, request, problem, extra_conv_constructor_args, with_jax):
+    def test_tp_triple_bwd(self, conv_object, graph, with_jax):
         if with_jax:
             pytest.skip("N/A for JAX")
 
-        if request.param == "atomic":
-            return oeq.TensorProductConv(
-                problem, deterministic=False, **extra_conv_constructor_args
-            )
-        elif request.param == "deterministic":
-            if not problem.shared_weights:
-                return oeq.TensorProductConv(
-                    problem, deterministic=True, **extra_conv_constructor_args
-                )
-            else:
-                pytest.skip("Shared weights not supported with deterministic")
-
-    def test_tp_triple_bwd(self, conv_object, small_graph):
         if conv_object is None:
             pytest.skip("'conv_object' fixture returned None, skipping")
 
         result = correctness_triple_backward_conv(
             conv_object,
-            small_graph,
+            graph,
             thresh=self.thresh("triple_bwd"),
             prng_seed=12345,
             reference_implementation=None,
@@ -206,30 +180,6 @@ class ConvTripleBackwardCorrectness:
             "weights_double_grad",
         ]:
             self.check_result(result, fieldname)
-
-
-class TestTripleBackwardConvUVU(ConvTripleBackwardCorrectness):
-    def id_func(m, i):
-        return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
-
-    @pytest.fixture(
-        params=[((2, 1, 2), (1, 1, 1))],
-        ids=lambda x: TestTripleBackwardConvUVU.id_func(x[0], x[1]),
-        scope="class",
-    )
-    def problem(self, request, dtype):
-        m, i = request.param[0], request.param[1]
-        instructions = [(0, 0, 0, "uvu", True)]
-        return oeq.TPProblem(
-            f"{m[0]}x{i[0]}e",
-            f"{m[1]}x{i[1]}e",
-            f"{m[2]}x{i[2]}e",
-            instructions,
-            shared_weights=False,
-            internal_weights=False,
-            irrep_dtype=dtype,
-            weight_dtype=dtype,
-        )
 
 
 class TestTripleBackwardConvDirectOps:
@@ -430,6 +380,7 @@ class TestAtomicSharedWeights(ConvCorrectness):
             "fwd": 1e-5,
             "bwd": 7.5e-2,  # Expect higher errors for shared weights
             "double_bwd": 5e-1,
+            "triple_bwd": 5e-1,
         }[direction]
 
     @pytest.fixture(params=problems, ids=lambda x: x.label, scope="class")

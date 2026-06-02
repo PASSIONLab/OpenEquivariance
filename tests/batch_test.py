@@ -31,7 +31,12 @@ def dtype(request):
 
 class TPCorrectness:
     def thresh(self, direction):
-        return {"fwd": 1e-5, "bwd": 3e-4, "double_bwd": 3e-4}[direction]
+        return {
+            "fwd": 1e-5,
+            "bwd": 3e-4,
+            "double_bwd": 3e-4,
+            "triple_bwd": 5e-4,
+        }[direction]
 
     def check_result(self, result, fieldname):
         with check:
@@ -99,32 +104,10 @@ class TPCorrectness:
         self.check_result(result, "in2_grad")
         self.check_result(result, "weights_grad")
 
-
-class TPTripleBackwardCorrectness:
-    def thresh(self, direction):
-        return {"triple_bwd": 5e-4}[direction]
-
-    def check_result(self, result, fieldname):
-        with check:
-            error = result[fieldname]["diff_Linf_norm"]
-            thresh = result["thresh"]
-            assert result[fieldname]["pass"], (
-                f"{fieldname} observed error={error:.5f} >= {thresh}"
-            )
-
-    @pytest.fixture(scope="class")
-    def extra_tp_constructor_args(self):
-        return {}
-
-    @pytest.fixture(scope="class")
-    def tp_and_problem(self, problem, extra_tp_constructor_args, with_jax):
+    def test_tp_triple_bwd(self, tp_and_problem, with_jax):
         if with_jax:
             pytest.skip("N/A for JAX")
 
-        tp = oeq.TensorProduct(problem, **extra_tp_constructor_args)
-        return tp, problem
-
-    def test_tp_triple_bwd(self, tp_and_problem):
         tp, problem = tp_and_problem
         result = correctness_triple_backward(
             problem=problem,
@@ -145,78 +128,6 @@ class TPTripleBackwardCorrectness:
             "weights_double_grad",
         ]:
             self.check_result(result, fieldname)
-
-
-class TestTripleBackwardUVUSingleIrrep(TPTripleBackwardCorrectness):
-    def id_func(m, i):
-        return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
-
-    @pytest.fixture(
-        params=[((2, 1, 2), (1, 1, 1))],
-        ids=lambda x: TestTripleBackwardUVUSingleIrrep.id_func(x[0], x[1]),
-        scope="class",
-    )
-    def problem(self, request, dtype):
-        m, i = request.param[0], request.param[1]
-        instructions = [(0, 0, 0, "uvu", True)]
-        return oeq.TPProblem(
-            f"{m[0]}x{i[0]}e",
-            f"{m[1]}x{i[1]}e",
-            f"{m[2]}x{i[2]}e",
-            instructions,
-            shared_weights=False,
-            internal_weights=False,
-            irrep_dtype=dtype,
-            weight_dtype=dtype,
-        )
-
-
-class TestTripleBackwardUVWSingleIrrep(TPTripleBackwardCorrectness):
-    def id_func(m, i):
-        return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
-
-    @pytest.fixture(
-        params=[((2, 2, 2), (1, 1, 1))],
-        ids=lambda x: TestTripleBackwardUVWSingleIrrep.id_func(x[0], x[1]),
-        scope="class",
-    )
-    def problem(self, request, dtype):
-        m, i = request.param[0], request.param[1]
-        instructions = [(0, 0, 0, "uvw", True)]
-        return oeq.TPProblem(
-            f"{m[0]}x{i[0]}e",
-            f"{m[1]}x{i[1]}e",
-            f"{m[2]}x{i[2]}e",
-            instructions,
-            shared_weights=False,
-            internal_weights=False,
-            irrep_dtype=dtype,
-            weight_dtype=dtype,
-        )
-
-
-class TestTripleBackwardSharedWeights(TPTripleBackwardCorrectness):
-    def id_func(m, i):
-        return f"{m[0]}x{i[0]}e__x__{m[1]}x{i[1]}e---{m[2]}x{i[2]}e"
-
-    @pytest.fixture(
-        params=[((2, 1, 2), (1, 1, 1))],
-        ids=lambda x: TestTripleBackwardSharedWeights.id_func(x[0], x[1]),
-        scope="class",
-    )
-    def problem(self, request, dtype):
-        m, i = request.param[0], request.param[1]
-        instructions = [(0, 0, 0, "uvu", True)]
-        return oeq.TPProblem(
-            f"{m[0]}x{i[0]}e",
-            f"{m[1]}x{i[1]}e",
-            f"{m[2]}x{i[2]}e",
-            instructions,
-            shared_weights=True,
-            internal_weights=False,
-            irrep_dtype=dtype,
-            weight_dtype=dtype,
-        )
 
 
 class TestTripleBackwardDirectOps:
@@ -446,6 +357,7 @@ class TestSharedWeights(TPCorrectness):
             "fwd": 1e-5,
             "bwd": 5e-4,  # Expect higher errors for shared weights
             "double_bwd": 5e-4,
+            "triple_bwd": 5e-4,
         }[direction]
 
     @pytest.fixture(params=problems, ids=lambda x: x.label, scope="class")

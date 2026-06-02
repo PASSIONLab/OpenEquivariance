@@ -92,6 +92,65 @@ def conv_buffers(edge_index, tpp, gen):
 
 
 @pytest.fixture
+def conv_det_buffers(edge_index, tpp, gen):
+    edge_index, _ = edge_index.sort_by("row")
+    _, sender_perm = edge_index.sort_by("col")
+    X = torch.rand(
+        edge_index.num_rows, tpp.irreps_in1.dim, device="cuda", generator=gen
+    )
+    Y = torch.rand(
+        edge_index.num_cols, tpp.irreps_in2.dim, device="cuda", generator=gen
+    )
+    W = torch.rand(edge_index.num_cols, tpp.weight_numel, device="cuda", generator=gen)
+    return (X, Y, W, edge_index[0], edge_index[1], sender_perm)
+
+
+def _none_to_zeros(values, refs):
+    return tuple(
+        ref * 0 if value is None else value for value, ref in zip(values, refs)
+    )
+
+
+def _triple_backward_from_output(out, X, Y, W):
+    out_grad = torch.ones_like(out).requires_grad_(True)
+    in1_dgrad = torch.ones_like(X).requires_grad_(True)
+    in2_dgrad = torch.ones_like(Y).requires_grad_(True)
+    w_dgrad = torch.ones_like(W).requires_grad_(True)
+
+    in1_grad, in2_grad, w_grad = torch.autograd.grad(
+        outputs=out,
+        inputs=(X, Y, W),
+        grad_outputs=out_grad,
+        create_graph=True,
+        retain_graph=True,
+    )
+
+    double_grads = torch.autograd.grad(
+        outputs=(in1_grad, in2_grad, w_grad),
+        inputs=(X, Y, W, out_grad),
+        grad_outputs=(in1_dgrad, in2_dgrad, w_dgrad),
+        create_graph=True,
+        retain_graph=True,
+        allow_unused=True,
+    )
+    double_grads = _none_to_zeros(double_grads, (X, Y, W, out_grad))
+
+    triple_grads = torch.autograd.grad(
+        outputs=double_grads,
+        inputs=(X, Y, W, out_grad, in1_dgrad, in2_dgrad, w_dgrad),
+        grad_outputs=(
+            torch.ones_like(X),
+            torch.ones_like(Y),
+            torch.ones_like(W),
+            torch.ones_like(out),
+        ),
+        allow_unused=True,
+    )
+
+    return sum(torch.norm(grad) for grad in triple_grads if grad is not None)
+
+
+@pytest.fixture
 def oeq_tp_fwd(tpp, tp_buffers):
     tp_oeq = TensorProduct(tpp)
     return Executable(tp_oeq, tp_buffers, [KE("forward", 1)])
@@ -156,6 +215,29 @@ def oeq_tp_double_bwd(tpp, tp_buffers):
             KE("backward", 1),
             KE("double_backward_A", 1),
             KE("double_backward_B", 1),
+        ],
+    )
+
+
+@pytest.fixture
+def oeq_tp_triple_bwd(tpp, tp_buffers):
+    tp_oeq = TensorProduct(tpp)
+
+    def triple_backward_fn(X, Y, W):
+        X.requires_grad_(True)
+        Y.requires_grad_(True)
+        W.requires_grad_(True)
+        out = tp_oeq(X, Y, W)
+        return _triple_backward_from_output(out, X, Y, W)
+
+    return Executable(
+        triple_backward_fn,
+        tp_buffers,
+        [
+            KE("forward", 1),
+            KE("backward", 4),
+            KE("double_backward_A", 5),
+            KE("double_backward_B", 5),
         ],
     )
 
@@ -239,30 +321,55 @@ def oeq_conv_atomic_double_bwd(tpp, conv_buffers):
 
 
 @pytest.fixture
-def oeq_conv_det_fwd(tpp, conv_buffers):
+def oeq_conv_atomic_triple_bwd(tpp, conv_buffers):
     tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
 
-    return Executable(tp_conv, conv_buffers, [KE("forward", 1), KE("fixup_forward", 1)])
+    def triple_backward_fn(X, Y, W, receivers, senders):
+        X.requires_grad_(True)
+        Y.requires_grad_(True)
+        W.requires_grad_(True)
+        out = tp_conv(X, Y, W, receivers, senders)
+        return _triple_backward_from_output(out, X, Y, W)
+
+    return Executable(
+        triple_backward_fn,
+        conv_buffers,
+        [
+            KE("forward", 1),
+            KE("backward", 4),
+            KE("double_backward_A", 5),
+            KE("double_backward_B", 5),
+        ],
+    )
 
 
 @pytest.fixture
-def oeq_conv_det_bwd(tpp, conv_buffers):
-    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
+def oeq_conv_det_fwd(tpp, conv_det_buffers):
+    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=True)
+
+    return Executable(
+        tp_conv, conv_det_buffers, [KE("forward", 1), KE("fixup_forward", 1)]
+    )
+
+
+@pytest.fixture
+def oeq_conv_det_bwd(tpp, conv_det_buffers):
+    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=True)
 
     # Set up backward-executing callable
-    def backward_fn(X, Y, W, receivers, senders):
+    def backward_fn(X, Y, W, receivers, senders, sender_perm):
         X.requires_grad_(True)
         Y.requires_grad_(True)
         W.requires_grad_(True)
         output = tp_conv(
-            X, Y, W, receivers, senders
+            X, Y, W, receivers, senders, sender_perm
         ).sum()  # Scalar output for backward
         output.backward()
         return output
 
     return Executable(
         backward_fn,
-        conv_buffers,
+        conv_det_buffers,
         [
             KE("forward", 1),
             KE("fixup_forward", 1),
@@ -273,16 +380,16 @@ def oeq_conv_det_bwd(tpp, conv_buffers):
 
 
 @pytest.fixture
-def oeq_conv_det_double_bwd(tpp, conv_buffers):
-    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
+def oeq_conv_det_double_bwd(tpp, conv_det_buffers):
+    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=True)
 
-    def double_backward_fn(X, Y, W, receivers, senders):
+    def double_backward_fn(X, Y, W, receivers, senders, sender_perm):
         # First forward pass
         X.requires_grad_(True)
         Y.requires_grad_(True)
         W.requires_grad_(True)
 
-        out = tp_conv(X, Y, W, receivers, senders)
+        out = tp_conv(X, Y, W, receivers, senders, sender_perm)
         out_grad = out.clone().detach().requires_grad_(True)
 
         # First backward (gradients w.r.t inputs)
@@ -308,7 +415,7 @@ def oeq_conv_det_double_bwd(tpp, conv_buffers):
 
     return Executable(
         double_backward_fn,
-        conv_buffers,
+        conv_det_buffers,
         [
             KE("forward", 1),
             KE("fixup_forward", 2),
@@ -321,17 +428,46 @@ def oeq_conv_det_double_bwd(tpp, conv_buffers):
     )
 
 
+@pytest.fixture
+def oeq_conv_det_triple_bwd(tpp, conv_det_buffers):
+    tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=True)
+
+    def triple_backward_fn(X, Y, W, receivers, senders, sender_perm):
+        X.requires_grad_(True)
+        Y.requires_grad_(True)
+        W.requires_grad_(True)
+        out = tp_conv(X, Y, W, receivers, senders, sender_perm)
+        return _triple_backward_from_output(out, X, Y, W)
+
+    return Executable(
+        triple_backward_fn,
+        conv_det_buffers,
+        [
+            KE("forward", 1),
+            KE("fixup_forward", 6),
+            KE("backward", 4),
+            KE("fixup_backward", 4),
+            KE("double_backward_A", 5),
+            KE("double_backward_B", 5),
+            KE("fixup_double_backwardB", 5),
+        ],
+    )
+
+
 @pytest.fixture(
     params=[
         "oeq_tp_fwd",
         "oeq_tp_bwd",
         "oeq_tp_double_bwd",
+        "oeq_tp_triple_bwd",
         "oeq_conv_atomic_fwd",
         "oeq_conv_atomic_bwd",
         "oeq_conv_atomic_double_bwd",
+        "oeq_conv_atomic_triple_bwd",
         "oeq_conv_det_fwd",
         "oeq_conv_det_bwd",
         "oeq_conv_det_double_bwd",
+        "oeq_conv_det_triple_bwd",
     ],
 )
 def executable(request):
