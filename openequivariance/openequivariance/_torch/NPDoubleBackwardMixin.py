@@ -3,8 +3,7 @@ import torch
 
 def _none_to_zeros(values, refs):
     return tuple(
-        ref * 0 if value is None else value
-        for value, ref in zip(values, refs)
+        ref * 0 if value is None else value for value, ref in zip(values, refs)
     )
 
 

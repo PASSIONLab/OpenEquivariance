@@ -127,9 +127,7 @@ def get_random_buffers_double_backward(
     )
 
 
-def get_random_buffers_triple_backward(
-    tpp: TPProblem, batch_size: int, prng_seed: int
-):
+def get_random_buffers_triple_backward(tpp: TPProblem, batch_size: int, prng_seed: int):
     rng = np.random.default_rng(prng_seed)
 
     in1 = np.array(
