@@ -12,7 +12,6 @@ from openequivariance.benchmark.correctness import (
     correctness_forward_conv,
     correctness_triple_backward_conv,
 )
-from openequivariance.core.ConvolutionBase import CoordGraph
 from itertools import product
 import torch
 
@@ -40,14 +39,6 @@ def graph(request):
 
     # graph = load_graph("data/1drf_radius3.5.pickle")
     return graph
-
-
-@pytest.fixture(scope="module")
-def small_graph():
-    coords = np.zeros((3, 3), dtype=np.float32)
-    rows = np.array([0, 1, 1, 2], dtype=np.int64)
-    cols = np.array([1, 0, 2, 1], dtype=np.int64)
-    return CoordGraph(coords, rows, cols, "small")
 
 
 @pytest.fixture(scope="module")
