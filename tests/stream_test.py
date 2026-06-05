@@ -378,8 +378,8 @@ def test_separate_streams(request, tmp_path, executable: Executable):
 
     for tid in set(tids):
         for kernel_expectation in executable.kernel_expectations:
-            criteria = lambda event: (
-                (event.get("cat") == "kernel")
+            criteria = (
+                lambda event: (event.get("cat") == "kernel")
                 and (event.get("name", "").startswith(kernel_expectation.kernel_name))
                 and (event.get("tid") == tid)
             )
