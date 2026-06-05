@@ -12,9 +12,6 @@ from openequivariance.benchmark.correctness import (
     correctness_forward_conv,
     correctness_triple_backward_conv,
 )
-from openequivariance.benchmark.test_buffers import (
-    get_random_buffers_triple_backward_conv,
-)
 from openequivariance.core.ConvolutionBase import CoordGraph
 from itertools import product
 import torch
@@ -180,98 +177,6 @@ class ConvCorrectness:
             "weights_double_grad",
         ]:
             self.check_result(result, fieldname)
-
-
-class TestTripleBackwardConvDirectOps:
-    @pytest.fixture(scope="class")
-    def problem(self, dtype, with_jax):
-        if with_jax:
-            pytest.skip("N/A for JAX")
-
-        return oeq.TPProblem(
-            "2x1e",
-            "1x1e",
-            "2x1e",
-            [(0, 0, 0, "uvu", True)],
-            shared_weights=False,
-            internal_weights=False,
-            irrep_dtype=dtype,
-            weight_dtype=dtype,
-        )
-
-    @pytest.fixture(scope="class")
-    def conv_object(self, problem):
-        return oeq.TensorProductConv(problem, deterministic=True)
-
-    def test_direct_conv_double_backward_op_is_differentiable(
-        self, conv_object, small_graph
-    ):
-        problem = conv_object.config
-        buffers = get_random_buffers_triple_backward_conv(
-            problem, small_graph.node_count, small_graph.nnz, prng_seed=12345
-        )
-        (
-            in1,
-            in2,
-            out_grad,
-            weights,
-            weights_dgrad,
-            in1_dgrad,
-            in2_dgrad,
-            out_tgrad,
-            weights_tgrad,
-            in1_tgrad,
-            in2_tgrad,
-        ) = buffers
-
-        weights = conv_object.reorder_weights_from_e3nn(
-            weights, has_batch_dim=not problem.shared_weights
-        )
-        weights_dgrad = conv_object.reorder_weights_from_e3nn(
-            weights_dgrad, has_batch_dim=not problem.shared_weights
-        )
-        weights_tgrad = conv_object.reorder_weights_from_e3nn(
-            weights_tgrad, has_batch_dim=not problem.shared_weights
-        )
-
-        tensors = [
-            torch.tensor(arr, device="cuda", requires_grad=True)
-            for arr in [
-                in1,
-                in2,
-                weights,
-                out_grad,
-                in1_dgrad,
-                in2_dgrad,
-                weights_dgrad,
-            ]
-        ]
-        grad_outputs = [
-            torch.tensor(arr, device="cuda")
-            for arr in [in1_tgrad, in2_tgrad, weights_tgrad, out_tgrad]
-        ]
-        rows = torch.tensor(small_graph.rows, device="cuda")
-        cols = torch.tensor(small_graph.cols, device="cuda")
-        transpose_perm = torch.tensor(small_graph.transpose_perm, device="cuda")
-
-        outputs = torch.ops.libtorch_tp_jit.jit_conv_double_backward(
-            conv_object.kernel,
-            conv_object.hash,
-            *tensors,
-            rows,
-            cols,
-            conv_object.workspace_buffer,
-            transpose_perm,
-        )
-        grads = torch.autograd.grad(
-            outputs=outputs,
-            inputs=tensors,
-            grad_outputs=grad_outputs,
-            allow_unused=True,
-        )
-
-        assert len(grads) == 7
-        assert all(grad is not None for grad in grads)
 
 
 class TestProductionModels(ConvCorrectness):

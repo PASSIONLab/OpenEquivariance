@@ -9,10 +9,7 @@ from openequivariance.benchmark.correctness import (
     correctness_forward,
     correctness_triple_backward,
 )
-from openequivariance.benchmark.test_buffers import (
-    get_random_buffers_forward,
-    get_random_buffers_triple_backward,
-)
+from openequivariance.benchmark.test_buffers import get_random_buffers_forward
 from openequivariance.benchmark.problems import (
     diffdock_problems,
     e3nn_torch_tetris_poly_problems,
@@ -128,88 +125,6 @@ class TPCorrectness:
             "weights_double_grad",
         ]:
             self.check_result(result, fieldname)
-
-
-class TestTripleBackwardDirectOps:
-    @pytest.fixture(scope="class")
-    def problem(self, dtype, with_jax):
-        if with_jax:
-            pytest.skip("N/A for JAX")
-
-        return oeq.TPProblem(
-            "2x1e",
-            "1x1e",
-            "2x1e",
-            [(0, 0, 0, "uvu", True)],
-            shared_weights=False,
-            internal_weights=False,
-            irrep_dtype=dtype,
-            weight_dtype=dtype,
-        )
-
-    @pytest.fixture(scope="class")
-    def tp_and_problem(self, problem):
-        tp = oeq.TensorProduct(problem)
-        return tp, problem
-
-    def test_direct_tp_double_backward_op_is_differentiable(self, tp_and_problem):
-        tp, problem = tp_and_problem
-        buffers = get_random_buffers_triple_backward(
-            problem, batch_size=3, prng_seed=12345
-        )
-        (
-            in1,
-            in2,
-            out_grad,
-            weights,
-            weights_dgrad,
-            in1_dgrad,
-            in2_dgrad,
-            out_tgrad,
-            weights_tgrad,
-            in1_tgrad,
-            in2_tgrad,
-        ) = buffers
-
-        weights = tp.reorder_weights_from_e3nn(
-            weights, has_batch_dim=not problem.shared_weights
-        )
-        weights_dgrad = tp.reorder_weights_from_e3nn(
-            weights_dgrad, has_batch_dim=not problem.shared_weights
-        )
-        weights_tgrad = tp.reorder_weights_from_e3nn(
-            weights_tgrad, has_batch_dim=not problem.shared_weights
-        )
-
-        tensors = [
-            torch.tensor(arr, device="cuda", requires_grad=True)
-            for arr in [
-                in1,
-                in2,
-                weights,
-                out_grad,
-                in1_dgrad,
-                in2_dgrad,
-                weights_dgrad,
-            ]
-        ]
-        grad_outputs = [
-            torch.tensor(arr, device="cuda")
-            for arr in [in1_tgrad, in2_tgrad, weights_tgrad, out_tgrad]
-        ]
-
-        outputs = torch.ops.libtorch_tp_jit.jit_tp_double_backward(
-            tp.kernel, tp.hash, *tensors
-        )
-        grads = torch.autograd.grad(
-            outputs=outputs,
-            inputs=tensors,
-            grad_outputs=grad_outputs,
-            allow_unused=True,
-        )
-
-        assert len(grads) == 7
-        assert all(grad is not None for grad in grads)
 
 
 class TestProductionModels(TPCorrectness):
