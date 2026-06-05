@@ -23,12 +23,8 @@ class NumpyDoubleBackwardMixin:
         in2_torch = torch.tensor(in2, device="cuda", requires_grad=True)
         weights_torch = torch.tensor(weights, device="cuda", requires_grad=True)
         out_grad_torch = torch.tensor(out_grad, device="cuda", requires_grad=True)
-        in1_dgrad_torch = torch.tensor(
-            in1_dgrad, device="cuda", requires_grad=False
-        )
-        in2_dgrad_torch = torch.tensor(
-            in2_dgrad, device="cuda", requires_grad=False
-        )
+        in1_dgrad_torch = torch.tensor(in1_dgrad, device="cuda", requires_grad=False)
+        in2_dgrad_torch = torch.tensor(in2_dgrad, device="cuda", requires_grad=False)
         weights_dgrad_torch = torch.tensor(
             weights_dgrad, device="cuda", requires_grad=False
         )
@@ -75,24 +71,14 @@ class NumpyDoubleBackwardMixin:
         in2_torch = torch.tensor(in2, device="cuda", requires_grad=True)
         weights_torch = torch.tensor(weights, device="cuda", requires_grad=True)
         out_grad_torch = torch.tensor(out_grad, device="cuda", requires_grad=True)
-        in1_dgrad_torch = torch.tensor(
-            in1_dgrad, device="cuda", requires_grad=True
-        )
-        in2_dgrad_torch = torch.tensor(
-            in2_dgrad, device="cuda", requires_grad=True
-        )
+        in1_dgrad_torch = torch.tensor(in1_dgrad, device="cuda", requires_grad=True)
+        in2_dgrad_torch = torch.tensor(in2_dgrad, device="cuda", requires_grad=True)
         weights_dgrad_torch = torch.tensor(
             weights_dgrad, device="cuda", requires_grad=True
         )
-        out_tgrad_torch = torch.tensor(
-            out_tgrad, device="cuda", requires_grad=False
-        )
-        in1_tgrad_torch = torch.tensor(
-            in1_tgrad, device="cuda", requires_grad=False
-        )
-        in2_tgrad_torch = torch.tensor(
-            in2_tgrad, device="cuda", requires_grad=False
-        )
+        out_tgrad_torch = torch.tensor(out_tgrad, device="cuda", requires_grad=False)
+        in1_tgrad_torch = torch.tensor(in1_tgrad, device="cuda", requires_grad=False)
+        in2_tgrad_torch = torch.tensor(in2_tgrad, device="cuda", requires_grad=False)
         weights_tgrad_torch = torch.tensor(
             weights_tgrad, device="cuda", requires_grad=False
         )
@@ -165,12 +151,8 @@ class NumpyDoubleBackwardMixinConv:
         in2_torch = torch.tensor(in2, device="cuda", requires_grad=True)
         weights_torch = torch.tensor(weights, device="cuda", requires_grad=True)
         out_grad_torch = torch.tensor(out_grad, device="cuda", requires_grad=True)
-        in1_dgrad_torch = torch.tensor(
-            in1_dgrad, device="cuda", requires_grad=False
-        )
-        in2_dgrad_torch = torch.tensor(
-            in2_dgrad, device="cuda", requires_grad=False
-        )
+        in1_dgrad_torch = torch.tensor(in1_dgrad, device="cuda", requires_grad=False)
+        in2_dgrad_torch = torch.tensor(in2_dgrad, device="cuda", requires_grad=False)
         weights_dgrad_torch = torch.tensor(
             weights_dgrad, device="cuda", requires_grad=False
         )
@@ -230,24 +212,14 @@ class NumpyDoubleBackwardMixinConv:
         in2_torch = torch.tensor(in2, device="cuda", requires_grad=True)
         weights_torch = torch.tensor(weights, device="cuda", requires_grad=True)
         out_grad_torch = torch.tensor(out_grad, device="cuda", requires_grad=True)
-        in1_dgrad_torch = torch.tensor(
-            in1_dgrad, device="cuda", requires_grad=True
-        )
-        in2_dgrad_torch = torch.tensor(
-            in2_dgrad, device="cuda", requires_grad=True
-        )
+        in1_dgrad_torch = torch.tensor(in1_dgrad, device="cuda", requires_grad=True)
+        in2_dgrad_torch = torch.tensor(in2_dgrad, device="cuda", requires_grad=True)
         weights_dgrad_torch = torch.tensor(
             weights_dgrad, device="cuda", requires_grad=True
         )
-        out_tgrad_torch = torch.tensor(
-            out_tgrad, device="cuda", requires_grad=False
-        )
-        in1_tgrad_torch = torch.tensor(
-            in1_tgrad, device="cuda", requires_grad=False
-        )
-        in2_tgrad_torch = torch.tensor(
-            in2_tgrad, device="cuda", requires_grad=False
-        )
+        out_tgrad_torch = torch.tensor(out_tgrad, device="cuda", requires_grad=False)
+        in1_tgrad_torch = torch.tensor(in1_tgrad, device="cuda", requires_grad=False)
+        in2_tgrad_torch = torch.tensor(in2_tgrad, device="cuda", requires_grad=False)
         weights_tgrad_torch = torch.tensor(
             weights_tgrad, device="cuda", requires_grad=False
         )
