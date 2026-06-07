@@ -7,6 +7,7 @@ from openequivariance.benchmark.correctness import (
     correctness_backward,
     correctness_double_backward,
     correctness_forward,
+    correctness_triple_backward,
 )
 from openequivariance.benchmark.test_buffers import get_random_buffers_forward
 from openequivariance.benchmark.problems import (
@@ -27,7 +28,12 @@ def dtype(request):
 
 class TPCorrectness:
     def thresh(self, direction):
-        return {"fwd": 1e-5, "bwd": 3e-4, "double_bwd": 3e-4}[direction]
+        return {
+            "fwd": 1e-5,
+            "bwd": 3e-4,
+            "double_bwd": 3e-4,
+            "triple_bwd": 5e-4,
+        }[direction]
 
     def check_result(self, result, fieldname):
         with check:
@@ -94,6 +100,31 @@ class TPCorrectness:
         self.check_result(result, "in1_grad")
         self.check_result(result, "in2_grad")
         self.check_result(result, "weights_grad")
+
+    def test_tp_triple_bwd(self, tp_and_problem, with_jax):
+        if with_jax:
+            pytest.skip("N/A for JAX")
+
+        tp, problem = tp_and_problem
+        result = correctness_triple_backward(
+            problem=problem,
+            test_implementation=tp,
+            reference_implementation=None,
+            batch_size=4,
+            correctness_threshold=self.thresh("triple_bwd"),
+            prng_seed=12345,
+        )
+
+        for fieldname in [
+            "in1_grad",
+            "in2_grad",
+            "weights_grad",
+            "output_grad",
+            "in1_double_grad",
+            "in2_double_grad",
+            "weights_double_grad",
+        ]:
+            self.check_result(result, fieldname)
 
 
 class TestProductionModels(TPCorrectness):
@@ -241,6 +272,7 @@ class TestSharedWeights(TPCorrectness):
             "fwd": 1e-5,
             "bwd": 5e-4,  # Expect higher errors for shared weights
             "double_bwd": 5e-4,
+            "triple_bwd": 5e-4,
         }[direction]
 
     @pytest.fixture(params=problems, ids=lambda x: x.label, scope="class")

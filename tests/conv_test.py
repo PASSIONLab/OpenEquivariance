@@ -10,6 +10,7 @@ from openequivariance.benchmark.correctness import (
     correctness_backward_conv,
     correctness_double_backward_conv,
     correctness_forward_conv,
+    correctness_triple_backward_conv,
 )
 from itertools import product
 import torch
@@ -47,7 +48,12 @@ def with_jax(request):
 
 class ConvCorrectness:
     def thresh(self, direction):
-        return {"fwd": 3e-4, "bwd": 3e-4, "double_bwd": 3e-4}[direction]
+        return {
+            "fwd": 3e-4,
+            "bwd": 3e-4,
+            "double_bwd": 3e-4,
+            "triple_bwd": 5e-4,
+        }[direction]
 
     def check_result(self, result, fieldname):
         with check:
@@ -136,6 +142,32 @@ class ConvCorrectness:
         self.check_result(result, "in1_grad")
         self.check_result(result, "in2_grad")
         self.check_result(result, "weights_grad")
+
+    def test_tp_triple_bwd(self, conv_object, graph, with_jax):
+        if with_jax:
+            pytest.skip("N/A for JAX")
+
+        if conv_object is None:
+            pytest.skip("'conv_object' fixture returned None, skipping")
+
+        result = correctness_triple_backward_conv(
+            conv_object,
+            graph,
+            thresh=self.thresh("triple_bwd"),
+            prng_seed=12345,
+            reference_implementation=None,
+        )
+
+        for fieldname in [
+            "in1_grad",
+            "in2_grad",
+            "weights_grad",
+            "output_grad",
+            "in1_double_grad",
+            "in2_double_grad",
+            "weights_double_grad",
+        ]:
+            self.check_result(result, fieldname)
 
 
 class TestProductionModels(ConvCorrectness):
@@ -244,6 +276,7 @@ class TestAtomicSharedWeights(ConvCorrectness):
             "fwd": 1e-5,
             "bwd": 7.5e-2,  # Expect higher errors for shared weights
             "double_bwd": 5e-1,
+            "triple_bwd": 5e-1,
         }[direction]
 
     @pytest.fixture(params=problems, ids=lambda x: x.label, scope="class")

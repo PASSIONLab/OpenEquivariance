@@ -330,6 +330,11 @@ def register_autograd():
     backward_op = torch.ops.libtorch_tp_jit.jit_conv_backward
     double_backward_op = torch.ops.libtorch_tp_jit.jit_conv_double_backward
 
+    def zero_if_none(grad_output, like):
+        if grad_output is None:
+            return torch.zeros_like(like)
+        return grad_output
+
     def setup_context(ctx, inputs, output):
         (
             ctx.kernel,
@@ -411,6 +416,143 @@ def register_autograd():
         "libtorch_tp_jit::jit_conv_backward",
         double_backward,
         setup_context=setup_context_double_backward,
+    )
+
+    def setup_context_triple_backward(ctx, inputs, output):
+        (
+            ctx.kernel,
+            ctx.hash,
+            ctx.L1_in,
+            ctx.L2_in,
+            ctx.W,
+            ctx.grad_output,
+            ctx.L1_dgrad,
+            ctx.L2_dgrad,
+            ctx.W_dgrad,
+            ctx.rows,
+            ctx.cols,
+            ctx.workspace_buffer,
+            ctx.sender_perm,
+        ) = inputs
+
+    def triple_backward(ctx, t_L1_grad, t_L2_grad, t_W_grad, t_L3_dgrad):
+        t_L1_grad = zero_if_none(t_L1_grad, ctx.L1_in)
+        t_L2_grad = zero_if_none(t_L2_grad, ctx.L2_in)
+        t_W_grad = zero_if_none(t_W_grad, ctx.W)
+        t_L3_dgrad = zero_if_none(t_L3_dgrad, ctx.grad_output)
+
+        common_args = (
+            ctx.rows,
+            ctx.cols,
+            ctx.workspace_buffer,
+            ctx.sender_perm,
+        )
+
+        g1_L1_dgrad, g1_L2_dgrad, g1_W, g1_L3_grad = double_backward_op(
+            ctx.kernel,
+            ctx.hash,
+            ctx.L1_dgrad,
+            ctx.L2_dgrad,
+            ctx.W,
+            ctx.grad_output,
+            t_L1_grad,
+            t_L2_grad,
+            torch.zeros_like(ctx.W),
+            *common_args,
+        )
+        g2_L1, g2_L2, g2_W_dgrad, g2_L3_grad = double_backward_op(
+            ctx.kernel,
+            ctx.hash,
+            ctx.L1_in,
+            ctx.L2_in,
+            ctx.W_dgrad,
+            ctx.grad_output,
+            t_L1_grad,
+            t_L2_grad,
+            torch.zeros_like(ctx.W_dgrad),
+            *common_args,
+        )
+        g3_L1_dgrad, g3_L2, g3_W, g3_L3_grad = double_backward_op(
+            ctx.kernel,
+            ctx.hash,
+            ctx.L1_dgrad,
+            ctx.L2_in,
+            ctx.W,
+            ctx.grad_output,
+            torch.zeros_like(ctx.L1_dgrad),
+            torch.zeros_like(ctx.L2_in),
+            t_W_grad,
+            *common_args,
+        )
+        g4_L1, g4_L2_dgrad, g4_W, g4_L3_grad = double_backward_op(
+            ctx.kernel,
+            ctx.hash,
+            ctx.L1_in,
+            ctx.L2_dgrad,
+            ctx.W,
+            ctx.grad_output,
+            torch.zeros_like(ctx.L1_in),
+            torch.zeros_like(ctx.L2_dgrad),
+            t_W_grad,
+            *common_args,
+        )
+
+        g5_L1_dgrad, g5_L2, g5_W = backward_op(
+            ctx.kernel,
+            ctx.hash,
+            ctx.L1_dgrad,
+            ctx.L2_in,
+            ctx.W,
+            t_L3_dgrad,
+            *common_args,
+        )
+        g6_L1, g6_L2_dgrad, g6_W = backward_op(
+            ctx.kernel,
+            ctx.hash,
+            ctx.L1_in,
+            ctx.L2_dgrad,
+            ctx.W,
+            t_L3_dgrad,
+            *common_args,
+        )
+        g7_L1, g7_L2, g7_W_dgrad = backward_op(
+            ctx.kernel,
+            ctx.hash,
+            ctx.L1_in,
+            ctx.L2_in,
+            ctx.W_dgrad,
+            t_L3_dgrad,
+            *common_args,
+        )
+
+        grad_L1 = g2_L1 + g4_L1 + g6_L1 + g7_L1
+        grad_L2 = g2_L2 + g3_L2 + g5_L2 + g7_L2
+        grad_W = g1_W + g3_W + g4_W + g5_W + g6_W
+        grad_L3_grad = g1_L3_grad + g2_L3_grad + g3_L3_grad + g4_L3_grad
+        grad_L1_dgrad = g1_L1_dgrad + g3_L1_dgrad + g5_L1_dgrad
+        grad_L2_dgrad = g1_L2_dgrad + g4_L2_dgrad + g6_L2_dgrad
+        grad_W_dgrad = g2_W_dgrad + g7_W_dgrad
+
+        return (
+            None,
+            None,
+            grad_L1,
+            grad_L2,
+            grad_W,
+            grad_L3_grad,
+            grad_L1_dgrad,
+            grad_L2_dgrad,
+            grad_W_dgrad,
+            None,
+            None,
+            None,
+            None,
+        )
+
+    torch.library.register_autograd(
+        "libtorch_tp_jit::jit_conv_double_backward",
+        triple_backward,
+        setup_context=setup_context_triple_backward,
     )
 
 
