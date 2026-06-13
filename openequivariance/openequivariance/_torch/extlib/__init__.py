@@ -197,8 +197,6 @@ sys.modules["oeq_utilities"] = extension_module
 
 if BUILT_EXTENSION:
     from oeq_utilities import (
-        GroupMM_F32,
-        GroupMM_F64,
         DeviceProp,
         GPUTimer,
     )
@@ -209,12 +207,6 @@ else:
             raise ImportError(
                 f"Could not import {import_target}: {BUILT_EXTENSION_ERROR}"
             )
-
-    def GroupMM_F32(*args, **kwargs):
-        _raise_import_error_helper("GroupMM_F32")
-
-    def GroupMM_F64(*args, **kwargs):
-        _raise_import_error_helper("GroupMM_F64")
 
     def DeviceProp(*args, **kwargs):
         _raise_import_error_helper("DeviceProp")

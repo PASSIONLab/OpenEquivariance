@@ -1,4 +1,4 @@
-from openequivariance._torch.symmetric_contraction.symmetric_contraction import (
+from openequivariance._torch.symmetric_contraction.SymmetricContraction import (
     SymmetricContraction,
 )
 

@@ -1,115 +1,7 @@
 # ruff: noqa : E402
 import torch
 
-from openequivariance._torch.extlib import GroupMM_F32, GroupMM_F64
-
-
-class GroupMM:
-    next_id = 0
-
-    def __init__(self, dtype, num_elements, batch_size):
-        self.id = GroupMM.next_id
-        self.num_elements = num_elements
-        GroupMM.next_id += 1
-
-        if dtype == torch.float32:
-            self.internal = GroupMM_F32(num_elements, batch_size)
-        else:
-            self.internal = GroupMM_F64(num_elements, batch_size)
-
-        @torch.library.custom_op(
-            f"openequivariance::group_gemm{self.id}",
-            mutates_args=(),
-            device_types="cuda",
-        )
-        def group_gemm(
-            A: torch.Tensor,
-            B: torch.Tensor,
-            ragged_counts: torch.Tensor,
-            M: int,
-            K: int,
-            ragged_inner: int,
-        ) -> torch.Tensor:
-            """
-            If ragged_inner == 0:
-                A is 3D, num_weights x num_features x M x K
-                B is batch_size x num_features x K
-                C is batch_size x num_features x M
-            If ragged_inner == 1:    (needed for the backward pass)
-                A is batch_size x num_features x M
-                B is batch_size x num_features K
-                C is 3D, num_weights x num_features M x K
-            """
-            shape = None
-            if ragged_inner == 0:
-                shape = (B.shape[0], B.shape[1], M)
-            elif ragged_inner == 1:
-                shape = (num_elements, B.shape[1], M, K)
-
-            C = torch.zeros(shape, device="cuda", dtype=A.dtype)
-            self.internal.group_gemm(
-                A.contiguous().data_ptr(),
-                B.contiguous().data_ptr(),
-                C.data_ptr(),
-                ragged_counts.data_ptr(),
-                M,
-                K,
-                ragged_inner,
-            )
-            return C
-
-        @group_gemm.register_fake
-        def _(A, B, ragged_counts, M, K, ragged_inner):
-            if ragged_inner == 0:
-                return A.new_empty(B.shape[0], B.shape[1], M)
-            elif ragged_inner == 1:
-                return A.new_empty(num_elements, batch_size, M, K)
-
-        self.group_gemm = group_gemm
-
-        def setup_context(ctx, inputs, output):
-            ctx.A, ctx.B, ctx.ragged_counts, ctx.M, ctx.K, ctx.ragged_inner = inputs
-
-        def backward(ctx, grad_output):
-            grad_A, grad_B = None, None
-
-            if ctx.ragged_inner == 0:
-                grad_A = group_gemm(
-                    grad_output, ctx.B, ctx.ragged_counts, ctx.M, ctx.K, 1
-                )
-                grad_B = group_gemm(
-                    ctx.A.transpose(2, 3),
-                    grad_output,
-                    ctx.ragged_counts,
-                    ctx.K,
-                    ctx.M,
-                    0,
-                )
-            elif ctx.ragged_inner == 1:
-                grad_A = group_gemm(
-                    grad_output, ctx.B, ctx.ragged_counts, ctx.M, ctx.K, 0
-                )
-                grad_B = group_gemm(
-                    grad_output.transpose(2, 3),
-                    ctx.A,
-                    ctx.ragged_counts,
-                    ctx.K,
-                    ctx.M,
-                    0,
-                )
-
-            return grad_A, grad_B, None, None, None, None
-
-        self.group_gemm.register_autograd(backward, setup_context=setup_context)
-
-    def forward(self, weights, vectors, bincounts):
-        return self.group_gemm(
-            weights, vectors, bincounts, weights.shape[2], weights.shape[3], 0
-        )
-
-
-# --------------------------------------------------------------------------
-# The following segment of code was copied from MACE's repo at https://github.com/ACEsuit/mace/blob/b5faaa076c49778fc17493edfecebcabeb960155/mace/tools/cg.py#L106
+from openequivariance._torch import extlib
 
 import collections
 from typing import Dict, Optional, Union, List
@@ -229,6 +121,19 @@ def U_matrix_real(
     return out
 
 
+class GroupMM:
+    def __init__(self, dtype, num_elements, batch_size):
+        self.num_elements = num_elements
+        self.batch_size = batch_size
+
+    def forward(self, weights, vectors, bincounts):
+        return torch.ops.libtorch_tp_jit.group_gemm(
+            weights, vectors, bincounts,
+            self.num_elements, self.batch_size,
+            weights.shape[2], weights.shape[3], 0,
+        )
+
+
 @compile_mode("script")
 class Contraction(torch.nn.Module):
     def __init__(
@@ -259,21 +164,17 @@ class Contraction(torch.nn.Module):
             )[-1]
             self.register_buffer(f"U_matrix_{nu}", U_matrix)
 
-        # Tensor contraction equations
         self.contractions_weighting = torch.nn.ModuleList()
         self.contractions_features = torch.nn.ModuleList()
 
-        # Create weight for product basis
         self.weights = torch.nn.ParameterList([])
         self.groupMM = GroupMM(dtype, num_elements, self.num_features)
         self.num_equivariance = 2 * irrep_out.lmax + 1
 
         for i in range(correlation, 0, -1):
-            # Shapes defining
             num_params = self.U_tensors(i).size()[-1]
 
             if i == correlation:
-                # Parameters for the product basis
                 w = torch.nn.Parameter(
                     torch.randn(
                         (num_elements, num_params, self.num_features), dtype=dtype
@@ -282,7 +183,6 @@ class Contraction(torch.nn.Module):
                 )
                 self.weights_max = w
             else:
-                # Parameters for the product basis
                 w = torch.nn.Parameter(
                     torch.randn(
                         (num_elements, num_params, self.num_features), dtype=dtype
@@ -295,7 +195,6 @@ class Contraction(torch.nn.Module):
             self.weights = weights[:-1]
             self.weights_max = weights[-1]
 
-        # Permute the U matrices
         for i in range(correlation, 0, -1):
             U = self.U_tensors(i)
             num_params = U.shape[-1]
@@ -334,7 +233,6 @@ class Contraction(torch.nn.Module):
                 c_tensor.view(s[0] * s[1], -1, s[-1]) * x.view(s[0] * s[1], 1, s[-1]),
                 dim=2,
             ).view(s[:-1])
-            # out = torch.bmm(c_tensor.view(s[0] * s[1], -1, s[-1]), x.view(s[0] * s[1], s[-1], 1)).view(s[:-1])
 
         return out.view(out.shape[0], -1)
 
@@ -420,3 +318,37 @@ class SymmetricContraction(CodeGenMixin, torch.nn.Module):
         ]
         outs_cat = torch.cat(outs, dim=-1)[inverse_perm]
         return outs_cat
+
+
+def register_torch_fakes():
+    @torch.library.register_fake("libtorch_tp_jit::group_gemm")
+    def fake_group_gemm(A, B, ragged_counts, num_W, batch_size, m, k, ragged_inner):
+        if ragged_inner == 0:
+            return A.new_empty(B.shape[0], B.shape[1], m)
+        else:
+            return A.new_empty(num_W, batch_size, m, k)
+
+
+def register_autograd():
+    op = torch.ops.libtorch_tp_jit.group_gemm
+
+    def setup_context(ctx, inputs, output):
+        ctx.A, ctx.B, ctx.ragged_counts, ctx.num_W, ctx.batch_size, ctx.m, ctx.k, ctx.ragged_inner = inputs
+
+    def backward(ctx, grad_output):
+        if ctx.ragged_inner == 0:
+            grad_A = op(grad_output, ctx.B, ctx.ragged_counts, ctx.num_W, ctx.batch_size, ctx.m, ctx.k, 1)
+            grad_B = op(ctx.A.transpose(2, 3), grad_output, ctx.ragged_counts, ctx.num_W, ctx.batch_size, ctx.k, ctx.m, 0)
+        else:
+            grad_A = op(grad_output, ctx.B, ctx.ragged_counts, ctx.num_W, ctx.batch_size, ctx.m, ctx.k, 0)
+            grad_B = op(grad_output.transpose(2, 3), ctx.A, ctx.ragged_counts, ctx.num_W, ctx.batch_size, ctx.k, ctx.m, 0)
+        return grad_A, grad_B, None, None, None, None, None, None
+
+    torch.library.register_autograd(
+        "libtorch_tp_jit::group_gemm", backward, setup_context=setup_context
+    )
+
+
+if extlib.BUILT_EXTENSION:
+    register_torch_fakes()
+    register_autograd()

@@ -14,23 +14,17 @@
 
 #ifdef CUDA_BACKEND
     #include "backend_cuda.hpp"
-    #include "group_mm_cuda.hpp"
     using JITKernel = CUJITKernel;
     using GPU_Allocator = CUDA_Allocator;
-
-    template<typename T>
-    using GroupMM = GroupMMCUDA<T>;
 #endif
 
 #ifdef HIP_BACKEND
     #include "backend_hip.hpp"
-    #include "group_mm_hip.hpp"
     using JITKernel = HIPJITKernel;
     using GPU_Allocator = HIP_Allocator;
-
-    template<typename T>
-    using GroupMM = GroupMMHIP<T>;
 #endif
+
+#include "group_mm.hpp"
 
 #include "tensorproducts.hpp"
 #include "convolution.hpp"
@@ -623,6 +617,42 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
 
 // ===========================================================
 
+inline Tensor group_gemm(
+        Tensor A, Tensor B, Tensor ragged_counts,
+        int64_t num_W, int64_t batch_size, int64_t m, int64_t k, int64_t ragged_inner) {
+    TCHECK(A.scalar_type() == B.scalar_type(), "group_gemm: A and B must have the same dtype");
+    TCHECK(ragged_counts.scalar_type() == kLong, "group_gemm: ragged_counts must be int64");
+
+    Tensor A_c    = tensor_contiguous(A);
+    Tensor B_c    = tensor_contiguous(B);
+    Tensor rc_c   = tensor_contiguous(ragged_counts);
+    int64_t* rc_ptr = reinterpret_cast<int64_t*>(data_ptr(rc_c));
+
+    Tensor C;
+    if (ragged_inner == 0) {
+        C = tensor_zeros_like(A, make_sizes({B.size(0), B.size(1), m}));
+    } 
+    else {
+        C = tensor_zeros_like(A, make_sizes({num_W, batch_size, m, k}));
+    }
+
+    if (A.scalar_type() == kFloat) {
+        group_gemm<float>(data_ptr(A_c), data_ptr(B_c), data_ptr(C), rc_ptr,
+            (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner);
+    } 
+    else if (A.scalar_type() == kDouble) {
+        group_gemm<double>(data_ptr(A_c), data_ptr(B_c), data_ptr(C), rc_ptr,
+            (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner);
+    } 
+    else {
+        throw std::logic_error("group_gemm: unsupported dtype, expected float32 or float64");
+    }
+
+    return C;
+}
+
+// ===========================================================
+
 REGISTER_LIBRARY_IMPL(libtorch_tp_jit, CUDA, m) {
     m.impl("jit_tp_forward", BOX(&jit_tp_forward));
     m.impl("jit_tp_backward", BOX(&jit_tp_backward));
@@ -631,6 +661,8 @@ REGISTER_LIBRARY_IMPL(libtorch_tp_jit, CUDA, m) {
     m.impl("jit_conv_forward", BOX(&jit_conv_forward));
     m.impl("jit_conv_backward", BOX(&jit_conv_backward));
     m.impl("jit_conv_double_backward", BOX(&jit_conv_double_backward));
+
+    m.impl("group_gemm", BOX(&group_gemm));
 };
 
 REGISTER_LIBRARY(libtorch_tp_jit, m) {
@@ -641,4 +673,6 @@ REGISTER_LIBRARY(libtorch_tp_jit, m) {
     m.def("jit_conv_forward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, int L3_dim, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> Tensor");
     m.def("jit_conv_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor)");
     m.def("jit_conv_double_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor, Tensor)");
+
+    m.def("group_gemm(Tensor A, Tensor B, Tensor ragged_counts, int num_W, int batch_size, int m, int k, int ragged_inner) -> Tensor");
 };
