@@ -128,9 +128,14 @@ class GroupMM:
 
     def forward(self, weights, vectors, bincounts):
         return torch.ops.libtorch_tp_jit.group_gemm(
-            weights, vectors, bincounts,
-            self.num_elements, self.batch_size,
-            weights.shape[2], weights.shape[3], 0,
+            weights,
+            vectors,
+            bincounts,
+            self.num_elements,
+            self.batch_size,
+            weights.shape[2],
+            weights.shape[3],
+            0,
         )
 
 
@@ -333,15 +338,60 @@ def register_autograd():
     op = torch.ops.libtorch_tp_jit.group_gemm
 
     def setup_context(ctx, inputs, output):
-        ctx.A, ctx.B, ctx.ragged_counts, ctx.num_W, ctx.batch_size, ctx.m, ctx.k, ctx.ragged_inner = inputs
+        (
+            ctx.A,
+            ctx.B,
+            ctx.ragged_counts,
+            ctx.num_W,
+            ctx.batch_size,
+            ctx.m,
+            ctx.k,
+            ctx.ragged_inner,
+        ) = inputs
 
     def backward(ctx, grad_output):
         if ctx.ragged_inner == 0:
-            grad_A = op(grad_output, ctx.B, ctx.ragged_counts, ctx.num_W, ctx.batch_size, ctx.m, ctx.k, 1)
-            grad_B = op(ctx.A.transpose(2, 3), grad_output, ctx.ragged_counts, ctx.num_W, ctx.batch_size, ctx.k, ctx.m, 0)
+            grad_A = op(
+                grad_output,
+                ctx.B,
+                ctx.ragged_counts,
+                ctx.num_W,
+                ctx.batch_size,
+                ctx.m,
+                ctx.k,
+                1,
+            )
+            grad_B = op(
+                ctx.A.transpose(2, 3),
+                grad_output,
+                ctx.ragged_counts,
+                ctx.num_W,
+                ctx.batch_size,
+                ctx.k,
+                ctx.m,
+                0,
+            )
         else:
-            grad_A = op(grad_output, ctx.B, ctx.ragged_counts, ctx.num_W, ctx.batch_size, ctx.m, ctx.k, 0)
-            grad_B = op(grad_output.transpose(2, 3), ctx.A, ctx.ragged_counts, ctx.num_W, ctx.batch_size, ctx.k, ctx.m, 0)
+            grad_A = op(
+                grad_output,
+                ctx.B,
+                ctx.ragged_counts,
+                ctx.num_W,
+                ctx.batch_size,
+                ctx.m,
+                ctx.k,
+                0,
+            )
+            grad_B = op(
+                grad_output.transpose(2, 3),
+                ctx.A,
+                ctx.ragged_counts,
+                ctx.num_W,
+                ctx.batch_size,
+                ctx.k,
+                ctx.m,
+                0,
+            )
         return grad_A, grad_B, None, None, None, None, None, None
 
     torch.library.register_autograd(

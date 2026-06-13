@@ -1,3 +1,4 @@
+import collections
 from unittest.mock import patch
 
 import pytest
@@ -12,12 +13,33 @@ mace_symmetric_contraction = pytest.importorskip("mace.modules.symmetric_contrac
 MaceSymmetricContraction = mace_symmetric_contraction.SymmetricContraction
 
 
-IRREPS_IN = o3.Irreps("2x0e + 2x1o")
-IRREPS_OUT = o3.Irreps("2x0e + 2x1o")
-CORRELATION = 2
-NUM_ELEMENTS = 4
-LABEL_VALUES = [0, 2, 3, 2, 0, 0, 2, 3, 2, 2]
+SCConfig = collections.namedtuple(
+    "SCConfig",
+    [
+        "irreps_in",
+        "irreps_out",
+        "correlation",
+        "num_elements",
+        "label_values",
+        "device",
+    ],
+)
+
 DEVICE = torch.device("cuda")
+
+SC_CONFIGS = [
+    SCConfig(o3.Irreps("2x0e + 2x1o"), o3.Irreps("2x0e + 2x1o"), 2, 4, [0, 2, 3, 2, 0, 0, 2, 3, 2, 2], DEVICE),
+    SCConfig(o3.Irreps("1x0e + 1x1o + 1x2e"), o3.Irreps("1x0e + 1x1o"), 3, 3, [0, 1, 2, 0, 1, 2, 0, 1], DEVICE),
+    SCConfig(o3.Irreps("4x0e + 4x1o"), o3.Irreps("4x0e"), 2, 5, [0, 1, 2, 3, 4, 0, 1, 2, 3, 4], DEVICE),
+]
+
+
+@pytest.fixture(
+    params=SC_CONFIGS,
+    ids=lambda cfg: f"{cfg.irreps_in}-corr{cfg.correlation}",
+)
+def symmetric_contraction_config(request):
+    return request.param
 
 
 @pytest.fixture(params=[torch.float32, torch.float64], ids=["F32", "F64"])
@@ -26,24 +48,28 @@ def dtype(request):
 
 
 @pytest.fixture
-def labels():
-    return torch.tensor(LABEL_VALUES, device=DEVICE, dtype=torch.long)
+def labels(symmetric_contraction_config):
+    cfg = symmetric_contraction_config
+    return torch.tensor(cfg.label_values, device=cfg.device, dtype=torch.long)
 
 
 @pytest.fixture
-def node_attrs(labels, dtype):
-    return F.one_hot(labels, num_classes=NUM_ELEMENTS).to(dtype=dtype)
+def node_attrs(labels, dtype, symmetric_contraction_config):
+    return F.one_hot(labels, num_classes=symmetric_contraction_config.num_elements).to(
+        dtype=dtype
+    )
 
 
 @pytest.fixture
-def node_feats(dtype):
-    gen = torch.Generator(device=DEVICE)
+def node_feats(dtype, symmetric_contraction_config):
+    cfg = symmetric_contraction_config
+    gen = torch.Generator(device=cfg.device)
     gen.manual_seed(2468)
     return torch.randn(
-        len(LABEL_VALUES),
-        IRREPS_IN.count((0, 1)),
-        IRREPS_IN.dim // IRREPS_IN.count((0, 1)),
-        device=DEVICE,
+        len(cfg.label_values),
+        cfg.irreps_in.count((0, 1)),
+        cfg.irreps_in.dim // cfg.irreps_in.count((0, 1)),
+        device=cfg.device,
         dtype=dtype,
         generator=gen,
         requires_grad=True,
@@ -51,28 +77,27 @@ def node_feats(dtype):
 
 
 @pytest.fixture
-def modules(dtype):
+def modules(dtype, symmetric_contraction_config):
+    cfg = symmetric_contraction_config
     torch.manual_seed(12345)
     oeq_module = SymmetricContraction(
-        IRREPS_IN,
-        IRREPS_OUT,
-        correlation=CORRELATION,
-        num_elements=NUM_ELEMENTS,
+        cfg.irreps_in,
+        cfg.irreps_out,
+        correlation=cfg.correlation,
+        num_elements=cfg.num_elements,
         dtype=dtype,
-    ).to(DEVICE)
+    ).to(cfg.device)
 
-    # MACE's original e3nn implementation reads torch.get_default_dtype()
-    # during construction, so patch that lookup instead of mutating global state.
     with patch(
         "mace.modules.symmetric_contraction.torch.get_default_dtype",
         return_value=dtype,
     ):
         mace_module = MaceSymmetricContraction(
-            IRREPS_IN,
-            IRREPS_OUT,
-            correlation=CORRELATION,
-            num_elements=NUM_ELEMENTS,
-        ).to(device=DEVICE, dtype=dtype)
+            cfg.irreps_in,
+            cfg.irreps_out,
+            correlation=cfg.correlation,
+            num_elements=cfg.num_elements,
+        ).to(device=cfg.device, dtype=dtype)
 
     copy_matching_state(oeq_module, mace_module)
     return oeq_module, mace_module
@@ -120,15 +145,16 @@ def random_like(tensor, seed):
 
 class TestSymmetricContraction:
     def test_matches_mace_forward_backward(
-        self, modules, node_feats, node_attrs, dtype
+        self, modules, node_feats, node_attrs, dtype, symmetric_contraction_config
     ):
+        cfg = symmetric_contraction_config
         oeq_module, mace_module = modules
         mace_node_feats = node_feats.detach().clone().requires_grad_()
 
         oeq_output = oeq_module(node_feats, node_attrs)
         mace_output = mace_module(mace_node_feats, node_attrs)
 
-        assert oeq_output.shape == (len(LABEL_VALUES), IRREPS_OUT.dim)
+        assert oeq_output.shape == (len(cfg.label_values), cfg.irreps_out.dim)
         torch.testing.assert_close(oeq_output, mace_output, **tolerance(dtype))
 
         output_grad = random_like(oeq_output, seed=4321)
@@ -144,7 +170,9 @@ class TestSymmetricContraction:
         for oeq_grad, mace_grad in zip(oeq_grads, mace_grads):
             torch.testing.assert_close(oeq_grad, mace_grad, **tolerance(dtype))
 
-    def test_matches_mace_double_backward(self, modules, node_feats, node_attrs, dtype):
+    def test_matches_mace_double_backward(
+        self, modules, node_feats, node_attrs, dtype, symmetric_contraction_config
+    ):
         oeq_module, mace_module = modules
         mace_node_feats = node_feats.detach().clone().requires_grad_()
 
@@ -193,3 +221,14 @@ class TestSymmetricContraction:
 
         for oeq_grad, mace_grad in zip(oeq_second_grads, mace_second_grads):
             torch.testing.assert_close(oeq_grad, mace_grad, **tolerance(dtype))
+
+    def test_compile(self, modules, node_feats, node_attrs):
+        sc, _ = modules
+        ref = sc(node_feats, node_attrs)
+        assert torch.allclose(ref, torch.compile(sc)(node_feats, node_attrs), atol=1e-5)
+
+    def test_export(self, modules, node_feats, node_attrs):
+        sc, _ = modules
+        ref = sc(node_feats, node_attrs)
+        exported = torch.export.export(sc, args=(node_feats, node_attrs), strict=False)
+        assert torch.allclose(ref, exported.module()(node_feats, node_attrs), atol=1e-5)
