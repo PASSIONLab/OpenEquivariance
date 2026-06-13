@@ -1,5 +1,21 @@
 ## Latest Changes
 
+### v0.6.7 (2026-06-13)
+
+**Added**:
+- Triple backward and higher-order derivative support for 
+  tensor products in Pytorch. 
+- Reintroduced symmetric contraction implementation for PyTorch.
+- `torch.compile`, `torch.export` support for symmetric
+  contraction.
+
+**Fixed**:
+- Some compilation issues for RocM.
+
+### v0.6.6 (2026-06-13) 
+Bugfix: added alternate URL for libtorch aarch64 download in
+stable extension.
+
 ### v0.6.5 (2026-03-22) 
 This release brings `ir_mul` layout support for
 OpenEquivariance. Pass the parameter
