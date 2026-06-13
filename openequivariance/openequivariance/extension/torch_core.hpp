@@ -637,14 +637,12 @@ inline Tensor group_gemm(
     }
 
     if (A.scalar_type() == kFloat) {
-        group_gemm<float>(data_ptr(A_c), data_ptr(B_c), data_ptr(C), rc_ptr,
+        group_gemm_blas<float>(data_ptr(A_c), data_ptr(B_c), data_ptr(C), rc_ptr,
             (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner);
-    } 
-    else if (A.scalar_type() == kDouble) {
-        group_gemm<double>(data_ptr(A_c), data_ptr(B_c), data_ptr(C), rc_ptr,
+    } else if (A.scalar_type() == kDouble) {
+        group_gemm_blas<double>(data_ptr(A_c), data_ptr(B_c), data_ptr(C), rc_ptr,
             (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner);
-    } 
-    else {
+    } else {
         throw std::logic_error("group_gemm: unsupported dtype, expected float32 or float64");
     }
 

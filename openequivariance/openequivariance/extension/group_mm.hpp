@@ -32,7 +32,7 @@
 inline std::unique_ptr<BlasHandle> g_blas_handle = std::make_unique<BlasHandle>();
 
 template<typename T>
-void group_gemm(void* A_raw, void* B_raw, void* C_raw,
+void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
         int64_t* ragged_counts, int num_W, int batch_size, int m, int k, int ragged_inner) {
 
     T alpha = 1.0, beta = 0.0;
