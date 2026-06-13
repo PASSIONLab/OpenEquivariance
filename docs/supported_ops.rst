@@ -105,15 +105,11 @@ See PyTorch usage details `here <https://docs.pytorch.org/docs/stable/notes/cuda
 Symmetric Contraction (Beta)
 ----------------------------
 
-We have recently added beta support for symmetric
-contraction acceleration. This primitive: 
-
-- Is specific to MACE
-- Requires e3nn as a dependency. 
-- Currently has no support for compile / export
-
-As a result, we do not expose it in the package
-toplevel. You can use our implementation by running
+We have beta support for symmetric
+contraction acceleration, which is used by MACE. This primitive 
+requires e3nn installed as a dependency. As a result, we do not 
+expose it in the package toplevel. You can use our implementation 
+by running
 
 .. code-block::
 

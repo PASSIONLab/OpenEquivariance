@@ -223,3 +223,48 @@ def test_aoti_cpp_inference(problem_and_irreps):
             print(e.stdout.decode(), file=sys.stderr)
             print(e.stderr.decode(), file=sys.stderr)
             assert False
+
+
+# ------------------- Symmetric Contraction Tests --------------------
+
+@pytest.fixture(scope="session")
+def sc_and_inputs():
+    from e3nn import o3
+    from openequivariance._torch.symmetric_contraction import SymmetricContraction
+
+    irreps_in = o3.Irreps("4x0e + 4x1o")
+    irreps_out = o3.Irreps("4x0e + 4x1o")
+    num_elements = 4
+    batch_size = 256
+    dtype = torch.float32
+
+    sc = SymmetricContraction(
+        irreps_in=irreps_in,
+        irreps_out=irreps_out,
+        correlation=2,
+        num_elements=num_elements,
+        dtype=dtype,
+    ).to("cuda")
+
+    gen = torch.Generator(device="cuda")
+    gen.manual_seed(42)
+    x = torch.randn(batch_size, irreps_in.dim, dtype=dtype, device="cuda", generator=gen)
+    y = torch.zeros(batch_size, num_elements, dtype=dtype, device="cuda")
+    indices = torch.randint(num_elements, (batch_size,), generator=gen, device="cuda")
+    y[torch.arange(batch_size, device="cuda"), indices] = 1.0
+
+    return sc, (x, y)
+
+
+def test_sc_compile(sc_and_inputs):
+    sc, inputs = sc_and_inputs
+    ref = sc(*inputs)
+    out = torch.compile(sc)(*inputs)
+    assert torch.allclose(ref, out, atol=1e-5)
+
+
+def test_sc_export(sc_and_inputs):
+    sc, inputs = sc_and_inputs
+    ref = sc(*inputs)
+    exported = torch.export.export(sc, args=inputs, strict=False)
+    assert torch.allclose(ref, exported.module()(*inputs), atol=1e-5)

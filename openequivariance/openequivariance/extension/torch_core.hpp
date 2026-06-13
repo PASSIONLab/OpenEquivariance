@@ -630,7 +630,7 @@ inline Tensor group_gemm(
 
     Tensor C;
     if (ragged_inner == 0) {
-        C = tensor_zeros_like(A, make_sizes({B.size(0), B.size(1), m}));
+        C = tensor_zeros_like(A, make_sizes({B.size(0), batch_size, m}));
     } 
     else {
         C = tensor_zeros_like(A, make_sizes({num_W, batch_size, m, k}));

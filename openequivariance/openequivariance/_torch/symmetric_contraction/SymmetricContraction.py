@@ -324,7 +324,7 @@ def register_torch_fakes():
     @torch.library.register_fake("libtorch_tp_jit::group_gemm")
     def fake_group_gemm(A, B, ragged_counts, num_W, batch_size, m, k, ragged_inner):
         if ragged_inner == 0:
-            return A.new_empty(B.shape[0], B.shape[1], m)
+            return A.new_empty(B.shape[0], batch_size, m)
         else:
             return A.new_empty(num_W, batch_size, m, k)
 
