@@ -29,12 +29,16 @@
     };
 #endif
 
-inline std::unique_ptr<BlasHandle> g_blas_handle = std::make_unique<BlasHandle>();
+inline BlasHandle& get_blas_handle() {
+    static BlasHandle handle;
+    return handle;
+}
 
 template<typename T>
 void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
         int64_t* ragged_counts, int num_W, int batch_size, int m, int k, int ragged_inner) {
 
+    auto& blas = get_blas_handle();
     T alpha = 1.0, beta = 0.0;
     T* A_base = reinterpret_cast<T*>(A_raw);
     T* B_base = reinterpret_cast<T*>(B_raw);
@@ -83,7 +87,7 @@ void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
 #ifdef CUDA_BACKEND
             cublasStatus_t stat;
             if (std::is_same<T, float>::value) {
-                stat = cublasSgemmStridedBatched(g_blas_handle->handle,
+                stat = cublasSgemmStridedBatched(blas.handle,
                     transa, transb, M, N, K,
                     reinterpret_cast<float*>(&alpha),
                     reinterpret_cast<float*>(A), lda, strideA,
@@ -92,7 +96,7 @@ void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
                     reinterpret_cast<float*>(C), ldc, strideC,
                     batch_size);
             } else if (std::is_same<T, double>::value) {
-                stat = cublasDgemmStridedBatched(g_blas_handle->handle,
+                stat = cublasDgemmStridedBatched(blas.handle,
                     transa, transb, M, N, K,
                     reinterpret_cast<double*>(&alpha),
                     reinterpret_cast<double*>(A), lda, strideA,
@@ -108,7 +112,7 @@ void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
 #elif defined(HIP_BACKEND)
             rocblas_status stat;
             if (std::is_same<T, float>::value) {
-                stat = rocblas_sgemm_strided_batched(g_blas_handle->handle,
+                stat = rocblas_sgemm_strided_batched(blas.handle,
                     transa, transb, M, N, K,
                     reinterpret_cast<float*>(&alpha),
                     reinterpret_cast<float*>(A), lda, strideA,
@@ -117,7 +121,7 @@ void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
                     reinterpret_cast<float*>(C), ldc, strideC,
                     batch_size);
             } else if (std::is_same<T, double>::value) {
-                stat = rocblas_dgemm_strided_batched(g_blas_handle->handle,
+                stat = rocblas_dgemm_strided_batched(blas.handle,
                     transa, transb, M, N, K,
                     reinterpret_cast<double*>(&alpha),
                     reinterpret_cast<double*>(A), lda, strideA,
