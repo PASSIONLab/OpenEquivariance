@@ -28,9 +28,30 @@ SCConfig = collections.namedtuple(
 DEVICE = torch.device("cuda")
 
 SC_CONFIGS = [
-    SCConfig(o3.Irreps("2x0e + 2x1o"), o3.Irreps("2x0e + 2x1o"), 2, 4, [0, 2, 3, 2, 0, 0, 2, 3, 2, 2], DEVICE),
-    SCConfig(o3.Irreps("1x0e + 1x1o + 1x2e"), o3.Irreps("1x0e + 1x1o"), 3, 3, [0, 1, 2, 0, 1, 2, 0, 1], DEVICE),
-    SCConfig(o3.Irreps("4x0e + 4x1o"), o3.Irreps("4x0e"), 2, 5, [0, 1, 2, 3, 4, 0, 1, 2, 3, 4], DEVICE),
+    SCConfig(
+        o3.Irreps("2x0e + 2x1o"),
+        o3.Irreps("2x0e + 2x1o"),
+        2,
+        4,
+        [0, 2, 3, 2, 0, 0, 2, 3, 2, 2],
+        DEVICE,
+    ),
+    SCConfig(
+        o3.Irreps("1x0e + 1x1o + 1x2e"),
+        o3.Irreps("1x0e + 1x1o"),
+        3,
+        3,
+        [0, 1, 2, 0, 1, 2, 0, 1],
+        DEVICE,
+    ),
+    SCConfig(
+        o3.Irreps("4x0e + 4x1o"),
+        o3.Irreps("4x0e"),
+        2,
+        5,
+        [0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
+        DEVICE,
+    ),
 ]
 
 

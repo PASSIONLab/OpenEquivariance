@@ -169,17 +169,21 @@ class Contraction(torch.nn.Module):
             )[-1]
             self.register_buffer(f"U_matrix_{nu}", U_matrix)
 
+        # Tensor contraction equations
         self.contractions_weighting = torch.nn.ModuleList()
         self.contractions_features = torch.nn.ModuleList()
 
+        # Create weight for product basis
         self.weights = torch.nn.ParameterList([])
         self.groupMM = GroupMM(dtype, num_elements, self.num_features)
         self.num_equivariance = 2 * irrep_out.lmax + 1
 
         for i in range(correlation, 0, -1):
+            # Shapes defining
             num_params = self.U_tensors(i).size()[-1]
 
             if i == correlation:
+                # Parameters for the product basis
                 w = torch.nn.Parameter(
                     torch.randn(
                         (num_elements, num_params, self.num_features), dtype=dtype
@@ -188,6 +192,7 @@ class Contraction(torch.nn.Module):
                 )
                 self.weights_max = w
             else:
+                # Parameters for the product basis
                 w = torch.nn.Parameter(
                     torch.randn(
                         (num_elements, num_params, self.num_features), dtype=dtype
@@ -200,6 +205,7 @@ class Contraction(torch.nn.Module):
             self.weights = weights[:-1]
             self.weights_max = weights[-1]
 
+        # Permute the U matrices
         for i in range(correlation, 0, -1):
             U = self.U_tensors(i)
             num_params = U.shape[-1]
@@ -238,6 +244,7 @@ class Contraction(torch.nn.Module):
                 c_tensor.view(s[0] * s[1], -1, s[-1]) * x.view(s[0] * s[1], 1, s[-1]),
                 dim=2,
             ).view(s[:-1])
+            # out = torch.bmm(c_tensor.view(s[0] * s[1], -1, s[-1]), x.view(s[0] * s[1], s[-1], 1)).view(s[:-1])
 
         return out.view(out.shape[0], -1)
 
