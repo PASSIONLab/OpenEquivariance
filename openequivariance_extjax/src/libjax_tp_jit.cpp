@@ -19,24 +19,16 @@ using json = json11::Json;
     #include <cuda_runtime.h>
 
     #include "backend/backend_cuda.hpp"
-    #include "group_mm_cuda.hpp"
     using JITKernel = CUJITKernel;
     using GPU_Allocator = CUDA_Allocator;
-
-    template<typename T>
-    using GroupMM = GroupMMCUDA<T>;
     using stream_t = cudaStream_t;
 #endif
 
 #ifdef HIP_BACKEND
     #include "backend/backend_hip.hpp"
-    #include "group_mm_hip.hpp"
     using JITKernel = HIPJITKernel;
     using GPU_Allocator = HIP_Allocator;
-
-    template<typename T>
-    using GroupMM = GroupMMHIP<T>;
-    using stream_t = hipStream_t; 
+    using stream_t = hipStream_t;
 #endif
 
 #include "tensorproducts.hpp"
