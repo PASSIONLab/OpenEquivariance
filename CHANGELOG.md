@@ -1,5 +1,8 @@
 ## Latest Changes
 
+### v0.6.8 (2026-06-14)
+Added `#include <cstdint>` to all C++ extension headers and sources. 
+
 ### v0.6.7 (2026-06-13)
 
 **Added**:

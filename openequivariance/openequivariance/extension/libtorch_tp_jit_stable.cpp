@@ -1,5 +1,6 @@
 #define USE_CUDA
 
+#include <cstdint>
 #include <torch/csrc/stable/accelerator.h>
 #include <torch/csrc/stable/library.h>
 #include <torch/csrc/stable/ops.h>

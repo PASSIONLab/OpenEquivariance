@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <vector>
 #include <torch/torch.h>
 #include <torch/csrc/inductor/aoti_package/model_package_loader.h>

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <hip/hip_runtime.h>
 #include <hip/hiprtc.h>
 

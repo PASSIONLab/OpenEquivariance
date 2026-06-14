@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <torch/csrc/inductor/aoti_torch/c/shim.h>
 
 extern "C" {
