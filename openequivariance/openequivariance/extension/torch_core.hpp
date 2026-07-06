@@ -128,6 +128,21 @@ inline void check_tensor(const Tensor &tensor,
           ". Got: ", static_cast<int>(tensor.scalar_type()));
 }
 
+inline void check_same_device(
+        std::initializer_list<std::pair<const Tensor*, const char*>> tensors) {
+    auto it = tensors.begin();
+    const Tensor *first = it->first;
+    const char *first_name = it->second;
+    for (++it; it != tensors.end(); ++it) {
+        TCHECK(it->first->get_device() == first->get_device(),
+              "Tensor '", it->second, "' is on device ",
+              static_cast<int>(it->first->get_device()),
+              ", but tensor '", first_name, "' is on device ",
+              static_cast<int>(first->get_device()),
+              ". All tensors must be on the same device.");
+    }
+}
+
 inline std::unordered_map<std::string, int64_t> parse_json_config(const json &j_obj) {
     std::unordered_map<std::string, int64_t> result;
     for (const auto &kv : j_obj.object_items()) {
@@ -286,6 +301,8 @@ inline Tensor jit_tp_forward(
     else
         check_tensor(W, {num_batch, k.weight_numel}, k.weight_dtype, "W");
 
+    check_same_device({{&L1_in, "L1_in"}, {&L2_in, "L2_in"}, {&W, "W"}});
+
     Tensor L3_out = tensor_empty_like(L1_in, make_sizes({num_batch, k.L3_dim}));
 
     Tensor L1_contig = tensor_contiguous(L1_in);
@@ -324,6 +341,9 @@ inline tuple<Tensor, Tensor, Tensor> jit_tp_backward(
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
     else
         check_tensor(W, {num_batch, k.weight_numel}, k.weight_dtype, "W");
+
+    check_same_device({{&L1_in, "L1_in"}, {&L2_in, "L2_in"}, {&W, "W"},
+                       {&L3_grad, "L3_grad"}});
 
     Tensor L1_grad = tensor_empty_like(L1_in, tensor_sizes_vec(L1_in));
     Tensor L2_grad = tensor_empty_like(L2_in, tensor_sizes_vec(L2_in));
@@ -377,6 +397,10 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_tp_double_backward(
         check_tensor(W, {num_batch, k.weight_numel}, k.weight_dtype, "W");
         check_tensor(W_dgrad, {num_batch, k.weight_numel}, k.weight_dtype, "W_dgrad");
     }
+
+    check_same_device({{&L1_in, "L1_in"}, {&L2_in, "L2_in"}, {&W, "W"},
+                       {&L3_grad, "L3_grad"}, {&L1_dgrad, "L1_dgrad"},
+                       {&L2_dgrad, "L2_dgrad"}, {&W_dgrad, "W_dgrad"}});
 
     Tensor L1_grad = tensor_empty_like(L1_in, tensor_sizes_vec(L1_in));
     Tensor L2_grad = tensor_empty_like(L2_in, tensor_sizes_vec(L2_in));
@@ -447,6 +471,11 @@ inline Tensor jit_conv_forward(
     else
         check_tensor(W, {nnz, k.weight_numel}, k.weight_dtype, "W");
 
+    check_same_device({{&L1_in, "L1_in"}, {&L2_in, "L2_in"}, {&W, "W"},
+                       {&rows, "rows"}, {&cols, "cols"}, {&workspace, "workspace"}});
+    if (k.deterministic)
+        check_same_device({{&L1_in, "L1_in"}, {&transpose_perm, "transpose_perm"}});
+
     Tensor L3_out = tensor_zeros_like(L1_in, make_sizes({node_count, k.L3_dim}));
 
     Tensor L1_contig = tensor_contiguous(L1_in);
@@ -504,6 +533,12 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
     else
         check_tensor(W, {nnz, k.weight_numel}, k.weight_dtype, "W");
+
+    check_same_device({{&L1_in, "L1_in"}, {&L2_in, "L2_in"}, {&W, "W"},
+                       {&L3_grad, "L3_grad"}, {&rows, "rows"}, {&cols, "cols"},
+                       {&workspace, "workspace"}});
+    if (k.deterministic)
+        check_same_device({{&L1_in, "L1_in"}, {&transpose_perm, "transpose_perm"}});
 
     Tensor L1_grad = tensor_zeros_like(L1_in, tensor_sizes_vec(L1_in));
     Tensor L2_grad = tensor_zeros_like(L2_in, tensor_sizes_vec(L2_in));
@@ -579,6 +614,13 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
         check_tensor(W_dgrad, {nnz, k.weight_numel}, k.weight_dtype, "W_dgrad");
     }
 
+    check_same_device({{&L1_in, "L1_in"}, {&L2_in, "L2_in"}, {&W, "W"},
+                       {&L3_grad, "L3_grad"}, {&L1_dgrad, "L1_dgrad"},
+                       {&L2_dgrad, "L2_dgrad"}, {&W_dgrad, "W_dgrad"},
+                       {&rows, "rows"}, {&cols, "cols"}, {&workspace, "workspace"}});
+    if (k.deterministic)
+        check_same_device({{&L1_in, "L1_in"}, {&transpose_perm, "transpose_perm"}});
+
     Tensor L1_grad = tensor_zeros_like(L1_in, tensor_sizes_vec(L1_in));
     Tensor L2_grad = tensor_zeros_like(L2_in, tensor_sizes_vec(L2_in));
     Tensor W_grad = tensor_empty_like(W, tensor_sizes_vec(W));
@@ -623,6 +665,11 @@ inline Tensor group_gemm(
         int64_t num_W, int64_t batch_size, int64_t m, int64_t k, int64_t ragged_inner) {
     TCHECK(A.scalar_type() == B.scalar_type(), "group_gemm: A and B must have the same dtype");
     TCHECK(ragged_counts.scalar_type() == kLong, "group_gemm: ragged_counts must be int64");
+    TCHECK(A.is_cuda(), "group_gemm: A must be a GPU tensor");
+    TCHECK(B.is_cuda(), "group_gemm: B must be a GPU tensor");
+    check_same_device({{&A, "A"}, {&B, "B"}});
+    TCHECK(ragged_counts.is_cpu(),
+          "group_gemm: ragged_counts must be a CPU tensor; its values are read on the host");
 
     Tensor A_c    = tensor_contiguous(A);
     Tensor B_c    = tensor_contiguous(B);
