@@ -42,7 +42,11 @@ Tensor tensor_zeros_like(const Tensor &ref, const std::vector<int64_t> &sizes);
 void tensor_zero_(Tensor &tensor);
 
 void alert_not_deterministic(const char *name);
-Stream get_current_stream();
+
+// Current PyTorch stream for the given device, NOT the thread's current
+// device. Each op must guard to its input tensor's device (DeviceGuard,
+// aliased per-backend) before launching work, then take that device's stream.
+Stream get_current_stream(int32_t device_index);
 
 const uint8_t *tensor_data_ptr_u8(const Tensor &tensor);
 void *data_ptr(const Tensor &tensor);
@@ -289,7 +293,10 @@ inline Tensor jit_tp_forward(
         int64_t L3_dim) {
 
     auto [jit_kernel, k] = compile_tp_with_caching(json_bytes, hash);
-    Stream stream = get_current_stream();
+
+    const int32_t device_index = static_cast<int32_t>(L1_in.get_device());
+    DeviceGuard device_guard(device_index);
+    Stream stream = get_current_stream(device_index);
 
     const int64_t num_batch = L1_in.size(0);
 
@@ -329,7 +336,10 @@ inline tuple<Tensor, Tensor, Tensor> jit_tp_backward(
         Tensor L3_grad) {
 
     auto [jit_kernel, k] = compile_tp_with_caching(json_bytes, hash);
-    Stream stream = get_current_stream();
+
+    const int32_t device_index = static_cast<int32_t>(L1_in.get_device());
+    DeviceGuard device_guard(device_index);
+    Stream stream = get_current_stream(device_index);
 
     const int64_t num_batch = L1_in.size(0);
 
@@ -380,7 +390,10 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_tp_double_backward(
         Tensor W_dgrad) {
 
     auto [jit_kernel, k] = compile_tp_with_caching(json_bytes, hash);
-    Stream stream = get_current_stream();
+
+    const int32_t device_index = static_cast<int32_t>(L1_in.get_device());
+    DeviceGuard device_guard(device_index);
+    Stream stream = get_current_stream(device_index);
 
     const int64_t num_batch = L1_in.size(0);
 
@@ -450,7 +463,10 @@ inline Tensor jit_conv_forward(
         Tensor transpose_perm) {
 
     auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
-    Stream stream = get_current_stream();
+
+    const int32_t device_index = static_cast<int32_t>(L1_in.get_device());
+    DeviceGuard device_guard(device_index);
+    Stream stream = get_current_stream(device_index);
 
     const int64_t nnz = rows.size(0);
     const int64_t node_count = L1_in.size(0);
@@ -511,7 +527,10 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
         Tensor transpose_perm) {
 
     auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
-    Stream stream = get_current_stream();
+
+    const int32_t device_index = static_cast<int32_t>(L1_in.get_device());
+    DeviceGuard device_guard(device_index);
+    Stream stream = get_current_stream(device_index);
 
     const int64_t nnz = rows.size(0);
     const int64_t node_count = L1_in.size(0);
@@ -586,7 +605,10 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
         Tensor transpose_perm) {
 
     auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
-    Stream stream = get_current_stream();
+
+    const int32_t device_index = static_cast<int32_t>(L1_in.get_device());
+    DeviceGuard device_guard(device_index);
+    Stream stream = get_current_stream(device_index);
 
     const int64_t nnz = rows.size(0);
     const int64_t node_count = L1_in.size(0);
@@ -671,6 +693,10 @@ inline Tensor group_gemm(
     TCHECK(ragged_counts.is_cpu(),
           "group_gemm: ragged_counts must be a CPU tensor; its values are read on the host");
 
+    const int32_t device_index = static_cast<int32_t>(A.get_device());
+    DeviceGuard device_guard(device_index);
+    Stream stream = get_current_stream(device_index);
+
     Tensor A_c    = tensor_contiguous(A);
     Tensor B_c    = tensor_contiguous(B);
     Tensor rc_c   = tensor_contiguous(ragged_counts);
@@ -686,10 +712,12 @@ inline Tensor group_gemm(
 
     if (A.scalar_type() == kFloat) {
         group_gemm_blas<float>(data_ptr(A_c), data_ptr(B_c), data_ptr(C), rc_ptr,
-            (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner);
+            (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner,
+            device_index, stream);
     } else if (A.scalar_type() == kDouble) {
         group_gemm_blas<double>(data_ptr(A_c), data_ptr(B_c), data_ptr(C), rc_ptr,
-            (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner);
+            (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner,
+            device_index, stream);
     } else {
         throw std::logic_error("group_gemm: unsupported dtype, expected float32 or float64");
     }
