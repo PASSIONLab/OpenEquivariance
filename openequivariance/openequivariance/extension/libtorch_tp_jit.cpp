@@ -3,10 +3,13 @@
 
 #ifdef CUDA_BACKEND
     #include <ATen/cuda/CUDAContext.h>
+    #include <c10/cuda/CUDAGuard.h>
 #endif
 
 #ifdef HIP_BACKEND
+    #include <ATen/hip/HIPContext.h>
     #include <c10/hip/HIPStream.h>
+    #include <c10/hip/HIPGuard.h>
 #endif
 
 #include <ATen/Operators.h>
@@ -28,6 +31,13 @@ constexpr Dtype kByte = torch::kByte;
 #define BOX(x) x
 #define REGISTER_LIBRARY_IMPL TORCH_LIBRARY_IMPL
 #define REGISTER_LIBRARY TORCH_LIBRARY
+
+#ifdef CUDA_BACKEND
+    using DeviceGuard = c10::cuda::CUDAGuard;
+#endif
+#ifdef HIP_BACKEND
+    using DeviceGuard = c10::hip::HIPGuard;
+#endif
 
 #include "torch_core.hpp"
 
@@ -74,13 +84,24 @@ void *data_ptr(const Tensor &tensor) {
         throw std::logic_error("Unsupported tensor datatype!");
 }
 
-Stream get_current_stream() {
+Stream get_current_stream(int32_t device_index) {
 #ifdef CUDA_BACKEND
-    return c10::cuda::getCurrentCUDAStream();
+    return c10::cuda::getCurrentCUDAStream(device_index);
 #endif
 #ifdef HIP_BACKEND
-    return c10::hip::getCurrentHIPStream();
+    return c10::hip::getCurrentHIPStream(device_index);
 #endif
+}
+
+BlasHandleT get_op_blas_handle(int32_t device_index, BlasStream stream) {
+    // The caller's device guard makes device_index current, and `stream` is
+    // that device's current stream, so PyTorch's handle arrives configured
+    // for exactly this (device, stream) with its workspace and math mode
+    // managed by PyTorch. On ROCm the same-named function returns a
+    // hipblasHandle_t.
+    (void)device_index;
+    (void)stream;
+    return at::cuda::getCurrentCUDABlasHandle();
 }
 
 namespace py=pybind11;
