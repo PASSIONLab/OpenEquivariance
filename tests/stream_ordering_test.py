@@ -146,14 +146,17 @@ def test_ordering_current_device(case_name):
 
 def test_cuda_graph_capture(case_name):
     case = _build(case_name, "cuda")
-    warmup = torch.cuda.Stream()
-    with torch.cuda.stream(warmup):
+    # Warm up on the same stream we capture on: JIT compilation and cuBLAS
+    # workspace allocation for this (handle, stream) pair happen here, outside
+    # the capture region.
+    s = torch.cuda.Stream()
+    with torch.cuda.stream(s):
         for _ in range(3):
             case()
     torch.cuda.synchronize()
 
     g = torch.cuda.CUDAGraph()
-    with torch.cuda.graph(g):
+    with torch.cuda.graph(g, stream=s):
         out = case()
     g.replay()
     torch.cuda.synchronize()
