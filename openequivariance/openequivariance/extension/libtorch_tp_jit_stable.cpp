@@ -11,6 +11,7 @@
 #include <torch/headeronly/util/Exception.h>
 #include <torch/headeronly/util/shim_utils.h>
 #include <torch/csrc/inductor/aoti_torch/c/shim.h>
+#include <torch/csrc/stable/c/shim.h>
 
 
 using Tensor = torch::stable::Tensor;
@@ -26,6 +27,8 @@ constexpr Dtype kByte = torch::headeronly::ScalarType::Byte;
 #define BOX(x) TORCH_BOX(x)
 #define REGISTER_LIBRARY_IMPL STABLE_TORCH_LIBRARY_IMPL
 #define REGISTER_LIBRARY STABLE_TORCH_LIBRARY
+
+using DeviceGuard = torch::stable::accelerator::DeviceGuard;
 
 #include "torch_core.hpp"
 
@@ -66,16 +69,23 @@ void *data_ptr(const Tensor &tensor) {
     return tensor.data_ptr();
 }
 
-Stream get_current_stream() {
-    auto device_idx = torch::stable::accelerator::getCurrentDeviceIndex();
+Stream get_current_stream(int32_t device_index) {
     void* stream_ptr = nullptr;
-    TORCH_ERROR_CODE_CHECK(aoti_torch_get_current_cuda_stream(device_idx, &stream_ptr));
+    TORCH_ERROR_CODE_CHECK(aoti_torch_get_current_cuda_stream(device_index, &stream_ptr));
+    return static_cast<Stream>(stream_ptr);
+}
 
-    #ifdef CUDA_BACKEND
-        return static_cast<Stream>(stream_ptr); 
-    #elif defined(HIP_BACKEND)
-        return static_cast<Stream>(stream_ptr);
-    #endif
+BlasHandleT get_op_blas_handle(int32_t device_index, BlasStream stream) {
+    // The caller's device guard makes device_index current, and `stream` is
+    // that device's current stream, so PyTorch's handle arrives configured
+    // for exactly this (device, stream) with its workspace and math mode
+    // managed by PyTorch. On ROCm builds of libtorch this shim symbol keeps
+    // its name and returns a hipblasHandle_t.
+    (void)device_index;
+    (void)stream;
+    void* handle = nullptr;
+    TORCH_ERROR_CODE_CHECK(torch_get_current_cuda_blas_handle(&handle));
+    return static_cast<BlasHandleT>(handle);
 }
 
 #ifdef CUDA_BACKEND
