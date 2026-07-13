@@ -64,9 +64,7 @@ class Case:
 def _build_group_gemm(device, gen):
     counts = torch.full((NUM_W,), N_PER_W, dtype=torch.int64)  # CPU tensor
     A = torch.randn(NUM_W, NUM_FEATURES, M, K, device=device, generator=gen)
-    B = torch.randn(
-        NUM_W * N_PER_W, NUM_FEATURES, K, device=device, generator=gen
-    )
+    B = torch.randn(NUM_W * N_PER_W, NUM_FEATURES, K, device=device, generator=gen)
     fn = lambda A, B: torch.ops.libtorch_tp_jit.group_gemm(
         A, B, counts, NUM_W, NUM_FEATURES, M, K, 0
     )
