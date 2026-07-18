@@ -152,13 +152,13 @@ forward(
                 ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = w[{{segment.weight_offset}} + j + lane_id];)
             {%- endif %}
 
-            __syncwarp();
+            {{ syncwarp }};
             forward_loop_unroll_{{i}}(L1_smem, L2_smem, w, weights_smem, {{ns.L3_accum}}, scratch_smem, lane_id);
-            __syncwarp();
+            {{ syncwarp }};
 
             {%- if forward_schedule.kahan %}
                 kahanAdd<{{segment.L3.dim}}>(L3_kahan_smem, L3_smem);
-                __syncwarp();
+                {{ syncwarp }};
             {%- endif %}
 
             bool changeRow = (i < end - 1) && (row != rows[i+1]);
@@ -170,7 +170,7 @@ forward(
                     firstSegment = false;
                 }
                 {{ store_ir_segments(segment.L3Map, "dst", "L3_smem", "j") }}
-                __syncwarp();
+                {{ syncwarp }};
 
                 ROW_OPERATION({{segment.L3.dim}}, j, L3_smem[j + lane_id] = 0.0f;)
             }
@@ -250,7 +250,7 @@ backward(IRREP_T* L1_in, IRREP_T* L1_grad,
             {{ load_ir_segments(segment.L2Map, "l2_shft", "L2_smem", "j") }}
             {{ load_ir_segments(segment.L3Map, "l3_shft", "L3_grad_smem", "j") }}
 
-            __syncwarp();
+            {{ syncwarp }};
             ROW_OPERATION({{segment.L2.dim}}, j, L2_grad_smem[j + lane_id] = 0.0f;)
 
             {%- if not backward_schedule.stream_weights %}
@@ -262,10 +262,10 @@ backward(IRREP_T* L1_in, IRREP_T* L1_grad,
             IRREP_T* l2_grad_shft = L2_grad + tperm_idx * {{backward_schedule.L2.dim}} + lane_id;
             WEIGHT_T* weights_grad_shft = wgrad + lane_id; 
 
-            __syncwarp();
+            {{ syncwarp }};
             backward_loop_unroll_{{i}}(L1_smem, L2_smem, w, weights_smem, L3_grad_smem,
                     {{ns.L1_accum}}, L2_grad_smem, wgrad, weights_grad_smem, scratch_smem, lane_id);
-            __syncwarp();
+            {{ syncwarp }};
 
             {%- if backward_schedule.kahan %}
                 kahanAdd<{{segment.L1.dim}}>(L1_kahan_smem, L1_grad_smem);
@@ -279,7 +279,7 @@ backward(IRREP_T* L1_in, IRREP_T* L1_grad,
                     firstSegment = false;
                 }
                 {{ store_ir_segments(segment.L1Map, "dst", "L1_grad_smem", "j") }}
-                __syncwarp();
+                {{ syncwarp }};
                 ROW_OPERATION({{segment.L1.dim}}, j, L1_grad_smem[j + lane_id] = 0.0f;)
             }
 
@@ -353,7 +353,7 @@ double_backward_A(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
                 WEIGHT_T* w_dgrad = W_dgrad;
             {%- endif %}
 
-            __syncwarp();
+            {{ syncwarp }};
             {{ load_ir_segments(segment.L1Map, "l1", "L1_smem", "j") }}
             {{ load_ir_segments(segment.L2Map, "l2", "L2_smem", "j") }}
              
@@ -376,9 +376,9 @@ double_backward_A(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
                     {{ load_ir_segments(segment.L1Map, "l1_dgrad", "L1_smem", "j") }}
                 }
 
-                __syncwarp();
+                {{ syncwarp }};
                 forward_loop_unroll_{{i}}(L1_smem, L2_smem, w_buffer, weights_smem, {{ns.L3_accum}}, scratch_smem, lane_id);
-                __syncwarp();
+                {{ syncwarp }};
             }
 
             {%- if forward_schedule.kahan %}
@@ -393,7 +393,7 @@ double_backward_A(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
                     firstSegment = false;
                 }
                 {{ store_ir_segments(segment.L3Map, "dst", "L3_smem", "j") }}
-                __syncwarp();
+                {{ syncwarp }};
 
                 ROW_OPERATION({{segment.L3.dim}}, j, L3_smem[j + lane_id] = 0.0f;)
             }
@@ -480,7 +480,7 @@ double_backward_B(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
             {{ load_ir_segments(segment.L2Map, "l2_shft", "L2_smem", "j") }}
             {{ load_ir_segments(segment.L2Map, "l2_original", "L2_dgrad_smem", "j") }}
 
-            __syncwarp();
+            {{ syncwarp }};
 
             {%- if not segment.L2Map.persist_load %}
                 ROW_OPERATION({{segment.L2.dim}}, j, L2_grad_smem[j + lane_id] = 0.0f;)
@@ -507,10 +507,10 @@ double_backward_B(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
                     L2_dgrad_buffer = L2_smem;
                 }
 
-                __syncwarp();
+                {{ syncwarp }};
                 double_backward_loop_unroll_{{i}}(L1_smem, L2_buffer, w_buffer, weights_smem, L3_grad_smem,
                         {{ns.L1_accum}}, L2_grad_smem, L2_dgrad_buffer, n, wgrad, weights_grad_smem, scratch_smem, lane_id);
-                __syncwarp();
+                {{ syncwarp }};
             }
 
             {%- if backward_schedule.kahan %}
@@ -534,7 +534,7 @@ double_backward_B(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
                     firstSegment = false;
                 }
                 {{ store_ir_segments(segment.L1Map, "dst", "L1_grad_smem", "j") }}
-                __syncwarp();
+                {{ syncwarp }};
                 ROW_OPERATION({{segment.L1.dim}}, j, L1_grad_smem[j + lane_id] = 0.0f;)
             }
 

@@ -24,13 +24,7 @@ assert torch.version.cuda or torch.version.hip, (
     "Only CUDA and HIP backends are supported"
 )
 
-
-def postprocess_kernel(kernel):
-    if torch.version.hip:
-        kernel = kernel.replace("__syncwarp();", "__threadfence_block();")
-        kernel = kernel.replace("__shfl_down_sync(FULL_MASK,", "__shfl_down(")
-        kernel = kernel.replace("atomicAdd", "unsafeAtomicAdd")
-    return kernel
+IS_HIP = bool(torch.version.hip)
 
 
 def load_jit_extension():

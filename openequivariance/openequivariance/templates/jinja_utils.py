@@ -16,7 +16,7 @@ def sizeof(dtype):
         raise Exception("Provided undefined datatype to sizeof!")
 
 
-def get_jinja_environment():
+def get_jinja_environment(is_hip=False):
     env = Environment(
         loader=PackageLoader("openequivariance"), extensions=["jinja2.ext.do"]
     )
@@ -24,4 +24,17 @@ def get_jinja_environment():
     env.globals["divide"] = divide
     env.globals["sizeof"] = sizeof
     env.globals["enumerate"] = enumerate
+
+    # HIP / CUDA intrinsic selection, previously handled by string replacement
+    # on the rendered kernel (extlib.postprocess_kernel). The HIP spellings
+    # (including whitespace) match the output of that historical replacement.
+    env.globals["is_hip"] = is_hip
+    env.globals["syncwarp"] = "__threadfence_block()" if is_hip else "__syncwarp()"
+    env.globals["atomic_add"] = "unsafeAtomicAdd" if is_hip else "atomicAdd"
+    if is_hip:
+        env.globals["shfl_down"] = lambda val, offset: f"__shfl_down( {val}, {offset})"
+    else:
+        env.globals["shfl_down"] = (
+            lambda val, offset: f"__shfl_down_sync(FULL_MASK, {val}, {offset})"
+        )
     return env

@@ -129,7 +129,7 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
                 {%- elif map.storeback_procedure[idx] == "accumulate" %}
                     ROW_OPERATION({{range_len}}, {{loop_var}}, {{glb_ptr_shft}}[{{loop_var}} + {{src_rng.start}}] += {{smem_ptr}}[{{loop_var}} + {{dst_rng.start}} + lane_id];)
                 {%- elif map.storeback_procedure[idx] == "atomic_accumulate" %}
-                    ROW_OPERATION({{range_len}}, {{loop_var}}, atomicAdd({{glb_ptr_shft}} + {{src_rng.start}} + {{loop_var}}, {{smem_ptr}}[{{dst_rng.start}} + lane_id + {{loop_var}}]);)
+                    ROW_OPERATION({{range_len}}, {{loop_var}}, {{ atomic_add }}({{glb_ptr_shft}} + {{src_rng.start}} + {{loop_var}}, {{smem_ptr}}[{{dst_rng.start}} + lane_id + {{loop_var}}]);)
                 {%- endif %}
             {%- endfor %}
         {%- elif map.src_views[0].layout == "ir_mul" %}
@@ -149,7 +149,7 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
                     {%- endfor %}
                 {%- elif map.storeback_procedure[idx] == "atomic_accumulate" %}
                     {%- for i in range(m.src_mul_ir.ir.dim) %}
-                        ROW_OPERATION({{m.src_mul_ir.mul}}, {{loop_var}}, atomicAdd({{glb_ptr_shft}} + {{m.src_view.ir_mul_offset + i * m.src_view.ir_mul_stride}} + {{loop_var}}, {{smem_ptr}}[{{m.dst_rng.start + i * m.src_mul_ir.mul}} + {{loop_var}} + lane_id]);)
+                        ROW_OPERATION({{m.src_mul_ir.mul}}, {{loop_var}}, {{ atomic_add }}({{glb_ptr_shft}} + {{m.src_view.ir_mul_offset + i * m.src_view.ir_mul_stride}} + {{loop_var}}, {{smem_ptr}}[{{m.dst_rng.start + i * m.src_mul_ir.mul}} + {{loop_var}} + lane_id]);)
                     {%- endfor %}
                 {%- endif %}
             {%- endfor %}
@@ -182,7 +182,7 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
             {%- for i in range(dim) %}
                 t_regs[{{i}}] = {{smem_ptr}}[{{offset}} + lane_id * {{dim}} + {{i}}];
             {%- endfor %}
-            __syncwarp();
+            {{ syncwarp }};
             {%- for i in range(dim) %}
                 {{smem_ptr}}[{{offset}} + lane_id + {{i * mul}}] = t_regs[{{i}}];
             {%- endfor %}
@@ -201,7 +201,7 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
             {%- for i in range(dim) %}
                 t_regs[{{i}}] = {{smem_ptr}}[{{offset}} + lane_id + {{i * mul}}];
             {%- endfor %}
-            __syncwarp();
+            {{ syncwarp }};
             {%- for i in range(dim) %}
                 {{smem_ptr}}[{{offset}} + lane_id * {{dim}} + {{i}}] = t_regs[{{i}}];
             {%- endfor %}

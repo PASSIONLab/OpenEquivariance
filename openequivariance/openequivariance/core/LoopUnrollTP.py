@@ -17,10 +17,10 @@ logger = getLogger()
 
 
 class LoopUnrollTP(TensorProductBase):
-    def __init__(self, config, dp, postprocess_kernel, torch_op):
+    def __init__(self, config, dp, is_hip, torch_op):
         super().__init__(config, torch_op=torch_op)
 
-        env = get_jinja_environment()
+        env = get_jinja_environment(is_hip=is_hip)
         template = env.get_template("loop_unroll_batch.cuh")
 
         analysis = filter_and_analyze_problem(config)
@@ -90,12 +90,10 @@ class LoopUnrollTP(TensorProductBase):
                 except Exception:
                     raise
 
-        self.jit_kernel = postprocess_kernel(
-            template.render(
-                forward_schedule=self.forward_schedule,
-                backward_schedule=self.backward_schedule,
-                double_backward_schedule=self.double_backward_schedule,
-            )
+        self.jit_kernel = template.render(
+            forward_schedule=self.forward_schedule,
+            backward_schedule=self.backward_schedule,
+            double_backward_schedule=self.double_backward_schedule,
         )
 
         self.kernel_prop = {
