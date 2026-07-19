@@ -36,7 +36,7 @@ You need the following to install OpenEquivariance:
 
         c++ --version 
         
-    To build the extension with an alternate compiler, set the 
+    To build the extension with an alternate compiler, set the
     ``CC`` and ``CXX``
     environment variable and retry the import:
 
@@ -46,9 +46,23 @@ You need the following to install OpenEquivariance:
         export CXX=/path/to/your/g++
         python -c "import openequivariance"
 
+    Building the extension also requires a **full CUDA toolkit**, including
+    the NVRTC development libraries (the CMake build links ``CUDA::nvrtc``).
+    A compiler-only toolchain — for example conda's ``cuda-nvcc`` package on
+    its own — fails with::
 
-    These configuration steps are required only ONCE after 
-    installation (or upgrade) with pip. 
+        target_link_libraries ... CUDA::nvrtc but the target was not found
+
+    In that case, point CMake at a full toolkit installation and retry the
+    step that failed (the ``pip install`` for a source build, or the import):
+
+    .. code-block:: bash
+
+        export CUDAToolkit_ROOT=/usr/local/cuda
+        python -c "import openequivariance"
+
+    These configuration steps are required only ONCE after
+    installation (or upgrade) with pip.
 
 
 .. tab:: JAX NVIDIA GPUs 
