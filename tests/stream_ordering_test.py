@@ -82,7 +82,7 @@ def _build_tp(device, gen):
 
 def _build_conv_atomic(device, gen):
     tpp = _tpp()
-    conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
+    conv = TensorProductConv(tpp, torch_op=True, deterministic=False).to(device)
     receivers = torch.tensor([0, 1, 1, 2], device=device, dtype=torch.long)
     senders = torch.tensor([1, 0, 2, 1], device=device, dtype=torch.long)
     X = torch.rand(3, tpp.irreps_in1.dim, device=device, generator=gen)
