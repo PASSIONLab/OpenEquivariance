@@ -87,7 +87,11 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
 
         self.allocate_workspace(self.workspace_size)
 
-        self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device="cuda")
+        self.register_buffer(
+            "dummy_transpose_perm",
+            torch.zeros(1, dtype=torch.int64, device=self.workspace_buffer.device),
+            persistent=False,
+        )
         self.weight_numel = self.config.weight_numel
         self.kernel = string_to_tensor(self.kernel_string)
         self.L3_dim = self.kernel_prop["L3_dim"]
@@ -129,7 +133,9 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             self.to(result.dtype)
             self._applying = False
 
-        return super()._apply(fn, recurse)
+        out = super()._apply(fn, recurse)
+        self.workspace_ptr = self.workspace_buffer.data_ptr()
+        return out
 
     def __getstate__(self):
         return self.input_args
@@ -184,10 +190,15 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             sender_perm,
         )
 
-    def allocate_workspace(self, size_bytes):
+    def allocate_workspace(self, size_bytes, device=None):
         self.workspace_size = size_bytes
-        self.workspace_buffer = torch.zeros(
-            size_bytes, dtype=torch.uint8, device="cuda"
+        if device is None:
+            device = getattr(self, "workspace_buffer", None)
+            device = device.device if device is not None else "cuda"
+        self.register_buffer(
+            "workspace_buffer",
+            torch.zeros(size_bytes, dtype=torch.uint8, device=device),
+            persistent=False,
         )
         self.workspace_ptr = self.workspace_buffer.data_ptr()
         logger.info(f"Convolution requires {size_bytes // 1000000}MB of workspace.")
