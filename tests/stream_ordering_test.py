@@ -1,25 +1,4 @@
 # ruff: noqa: E731
-"""Stream-ordering and device-mismatch tests for every GPU-launching API:
-the raw group_gemm op, TensorProduct, and TensorProductConv.
-
-Technique: zero one input, stall a stream with torch.cuda._sleep, enqueue the
-real input write behind the stall, then run the op with that stream current.
-An op that enqueues on the correct stream waits for the write; an op that uses
-the wrong stream (e.g. the legacy default stream, or another device's stream)
-always reads stale zeros, so the failure is deterministic rather than a race.
-
-Expected against the current implementation:
-  - test_ordering_current_device: FAILS for group_gemm (cuBLAS work is issued
-    with no stream set, i.e. the legacy default stream); PASSES for tp/conv,
-    which are stream-correct on a single device.
-  - test_cuda_graph_capture: RAISES for group_gemm (legacy-stream work aborts
-    stream capture); PASSES for tp/conv.
-  - test_ordering_nondefault_device (2+ GPUs): FAILS for all three cases, since
-    every op derives device and stream from the host thread, not its inputs.
-    tp/conv may fail as an async CUDA error or process abort rather than a
-    clean assert, because kernel-launch errors currently call exit(1).
-"""
-
 import pytest
 import torch
 
@@ -110,9 +89,6 @@ def _build(case_name, device):
 
 
 def _delayed_run(case, tensor_device, stream):
-    """Re-write the delayed input on a stalled stream, then run the op with
-    that stream current on the tensors' device. The op must wait for the
-    write; reading early yields zeros."""
     delayed = case.tensors[0]
     src = delayed.clone()
     torch.cuda.synchronize(tensor_device)
@@ -123,9 +99,6 @@ def _delayed_run(case, tensor_device, stream):
         torch.cuda._sleep(SLEEP_CYCLES)
         delayed.copy_(src)
 
-    # Note: torch.cuda.stream() selects the stream on *its* device without
-    # changing the current device, so in the cross-device test the host
-    # thread's current device stays cuda:0 here.
     with torch.cuda.stream(stream):
         out = case()
     torch.cuda.synchronize(tensor_device)
@@ -144,9 +117,6 @@ def test_ordering_current_device(case_name):
 
 def test_cuda_graph_capture(case_name):
     case = _build(case_name, "cuda")
-    # Warm up on the same stream we capture on: JIT compilation and cuBLAS
-    # workspace allocation for this (handle, stream) pair happen here, outside
-    # the capture region.
     s = torch.cuda.Stream()
     with torch.cuda.stream(s):
         for _ in range(3):
@@ -164,8 +134,6 @@ def test_cuda_graph_capture(case_name):
 
 @pytest.mark.skipif(torch.cuda.device_count() < 2, reason="requires 2+ GPUs")
 def test_ordering_nondefault_device(case_name):
-    """All inputs on cuda:1 while the host thread stays on cuda:0. Ops must
-    derive device and stream from their inputs, not from thread state."""
     assert torch.cuda.current_device() == 0
 
     case = _build(case_name, "cuda:1")
