@@ -2,16 +2,6 @@
 #include <cstdio>
 #include <torch/csrc/inductor/aoti_torch/c/shim.h>
 
-// The stable extension is linked on a machine with CPU-only libtorch, where
-// no libtorch_cuda/libtorch_hip exists. This file builds a stand-in library
-// with the real one's SONAME so the link succeeds; at runtime the DT_NEEDED
-// entry is satisfied by the real library, already loaded via `import torch`,
-// and this file is never opened. It is not shipped in the wheel.
-//
-// These bodies can therefore only execute in a misconfigured process (e.g.
-// the extension loaded without torch). Fail through the shim's error-code
-// contract - TORCH_ERROR_CODE_CHECK at the call site turns this into a
-// catchable exception - rather than returning success with garbage outputs.
 namespace {
 
 AOTITorchError oeq_stub_called(const char *name) {

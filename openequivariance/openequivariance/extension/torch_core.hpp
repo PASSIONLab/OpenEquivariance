@@ -43,9 +43,6 @@ void tensor_zero_(Tensor &tensor);
 
 void alert_not_deterministic(const char *name);
 
-// Current PyTorch stream for the given device, NOT the thread's current
-// device. Each op must guard to its input tensor's device (DeviceGuard,
-// aliased per-backend) before launching work, then take that device's stream.
 Stream get_current_stream(int32_t device_index);
 
 const uint8_t *tensor_data_ptr_u8(const Tensor &tensor);

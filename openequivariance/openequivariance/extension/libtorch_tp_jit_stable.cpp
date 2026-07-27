@@ -76,11 +76,6 @@ Stream get_current_stream(int32_t device_index) {
 }
 
 BlasHandleT get_op_blas_handle(int32_t device_index, BlasStream stream) {
-    // The caller's device guard makes device_index current, and `stream` is
-    // that device's current stream, so PyTorch's handle arrives configured
-    // for exactly this (device, stream) with its workspace and math mode
-    // managed by PyTorch. On ROCm builds of libtorch this shim symbol keeps
-    // its name and returns a hipblasHandle_t.
     (void)device_index;
     (void)stream;
     void* handle = nullptr;

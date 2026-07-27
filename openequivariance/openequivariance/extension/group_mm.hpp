@@ -18,11 +18,6 @@
     using BlasHandleT = hipblasHandle_t;
 #endif
 
-// Returns a BLAS handle ready to launch on (device_index, stream). Defined
-// per-build (libtorch_tp_jit.cpp / libtorch_tp_jit_stable.cpp): both return
-// PyTorch's pooled handle (cuBLAS on CUDA, hipBLAS on ROCm), which arrives
-// with the stream, workspace, and math mode already set for the current
-// device and stream. The caller must hold a device guard for device_index.
 BlasHandleT get_op_blas_handle(int32_t device_index, BlasStream stream);
 
 template<typename T>
