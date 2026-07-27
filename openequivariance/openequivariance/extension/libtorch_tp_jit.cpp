@@ -93,9 +93,7 @@ Stream get_current_stream(int32_t device_index) {
 #endif
 }
 
-BlasHandleT get_op_blas_handle(int32_t device_index, BlasStream stream) {
-    (void)device_index;
-    (void)stream;
+BlasHandleT get_op_blas_handle() {
     return at::cuda::getCurrentCUDABlasHandle();
 }
 

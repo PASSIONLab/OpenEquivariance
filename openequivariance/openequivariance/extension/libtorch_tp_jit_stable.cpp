@@ -75,9 +75,7 @@ Stream get_current_stream(int32_t device_index) {
     return static_cast<Stream>(stream_ptr);
 }
 
-BlasHandleT get_op_blas_handle(int32_t device_index, BlasStream stream) {
-    (void)device_index;
-    (void)stream;
+BlasHandleT get_op_blas_handle() {
     void* handle = nullptr;
     TORCH_ERROR_CODE_CHECK(torch_get_current_cuda_blas_handle(&handle));
     return static_cast<BlasHandleT>(handle);

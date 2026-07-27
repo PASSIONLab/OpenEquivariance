@@ -692,7 +692,6 @@ inline Tensor group_gemm(
 
     const int32_t device_index = static_cast<int32_t>(A.get_device());
     DeviceGuard device_guard(device_index);
-    Stream stream = get_current_stream(device_index);
 
     Tensor A_c    = tensor_contiguous(A);
     Tensor B_c    = tensor_contiguous(B);
@@ -709,12 +708,10 @@ inline Tensor group_gemm(
 
     if (A.scalar_type() == kFloat) {
         group_gemm_blas<float>(data_ptr(A_c), data_ptr(B_c), data_ptr(C), rc_ptr,
-            (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner,
-            device_index, stream);
+            (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner);
     } else if (A.scalar_type() == kDouble) {
         group_gemm_blas<double>(data_ptr(A_c), data_ptr(B_c), data_ptr(C), rc_ptr,
-            (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner,
-            device_index, stream);
+            (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner);
     } else {
         throw std::logic_error("group_gemm: unsupported dtype, expected float32 or float64");
     }

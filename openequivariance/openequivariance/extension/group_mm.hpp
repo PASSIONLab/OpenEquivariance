@@ -8,24 +8,21 @@
     #include "cublas_v2.h"
     #include <cuda_runtime.h>
 
-    using BlasStream = cudaStream_t;
     using BlasHandleT = cublasHandle_t;
 #elif defined(HIP_BACKEND)
     #include <hipblas/hipblas.h>
     #include <hip/hip_runtime.h>
 
-    using BlasStream = hipStream_t;
     using BlasHandleT = hipblasHandle_t;
 #endif
 
-BlasHandleT get_op_blas_handle(int32_t device_index, BlasStream stream);
+BlasHandleT get_op_blas_handle();
 
 template<typename T>
 void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
-        int64_t* ragged_counts, int num_W, int batch_size, int m, int k, int ragged_inner,
-        int32_t device_index, BlasStream stream) {
+        int64_t* ragged_counts, int num_W, int batch_size, int m, int k, int ragged_inner) {
 
-    BlasHandleT handle = get_op_blas_handle(device_index, stream);
+    BlasHandleT handle = get_op_blas_handle();
     T alpha = 1.0, beta = 0.0;
     T* A_base = reinterpret_cast<T*>(A_raw);
     T* B_base = reinterpret_cast<T*>(B_raw);
