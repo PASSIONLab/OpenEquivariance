@@ -7,7 +7,6 @@ from openequivariance.jax import extlib
 
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.LoopUnrollConv import LoopUnrollConv
-from openequivariance.jax.utils import reorder_jax
 
 from openequivariance.core.logging import getLogger
 from openequivariance.jax.jvp import conv_prim
@@ -104,19 +103,10 @@ class TensorProductConv(LoopUnrollConv):
     ) -> jax.numpy.ndarray:
         return self.forward(X, Y, W, rows, cols, sender_perm)
 
-    def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
-        return reorder_jax(self.forward_schedule, weights, "forward", has_batch_dim)
-
-    def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
-        return reorder_jax(self.forward_schedule, weights, "backward", has_batch_dim)
-
     def forward_cpu(self, L1_in, L2_in, weights, L3_out, graph):
         rows = graph.rows.astype(np.int32)
         cols = graph.cols.astype(np.int32)
         sender_perm = graph.transpose_perm.astype(np.int32)
-        weights = self.reorder_weights_from_e3nn(
-            weights, has_batch_dim=not self.config.shared_weights
-        )
 
         jit_fwd = jax.jit(self.forward)
         result = jit_fwd(
@@ -143,9 +133,6 @@ class TensorProductConv(LoopUnrollConv):
         rows = graph.rows.astype(np.int32)
         cols = graph.cols.astype(np.int32)
         sender_perm = graph.transpose_perm.astype(np.int32)
-        weights = self.reorder_weights_from_e3nn(
-            weights, has_batch_dim=not self.config.shared_weights
-        )
 
         backward_fn = jax.jit(
             jax.vjp(
@@ -169,9 +156,6 @@ class TensorProductConv(LoopUnrollConv):
         L1_grad[:] = np.asarray(L1_grad_jax)
         L2_grad[:] = np.asarray(L2_grad_jax)
         weights_grad[:] = np.asarray(weights_grad_jax)
-        weights_grad[:] = self.reorder_weights_to_e3nn(
-            weights_grad, has_batch_dim=not self.config.shared_weights
-        )
 
     def double_backward_cpu(
         self, in1, in2, out_grad, weights, weights_dgrad, in1_dgrad, in2_dgrad, graph

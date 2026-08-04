@@ -5,7 +5,6 @@ import torch
 from openequivariance.core.utils import torch_to_oeq_dtype, dtype_to_enum
 from openequivariance.core.logging import getLogger
 from openequivariance._torch.utils import (
-    reorder_torch,
     string_to_tensor,
     enum_to_torch_dtype,
 )
@@ -99,16 +98,6 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
         self.input_args = state
         self._init_class()
 
-    def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
-        return reorder_torch(
-            self.forward_schedule, weights, "forward", not self.config.shared_weights
-        )
-
-    def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
-        return reorder_torch(
-            self.forward_schedule, weights, "backward", not self.config.shared_weights
-        )
-
     def forward(
         self, x: torch.Tensor, y: torch.Tensor, W: torch.Tensor
     ) -> torch.Tensor:
@@ -142,13 +131,9 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
         L3_out: np.ndarray,
         weights: np.ndarray,
     ) -> None:
-        weights_chunked = self.reorder_weights_from_e3nn(
-            weights, not self.config.shared_weights
-        )
-
         torch_L1_in = torch.tensor(L1_in, device="cuda")
         torch_L2_in = torch.tensor(L2_in, device="cuda")
-        torch_weights = torch.tensor(weights_chunked, device="cuda")
+        torch_weights = torch.tensor(weights, device="cuda")
         torch_L3_out = self.forward(torch_L1_in, torch_L2_in, torch_weights)
 
         L3_out[:] = torch_L3_out.numpy(force=True)
@@ -156,13 +141,9 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
     def backward_cpu(
         self, L1_in, L1_grad, L2_in, L2_grad, L3_grad, weights, weights_grad
     ) -> None:
-        weights_chunked = self.reorder_weights_from_e3nn(
-            weights, not self.config.shared_weights
-        )
-
         torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
         torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
-        torch_weights = torch.tensor(weights_chunked, requires_grad=True, device="cuda")
+        torch_weights = torch.tensor(weights, requires_grad=True, device="cuda")
 
         torch_out = self.forward(torch_L1_in, torch_L2_in, torch_weights)
 
@@ -173,10 +154,6 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
         L1_grad[:] = torch_L1_in.grad.numpy(force=True)
         L2_grad[:] = torch_L2_in.grad.numpy(force=True)
         weights_grad[:] = torch_weights.grad.numpy(force=True)
-
-        weights_grad[:] = self.reorder_weights_to_e3nn(
-            weights_grad, not self.config.shared_weights
-        )
 
 
 def register_torch_fakes():

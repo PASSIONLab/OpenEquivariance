@@ -40,29 +40,43 @@ class TensorProductBase:
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim: bool = True):
         r"""
-        Reorders weights from ``e3nn`` canonical order to the order used by ``oeq``.
+        Returns ``weights`` unchanged.
+
+        ``oeq`` consumes weights in ``e3nn`` canonical order, so no reordering is
+        required. This method is retained so that code written against earlier
+        releases, which did need an explicit conversion, keeps working.
+
+        .. deprecated:: 0.6.9
+            Call the tensor product with your ``e3nn`` weights directly.
 
         :param weights: Weights in ``e3nn`` canonical order, either an
                         np.ndarray, torch.Tensor or JAX array. Tensor of dimensions ``[B, problem.weight_numel]``
                         when ``has_batch_dim=True``, otherwise of dimensions ``[problem.weight_numel]``.
 
-        :param has_batch_dim: If ``True``, treats the first dimension of weights as a batch dimension. Default: ``True``.
+        :param has_batch_dim: Ignored.
 
-        :return: Weights in ``oeq`` order. Output type is identical to input.
+        :return: ``weights``, unchanged.
         """
         return weights
 
     def reorder_weights_to_e3nn(self, weights, has_batch_dim: bool = True):
         r"""
-        Reorders weights from ``oeq`` canonical order to the order used by ``e3nn``.
+        Returns ``weights`` unchanged.
 
-        :param weights: Weights in ``oeq`` canonical order, either a
+        ``oeq`` produces weight gradients in ``e3nn`` canonical order, so no
+        reordering is required. This method is retained so that code written
+        against earlier releases keeps working.
+
+        .. deprecated:: 0.6.9
+            Weight gradients are already in ``e3nn`` order.
+
+        :param weights: Weights, either a
                         np.ndarray, torch.Tensor or JAX array. Tensor of dimensions ``[B, problem.weight_numel]``
                         when ``has_batch_dim=True``, otherwise of dimensions ``[problem.weight_numel]``.
 
-        :param has_batch_dim: If ``True``, treats the first dimension of wieghts as a batch dimension. Default: ``True``.
+        :param has_batch_dim: Ignored.
 
-        :return: Weights in ``e3nn`` order. Output type is identical to input.
+        :return: ``weights``, unchanged.
         """
         return weights
 

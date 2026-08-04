@@ -1,4 +1,5 @@
-{%- from 'macros.jinja' import layout_load, layout_store, reg_store with context %}
+{%- from 'macros.jinja' import layout_load, layout_store, reg_store,
+        stream_uvw_weight_tile, store_uvw_weight_grad_tile with context %}
 {%- from 'wmm.cuh' import generate_matmul %}
 
 {%- macro generate_segment_kernel_forward(id, segment, warp_size) %}
@@ -32,10 +33,10 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
     {%- for k in range(num_interact) %}
         {%- set u, v, w, tensor = interactions[k] %}
-        {%- set weight_start, _, _ = problem.weight_range_and_shape_for_instruction(k)%}
+        {%- set wmap = segment.weight_maps[k] %}
 
         {%- if k == 0 or interactions[k][0] != interactions[k-1][0] %}
-            offset = {{ L1.slices()[u].start}}; 
+            offset = {{ L1.slices()[u].start}};
             {{layout_load(problem.layout, L1[u].mul, L1[u].ir.dim, 'L1_smem', 'offset', 'l1_vec')}}
         {%- endif %}
 
@@ -46,18 +47,16 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
         for(int k = 0; k < {{L2[v].mul}}; k++) {
             {%- if problem.instructions[k].connection_mode == "uvu" %}
                 if(lane_id < {{L1[u].mul}}) {
-                    weight = weights_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id];
+                    weight = weights_smem[{{wmap.smem_offset}} + k * {{L1[u].mul}} + lane_id];
                 }
 
                 #pragma unroll
                 for(int j = 0; j < {{L2[v].ir.dim}}; j++)
                     l2_vec[j] = L2_smem[j + {{L2.slices()[v].start}} + k * {{L2[v].ir.dim}}] * weight;
             {%- elif problem.instructions[k].connection_mode == "uvw" %}
-                {# Stream weights here #}
-                {%- set slice_size = L3[w].mul * L1[u].mul %}
+                {# Stream this instruction's (u, w) tile for the current v. #}
                 {
-                    WEIGHT_T* tmp = weights + {{segment.weight_offset + weight_start}} + k * {{slice_size}} + lane_id;
-                    ROW_OPERATION({{slice_size}}, j, weights_smem[j + lane_id] = tmp[j];)
+                    {{ stream_uvw_weight_tile(wmap, 'weights', 'weights_smem', 'k', 'j') }}
                 }
                 #pragma unroll
                 for(int j = 0; j < {{L2[v].ir.dim}}; j++)
@@ -164,7 +163,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
     {%- for k in range(num_interact) %}
         {%- set u, v, w, tensor = interactions[k] %}
-        {%- set weight_start, _, _ = problem.weight_range_and_shape_for_instruction(k)%}
+        {%- set wmap = segment.weight_maps[k] %}
 
         {%- if k == 0 or interactions[k][0] != interactions[k-1][0] %}
             offset = {{ L1.slices()[u].start}};
@@ -195,7 +194,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
             {%- if problem.instructions[k].connection_mode == "uvu" %}
                 if(lane_id < {{L1[u].mul}}) {
-                    weight = weights_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id];
+                    weight = weights_smem[{{wmap.smem_offset}} + k * {{L1[u].mul}} + lane_id];
                 }
                 weight_grad = 0.0;
 
@@ -215,10 +214,8 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                 {%- endfor %}
 
             {%- elif problem.instructions[k].connection_mode == "uvw" %}
-                {%- set slice_size = L3[w].mul * L1[u].mul %}
                 {
-                    WEIGHT_T* tmp = weights + {{segment.weight_offset + weight_start}} + k * {{slice_size}} + lane_id;
-                    ROW_OPERATION({{slice_size}}, j, weights_smem[j + lane_id] = tmp[j];)
+                    {{ stream_uvw_weight_tile(wmap, 'weights', 'weights_smem', 'k', 'j') }}
 
                     __syncwarp();
                     offset = {{ L3.slices()[w].start}}; 
@@ -254,19 +251,18 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                     {{matmul_basename}}B_{{id}}_{{k}}(L3_grad_smem + offset, scratch, weights_smem);
                     __syncwarp();
 
-                    tmp = weights_grad + {{segment.weight_offset + weight_start}} + k * {{slice_size}} + lane_id;
                     {%- if problem.shared_weights %}
-                        ROW_OPERATION({{slice_size}}, j, atomicAdd(tmp + j, weights_smem[j + lane_id]);)
+                        {{ store_uvw_weight_grad_tile(wmap, 'weights_grad', 'weights_smem', 'k', 'j', '=', atomic=True) }}
                     {%- else %}
                         {%- if double_bwd %}
                             if(n == 0) {
-                                ROW_OPERATION({{slice_size}}, j, tmp[j] = weights_smem[j + lane_id];)
+                                {{ store_uvw_weight_grad_tile(wmap, 'weights_grad', 'weights_smem', 'k', 'j', '=') }}
                             }
                             else {
-                                ROW_OPERATION({{slice_size}}, j, tmp[j] += weights_smem[j + lane_id];)
+                                {{ store_uvw_weight_grad_tile(wmap, 'weights_grad', 'weights_smem', 'k', 'j', '+=') }}
                             }
                         {%- else %}
-                            ROW_OPERATION({{slice_size}}, j, tmp[j] = weights_smem[j + lane_id];)
+                            {{ store_uvw_weight_grad_tile(wmap, 'weights_grad', 'weights_smem', 'k', 'j', '=') }}
                         {%- endif %}
                     {%- endif %}
                 }
@@ -294,9 +290,9 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
             {%- if problem.instructions[k].connection_mode != "uvw" %}
                 if(lane_id < {{L1[u].mul}}) {
                     {%- if double_bwd %}
-                        weights_grad_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id] += weight_grad;
+                        weights_grad_smem[{{wmap.smem_offset}} + k * {{L1[u].mul}} + lane_id] += weight_grad;
                     {%- else %}
-                        weights_grad_smem[{{weight_start}} + k * {{L1[u].mul}} + lane_id] = weight_grad;
+                        weights_grad_smem[{{wmap.smem_offset}} + k * {{L1[u].mul}} + lane_id] = weight_grad;
                     {%- endif %}
                 }
             {%- endif %}

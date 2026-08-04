@@ -82,8 +82,86 @@ class CGTensor:
         self.nnz = len(values)
 
 
+class WeightAddressMap:
+    """
+    Locates one child instruction's weight tile inside the e3nn-ordered
+    weight vector.
+
+    e3nn stores instruction ``p``'s weights as a row-major array of shape
+    ``path_shape`` beginning at flat offset ``parent_weights_start``.
+    :class:`ProblemSplitter` carves that array into tiles of at most
+    ``warp_size`` per multiplicity, so a child instruction owns the sub-box
+    ``[u0, u0 + cu) x [v0, v0 + cv) x [w0, w0 + cw)`` of it.
+
+    ``base`` is the flat index of the tile's first element and ``u_stride`` /
+    ``v_stride`` / ``w_stride`` are the parent's row-major strides, so element
+    ``(iu, iv, iw)`` of the tile lives at
+    ``base + iu * u_stride + iv * v_stride + iw * w_stride``. Kernels use these
+    to address global weights directly instead of assuming each tile is a
+    contiguous run, which is what previously forced callers to permute their
+    weights before handing them over.
+
+    Shared memory keeps the tile in the kernel's own order (``[v][u]`` for uvu,
+    ``[v][u][w]`` for uvw) at ``smem_offset``; only the global side is e3nn
+    ordered.
+    """
+
+    def __init__(self, child_inst, smem_offset):
+        self.smem_offset = smem_offset
+        self.connection_mode = child_inst.instruction_tup[3]
+
+        parent_shape = list(child_inst.parent_weights_shape)
+        subrange = child_inst.weights_subrange
+        assert len(parent_shape) == len(subrange)
+
+        strides, acc = [], 1
+        for extent in reversed(parent_shape):
+            strides.append(acc)
+            acc *= extent
+        strides.reverse()
+
+        self.base = child_inst.parent_weights_start + sum(
+            rng.start * stride for rng, stride in zip(subrange, strides)
+        )
+        extents = [rng.stop - rng.start for rng in subrange]
+
+        if self.connection_mode == "uvu":
+            (self.u_stride, self.v_stride), self.w_stride = strides, 0
+            (self.cu, self.cv), self.cw = extents, 1
+        elif self.connection_mode == "uvw":
+            self.u_stride, self.v_stride, self.w_stride = strides
+            self.cu, self.cv, self.cw = extents
+        else:
+            raise ValueError(
+                f"No weight address map for connection mode {self.connection_mode}"
+            )
+
+    @property
+    def is_contiguous(self):
+        """
+        True when the tile is a contiguous run of ``cu * cw`` elements laid out
+        exactly as shared memory wants it, so the copy collapses to a single
+        ``ROW_OPERATION``. This covers every problem whose second input has
+        multiplicity 1 -- the common channelwise case -- where the e3nn and
+        kernel orders already agree.
+        """
+        if self.connection_mode == "uvu":
+            return self.u_stride == 1
+        return self.u_stride == self.cw
+
+
 class ComputationSegment:
-    def __init__(self, L1Map, L2Map, L3Map, problem, smem, weight_offset, irrep_dtype):
+    def __init__(
+        self,
+        L1Map,
+        L2Map,
+        L3Map,
+        problem,
+        smem,
+        weight_offset,
+        irrep_dtype,
+        child_instructions,
+    ):
         self.L1Map = L1Map
         self.L2Map = L2Map
         self.L3Map = L3Map
@@ -94,6 +172,15 @@ class ComputationSegment:
         self.weight_offset = (
             weight_offset  # Starting point for weights in overall problem.
         )
+
+        # Per-instruction map from the kernel's shared-memory tiles onto the
+        # e3nn-ordered global weight vector.
+        self.weight_maps = [
+            WeightAddressMap(
+                child_inst, problem.weight_range_and_shape_for_instruction(k)[0]
+            )
+            for k, child_inst in enumerate(child_instructions)
+        ]
 
         self.L1 = problem.irreps_in1
         self.L2 = problem.irreps_in2
@@ -615,6 +702,7 @@ class ComputationSchedule:
                 calculate_smem(L1_idxs, L2_idxs, L3_idxs, inst_idxs),
                 weight_offset,
                 irrep_dtype,
+                [self.problem_splitter.new_instructions[idx] for idx in inst_idxs],
             )
 
         for ir_idx, ir in enumerate([self.L1, self.L2, self.L3]):
@@ -647,66 +735,3 @@ class ComputationSchedule:
             warp_size=warp_size,
             smem=self.memory_per_warp * warps_per_block,
         )
-
-    def weight_reordering_info(self, weights_in, has_batch_dim):
-        """
-        Calculates all shapes, slices, and permutation info to reorder
-        weights.
-        """
-        batch_dim = weights_in.shape[0]
-        reorder_specs = []
-
-        for i, child_inst in enumerate(self.problem_splitter.new_instructions):
-            parent_start, parent_end = (
-                child_inst.parent_weights_start,
-                child_inst.parent_weights_end,
-            )
-            parent_shape = list(child_inst.parent_weights_shape)
-            parent_range = [slice(parent_start, parent_end)]
-
-            child_start, child_end, child_shape = (
-                self.updated_config.weight_range_and_shape_for_instruction(i)
-            )
-            child_range = [slice(child_start, child_end)]
-
-            weights_subrange = child_inst.weights_subrange
-
-            reshape_size = [-1]
-            transpose_perm = None
-            connection_mode = self.updated_config.instructions[i].connection_mode
-
-            if connection_mode == "uvu":
-                transpose_perm = [1, 0]
-            elif connection_mode == "uvw":
-                transpose_perm = [1, 0, 2]
-
-            if has_batch_dim:
-                child_range = [slice(0, batch_dim)] + child_range
-                parent_range = [slice(0, batch_dim)] + parent_range
-                parent_shape = [batch_dim] + parent_shape
-
-                child_shape = [batch_dim] + list(child_shape)
-                weights_subrange = [slice(0, batch_dim)] + child_inst.weights_subrange
-                reshape_size = [batch_dim] + reshape_size
-
-                if transpose_perm is not None:
-                    transpose_perm = [0] + [k + 1 for k in transpose_perm]
-
-            transpose_child_shape = None
-            if transpose_perm is not None:
-                transpose_child_shape = [child_shape[k] for k in transpose_perm]
-
-            reorder_specs.append(
-                {
-                    "parent_range": tuple(parent_range),
-                    "parent_shape": parent_shape,
-                    "weights_subrange": tuple(weights_subrange),
-                    "child_range": tuple(child_range),
-                    "child_shape": child_shape,
-                    "transpose_perm": transpose_perm,
-                    "reshape_size": reshape_size,
-                    "transpose_child_shape": transpose_child_shape,
-                }
-            )
-
-        return reorder_specs

@@ -228,3 +228,91 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
 {%- macro launch_bounds(schedule) %}
 __launch_bounds__({{schedule.launch_config.num_threads}})
 {%- endmacro %}
+
+{# Weights arrive in e3nn order: each instruction's weights are a row-major
+   array of shape path_shape, and the arrays are concatenated in instruction
+   order. Shared memory keeps the kernel's own tile order ([v][u] for uvu,
+   [u][w] per v for uvw), so these macros carry the whole difference between the
+   two layouts.
+
+   `map.is_contiguous` marks the tiles whose e3nn layout already matches shared
+   memory -- any problem whose second input has multiplicity 1, plus anything
+   small enough to escape chunking -- and those emit the single copy they always
+   did. Otherwise the tile is strided, and the outer index gets a constant-bound
+   loop rather than a codegen-time unroll: ROW_OPERATION already leans on the
+   compiler to unroll constant trip counts, and unrolling here instead would
+   multiply the generated source by up to the chunk width. #}
+{%- macro load_uvu_weights(segment, glb_ptr, smem_ptr, loop_var) %}
+    {%- for map in segment.weight_maps %}
+        {%- if map.is_contiguous %}
+            ROW_OPERATION({{map.cu}}, {{loop_var}}, {{smem_ptr}}[{{map.smem_offset}} + {{loop_var}} + lane_id] = {{glb_ptr}}[{{map.base}} + {{loop_var}} + lane_id];)
+        {%- else %}
+            #pragma unroll
+            for(int wv = 0; wv < {{map.cv}}; wv++) {
+                ROW_OPERATION({{map.cu}}, {{loop_var}}, {{smem_ptr}}[{{map.smem_offset}} + wv * {{map.cu}} + {{loop_var}} + lane_id] = {{glb_ptr}}[{{map.base}} + wv * {{map.v_stride}} + ({{loop_var}} + lane_id) * {{map.u_stride}}];)
+            }
+        {%- endif %}
+    {%- endfor %}
+{%- endmacro %}
+
+{# Mirror of load_uvu_weights for the weight gradients the backward kernel
+   produces. `op` is "=" for a plain write or "+=" to accumulate; `atomic`
+   switches to atomicAdd, which shared weights need because every batch element
+   contributes to the same destination. #}
+{%- macro store_uvu_weight_grads(segment, glb_ptr, smem_ptr, loop_var, op, atomic=False) %}
+    {%- for map in segment.weight_maps %}
+        {%- if map.is_contiguous %}
+            {%- if atomic %}
+                ROW_OPERATION({{map.cu}}, {{loop_var}}, atomicAdd({{glb_ptr}} + {{map.base}} + {{loop_var}} + lane_id, {{smem_ptr}}[{{map.smem_offset}} + {{loop_var}} + lane_id]);)
+            {%- else %}
+                ROW_OPERATION({{map.cu}}, {{loop_var}}, {{glb_ptr}}[{{map.base}} + {{loop_var}} + lane_id] {{op}} {{smem_ptr}}[{{map.smem_offset}} + {{loop_var}} + lane_id];)
+            {%- endif %}
+        {%- else %}
+            #pragma unroll
+            for(int wv = 0; wv < {{map.cv}}; wv++) {
+                {%- if atomic %}
+                    ROW_OPERATION({{map.cu}}, {{loop_var}}, atomicAdd({{glb_ptr}} + {{map.base}} + wv * {{map.v_stride}} + ({{loop_var}} + lane_id) * {{map.u_stride}}, {{smem_ptr}}[{{map.smem_offset}} + wv * {{map.cu}} + {{loop_var}} + lane_id]);)
+                {%- else %}
+                    ROW_OPERATION({{map.cu}}, {{loop_var}}, {{glb_ptr}}[{{map.base}} + wv * {{map.v_stride}} + ({{loop_var}} + lane_id) * {{map.u_stride}}] {{op}} {{smem_ptr}}[{{map.smem_offset}} + wv * {{map.cu}} + {{loop_var}} + lane_id];)
+                {%- endif %}
+            }
+        {%- endif %}
+    {%- endfor %}
+{%- endmacro %}
+
+{# UVW streams one (u, w) tile per v straight from global memory rather than
+   staging the whole segment. `v_var` is the runtime loop variable over v.
+   Lanes run along w, so the strided case issues cu runs of cw contiguous
+   elements: the same number of memory transactions as before, at addresses that
+   are no longer adjacent. #}
+{%- macro stream_uvw_weight_tile(map, glb_ptr, smem_ptr, v_var, loop_var) %}
+    WEIGHT_T* tmp = {{glb_ptr}} + {{map.base}} + {{v_var}} * {{map.v_stride}} + lane_id;
+    {%- if map.is_contiguous %}
+        ROW_OPERATION({{map.cu * map.cw}}, {{loop_var}}, {{smem_ptr}}[{{loop_var}} + lane_id] = tmp[{{loop_var}}];)
+    {%- else %}
+        #pragma unroll
+        for(int wu = 0; wu < {{map.cu}}; wu++) {
+            ROW_OPERATION({{map.cw}}, {{loop_var}}, {{smem_ptr}}[wu * {{map.cw}} + {{loop_var}} + lane_id] = tmp[wu * {{map.u_stride}} + {{loop_var}}];)
+        }
+    {%- endif %}
+{%- endmacro %}
+
+{%- macro store_uvw_weight_grad_tile(map, glb_ptr, smem_ptr, v_var, loop_var, op, atomic=False) %}
+    tmp = {{glb_ptr}} + {{map.base}} + {{v_var}} * {{map.v_stride}} + lane_id;
+    {%- if map.is_contiguous %}
+        {%- if atomic %}
+            ROW_OPERATION({{map.cu * map.cw}}, {{loop_var}}, atomicAdd(tmp + {{loop_var}}, {{smem_ptr}}[{{loop_var}} + lane_id]);)
+        {%- else %}
+            ROW_OPERATION({{map.cu * map.cw}}, {{loop_var}}, tmp[{{loop_var}}] {{op}} {{smem_ptr}}[{{loop_var}} + lane_id];)
+        {%- endif %}
+    {%- else %}
+        #pragma unroll
+        for(int wu = 0; wu < {{map.cu}}; wu++) {
+            {%- if atomic %}
+                ROW_OPERATION({{map.cw}}, {{loop_var}}, atomicAdd(tmp + wu * {{map.u_stride}} + {{loop_var}}, {{smem_ptr}}[wu * {{map.cw}} + {{loop_var}} + lane_id]);)
+            {%- else %}
+                ROW_OPERATION({{map.cw}}, {{loop_var}}, tmp[wu * {{map.u_stride}} + {{loop_var}}] {{op}} {{smem_ptr}}[wu * {{map.cw}} + {{loop_var}} + lane_id];)
+            {%- endif %}
+        }
+    {%- endif %}
+{%- endmacro %}

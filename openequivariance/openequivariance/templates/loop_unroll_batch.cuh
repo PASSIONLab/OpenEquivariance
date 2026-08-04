@@ -2,10 +2,11 @@
 
 {% include 'common.cuh' %}
 {%- from 'macros.jinja' import
-        transpose_load, transpose_store, 
+        transpose_load, transpose_store,
         load_ir_segments, load_ir_segments_force,
         store_ir_segments, declare_smem_variables,
-        set_launch_bound_variables, launch_bounds
+        set_launch_bound_variables, launch_bounds,
+        load_uvu_weights, store_uvu_weight_grads
         with context%}
 
 {%- from 'loop_unroll_tp.cuh' import 
@@ -50,7 +51,7 @@ forward(size_t num_products, IRREP_T* L1_in, IRREP_T* L2_in, IRREP_T* L3_out, WE
             ROW_OPERATION({{segment.L3.dim}}, j, L3_smem[j + lane_id] = 0.0f;)
 
             {% if not forward_schedule.stream_weights%}
-                ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = w[{{segment.weight_offset}} + j + lane_id];)
+                {{ load_uvu_weights(segment, "w", "weights_smem", "j") }}
             {% endif %}
 
             __syncwarp();
@@ -88,9 +89,8 @@ backward(size_t num_products,
             WEIGHT_T* wgrad = weights_grad + i * {{tpp.weight_numel}}; 
         {%- else %}
             WEIGHT_T* w = weights; 
-            WEIGHT_T* wgrad = weights_grad; 
+            WEIGHT_T* wgrad = weights_grad;
         {%- endif %}
-        WEIGHT_T* weights_shft = w + lane_id;
 
         {%- for i, segment in enumerate(backward_schedule.segments) %} {
             {{ declare_smem_variables(segment, "smem") }}
@@ -109,7 +109,7 @@ backward(size_t num_products,
             {%- endif %}
 
             {%- if not backward_schedule.stream_weights%}
-                ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = weights_shft[{{segment.weight_offset}} + j];)
+                {{ load_uvu_weights(segment, "w", "weights_smem", "j") }}
                 ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_grad_smem[j + lane_id] = 0.0;)
             {%- endif %}
 
@@ -121,20 +121,14 @@ backward(size_t num_products,
             IRREP_T* l1_grad_shft = L1_grad + i * {{backward_schedule.L1.dim}} + lane_id;
             IRREP_T* l2_grad_shft = L2_grad + i * {{backward_schedule.L2.dim}} + lane_id;
 
-            {%- if not tpp.shared_weights %}
-                WEIGHT_T* weights_grad_shft = weights_grad + i * {{backward_schedule.updated_config.weight_numel}} + lane_id;
-            {%- else %}
-                WEIGHT_T* weights_grad_shft = weights_grad + lane_id;
-            {%- endif %}
-
             {{ store_ir_segments(segment.L1Map, "l1_grad_shft", "L1_grad_smem", "j") }}
             {{ store_ir_segments(segment.L2Map, "l2_grad_shft", "L2_grad_smem", "j") }}
 
             {%- if not backward_schedule.stream_weights%}
                 {%- if not tpp.shared_weights %}
-                    ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_grad_shft[{{segment.weight_offset}} + j] = weights_grad_smem[j + lane_id];)
-                {%- else %}  
-                    ROW_OPERATION({{segment.problem.weight_numel}}, j, atomicAdd(weights_grad_shft + {{segment.weight_offset}} + j, weights_grad_smem[j + lane_id]);)
+                    {{ store_uvu_weight_grads(segment, "wgrad", "weights_grad_smem", "j", "=") }}
+                {%- else %}
+                    {{ store_uvu_weight_grads(segment, "wgrad", "weights_grad_smem", "j", "=", atomic=True) }}
                 {%- endif %}
             {%- endif %}
         } {%- endfor %}
@@ -183,14 +177,14 @@ double_backward_A(
             {{ load_ir_segments_force(segment.L1Map, "l1", "L1_smem", "j") }}
             {{ load_ir_segments_force(segment.L2Map, "l2", "L2_smem", "j") }}
             {% if not forward_schedule.stream_weights%}
-                ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = w_dgrad[{{segment.weight_offset}} + j + lane_id];)
+                {{ load_uvu_weights(segment, "w_dgrad", "weights_smem", "j") }}
             {% endif %}
             w_buffer = w_dgrad;
 
             for(int n = 0; n < 3; n++) {
                 if(n == 1) {
                     {% if not forward_schedule.stream_weights%}
-                        ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = w[{{segment.weight_offset}} + j + lane_id];)
+                        {{ load_uvu_weights(segment, "w", "weights_smem", "j") }}
                     {% endif %}
                     {{ load_ir_segments_force(segment.L2Map, "l2_dgrad", "L2_smem", "j") }}
                     w_buffer = w;
@@ -248,9 +242,6 @@ double_backward_B(
             WEIGHT_T* wgrad = W_grad; 
             WEIGHT_T* wdgrad = W_dgrad; 
             {%- endif %}
-            WEIGHT_T* weights_shft = w + lane_id;
-            WEIGHT_T* weights_dgrad_shft = wdgrad + lane_id;
-
 
             {{ load_ir_segments(segment.L3Map, "l3_shft", "L3_grad_smem", "j") }}
             {{ load_ir_segments_force(segment.L1Map, "l1_shft", "L1_smem", "j") }}
@@ -267,7 +258,7 @@ double_backward_B(
             {%- endif %}
 
             {% if not schedule.stream_weights%}
-                ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = weights_shft[{{segment.weight_offset}} + j];)
+                {{ load_uvu_weights(segment, "w", "weights_smem", "j") }}
                 ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_grad_smem[j + lane_id] = 0.0;)
             {% endif %}
             
@@ -280,7 +271,7 @@ double_backward_B(
                     {{ load_ir_segments_force(segment.L1Map, "l1_original", "L1_smem", "j") }}
 
                     {% if not schedule.stream_weights%}
-                        ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_smem[j + lane_id] = weights_dgrad_shft[{{segment.weight_offset}} + j];)
+                        {{ load_uvu_weights(segment, "wdgrad", "weights_smem", "j") }}
                     {% endif %}
                     w_buffer = wdgrad;
                     L2_buffer = L2_dgrad_smem;
@@ -296,20 +287,14 @@ double_backward_B(
             IRREP_T* l1_grad_shft = L1_grad + i * {{schedule.L1.dim}} + lane_id;
             IRREP_T* l2_grad_shft = L2_grad + i * {{schedule.L2.dim}} + lane_id;
 
-            {%- if not tpp.shared_weights %}
-                WEIGHT_T* weights_grad_shft = W_grad + i * {{schedule.updated_config.weight_numel}} + lane_id;
-            {%- else %}
-                WEIGHT_T* weights_grad_shft = W_grad + lane_id;
-            {%- endif %}
-
             {{ store_ir_segments(segment.L1Map, "l1_grad_shft", "L1_grad_smem", "j") }}
             {{ store_ir_segments(segment.L2Map, "l2_grad_shft", "L2_grad_smem", "j") }}
 
             {% if not schedule.stream_weights%}
                 {%- if not tpp.shared_weights %}
-                    ROW_OPERATION({{segment.problem.weight_numel}}, j, weights_grad_shft[{{segment.weight_offset}} + j] = weights_grad_smem[j + lane_id];)
-                {%- else %}  
-                    ROW_OPERATION({{segment.problem.weight_numel}}, j, atomicAdd(weights_grad_shft + {{segment.weight_offset}} + j, weights_grad_smem[j + lane_id]);)
+                    {{ store_uvu_weight_grads(segment, "wgrad", "weights_grad_smem", "j", "=") }}
+                {%- else %}
+                    {{ store_uvu_weight_grads(segment, "wgrad", "weights_grad_smem", "j", "=", atomic=True) }}
                 {%- endif %}
             {% endif %}
         }

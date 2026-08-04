@@ -18,7 +18,6 @@ from openequivariance._torch.TensorProduct import TensorProduct
 from openequivariance import TPProblem
 from openequivariance.core.utils import torch_to_oeq_dtype, dtype_to_enum
 from openequivariance._torch.utils import (
-    reorder_torch,
     string_to_tensor,
     enum_to_torch_dtype,
 )
@@ -192,16 +191,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
         self.workspace_ptr = self.workspace_buffer.data_ptr()
         logger.info(f"Convolution requires {size_bytes // 1000000}MB of workspace.")
 
-    def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
-        return reorder_torch(
-            self.forward_schedule, weights, "forward", not self.config.shared_weights
-        )
-
-    def reorder_weights_to_e3nn(self, weights, has_batch_dim=True):
-        return reorder_torch(
-            self.forward_schedule, weights, "backward", not self.config.shared_weights
-        )
-
     @staticmethod
     def name():
         return "LoopUnrollConv"
@@ -210,13 +199,9 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
         assert graph.rows.dtype == self.idx_dtype
         assert graph.cols.dtype == self.idx_dtype
 
-        weights_chunked = self.reorder_weights_from_e3nn(
-            weights, not self.config.shared_weights
-        )
-
         torch_L1_in = torch.tensor(L1_in, device="cuda")
         torch_L2_in = torch.tensor(L2_in, device="cuda")
-        torch_weights = torch.tensor(weights_chunked, device="cuda")
+        torch_weights = torch.tensor(weights, device="cuda")
         torch_rows = torch.tensor(graph.rows, device="cuda")
         torch_cols = torch.tensor(graph.cols, device="cuda")
 
@@ -241,13 +226,9 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
         assert graph.rows.dtype == self.idx_dtype
         assert graph.cols.dtype == self.idx_dtype
 
-        weights_chunked = self.reorder_weights_from_e3nn(
-            weights, not self.config.shared_weights
-        )
-
         torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
         torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
-        torch_weights = torch.tensor(weights_chunked, requires_grad=True, device="cuda")
+        torch_weights = torch.tensor(weights, requires_grad=True, device="cuda")
         torch_L3_grad = torch.tensor(L3_grad, device="cuda")
         torch_rows = torch.tensor(graph.rows, device="cuda")
         torch_cols = torch.tensor(graph.cols, device="cuda")
@@ -269,10 +250,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
         L1_grad[:] = torch_L1_in.grad.numpy(force=True)
         L2_grad[:] = torch_L2_in.grad.numpy(force=True)
         weights_grad[:] = torch_weights.grad.numpy(force=True)
-
-        weights_grad[:] = self.reorder_weights_to_e3nn(
-            weights_grad, not self.config.shared_weights
-        )
 
         return L1_grad, L2_grad, weights_grad
 
@@ -612,8 +589,6 @@ class TensorProductConvScatterSum(ConvolutionBase):
         super().__init__(config, torch_op=torch_op, deterministic=False)
 
         self.reference_tp = TensorProduct(config, torch_op=torch_op)
-        self.reorder_weights_from_e3nn = self.reference_tp.reorder_weights_from_e3nn
-        self.reorder_weights_to_e3nn = self.reference_tp.reorder_weights_to_e3nn
 
     def forward(self, L1_in, L2_in, weights, rows, cols, sender_perm=None):
         messages = self.reference_tp(L1_in[cols], L2_in, weights)
