@@ -96,11 +96,12 @@ We recommend reading the [e3nn documentation and API reference](https://docs.e3n
 as drop-in replacements. We support most "uvu" and "uvw" tensor products; 
 see [this section](#tensor-products-we-accelerate) for an up-to-date list of supported configurations. 
 
-**Important**: For many configurations, our kernels return results identical to
-e3nn up to floating point roundoff (this includes all "uvu" problems with
-multiplicity 1 for all irreps in the second input). For other configurations 
-(e.g. any "uvw" connection modes), we return identical 
-results up to a well-defined reordering of the weights relative to e3nn. 
+**Important**: our kernels consume weights in e3nn's canonical ordering and
+produce weight gradients in it, so an `o3.TensorProduct`'s weights can be passed
+to us unchanged. Results are identical to e3nn up to floating point roundoff.
+(Releases before v0.6.9 used an internal weight layout that some configurations
+had to convert to explicitly; `reorder_weights_from_e3nn` and
+`reorder_weights_to_e3nn` remain available but are now no-ops.)
 
 If you're executing tensor products as part of a message passing graph
 neural network, we offer fused kernels that save both memory and compute time: 

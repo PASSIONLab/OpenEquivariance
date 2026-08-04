@@ -33,13 +33,26 @@ two that are commonly used in equivariant graph neural networks:
 "uvu" and "uvw". Our JIT compiled kernels should handle:
 
 1. Pure "uvu" tensor products, which are most efficient when the input with higher
-   multiplicities is the first argument. Our results are identical to e3nn when irreps in
-   the second input have multiplicity 1, and otherwise identical up to a reordering
-   of the input weights.
+   multiplicities is the first argument.
 
 2. Pure "uvw" tensor products, which are currently more efficient when the input with
-   higher multiplicities is the first argument. Our results are identical to e3nn up to a reordering
-   of the input weights. 
+   higher multiplicities is the first argument.
+
+In both cases our results are identical to e3nn up to floating point roundoff.
+
+Weight Ordering
+---------------
+
+We consume weights in e3nn's canonical ordering and produce weight gradients in
+it, so the weights of an ``o3.TensorProduct`` can be handed to our kernels
+unchanged. Concretely, each instruction owns a contiguous block of the flat
+weight vector that reshapes to ``instruction.path_shape``, and the blocks are
+concatenated in instruction order.
+
+Releases before v0.6.9 used an internal weight layout and required an explicit
+conversion for some configurations. ``reorder_weights_from_e3nn`` and
+``reorder_weights_to_e3nn`` are still present on both classes, but they now
+return their argument unchanged.
 
 Our code includes correctness checks, but the configuration space is large. If you notice
 a bug, let us know in a GitHub issue. We'll try our best to correct it or document the problem here.

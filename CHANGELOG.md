@@ -1,5 +1,29 @@
 ## Latest Changes
 
+### Unreleased
+
+**Changed**:
+- Weights are now consumed in `e3nn`'s canonical ordering, and weight
+  gradients are produced in it. An `o3.TensorProduct`'s weights can be
+  passed to `TensorProduct` / `TensorProductConv` unchanged, for every
+  supported configuration.
+
+  Previously the kernels used an internal layout that differed from `e3nn`
+  in two ways: each instruction's weight tile was stored transposed (`[v][u]`
+  rather than `[u][v]`, visible only when the second input had multiplicity
+  greater than 1), and multiplicities above 32 were split into tiles that were
+  then concatenated. The generated kernels now index the `e3nn` layout
+  directly, so no permutation is needed.
+
+  `reorder_weights_from_e3nn` and `reorder_weights_to_e3nn` remain on both
+  classes and are now no-ops. **If you were calling them, you can delete the
+  calls; if you stored weights in the old internal layout, they must be
+  converted with a release <= v0.6.8 before loading.**
+
+**Fixed**:
+- Jinja templates now render with `StrictUndefined`, so an undefined template
+  variable raises instead of silently producing an empty string.
+
 ### v0.6.8 (2026-06-14)
 Added `#include <cstdint>` to all C++ extension headers and sources. 
 
