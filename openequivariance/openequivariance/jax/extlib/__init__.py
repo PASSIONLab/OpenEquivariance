@@ -1,19 +1,10 @@
 import jax
 import openequivariance_extjax as oeq_extjax
 
-
-def postprocess_kernel(kernel):
-    if oeq_extjax.is_hip():
-        kernel = kernel.replace("__syncwarp();", "__threadfence_block();")
-        kernel = kernel.replace("__shfl_down_sync(FULL_MASK,", "__shfl_down(")
-        kernel = kernel.replace("atomicAdd", "unsafeAtomicAdd")
-        return kernel
-    else:
-        return kernel
-
+IS_HIP = oeq_extjax.is_hip()
 
 platform = "CUDA"
-if oeq_extjax.is_hip():
+if IS_HIP:
     platform = "ROCM"
 
 for name, target in oeq_extjax.registrations().items():

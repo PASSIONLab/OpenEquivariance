@@ -73,10 +73,10 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
             {%- if problem.instructions[k].connection_mode == "uvw" %}
                 {{layout_store(problem.layout, L1[u].mul, L3[w].ir.dim, 'scratch', '0', 'l3_vec', '=', '1.0')}}
-                __syncwarp();
+                {{ syncwarp }};
                 offset = {{ L3.slices()[w].start}}; 
                 matmul_fwd_{{id}}_{{k}}(weights_smem, scratch, L3_smem + offset);
-                __syncwarp();
+                {{ syncwarp }};
 
                 #pragma unroll
                 for(int j = 0; j < {{L3[w].ir.dim}}; j++)
@@ -220,10 +220,10 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                     WEIGHT_T* tmp = weights + {{segment.weight_offset + weight_start}} + k * {{slice_size}} + lane_id;
                     ROW_OPERATION({{slice_size}}, j, weights_smem[j + lane_id] = tmp[j];)
 
-                    __syncwarp();
+                    {{ syncwarp }};
                     offset = {{ L3.slices()[w].start}}; 
                     {{matmul_basename}}A_{{id}}_{{k}}(weights_smem, L3_grad_smem + offset, scratch);
-                    __syncwarp();
+                    {{ syncwarp }};
 
                     {{layout_load(problem.layout, L1[u].mul, L3[w].ir.dim, 'scratch', '0', 'l3_grad')}}
 
@@ -250,13 +250,13 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
                     {{ reg_store(L1[u].mul, L3[w].ir.dim, "scratch", "0", "l3_grad", "=", 1.0) }}
 
-                    __syncwarp(); 
+                    {{ syncwarp }}; 
                     {{matmul_basename}}B_{{id}}_{{k}}(L3_grad_smem + offset, scratch, weights_smem);
-                    __syncwarp();
+                    {{ syncwarp }};
 
                     tmp = weights_grad + {{segment.weight_offset + weight_start}} + k * {{slice_size}} + lane_id;
                     {%- if problem.shared_weights %}
-                        ROW_OPERATION({{slice_size}}, j, atomicAdd(tmp + j, weights_smem[j + lane_id]);)
+                        ROW_OPERATION({{slice_size}}, j, {{ atomic_add }}(tmp + j, weights_smem[j + lane_id]);)
                     {%- else %}
                         {%- if double_bwd %}
                             if(n == 0) {
@@ -280,7 +280,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                     }
                     #pragma unroll
                     for (int offset = {{ warp_size  // 2}}; offset > 0; offset /= 2) {
-                        l2_grad[j] += __shfl_down_sync(FULL_MASK, l2_grad[j], offset);
+                        l2_grad[j] += {{ shfl_down("l2_grad[j]", "offset") }};
                     } 
                 }
 

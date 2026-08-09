@@ -20,7 +20,7 @@ class LoopUnrollConv(ConvolutionBase):
         self,
         config,
         dp,
-        postprocess_kernel,
+        is_hip,
         *,
         idx_dtype: type[np.generic] = np.int64,
         torch_op: bool = False,
@@ -34,7 +34,7 @@ class LoopUnrollConv(ConvolutionBase):
         if kahan:
             assert deterministic
 
-        env = get_jinja_environment()
+        env = get_jinja_environment(is_hip=is_hip)
         template = env.get_template("loop_unroll_conv_atomic.cuh")
 
         analysis = filter_and_analyze_problem(config)
@@ -207,7 +207,6 @@ class LoopUnrollConv(ConvolutionBase):
             backward_workspace_offset=self.backward_workspace_offset,
             double_backwardB_offset=self.double_backwardB_offset,
         )
-        self.jit_kernel = postprocess_kernel(self.jit_kernel)
 
         self.kernel_string = json.dumps(
             {
