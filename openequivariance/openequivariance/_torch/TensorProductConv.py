@@ -327,6 +327,7 @@ def register_torch_fakes():
 
 
 def register_autograd():
+    forward_op = torch.ops.libtorch_tp_jit.jit_conv_forward
     backward_op = torch.ops.libtorch_tp_jit.jit_conv_backward
     double_backward_op = torch.ops.libtorch_tp_jit.jit_conv_double_backward
 
@@ -335,105 +336,113 @@ def register_autograd():
             return torch.zeros_like(like)
         return grad_output
 
-    def setup_context(ctx, inputs, output):
-        (
-            ctx.kernel,
-            ctx.hash,
-            ctx.L1_in,
-            ctx.L2_in,
-            ctx.W,
-            ctx.L3_dim,
-            ctx.rows,
-            ctx.cols,
-            ctx.workspace_buffer,
-            ctx.sender_perm,
-        ) = inputs
+    # The conv ops mutate their workspace argument (Tensor(a!) in the schema),
+    # and torch.library.register_autograd only accepts functional ops. The
+    # autograd formulas are instead registered on the Autograd dispatch key,
+    # redispatching to the device kernel below autograd.
 
-    def backward(ctx, grad_output):
-        L1_grad, L2_grad, W_grad = backward_op(
-            ctx.kernel,
-            ctx.hash,
-            ctx.L1_in,
-            ctx.L2_in,
-            ctx.W,
-            grad_output,
-            ctx.rows,
-            ctx.cols,
-            ctx.workspace_buffer,
-            ctx.sender_perm,
-        )
-        return None, None, L1_grad, L2_grad, W_grad, None, None, None, None, None
+    class ConvForward(torch.autograd.Function):
+        @staticmethod
+        def forward(
+            ctx, kernel, hash, L1_in, L2_in, W, L3_dim, rows, cols, workspace_buffer, sender_perm
+        ):
+            ctx.kernel = kernel
+            ctx.hash = hash
+            ctx.L1_in = L1_in
+            ctx.L2_in = L2_in
+            ctx.W = W
+            ctx.rows = rows
+            ctx.cols = cols
+            ctx.workspace_buffer = workspace_buffer
+            ctx.sender_perm = sender_perm
+            with torch._C._AutoDispatchBelowAutograd():
+                return forward_op(
+                    kernel,
+                    hash,
+                    L1_in,
+                    L2_in,
+                    W,
+                    L3_dim,
+                    rows,
+                    cols,
+                    workspace_buffer,
+                    sender_perm,
+                )
 
-    torch.library.register_autograd(
-        "libtorch_tp_jit::jit_conv_forward", backward, setup_context=setup_context
-    )
+        @staticmethod
+        def backward(ctx, grad_output):
+            L1_grad, L2_grad, W_grad = backward_op(
+                ctx.kernel,
+                ctx.hash,
+                ctx.L1_in,
+                ctx.L2_in,
+                ctx.W,
+                grad_output,
+                ctx.rows,
+                ctx.cols,
+                ctx.workspace_buffer,
+                ctx.sender_perm,
+            )
+            return None, None, L1_grad, L2_grad, W_grad, None, None, None, None, None
 
-    def setup_context_double_backward(ctx, inputs, output):
-        (
-            ctx.kernel,
-            ctx.hash,
-            ctx.L1_in,
-            ctx.L2_in,
-            ctx.W,
-            ctx.grad_output,
-            ctx.rows,
-            ctx.cols,
-            ctx.workspace_buffer,
-            ctx.sender_perm,
-        ) = inputs
-        ctx.inputs = inputs
+    class ConvBackward(torch.autograd.Function):
+        @staticmethod
+        def forward(
+            ctx, kernel, hash, L1_in, L2_in, W, grad_output, rows, cols, workspace_buffer, sender_perm
+        ):
+            ctx.kernel = kernel
+            ctx.hash = hash
+            ctx.L1_in = L1_in
+            ctx.L2_in = L2_in
+            ctx.W = W
+            ctx.grad_output = grad_output
+            ctx.rows = rows
+            ctx.cols = cols
+            ctx.workspace_buffer = workspace_buffer
+            ctx.sender_perm = sender_perm
+            with torch._C._AutoDispatchBelowAutograd():
+                return backward_op(
+                    kernel,
+                    hash,
+                    L1_in,
+                    L2_in,
+                    W,
+                    grad_output,
+                    rows,
+                    cols,
+                    workspace_buffer,
+                    sender_perm,
+                )
 
-    def double_backward(ctx, E, F, G):
-        result = double_backward_op(
-            ctx.kernel,
-            ctx.hash,
-            ctx.L1_in,
-            ctx.L2_in,
-            ctx.W,
-            ctx.grad_output,
-            E,
-            F,
-            G,
-            ctx.rows,
-            ctx.cols,
-            ctx.workspace_buffer,
-            ctx.sender_perm,
-        )
-        return (
-            None,
-            None,
-            result[0],
-            result[1],
-            result[2],
-            result[3],
-            None,
-            None,
-            None,
-            None,
-        )
-
-    torch.library.register_autograd(
-        "libtorch_tp_jit::jit_conv_backward",
-        double_backward,
-        setup_context=setup_context_double_backward,
-    )
-
-    def setup_context_triple_backward(ctx, inputs, output):
-        (
-            ctx.kernel,
-            ctx.hash,
-            ctx.L1_in,
-            ctx.L2_in,
-            ctx.W,
-            ctx.grad_output,
-            ctx.L1_dgrad,
-            ctx.L2_dgrad,
-            ctx.W_dgrad,
-            ctx.rows,
-            ctx.cols,
-            ctx.workspace_buffer,
-            ctx.sender_perm,
-        ) = inputs
+        @staticmethod
+        def backward(ctx, E, F, G):
+            result = double_backward_op(
+                ctx.kernel,
+                ctx.hash,
+                ctx.L1_in,
+                ctx.L2_in,
+                ctx.W,
+                ctx.grad_output,
+                E,
+                F,
+                G,
+                ctx.rows,
+                ctx.cols,
+                ctx.workspace_buffer,
+                ctx.sender_perm,
+            )
+            return (
+                None,
+                None,
+                result[0],
+                result[1],
+                result[2],
+                result[3],
+                None,
+                None,
+                None,
+                None,
+            )
 
     def triple_backward(ctx, t_L1_grad, t_L2_grad, t_W_grad, t_L3_dgrad):
         t_L1_grad = zero_if_none(t_L1_grad, ctx.L1_in)
@@ -549,10 +558,66 @@ def register_autograd():
             None,
         )
 
-    torch.library.register_autograd(
+    class ConvDoubleBackward(torch.autograd.Function):
+        @staticmethod
+        def forward(
+            ctx,
+            kernel,
+            hash,
+            L1_in,
+            L2_in,
+            W,
+            grad_output,
+            L1_dgrad,
+            L2_dgrad,
+            W_dgrad,
+            rows,
+            cols,
+            workspace_buffer,
+            sender_perm,
+        ):
+            ctx.kernel = kernel
+            ctx.hash = hash
+            ctx.L1_in = L1_in
+            ctx.L2_in = L2_in
+            ctx.W = W
+            ctx.grad_output = grad_output
+            ctx.L1_dgrad = L1_dgrad
+            ctx.L2_dgrad = L2_dgrad
+            ctx.W_dgrad = W_dgrad
+            ctx.rows = rows
+            ctx.cols = cols
+            ctx.workspace_buffer = workspace_buffer
+            ctx.sender_perm = sender_perm
+            with torch._C._AutoDispatchBelowAutograd():
+                return double_backward_op(
+                    kernel,
+                    hash,
+                    L1_in,
+                    L2_in,
+                    W,
+                    grad_output,
+                    L1_dgrad,
+                    L2_dgrad,
+                    W_dgrad,
+                    rows,
+                    cols,
+                    workspace_buffer,
+                    sender_perm,
+                )
+
+        backward = staticmethod(triple_backward)
+
+    torch.library.impl(
+        "libtorch_tp_jit::jit_conv_forward", "Autograd", func=ConvForward.apply
+    )
+    torch.library.impl(
+        "libtorch_tp_jit::jit_conv_backward", "Autograd", func=ConvBackward.apply
+    )
+    torch.library.impl(
         "libtorch_tp_jit::jit_conv_double_backward",
-        triple_backward,
-        setup_context=setup_context_triple_backward,
+        "Autograd",
+        func=ConvDoubleBackward.apply,
     )
 
 
