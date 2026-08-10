@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from openequivariance._torch.extlib import (
-    postprocess_kernel,
+    IS_HIP,
     DeviceProp,
     BUILT_EXTENSION,
 )
@@ -78,7 +78,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             self,
             self.input_args["problem"],
             dp,
-            postprocess_kernel,
+            IS_HIP,
             idx_dtype=np.int64,
             torch_op=self.input_args["torch_op"],
             deterministic=self.input_args["deterministic"],

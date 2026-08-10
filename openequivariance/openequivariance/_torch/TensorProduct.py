@@ -44,7 +44,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
             self,
             self.input_args["problem"],
             dp,
-            extlib.postprocess_kernel,
+            extlib.IS_HIP,
             self.input_args["torch_op"],
         )
 

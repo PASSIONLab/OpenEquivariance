@@ -1,8 +1,10 @@
 # ruff: noqa : F401, E402
 import sys
 import os
+import time
 import warnings
 import sysconfig
+import contextlib
 from pathlib import Path
 from packaging.version import Version
 
@@ -24,13 +26,35 @@ assert torch.version.cuda or torch.version.hip, (
     "Only CUDA and HIP backends are supported"
 )
 
+IS_HIP = bool(torch.version.hip)
 
-def postprocess_kernel(kernel):
-    if torch.version.hip:
-        kernel = kernel.replace("__syncwarp();", "__threadfence_block();")
-        kernel = kernel.replace("__shfl_down_sync(FULL_MASK,", "__shfl_down(")
-        kernel = kernel.replace("atomicAdd", "unsafeAtomicAdd")
-    return kernel
+
+@contextlib.contextmanager
+def _maybe_set_max_jobs_env(limit=8):
+    if "MAX_JOBS" in os.environ:
+        yield
+        return
+    os.environ["MAX_JOBS"] = str(min(limit, os.cpu_count() or 1))
+    try:
+        yield
+    finally:
+        os.environ.pop("MAX_JOBS", None)
+
+
+def _wait_for_torch_build_lock(name, timeout=300):
+    from torch.utils.cpp_extension import _get_build_directory
+
+    lock_path = os.path.join(_get_build_directory(name, False), "lock")
+    start = time.time()
+    while os.path.exists(lock_path):
+        if time.time() - start > timeout:
+            raise RuntimeError(
+                f"Timed out after {timeout} seconds waiting for another process "
+                f"to finish building the OpenEquivariance extension '{name}'. "
+                f"If no other build is running, a previous build was likely "
+                f"killed partway; delete {lock_path} and retry."
+            )
+        time.sleep(1)
 
 
 def load_jit_extension():
@@ -116,13 +140,15 @@ def load_jit_extension():
             warnings.simplefilter("ignore")
 
             try:
-                extension_module = torch.utils.cpp_extension.load(
-                    "libtorch_tp_jit",
-                    torch_sources,
-                    extra_cflags=extra_cflags,
-                    extra_include_paths=include_dirs,
-                    extra_ldflags=extra_link_args,
-                )
+                _wait_for_torch_build_lock("libtorch_tp_jit")
+                with _maybe_set_max_jobs_env():
+                    extension_module = torch.utils.cpp_extension.load(
+                        "libtorch_tp_jit",
+                        torch_sources,
+                        extra_cflags=extra_cflags,
+                        extra_include_paths=include_dirs,
+                        extra_ldflags=extra_link_args,
+                    )
                 torch.ops.load_library(extension_module.__file__)
                 BUILT_EXTENSION = True
             except Exception as e:
@@ -177,7 +203,7 @@ if not os.path.exists(
 if USE_PRECOMPILED_EXTENSION:
     load_precompiled_extension()
 else:
-    WARNING_MESSAGE += "For these reasons, falling back to JIT compilation of OpenEquivariance extension, which may hang. If waiting for >5 minutes, clear ~/.cache/torch_extensions or address the conditions above.\n"
+    WARNING_MESSAGE += "For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.\n"
     warnings.warn(WARNING_MESSAGE, stacklevel=3)
     load_jit_extension()
 
