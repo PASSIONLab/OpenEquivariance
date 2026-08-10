@@ -345,6 +345,42 @@ class TestIrMulLayout(ConvCorrectness):
             internal_weights=False,
             label="ir_mul_repr_13x1x13_l535",
         ),
+        oeq.TPProblem(
+            "32x1e",
+            "3x1e",
+            "32x1e",
+            [(0, 0, 0, "uvu", True)],
+            shared_weights=False,
+            internal_weights=False,
+            label="ir_mul_L2mul3_l111",
+        ),
+        oeq.TPProblem(
+            "32x1e",
+            "2x2e",
+            "32x1e",
+            [(0, 0, 0, "uvu", True)],
+            shared_weights=False,
+            internal_weights=False,
+            label="ir_mul_L2mul2_l121",
+        ),
+        oeq.TPProblem(
+            "16x2e",
+            "8x2e",
+            "16x2e",
+            [(0, 0, 0, "uvu", True)],
+            shared_weights=False,
+            internal_weights=False,
+            label="ir_mul_L2mul8_l222",
+        ),
+        oeq.TPProblem(
+            "16x1e",
+            "40x1e",
+            "16x1e",
+            [(0, 0, 0, "uvu", True)],
+            shared_weights=False,
+            internal_weights=False,
+            label="ir_mul_L2mul40_l111",
+        ),
     ]
 
     @pytest.fixture(params=production_model_tpps, ids=lambda x: x.label, scope="class")
