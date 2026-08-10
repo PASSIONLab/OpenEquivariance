@@ -128,6 +128,13 @@ inline void check_tensor(const Tensor &tensor,
           ". Got: ", static_cast<int>(tensor.scalar_type()));
 }
 
+inline void check_contiguous(const Tensor &tensor, std::string tensor_name) {
+    TCHECK(tensor.is_contiguous(),
+          "Tensor '", tensor_name, "' must be contiguous. It is mutated in place, "
+          "and a non-contiguous input would receive its writes into a discarded "
+          "temporary copy.");
+}
+
 inline std::unordered_map<std::string, int64_t> parse_json_config(const json &j_obj) {
     std::unordered_map<std::string, int64_t> result;
     for (const auto &kv : j_obj.object_items()) {
@@ -434,6 +441,7 @@ inline Tensor jit_conv_forward(
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
     check_tensor(workspace, {k.workspace_size}, k.workspace_dtype, "workspace");
+    check_contiguous(workspace, "workspace");
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
@@ -454,7 +462,6 @@ inline Tensor jit_conv_forward(
     Tensor W_contig = tensor_contiguous(W);
     Tensor rows_contig = tensor_contiguous(rows);
     Tensor cols_contig = tensor_contiguous(cols);
-    Tensor workspace_contig = tensor_contiguous(workspace);
 
     jit_kernel->exec_conv(
             data_ptr(L1_contig),
@@ -464,7 +471,7 @@ inline Tensor jit_conv_forward(
             data_ptr(rows_contig),
             data_ptr(cols_contig),
             nnz, node_count,
-            data_ptr(workspace_contig),
+            data_ptr(workspace),
             stream);
 
     return L3_out;
@@ -491,6 +498,7 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
     check_tensor(L3_grad, {node_count, k.L3_dim}, k.irrep_dtype, "L3_grad");
     check_tensor(workspace, {k.workspace_size}, k.workspace_dtype, "workspace");
+    check_contiguous(workspace, "workspace");
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
@@ -516,7 +524,6 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
 
     Tensor rows_contig = tensor_contiguous(rows);
     Tensor cols_contig = tensor_contiguous(cols);
-    Tensor workspace_contig = tensor_contiguous(workspace);
     Tensor transpose_perm_contig = tensor_contiguous(transpose_perm);
 
     if (k.shared_weights)
@@ -529,7 +536,7 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
             data_ptr(L3_grad_contig),
             data_ptr(rows_contig), data_ptr(cols_contig),
             nnz, node_count,
-            data_ptr(workspace_contig),
+            data_ptr(workspace),
             data_ptr(transpose_perm_contig),
             stream);
 
@@ -562,6 +569,7 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
     check_tensor(L1_dgrad, {node_count, k.L1_dim}, k.irrep_dtype, "L1_dgrad");
     check_tensor(L2_dgrad, {nnz, k.L2_dim}, k.irrep_dtype, "L2_dgrad");
     check_tensor(workspace, {k.workspace_size}, k.workspace_dtype, "workspace");
+    check_contiguous(workspace, "workspace");
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
@@ -594,7 +602,6 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
 
     Tensor rows_contig = tensor_contiguous(rows);
     Tensor cols_contig = tensor_contiguous(cols);
-    Tensor workspace_contig = tensor_contiguous(workspace);
     Tensor transpose_perm_contig = tensor_contiguous(transpose_perm);
 
     if (k.shared_weights)
@@ -609,7 +616,7 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
             data_ptr(W_grad), data_ptr(L3_dgrad),
             data_ptr(rows_contig), data_ptr(cols_contig),
             nnz, node_count,
-            data_ptr(workspace_contig), data_ptr(transpose_perm_contig),
+            data_ptr(workspace), data_ptr(transpose_perm_contig),
             stream
     );
 
