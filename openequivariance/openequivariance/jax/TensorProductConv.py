@@ -42,7 +42,7 @@ class TensorProductConv(LoopUnrollConv):
         super().__init__(
             config,
             dp,
-            extlib.IS_HIP,
+            extlib.BACKEND,
             idx_dtype=np.int32,
             torch_op=False,
             deterministic=deterministic,

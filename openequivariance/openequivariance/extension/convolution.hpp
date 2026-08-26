@@ -4,6 +4,8 @@
 #include <iostream>
 #include <cstdint>
 
+#include "kernel_args.hpp"
+
 struct ConvData {
     void* rows;
     void* cols;
@@ -89,11 +91,12 @@ public:
 
         ConvData conv_data = {rows, cols, nnz, node_count};
 
-        void *args[] = {&L1_in, &L2_in, &weights, &L3_out, &conv_data, &workspace};
-        jit.execute(0, args, with_stream(forward_config_ref, stream));
+        auto args = make_kernel_args(L1_in, L2_in, weights, L3_out, conv_data, workspace);
+        jit.execute(0, args.data(), args.arg_sizes(), args.count(),
+                    with_stream(forward_config_ref, stream));
 
         if(reinterpret_cast<uint64_t>(workspace) != 0) {
-            void *fixup_args[] = {&workspace, &L3_out};
+            auto fixup_args = make_kernel_args(workspace, L3_out);
             
             KernelLaunchConfig fixup_config(
                 forward_config_ref.num_blocks,
@@ -102,7 +105,8 @@ public:
             );
             fixup_config.hStream = stream; 
 
-            jit.execute(2, fixup_args, fixup_config);
+            jit.execute(2, fixup_args.data(), fixup_args.arg_sizes(),
+                        fixup_args.count(), fixup_config);
         }
     } 
 
@@ -118,11 +122,14 @@ public:
             Stream stream) {
 
         ConvData conv_data = {rows, cols, nnz, node_count};
-        void *args[] = {&L1_in, &L1_grad, &L2_in, &L2_grad, &weight, &weight_grad, &L3_grad, &conv_data, &workspace, &transpose_perm};
-        jit.execute(1, args, with_stream(backward_config_ref, stream));
+        auto args = make_kernel_args(L1_in, L1_grad, L2_in, L2_grad, weight,
+                                     weight_grad, L3_grad, conv_data, workspace,
+                                     transpose_perm);
+        jit.execute(1, args.data(), args.arg_sizes(), args.count(),
+                    with_stream(backward_config_ref, stream));
 
         if(reinterpret_cast<uint64_t>(workspace) != 0) {
-            void *fixup_args[] = {&workspace, &L1_grad};
+            auto fixup_args = make_kernel_args(workspace, L1_grad);
 
             KernelLaunchConfig fixup_config(
                 backward_config_ref.num_blocks,
@@ -131,7 +138,8 @@ public:
             );
             fixup_config.hStream = stream;
 
-            jit.execute(3, fixup_args, fixup_config);
+            jit.execute(3, fixup_args.data(), fixup_args.arg_sizes(),
+                        fixup_args.count(), fixup_config);
         }
     }
 
@@ -145,33 +153,36 @@ public:
             Stream stream) {
 
         ConvData conv_data = {rows, cols, nnz, node_count};
-        void* args[] = { 
-            &L1_in, &L2_in, &W, &L3_grad, &L1_dgrad, &L2_dgrad, &w_dgrad, 
-            &L1_grad, &L2_grad, &W_grad, &L3_dgrad, &conv_data, &wspace, &transpose_perm
-        };
+        auto args = make_kernel_args(
+            L1_in, L2_in, W, L3_grad, L1_dgrad, L2_dgrad, w_dgrad,
+            L1_grad, L2_grad, W_grad, L3_dgrad, conv_data, wspace, transpose_perm);
 
-        jit.execute(4, args, with_stream(forward_config_ref, stream));
+        jit.execute(4, args.data(), args.arg_sizes(), args.count(),
+                    with_stream(forward_config_ref, stream));
         if(reinterpret_cast<uint64_t>(wspace) != 0) {
-            void *fixup_args[] = {&wspace, &L3_dgrad};    
+            auto fixup_args = make_kernel_args(wspace, L3_dgrad);
             KernelLaunchConfig fixup_config(
                 forward_config_ref.num_blocks,
                 forward_config_ref.num_threads,
                 0
             );
             fixup_config.hStream = stream; 
-            jit.execute(2, fixup_args, fixup_config);
+            jit.execute(2, fixup_args.data(), fixup_args.arg_sizes(),
+                        fixup_args.count(), fixup_config);
         }
 
-        jit.execute(5, args, with_stream(double_backward_config_ref, stream));
+        jit.execute(5, args.data(), args.arg_sizes(), args.count(),
+                    with_stream(double_backward_config_ref, stream));
         if(reinterpret_cast<uint64_t>(wspace) != 0) {
-            void *fixup_args[] = {&wspace, &L1_grad};
+            auto fixup_args = make_kernel_args(wspace, L1_grad);
             KernelLaunchConfig fixup_config(
                     double_backward_config_ref.num_blocks,
                     double_backward_config_ref.num_threads,
                     0
             );
             fixup_config.hStream = stream; 
-            jit.execute(6, fixup_args, fixup_config);
+            jit.execute(6, fixup_args.data(), fixup_args.arg_sizes(),
+                        fixup_args.count(), fixup_config);
         }
     }
 

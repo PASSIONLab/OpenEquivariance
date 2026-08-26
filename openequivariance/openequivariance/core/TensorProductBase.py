@@ -2,7 +2,7 @@ import numpy as np
 
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.logging import getLogger
-from openequivariance.core.utils import benchmark
+from openequivariance.core.utils import accelerator_device_type, benchmark
 
 logger = getLogger()
 
@@ -77,9 +77,11 @@ class TensorProductBase:
         with_torch_overhead: bool = True,
         kernel_names=["forward"],
     ) -> np.ndarray:
-        torch_L1_in = torch.tensor(L1_in).to(device="cuda").detach()
-        torch_L2_in = torch.tensor(L2_in).to(device="cuda").detach()
-        torch_weights = torch.tensor(weights).to(device="cuda").detach()
+        torch_L1_in = torch.tensor(L1_in).to(device=accelerator_device_type()).detach()
+        torch_L2_in = torch.tensor(L2_in).to(device=accelerator_device_type()).detach()
+        torch_weights = (
+            torch.tensor(weights).to(device=accelerator_device_type()).detach()
+        )
 
         mode = "gpu_time" if with_torch_overhead else "torch_kernel_time"
         return benchmark(
@@ -101,11 +103,17 @@ class TensorProductBase:
         with_torch_overhead: bool = True,
         kernel_names=["backward"],
     ) -> np.ndarray:
-        torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
-        torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
-        torch_weights = torch.tensor(weights, requires_grad=True, device="cuda")
+        torch_L1_in = torch.tensor(
+            L1_in, requires_grad=True, device=accelerator_device_type()
+        )
+        torch_L2_in = torch.tensor(
+            L2_in, requires_grad=True, device=accelerator_device_type()
+        )
+        torch_weights = torch.tensor(
+            weights, requires_grad=True, device=accelerator_device_type()
+        )
         torch_out = self.forward(torch_L1_in, torch_L2_in, torch_weights)
-        torch_L3_grad_in = torch.tensor(L3_buffer, device="cuda")
+        torch_L3_grad_in = torch.tensor(L3_buffer, device=accelerator_device_type())
 
         mode = "gpu_time" if with_torch_overhead else "torch_kernel_time"
 
@@ -134,13 +142,22 @@ class TensorProductBase:
         with_torch_overhead: bool = True,
         kernel_names=["double_backward_A", "double_backward_B"],
     ) -> np.ndarray:
-        torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
-        torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
-        torch_weights = torch.tensor(weights, requires_grad=True, device="cuda")
+        torch_L1_in = torch.tensor(
+            L1_in, requires_grad=True, device=accelerator_device_type()
+        )
+        torch_L2_in = torch.tensor(
+            L2_in, requires_grad=True, device=accelerator_device_type()
+        )
+        torch_weights = torch.tensor(
+            weights, requires_grad=True, device=accelerator_device_type()
+        )
 
         torch_out = self(torch_L1_in, torch_L2_in, torch_weights)
         torch_out_grad = (
-            torch_out.clone().detach().to(device="cuda").requires_grad_(True)
+            torch_out.clone()
+            .detach()
+            .to(device=accelerator_device_type())
+            .requires_grad_(True)
         )
 
         (torch_L1_grad, torch_L2_grad, torch_weights_grad) = torch.autograd.grad(
@@ -156,12 +173,18 @@ class TensorProductBase:
             + torch.norm(torch_L2_grad)
             + torch.norm(torch_weights_grad)
         )
-        dummy_grad = torch.tensor(float(dummy), device="cuda", requires_grad=True)
+        dummy_grad = torch.tensor(
+            float(dummy), device=accelerator_device_type(), requires_grad=True
+        )
 
-        torch_L1_grad = torch.tensor(L1_in, requires_grad=True, device="cuda")
-        torch_L2_grad = torch.tensor(L2_in, requires_grad=True, device="cuda")
+        torch_L1_grad = torch.tensor(
+            L1_in, requires_grad=True, device=accelerator_device_type()
+        )
+        torch_L2_grad = torch.tensor(
+            L2_in, requires_grad=True, device=accelerator_device_type()
+        )
         torch_weights_grad = torch.tensor(
-            weights_grad, requires_grad=True, device="cuda"
+            weights_grad, requires_grad=True, device=accelerator_device_type()
         )
 
         mode = "gpu_time" if with_torch_overhead else "torch_kernel_time"

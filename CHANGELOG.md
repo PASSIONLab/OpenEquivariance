@@ -1,5 +1,21 @@
 ## Latest Changes
 
+**Added**:
+- SYCL backend, bringing support for Intel GPUs through PyTorch's
+  `xpu` device. Kernels are generated as SYCL free functions and compiled
+  at runtime through the oneAPI kernel compiler extension. The backend is
+  selected automatically from the active PyTorch build.
+
+**Changed**:
+- The kernel backend is now identified by a string (`"cuda"` / `"hip"` /
+  `"sycl"`) rather than an `is_hip` boolean, in the Jinja environment and
+  the `LoopUnrollTP` / `LoopUnrollConv` constructors.
+- `JITKernel::execute` also takes the kernel argument sizes, which SYCL
+  requires to launch with raw arguments. CUDA and HIP ignore them.
+- float64 Clebsch-Gordon coefficients are emitted without the `L`
+  (long double) literal suffix. The values are unchanged — a hex float
+  literal is already exactly a double — but SPIR-V targets reject the suffix.
+
 ### v0.7.0 (2026-09-10)
 **Added**: 
 - Public XLA FFI registration provider

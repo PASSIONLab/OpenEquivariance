@@ -20,7 +20,7 @@ class LoopUnrollConv(ConvolutionBase):
         self,
         config,
         dp,
-        is_hip,
+        backend,
         *,
         idx_dtype: type[np.generic] = np.int64,
         torch_op: bool = False,
@@ -34,7 +34,7 @@ class LoopUnrollConv(ConvolutionBase):
         if kahan:
             assert deterministic
 
-        env = get_jinja_environment(is_hip=is_hip)
+        env = get_jinja_environment(backend=backend, warp_size=dp.warpsize)
         template = env.get_template("loop_unroll_conv_atomic.cuh")
 
         analysis = filter_and_analyze_problem(config)

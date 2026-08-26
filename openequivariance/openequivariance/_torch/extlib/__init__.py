@@ -22,11 +22,35 @@ LINKED_LIBPYTHON_ERROR = None
 
 extension_module = None
 
-assert torch.version.cuda or torch.version.hip, (
-    "Only CUDA and HIP backends are supported"
+
+def _detect_backend():
+    """
+    Determines which GPU backend this PyTorch build targets.
+
+    Returns one of ``"cuda"``, ``"hip"`` or ``"sycl"``. HIP builds report a
+    ``torch.version.cuda`` of ``None``, so HIP must be tested first.
+    """
+    if torch.version.hip:
+        return "hip"
+    if torch.version.cuda:
+        return "cuda"
+    if hasattr(torch, "xpu") and torch.xpu.is_available():
+        return "sycl"
+    return None
+
+
+BACKEND = _detect_backend()
+
+assert BACKEND is not None, (
+    "Only the CUDA, HIP and XPU (SYCL) backends are supported. "
+    "No supported accelerator was detected in this PyTorch build."
 )
 
-IS_HIP = bool(torch.version.hip)
+IS_HIP = BACKEND == "hip"
+IS_SYCL = BACKEND == "sycl"
+
+# The torch device type that tensors passed to the kernels must live on.
+DEVICE_TYPE = "xpu" if IS_SYCL else "cuda"
 
 
 @contextlib.contextmanager
@@ -111,7 +135,7 @@ def load_jit_extension():
                     f"-l{python_lib_name}",
                 ],
             )
-        if torch.version.cuda:
+        if BACKEND == "cuda":
             extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc", "-lcublas"])
 
             try:
@@ -124,16 +148,48 @@ def load_jit_extension():
                 getLogger().info(str(e))
 
             extra_cflags.append("-DCUDA_BACKEND")
-        elif torch.version.hip:
+        elif BACKEND == "hip":
             torch_libs = library_paths("cuda")[0]
             extra_link_args.append("-Wl,-rpath," + torch_libs)
             extra_cflags.append("-DHIP_BACKEND")
+        elif BACKEND == "sycl":
+            # torch.utils.cpp_extension compiles with $CXX (default c++),
+            # which must be the oneAPI DPC++ driver for -fsycl to work.
+            import shutil
+
+            cxx = os.environ.get("CXX", "")
+            if "icpx" not in os.path.basename(cxx):
+                if shutil.which("icpx") is None:
+                    BUILT_EXTENSION_ERROR = (
+                        "The SYCL backend requires the oneAPI DPC++ compiler. "
+                        "Put 'icpx' on your PATH or set CXX to it."
+                    )
+                    return
+                os.environ["CXX"] = "icpx"
+
+            # SYCL sources must be compiled and linked by the SYCL compiler
+            # driver; -fsycl is required on both the compile and link lines.
+            extra_cflags.extend(["-fsycl", "-DSYCL_BACKEND"])
+            extra_link_args.extend(
+                ["-fsycl", "-ltorch_xpu", "-lc10_xpu", "-lmkl_sycl_blas"]
+            )
+
+            for lib_dir in library_paths("xpu"):
+                extra_link_args.append("-Wl,-rpath," + lib_dir)
+                extra_link_args.append("-L" + lib_dir)
+
+            mkl_root = os.environ.get("MKLROOT")
+            if mkl_root:
+                mkl_lib = os.path.join(mkl_root, "lib")
+                extra_link_args.append("-L" + mkl_lib)
+                extra_link_args.append("-Wl,-rpath," + mkl_lib)
+                extra_include_dirs.append(os.path.join(mkl_root, "include"))
 
         torch_sources = [oeq_root + "/extension/" + src for src in torch_sources]
         include_dirs = (
             [oeq_root + "/extension/" + d for d in include_dirs]
             + extra_include_dirs
-            + include_paths("cuda")
+            + include_paths("xpu" if BACKEND == "sycl" else "cuda")
         )
 
         with warnings.catch_warnings():
@@ -165,10 +221,12 @@ def load_precompiled_extension():
         True  # Doesn't actually use libpython, just set this as true anyway
     )
     try:
-        if torch.version.cuda:
+        if BACKEND == "cuda":
             import openequivariance._torch.extlib.oeq_stable_cuda as extension_module
-        elif torch.version.hip:
+        elif BACKEND == "hip":
             import openequivariance._torch.extlib.oeq_stable_hip as extension_module
+        elif BACKEND == "sycl":
+            import openequivariance._torch.extlib.oeq_stable_sycl as extension_module
 
         torch.ops.load_library(extension_module.__file__)
         BUILT_EXTENSION = True
@@ -189,13 +247,17 @@ if Version(torch.__version__) <= Version("2.9.9"):
     WARNING_MESSAGE += f"PyTorch version {torch.__version__} is < 2.10, minimum required for precompiled extension. Please upgrade to 2.10.\n"
     USE_PRECOMPILED_EXTENSION = False
 
-if torch.version.hip:
+if BACKEND == "hip":
     WARNING_MESSAGE += "HIP does not support precompiled extension yet.\n"
     USE_PRECOMPILED_EXTENSION = False
 
-if not os.path.exists(
-    os.path.join(os.path.dirname(__file__), "liboeq_stable_cuda_aoti.so")
-):
+if BACKEND == "sycl":
+    WARNING_MESSAGE += "SYCL does not support precompiled extension yet.\n"
+    USE_PRECOMPILED_EXTENSION = False
+
+AOTI_SO_NAME = f"liboeq_stable_{BACKEND}_aoti.so"
+
+if not os.path.exists(os.path.join(os.path.dirname(__file__), AOTI_SO_NAME)):
     WARNING_MESSAGE += "Precompiled extension shared object not found.\n"
     USE_PRECOMPILED_EXTENSION = False
 
@@ -213,10 +275,7 @@ def torch_ext_so_path():
         return extension_module.__file__
     else:
         dirname = os.path.dirname(extension_module.__file__)
-        if torch.version.cuda:
-            return os.path.join(dirname, "liboeq_stable_cuda_aoti.so")
-        elif torch.version.hip:
-            return os.path.join(dirname, "liboeq_stable_hip_aoti.so")
+        return os.path.join(dirname, AOTI_SO_NAME)
 
 
 sys.modules["oeq_utilities"] = extension_module
