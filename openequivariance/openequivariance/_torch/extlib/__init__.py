@@ -29,12 +29,16 @@ def _detect_backend():
 
     Returns one of ``"cuda"``, ``"hip"`` or ``"sycl"``. HIP builds report a
     ``torch.version.cuda`` of ``None``, so HIP must be tested first.
+
+    All three checks are build-time properties of the PyTorch install, not
+    runtime device queries, so importing works on a machine with no
+    accelerator attached (a CI builder, for instance).
     """
     if torch.version.hip:
         return "hip"
     if torch.version.cuda:
         return "cuda"
-    if hasattr(torch, "xpu") and torch.xpu.is_available():
+    if getattr(torch.version, "xpu", None):
         return "sycl"
     return None
 

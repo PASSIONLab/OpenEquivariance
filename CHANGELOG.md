@@ -5,6 +5,9 @@
   `xpu` device. Kernels are generated as SYCL free functions and compiled
   at runtime through the oneAPI kernel compiler extension. The backend is
   selected automatically from the active PyTorch build.
+- A CI job that verifies the SYCL extension builds. Like the CUDA job it
+  runs on a GPU-less runner and only exercises the build, since GitHub
+  offers no Intel GPU runner.
 
 **Changed**:
 - The kernel backend is now identified by a string (`"cuda"` / `"hip"` /
