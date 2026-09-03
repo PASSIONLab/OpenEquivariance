@@ -1,6 +1,10 @@
+# PyTorch >= 2.7 is the minimum for the SYCL backend: 2.6 adds the XPU
+# device, shim_xpu.h and cpp_extension's SYCL support, and 2.7 adds
+# torch.library.register_autocast, which the operators register with.
+# Pinned to the newest XPU wheel this was verified against.
 --extra-index-url https://download.pytorch.org/whl/xpu
 numpy==2.2.5
-torch==2.10.0+xpu
+torch==2.12.1+xpu
 pytest==9.0.3
 ninja==1.11.1.4
 nanobind==2.10.2

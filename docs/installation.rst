@@ -8,8 +8,8 @@ Installation
 You need the following to install OpenEquivariance:
 
 - A Linux system equipped with an NVIDIA / AMD / Intel graphics card.
-- Either PyTorch >= 2.4 (>= 2.8 for AOTI and export), or JAX>0.5.0 
-  with CUDA, RocM, or XPU support. 
+- Either PyTorch >= 2.4 (>= 2.8 for AOTI and export, >= 2.7 for Intel
+  GPUs), or JAX>0.5.0 with CUDA, RocM, or XPU support. 
 - GCC 9+ and the CUDA / HIP toolkit, or the oneAPI DPC++ compiler
   (``icpx``) for Intel GPUs. The command
   ``c++ --version`` should return >= 9.0; see below for details on 
@@ -18,9 +18,13 @@ You need the following to install OpenEquivariance:
 .. note::
 
    On Intel GPUs the kernels are generated as SYCL and compiled at runtime
-   through the oneAPI kernel compiler, so ``icpx`` must be on your ``PATH``.
-   Tensors passed to the kernels live on the ``xpu`` device rather than
-   ``cuda``. The JAX frontend currently supports CUDA and HIP only.
+   through the oneAPI kernel compiler, so ``icpx`` must be on your ``PATH``
+   (PyTorch locates the SYCL toolchain from it). Tensors passed to the
+   kernels live on the ``xpu`` device rather than ``cuda``. PyTorch 2.7 is
+   the minimum: 2.6 introduces the XPU device and the SYCL support in
+   ``torch.utils.cpp_extension``, and 2.7 adds
+   ``torch.library.register_autocast``. The precompiled extension and the
+   JAX frontend both remain CUDA/HIP only.
 
 .. tab:: PyTorch
 
