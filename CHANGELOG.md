@@ -18,8 +18,7 @@
 - `JITKernel::execute` also takes the kernel argument sizes, which SYCL
   requires to launch with raw arguments. CUDA and HIP ignore them.
 - float64 Clebsch-Gordon coefficients are emitted without the `L`
-  (long double) literal suffix. The values are unchanged — a hex float
-  literal is already exactly a double — but SPIR-V targets reject the suffix.
+  (long double) literal suffix, which SPIR-V rejects. The values are unchanged.
 
 **Fixed**:
 - The documented PyTorch floor for AOTI and export is 2.10, not 2.8.
