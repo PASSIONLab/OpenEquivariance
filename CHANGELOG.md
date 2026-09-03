@@ -8,7 +8,7 @@
 - A CI job that verifies the SYCL extension builds. Like the CUDA job it
   runs on a GPU-less runner and only exercises the build, since GitHub
   offers no Intel GPU runner.
-- The SYCL backend requires PyTorch >= 2.8, the floor the project already
+- The SYCL backend requires PyTorch >= 2.10, the floor the project already
   sets for AOTI and export, and raises at import on an older version.
 
 **Changed**:
@@ -20,6 +20,13 @@
 - float64 Clebsch-Gordon coefficients are emitted without the `L`
   (long double) literal suffix. The values are unchanged — a hex float
   literal is already exactly a double — but SPIR-V targets reject the suffix.
+
+**Fixed**:
+- The documented PyTorch floor for AOTI and export is 2.10, not 2.8. The
+  stable-ABI headers the extension includes (`torch/csrc/stable/tensor_struct.h`,
+  `torch/csrc/stable/accelerator.h`, `torch/headeronly/core/DeviceType.h`) are
+  not all present before 2.10, which is the version the precompiled-extension
+  check in `extlib` has required all along.
 
 ### v0.7.0 (2026-09-10)
 **Added**: 

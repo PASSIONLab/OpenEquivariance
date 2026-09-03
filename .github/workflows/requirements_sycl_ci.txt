@@ -1,4 +1,4 @@
-# The SYCL backend follows the project's existing PyTorch >= 2.8 floor.
+# The SYCL backend follows the project's existing PyTorch >= 2.10 floor.
 # Pinned to the newest XPU wheel this was verified against.
 --extra-index-url https://download.pytorch.org/whl/xpu
 numpy==2.2.5
