@@ -8,8 +8,8 @@
 - A CI job that verifies the SYCL extension builds. Like the CUDA job it
   runs on a GPU-less runner and only exercises the build, since GitHub
   offers no Intel GPU runner.
-- The SYCL backend requires PyTorch >= 2.7 and raises at import if an
-  older version is installed.
+- The SYCL backend requires PyTorch >= 2.8, the floor the project already
+  sets for AOTI and export, and raises at import on an older version.
 
 **Changed**:
 - The kernel backend is now identified by a string (`"cuda"` / `"hip"` /

@@ -53,11 +53,13 @@ assert BACKEND is not None, (
 IS_HIP = BACKEND == "hip"
 IS_SYCL = BACKEND == "sycl"
 
-# The SYCL backend needs torch.library.register_autocast, added in 2.7. The
-# XPU device itself and cpp_extension's SYCL support arrive in 2.6.
-if IS_SYCL and Version(torch.__version__) < Version("2.7"):
+# The SYCL backend needs at least the 2.7 APIs (torch.library.register_autocast;
+# 2.6 for the XPU device and cpp_extension's SYCL support), but it is only
+# tested against the 2.8 floor the rest of the project already requires for
+# AOTI and export, so that is what is enforced.
+if IS_SYCL and Version(torch.__version__) < Version("2.8"):
     raise RuntimeError(
-        f"The SYCL backend requires PyTorch >= 2.7, found {torch.__version__}."
+        f"The SYCL backend requires PyTorch >= 2.8, found {torch.__version__}."
     )
 
 # The torch device type that tensors passed to the kernels must live on.
