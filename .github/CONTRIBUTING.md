@@ -10,7 +10,7 @@ We adopt [LLVM's AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html)
 and expect contributors to adhere to it. The document is
 worth reading in its entirety, but three salient points are:
 
-1. All code must be read and reviewed by the contributor before submitting
+1. All code must be read, reviewed, and understood by the contributor before submitting
    a pull request.
 
 2. Contributions should be *non-extractive*. A non-extractive contribution,
