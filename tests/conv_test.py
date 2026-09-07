@@ -19,6 +19,7 @@ from openequivariance.benchmark.problems import (
     mace_problems,
     diffdock_problems,
     e3tools_problems,
+    nequip_oam_problems,
 )
 
 
@@ -172,7 +173,10 @@ class ConvCorrectness:
 
 class TestProductionModels(ConvCorrectness):
     production_model_tpps = (
-        mace_problems() + diffdock_problems() + [e3tools_problems()[0]]
+        mace_problems()
+        + diffdock_problems()
+        + [e3tools_problems()[0]]
+        + nequip_oam_problems()
     )
 
     @pytest.fixture(params=production_model_tpps, ids=lambda x: x.label, scope="class")

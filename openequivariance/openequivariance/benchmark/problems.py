@@ -196,6 +196,61 @@ class SingleInstruction(TPProblem):
         )
 
 
+class NequIPTPP(TPProblem):
+    """
+    Taken from nequip.nn.interaction_block.InteractionBlock:
+    https://github.com/mir-group/nequip/blob/27d9d2182da918ab7be0017d8300e53278f5e00e/nequip/nn/interaction_block.py#L89-L116
+
+    Produces the same set of instructions as ChannelwiseTPP, but in a different
+    order: the output irreps are sorted, while the instruction list stays in
+    in1-major / in2-minor enumeration order (ChannelwiseTPP re-sorts it by
+    output index)
+    """
+
+    def __init__(
+        self,
+        feature_irreps_in: Irreps,
+        irreps_edge_attr: Irreps,
+        feature_irreps_out: Irreps,
+        label: Optional[str] = None,
+        irrep_dtype=np.float32,
+        weight_dtype=np.float32,
+    ):
+        feature_irreps_in = Irreps(feature_irreps_in)
+        irreps_edge_attr = Irreps(irreps_edge_attr)
+        feature_irreps_out = Irreps(feature_irreps_out)
+
+        irreps_mid = []
+        instructions = []
+        for i, (mul, ir_in) in enumerate(feature_irreps_in):
+            for j, (_, ir_edge) in enumerate(irreps_edge_attr):
+                for ir_out in ir_in * ir_edge:
+                    if ir_out in feature_irreps_out:
+                        k = len(irreps_mid)
+                        irreps_mid.append((mul, ir_out))
+                        instructions.append((i, j, k, "uvu", True))
+
+        irreps_mid = Irreps(irreps_mid)
+        irreps_mid, p, _ = irreps_mid.sort()
+
+        instructions = [
+            (i_in1, i_in2, p[i_out], mode, train)
+            for i_in1, i_in2, i_out, mode, train in instructions
+        ]
+
+        super().__init__(
+            feature_irreps_in,
+            irreps_edge_attr,
+            irreps_mid,
+            instructions,
+            internal_weights=False,
+            shared_weights=False,
+            label=label,
+            irrep_dtype=irrep_dtype,
+            weight_dtype=weight_dtype,
+        )
+
+
 FCTPP = FullyConnectedTPProblem
 CTPP = ChannelwiseTPP
 
@@ -344,6 +399,17 @@ def nequip_problems():
                 "nequip-water",
             ),
         ]
+    ]
+
+
+# https://github.com/mir-group/nequip/blob/27d9d2182da918ab7be0017d8300e53278f5e00e/nequip/model/nequip_models.py#L30-L58
+def nequip_oam_problems():
+    sh = "1x0e+1x1o+1x2e+1x3o"
+    hidden = "128x0e+64x1o+32x2e+32x3o"
+    return [
+        NequIPTPP("32x0e", sh, hidden, "nequip-oam-l-first-layer"),
+        NequIPTPP(hidden, sh, hidden, "nequip-oam-l-main-layers"),
+        NequIPTPP(hidden, sh, "128x0e", "nequip-oam-l-last-layer"),
     ]
 
 
