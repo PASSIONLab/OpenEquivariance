@@ -1,0 +1,49 @@
+licenses(["notice"])
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "ffi_handlers",
+    srcs = [
+        "src/ffi_handlers.cpp",
+        "src/extension/json11/json11.cpp",
+    ],
+    hdrs = glob([
+        "src/extension/**/*.h",
+        "src/extension/**/*.hpp",
+        "src/extension/**/*.inl",
+    ]) + ["src/ffi_handler_table.h"],
+    alwayslink = True,
+    copts = [
+        "-std=c++17",
+        "-Wno-attributes",
+        "-Wno-return-type",
+    ],
+    defines = [
+        "CUDA_BACKEND=1",
+    ],
+    includes = [
+        "src",
+        "src/extension",
+    ],
+    deps = [
+        "@local_config_cuda//cuda:cuda_driver",
+        "@local_config_cuda//cuda:cuda_headers",
+        "@local_config_cuda//cuda:cuda_runtime",
+        "@local_config_cuda//cuda:nvrtc",
+        "@xla//xla/ffi/api:c_api",
+        "@xla//xla/ffi/api:ffi",
+    ],
+)
+
+cc_binary(
+    name = "libjcn_ffi_openequivariance.so",
+    srcs = ["src/ffi_provider.cpp"],
+    linkopts = ["-Wl,--no-undefined"],
+    linkshared = True,
+    tags = ["manual"],
+    deps = [
+        ":ffi_handlers",
+        "@xla//xla/ffi/api:c_api",
+    ],
+)
