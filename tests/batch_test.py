@@ -317,23 +317,22 @@ class TestIrMul(TPCorrectness):
 
     tpps = mace_problems() + [
         oeq.TPProblem(
-            "5x5e",
-            "1x3e",
-            "5x5e",
+            in1,
+            in2,
+            in1,
             [(0, 0, 0, "uvu", True)],
             shared_weights=False,
             internal_weights=False,
-            label="ir_mul_repr_5x1x5_l535",
-        ),
-        oeq.TPProblem(
-            "13x5e",
-            "1x3e",
-            "13x5e",
-            [(0, 0, 0, "uvu", True)],
-            shared_weights=False,
-            internal_weights=False,
-            label="ir_mul_repr_13x1x13_l535",
-        ),
+            label=label,
+        )
+        for in1, in2, label in [
+            ("5x5e", "1x3e", "ir_mul_repr_5x1x5_l535"),
+            ("13x5e", "1x3e", "ir_mul_repr_13x1x13_l535"),
+            ("32x1e", "3x1e", "ir_mul_L2mul3_l111"),
+            ("32x1e", "2x2e", "ir_mul_L2mul2_l121"),
+            ("16x2e", "8x2e", "ir_mul_L2mul8_l222"),
+            ("16x1e", "40x1e", "ir_mul_L2mul40_l111"),
+        ]
     ]
 
     @pytest.fixture(params=tpps, ids=lambda x: x.label, scope="class")

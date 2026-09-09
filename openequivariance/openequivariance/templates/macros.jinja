@@ -66,6 +66,14 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
     {%- endif %}
 {%- endmacro %}
 
+{%- macro l2_smem_index(layout, mul, dim, start, mul_var, dim_var) -%}
+    {%- if layout == "ir_mul" -%}
+        {{mul_var}} + {{start}} + {{dim_var}} * {{mul}}
+    {%- else -%}
+        {{dim_var}} + {{start}} + {{mul_var}} * {{dim}}
+    {%- endif -%}
+{%- endmacro %}
+
 {%- macro declare_smem_variables(segment, smem_base) %}
     {%- for name in segment.smem %}
         {%- if name != "total" %}

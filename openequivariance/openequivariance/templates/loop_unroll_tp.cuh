@@ -1,4 +1,5 @@
-{%- from 'macros.jinja' import layout_load, layout_store, reg_store with context %}
+{%- from 'macros.jinja' import layout_load, layout_store, reg_store,
+        l2_smem_index with context %}
 {%- from 'wmm.cuh' import generate_matmul %}
 
 {%- macro generate_segment_kernel_forward(id, segment, warp_size) %}
@@ -51,7 +52,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
 
                 #pragma unroll
                 for(int j = 0; j < {{L2[v].ir.dim}}; j++)
-                    l2_vec[j] = L2_smem[j + {{L2.slices()[v].start}} + k * {{L2[v].ir.dim}}] * weight;
+                    l2_vec[j] = L2_smem[{{ l2_smem_index(problem.layout, L2[v].mul, L2[v].ir.dim, L2.slices()[v].start, 'k', 'j') }}] * weight;
             {%- elif problem.instructions[k].connection_mode == "uvw" %}
                 {# Stream weights here #}
                 {%- set slice_size = L3[w].mul * L1[u].mul %}
@@ -61,7 +62,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                 }
                 #pragma unroll
                 for(int j = 0; j < {{L2[v].ir.dim}}; j++)
-                    l2_vec[j] = L2_smem[j + {{L2.slices()[v].start}} + k * {{L2[v].ir.dim}}];
+                    l2_vec[j] = L2_smem[{{ l2_smem_index(problem.layout, L2[v].mul, L2[v].ir.dim, L2.slices()[v].start, 'k', 'j') }}];
             {%- endif %}
 
             // ----------------- CORE CALCULATION -----------------
@@ -184,11 +185,11 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
             {%- if k == 0 or interactions[k][1] != interactions[k-1][1] or L2[v].mul > 1 or L1[u].mul != L1[interactions[k-1][0]].mul %}
                 #pragma unroll
                 for(int j = 0; j < {{L2[v].ir.dim}}; j++) {
-                    l2_vec[j] = L2_smem[j + {{L2.slices()[v].start}} + k * {{L2[v].ir.dim}}]; 
+                    l2_vec[j] = L2_smem[{{ l2_smem_index(problem.layout, L2[v].mul, L2[v].ir.dim, L2.slices()[v].start, 'k', 'j') }}];
                     l2_grad[j] = 0.0; 
 
                     {%- if double_bwd %}
-                    l2_original[j] = L2_original[j + {{L2.slices()[v].start}} + k * {{L2[v].ir.dim}}]; 
+                    l2_original[j] = L2_original[{{ l2_smem_index(problem.layout, L2[v].mul, L2[v].ir.dim, L2.slices()[v].start, 'k', 'j') }}];
                     {%- endif %}
                 }
             {%- endif %}
@@ -287,7 +288,7 @@ __device__ __forceinline__ void forward_loop_unroll_{{id}}(IRREP_T* __restrict__
                 if(lane_id == 0) {
                     #pragma unroll 
                     for(int j = 0; j < {{L2[v].ir.dim}}; j++)
-                        L2_grad_smem[j + {{L2.slices()[v].start}} + k * {{L2[v].ir.dim}}] += l2_grad[j];
+                        L2_grad_smem[{{ l2_smem_index(problem.layout, L2[v].mul, L2[v].ir.dim, L2.slices()[v].start, 'k', 'j') }}] += l2_grad[j];
                 }
             {%- endif %}
 
