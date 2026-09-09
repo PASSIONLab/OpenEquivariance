@@ -1,5 +1,28 @@
 ## Latest Changes
 
+**Added**:
+- SYCL backend, bringing support for Intel GPUs through PyTorch's
+  `xpu` device. Kernels are generated as SYCL free functions and compiled
+  at runtime through the oneAPI kernel compiler extension. The backend is
+  selected automatically from the active PyTorch build.
+- A CI job that verifies the SYCL extension builds. Like the CUDA job it
+  runs on a GPU-less runner and only exercises the build, since GitHub
+  offers no Intel GPU runner.
+- The SYCL backend requires PyTorch >= 2.10, the floor the project already
+  sets for AOTI and export, and raises at import on an older version.
+
+**Changed**:
+- The kernel backend is now identified by a string (`"cuda"` / `"hip"` /
+  `"sycl"`) rather than an `is_hip` boolean, in the Jinja environment and
+  the `LoopUnrollTP` / `LoopUnrollConv` constructors.
+- `JITKernel::execute` also takes the kernel argument sizes, which SYCL
+  requires to launch with raw arguments. CUDA and HIP ignore them.
+- float64 Clebsch-Gordon coefficients are emitted without the `L`
+  (long double) literal suffix, which SPIR-V rejects. The values are unchanged.
+
+**Fixed**:
+- The documented PyTorch floor for AOTI and export is 2.10, not 2.8.
+
 ### v0.6.8 (2026-06-14)
 Added `#include <cstdint>` to all C++ extension headers and sources. 
 

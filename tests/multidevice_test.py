@@ -3,6 +3,13 @@ import torch
 import subprocess
 import os
 
+# Resolved directly rather than through conftest: this file is also executed
+# as a standalone script by torch.distributed.run below, where conftest is not
+# importable.
+from openequivariance._torch.extlib import DEVICE_TYPE as DEVICE
+
+ACCEL = getattr(torch, DEVICE)
+
 
 def test_multidevice():
     result = subprocess.run(
@@ -40,7 +47,7 @@ if __name__ == "__main__":
     problem = mace_problems()[0]
 
     local_rank = int(os.environ["LOCAL_RANK"])
-    device = f"cuda:{local_rank}"
+    device = f"{DEVICE}:{local_rank}"
     torch.set_default_device(device)
 
     X_ir, Y_ir, Z_ir = problem.irreps_in1, problem.irreps_in2, problem.irreps_out
@@ -53,5 +60,5 @@ if __name__ == "__main__":
     Y = torch.rand(batch_size, Y_ir.dim, device=device, generator=gen)
     W = torch.rand(batch_size, problem.weight_numel, device=device, generator=gen)
 
-    with torch.cuda.device(device):
+    with ACCEL.device(device):
         result = tp.forward(X, Y, W)

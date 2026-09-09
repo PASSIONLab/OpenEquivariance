@@ -41,4 +41,46 @@ jobs:
 
     - name: Test JAX extension build
       run: |
-        XLA_DIRECT_DOWNLOAD=1 pip install -e "./openequivariance_extjax" --no-build-isolation 
+        XLA_DIRECT_DOWNLOAD=1 pip install -e "./openequivariance_extjax" --no-build-isolation
+
+  verify_sycl_extension:
+    if: ${{ github.event.label.name == 'ci-ready' || github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+        cache: 'pip'
+        cache-dependency-path: '**/requirements_sycl_ci.txt'
+
+    # The SYCL backend compiles the extension with the oneAPI DPC++ driver
+    # (icpx), so the compiler and the oneMKL headers both have to be present.
+    # No Intel GPU is attached to this runner; only the build is exercised.
+    - name: Install oneAPI DPC++ and oneMKL
+      run: |
+        wget -qO- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
+          | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+        echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" \
+          | sudo tee /etc/apt/sources.list.d/oneAPI.list
+        sudo apt-get update
+        sudo apt-get install -y intel-oneapi-compiler-dpcpp-cpp intel-oneapi-mkl-devel
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r .github/workflows/requirements_sycl_ci.txt
+        pip install -e "./openequivariance"
+
+    - name: Test SYCL extension build via import
+      run: |
+        source /opt/intel/oneapi/setvars.sh
+        export CXX=icpx
+
+        pytest tests/import_test.py
+
+        export OEQ_JIT_EXTENSION=1
+
+        pytest tests/import_test.py 

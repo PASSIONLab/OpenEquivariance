@@ -13,6 +13,10 @@ from torch_geometric import EdgeIndex
 
 from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
 
+from conftest import device_type
+
+DEVICE = device_type()
+
 
 @pytest.fixture(scope="session")
 def problem_and_irreps():
@@ -28,7 +32,7 @@ def problem_and_irreps():
         weight_dtype=np.float32,
     )
 
-    gen = torch.Generator(device="cuda")
+    gen = torch.Generator(device=DEVICE)
     gen.manual_seed(0)
 
     return (
@@ -42,30 +46,30 @@ def problem_and_irreps():
 @pytest.fixture(params=["batch", "conv_det", "conv_atomic"], scope="session")
 def tp_and_inputs(request, problem_and_irreps):
     problem, X_ir, Y_ir, _ = problem_and_irreps
-    gen = torch.Generator(device="cuda")
+    gen = torch.Generator(device=DEVICE)
     gen.manual_seed(0)
 
     if request.param == "batch":
         batch_size = 1000
-        X = torch.rand(batch_size, X_ir.dim, device="cuda", generator=gen)
-        Y = torch.rand(batch_size, Y_ir.dim, device="cuda", generator=gen)
-        W = torch.rand(batch_size, problem.weight_numel, device="cuda", generator=gen)
+        X = torch.rand(batch_size, X_ir.dim, device=DEVICE, generator=gen)
+        Y = torch.rand(batch_size, Y_ir.dim, device=DEVICE, generator=gen)
+        W = torch.rand(batch_size, problem.weight_numel, device=DEVICE, generator=gen)
         return oeq.TensorProduct(problem), (X, Y, W)
     else:
         node_ct, nonzero_ct = 3, 4
 
         # Receiver, sender indices for message passing GNN
         edge_index = EdgeIndex(
-            [[0, 1, 1, 2], [1, 0, 2, 1]], device="cuda", dtype=torch.long
+            [[0, 1, 1, 2], [1, 0, 2, 1]], device=DEVICE, dtype=torch.long
         )
 
         _, sender_perm = edge_index.sort_by("col")
         edge_index, _ = edge_index.sort_by("row")
         edge_index = [edge_index[0].detach(), edge_index[1].detach()]
 
-        X = torch.rand(node_ct, X_ir.dim, device="cuda", generator=gen)
-        Y = torch.rand(nonzero_ct, Y_ir.dim, device="cuda", generator=gen)
-        W = torch.rand(nonzero_ct, problem.weight_numel, device="cuda", generator=gen)
+        X = torch.rand(node_ct, X_ir.dim, device=DEVICE, generator=gen)
+        Y = torch.rand(nonzero_ct, Y_ir.dim, device=DEVICE, generator=gen)
+        W = torch.rand(nonzero_ct, problem.weight_numel, device=DEVICE, generator=gen)
 
         if request.param == "conv_atomic":
             return oeq.TensorProductConv(problem, torch_op=True, deterministic=False), (
@@ -143,18 +147,18 @@ def test_aoti_cpp_inference(problem_and_irreps):
     cmake_prefix_path = torch.utils.cmake_prefix_path
     torch_ext_so_path = oeq.torch_ext_so_path()
 
-    gen = torch.Generator(device="cuda")
+    gen = torch.Generator(device=DEVICE)
     gen.manual_seed(0)
     batch_size = 1000
 
     # Create models
-    oeq_tp = oeq.TensorProduct(problem).to("cuda")
-    e3nn_tp = E3NNTensorProduct(problem).e3nn_tp.to("cuda")
+    oeq_tp = oeq.TensorProduct(problem).to(DEVICE)
+    e3nn_tp = E3NNTensorProduct(problem).e3nn_tp.to(DEVICE)
 
     # Prepare inputs for export
-    X = torch.rand(batch_size, X_ir.dim, device="cuda", generator=gen)
-    Y = torch.rand(batch_size, Y_ir.dim, device="cuda", generator=gen)
-    W = torch.rand(batch_size, problem.weight_numel, device="cuda", generator=gen)
+    X = torch.rand(batch_size, X_ir.dim, device=DEVICE, generator=gen)
+    Y = torch.rand(batch_size, Y_ir.dim, device=DEVICE, generator=gen)
+    W = torch.rand(batch_size, problem.weight_numel, device=DEVICE, generator=gen)
     inputs = (X, Y, W)
 
     with (

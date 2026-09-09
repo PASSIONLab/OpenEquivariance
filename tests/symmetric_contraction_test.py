@@ -9,6 +9,10 @@ from e3nn import o3
 
 from openequivariance._torch.symmetric_contraction import SymmetricContraction
 
+from conftest import device_type
+
+DEVICE = device_type()
+
 mace_symmetric_contraction = pytest.importorskip("mace.modules.symmetric_contraction")
 MaceSymmetricContraction = mace_symmetric_contraction.SymmetricContraction
 
@@ -25,7 +29,7 @@ SCConfig = collections.namedtuple(
     ],
 )
 
-DEVICE = torch.device("cuda")
+DEVICE = torch.device(DEVICE)
 
 SC_CONFIGS = [
     SCConfig(

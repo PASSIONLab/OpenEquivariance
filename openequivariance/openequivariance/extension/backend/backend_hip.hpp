@@ -292,7 +292,10 @@ public:
         // Ignore for AMD GPUs 
     }
 
-    void execute(int kernel_id, void* args[], KernelLaunchConfig config) {
+    void execute(int kernel_id, void* args[], const size_t arg_sizes[],
+                 size_t num_args, KernelLaunchConfig config) {
+        (void) arg_sizes; // The HIP driver infers argument sizes from the kernel signature.
+        (void) num_args;
         int device_id; HIP_ERRCHK(hipGetDevice(&device_id));
         if(device_id != kernels->device) {
             kernels.reset();

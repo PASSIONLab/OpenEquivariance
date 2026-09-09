@@ -20,6 +20,10 @@ from pytest_check import check
 
 import openequivariance as oeq
 
+from conftest import device_type
+
+DEVICE = device_type()
+
 
 @pytest.fixture(params=[np.float32, np.float64], ids=["F32", "F64"], scope="module")
 def dtype(request):
@@ -424,7 +428,7 @@ class TestTorchToSubmodule:
         parent, problem = parent_module_and_problem
 
         batch_size = 10
-        device = "cuda"
+        device = DEVICE
         input_dtype = self._problem_dtype(problem)
         in1, in2, weights = self._make_inputs(problem, batch_size, input_dtype, device)
 

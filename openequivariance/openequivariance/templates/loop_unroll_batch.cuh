@@ -5,7 +5,8 @@
         transpose_load, transpose_store, 
         load_ir_segments, load_ir_segments_force,
         store_ir_segments, declare_smem_variables,
-        set_launch_bound_variables, launch_bounds
+        set_launch_bound_variables, launch_bounds,
+        declare_smem
         with context%}
 
 {%- from 'loop_unroll_tp.cuh' import 
@@ -26,7 +27,7 @@ __global__ void
 {{ launch_bounds(forward_schedule) }}
 forward(size_t num_products, IRREP_T* L1_in, IRREP_T* L2_in, IRREP_T* L3_out, WEIGHT_T* weights) {
 
-    extern __shared__ char s[];
+    {{ declare_smem(forward_schedule) }}
     {{ set_launch_bound_variables(forward_schedule.launch_config) }}
     {%- set tpp = forward_schedule.updated_config %}
     char* smem = s + {{forward_schedule.memory_per_warp}} * warp_loc; 
@@ -73,7 +74,7 @@ backward(size_t num_products,
         IRREP_T* L2_in, IRREP_T* L2_grad,
         WEIGHT_T* weights, WEIGHT_T* weights_grad,
         IRREP_T* L3_grad) {
-    extern __shared__ char s[];
+    {{ declare_smem(backward_schedule) }}
     {{ set_launch_bound_variables(backward_schedule.launch_config) }}
     char* smem = s + {{backward_schedule.memory_per_warp}} * warp_loc; 
 
@@ -153,7 +154,7 @@ double_backward_A(
     IRREP_T* L1_dgrad, IRREP_T* L2_dgrad, IRREP_T* W_dgrad, // Gradients w.r.t outputs of backward op
     IRREP_T* L1_grad, IRREP_T* L2_grad, WEIGHT_T* W_grad, IRREP_T* L3_dgrad) {
 
-    extern __shared__ char s[];
+    {{ declare_smem(forward_schedule) }}
     {{ set_launch_bound_variables(forward_schedule.launch_config) }}
     {%- set tpp = forward_schedule.updated_config %}
     char* smem = s + {{forward_schedule.memory_per_warp}} * warp_loc; 
@@ -223,7 +224,7 @@ double_backward_B(
         IRREP_T* L1_dgrad, IRREP_T* L2_dgrad, IRREP_T* W_dgrad, // Gradients w.r.t outputs of backward op
         IRREP_T* L1_grad, IRREP_T* L2_grad, WEIGHT_T* W_grad, IRREP_T* L3_dgrad) {
 
-    extern __shared__ char s[];
+    {{ declare_smem(schedule) }}
     {{ set_launch_bound_variables(schedule.launch_config) }}
     char* smem = s + {{schedule.memory_per_warp}} * warp_loc; 
 
