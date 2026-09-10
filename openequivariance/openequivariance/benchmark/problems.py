@@ -200,11 +200,6 @@ class NequIPTPP(TPProblem):
     """
     Taken from nequip.nn.interaction_block.InteractionBlock:
     https://github.com/mir-group/nequip/blob/27d9d2182da918ab7be0017d8300e53278f5e00e/nequip/nn/interaction_block.py#L89-L116
-
-    Produces the same set of instructions as ChannelwiseTPP, but in a different
-    order: the output irreps are sorted, while the instruction list stays in
-    in1-major / in2-minor enumeration order (ChannelwiseTPP re-sorts it by
-    output index)
     """
 
     def __init__(
