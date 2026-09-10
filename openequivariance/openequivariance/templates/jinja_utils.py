@@ -26,7 +26,11 @@ def get_jinja_environment(is_hip=False):
     env.globals["enumerate"] = enumerate
 
     env.globals["is_hip"] = is_hip
-    env.globals["syncwarp"] = "__threadfence_block()" if is_hip else "__syncwarp()"
+    env.globals["syncwarp"] = (
+        '__builtin_amdgcn_fence(__ATOMIC_RELEASE, "wavefront");__builtin_amdgcn_wave_barrier();__builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "wavefront");'
+        if is_hip
+        else "__syncwarp()"
+    )
     env.globals["atomic_add"] = "unsafeAtomicAdd" if is_hip else "atomicAdd"
 
     if is_hip:

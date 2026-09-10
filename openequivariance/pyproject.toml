@@ -56,7 +56,6 @@ dev = [
   "pytest",
   "pytest-check",
   "pytest-subtests",
-  "mace-torch",
   "torch_geometric",
   "cmake"
 ]

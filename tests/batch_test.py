@@ -14,6 +14,7 @@ from openequivariance.benchmark.problems import (
     diffdock_problems,
     e3nn_torch_tetris_poly_problems,
     mace_problems,
+    nequip_oam_problems,
     nequip_problems,
 )
 from pytest_check import check
@@ -131,6 +132,7 @@ class TestProductionModels(TPCorrectness):
     production_model_tpps = (
         mace_problems()
         + nequip_problems()
+        + nequip_oam_problems()
         + e3nn_torch_tetris_poly_problems()
         + diffdock_problems()
     )
