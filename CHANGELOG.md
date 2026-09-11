@@ -1,5 +1,16 @@
 ## Latest Changes
 
+### v0.7.0 (2026-09-10)
+**Added**: 
+- Public XLA FFI registration provider
+- Better timeout error for torch < 2.10 
+- Contribution Guidelines 
+
+**Fixed**: 
+- Bug for some TPPs on AMD machines 
+- Bug for TPPs with L2 > 1 and ir_mul layout 
+- Bug with JAX backward gradients  
+
 ### v0.6.8 (2026-06-14)
 Added `#include <cstdint>` to all C++ extension headers and sources. 
 
