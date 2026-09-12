@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from jinja2 import Environment, PackageLoader
 
 
@@ -16,6 +18,7 @@ def sizeof(dtype):
         raise Exception("Provided undefined datatype to sizeof!")
 
 
+@lru_cache(maxsize=2)
 def get_jinja_environment(is_hip=False):
     env = Environment(
         loader=PackageLoader("openequivariance"), extensions=["jinja2.ext.do"]
