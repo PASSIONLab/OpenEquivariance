@@ -117,7 +117,7 @@ endfunction()
 
 find_package(CUDAToolkit QUIET)
 find_package(hip QUIET)
-find_package(rocblas QUIET)
+find_package(hipblas QUIET)
 
 if(CUDAToolkit_FOUND)
     message(STATUS "Building stable extension with CUDA backend.")
@@ -159,10 +159,10 @@ if(hip_FOUND)
         CXX_STANDARD 17
     )
 
-    if(TARGET roc::rocblas)
-        set(HIP_BLAS_LIB roc::rocblas)
+    if(TARGET roc::hipblas)
+        set(HIP_BLAS_LIB roc::hipblas)
     else()
-        set(HIP_BLAS_LIB rocblas)
+        set(HIP_BLAS_LIB hipblas)
     endif()
 
     set(HIP_LINK_LIBS

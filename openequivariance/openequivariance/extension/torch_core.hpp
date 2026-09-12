@@ -42,7 +42,8 @@ Tensor tensor_zeros_like(const Tensor &ref, const std::vector<int64_t> &sizes);
 void tensor_zero_(Tensor &tensor);
 
 void alert_not_deterministic(const char *name);
-Stream get_current_stream();
+
+Stream get_current_stream(int32_t device_index);
 
 const uint8_t *tensor_data_ptr_u8(const Tensor &tensor);
 void *data_ptr(const Tensor &tensor);
@@ -126,6 +127,21 @@ inline void check_tensor(const Tensor &tensor,
           "Dtype mismatch for tensor '", tensor_name,
           "'. Expected: ", static_cast<int>(expected_dtype),
           ". Got: ", static_cast<int>(tensor.scalar_type()));
+}
+
+inline void check_same_device(
+        std::initializer_list<std::pair<const Tensor*, const char*>> tensors) {
+    auto it = tensors.begin();
+    const Tensor *first = it->first;
+    const char *first_name = it->second;
+    for (++it; it != tensors.end(); ++it) {
+        TCHECK(it->first->get_device() == first->get_device(),
+              "Tensor '", it->second, "' is on device ",
+              static_cast<int>(it->first->get_device()),
+              ", but tensor '", first_name, "' is on device ",
+              static_cast<int>(first->get_device()),
+              ". All tensors must be on the same device.");
+    }
 }
 
 inline std::unordered_map<std::string, int64_t> parse_json_config(const json &j_obj) {
@@ -274,7 +290,10 @@ inline Tensor jit_tp_forward(
         int64_t L3_dim) {
 
     auto [jit_kernel, k] = compile_tp_with_caching(json_bytes, hash);
-    Stream stream = get_current_stream();
+
+    const int32_t device_index = static_cast<int32_t>(L1_in.get_device());
+    DeviceGuard device_guard(device_index);
+    Stream stream = get_current_stream(device_index);
 
     const int64_t num_batch = L1_in.size(0);
 
@@ -285,6 +304,8 @@ inline Tensor jit_tp_forward(
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
     else
         check_tensor(W, {num_batch, k.weight_numel}, k.weight_dtype, "W");
+
+    check_same_device({{&L1_in, "L1_in"}, {&L2_in, "L2_in"}, {&W, "W"}});
 
     Tensor L3_out = tensor_empty_like(L1_in, make_sizes({num_batch, k.L3_dim}));
 
@@ -312,7 +333,10 @@ inline tuple<Tensor, Tensor, Tensor> jit_tp_backward(
         Tensor L3_grad) {
 
     auto [jit_kernel, k] = compile_tp_with_caching(json_bytes, hash);
-    Stream stream = get_current_stream();
+
+    const int32_t device_index = static_cast<int32_t>(L1_in.get_device());
+    DeviceGuard device_guard(device_index);
+    Stream stream = get_current_stream(device_index);
 
     const int64_t num_batch = L1_in.size(0);
 
@@ -324,6 +348,9 @@ inline tuple<Tensor, Tensor, Tensor> jit_tp_backward(
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
     else
         check_tensor(W, {num_batch, k.weight_numel}, k.weight_dtype, "W");
+
+    check_same_device({{&L1_in, "L1_in"}, {&L2_in, "L2_in"}, {&W, "W"},
+                       {&L3_grad, "L3_grad"}});
 
     Tensor L1_grad = tensor_empty_like(L1_in, tensor_sizes_vec(L1_in));
     Tensor L2_grad = tensor_empty_like(L2_in, tensor_sizes_vec(L2_in));
@@ -360,7 +387,10 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_tp_double_backward(
         Tensor W_dgrad) {
 
     auto [jit_kernel, k] = compile_tp_with_caching(json_bytes, hash);
-    Stream stream = get_current_stream();
+
+    const int32_t device_index = static_cast<int32_t>(L1_in.get_device());
+    DeviceGuard device_guard(device_index);
+    Stream stream = get_current_stream(device_index);
 
     const int64_t num_batch = L1_in.size(0);
 
@@ -377,6 +407,10 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_tp_double_backward(
         check_tensor(W, {num_batch, k.weight_numel}, k.weight_dtype, "W");
         check_tensor(W_dgrad, {num_batch, k.weight_numel}, k.weight_dtype, "W_dgrad");
     }
+
+    check_same_device({{&L1_in, "L1_in"}, {&L2_in, "L2_in"}, {&W, "W"},
+                       {&L3_grad, "L3_grad"}, {&L1_dgrad, "L1_dgrad"},
+                       {&L2_dgrad, "L2_dgrad"}, {&W_dgrad, "W_dgrad"}});
 
     Tensor L1_grad = tensor_empty_like(L1_in, tensor_sizes_vec(L1_in));
     Tensor L2_grad = tensor_empty_like(L2_in, tensor_sizes_vec(L2_in));
@@ -426,7 +460,10 @@ inline Tensor jit_conv_forward(
         Tensor transpose_perm) {
 
     auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
-    Stream stream = get_current_stream();
+
+    const int32_t device_index = static_cast<int32_t>(L1_in.get_device());
+    DeviceGuard device_guard(device_index);
+    Stream stream = get_current_stream(device_index);
 
     const int64_t nnz = rows.size(0);
     const int64_t node_count = L1_in.size(0);
@@ -446,6 +483,11 @@ inline Tensor jit_conv_forward(
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
     else
         check_tensor(W, {nnz, k.weight_numel}, k.weight_dtype, "W");
+
+    check_same_device({{&L1_in, "L1_in"}, {&L2_in, "L2_in"}, {&W, "W"},
+                       {&rows, "rows"}, {&cols, "cols"}, {&workspace, "workspace"}});
+    if (k.deterministic)
+        check_same_device({{&L1_in, "L1_in"}, {&transpose_perm, "transpose_perm"}});
 
     Tensor L3_out = tensor_zeros_like(L1_in, make_sizes({node_count, k.L3_dim}));
 
@@ -482,7 +524,10 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
         Tensor transpose_perm) {
 
     auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
-    Stream stream = get_current_stream();
+
+    const int32_t device_index = static_cast<int32_t>(L1_in.get_device());
+    DeviceGuard device_guard(device_index);
+    Stream stream = get_current_stream(device_index);
 
     const int64_t nnz = rows.size(0);
     const int64_t node_count = L1_in.size(0);
@@ -504,6 +549,12 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
         check_tensor(W, {k.weight_numel}, k.weight_dtype, "W");
     else
         check_tensor(W, {nnz, k.weight_numel}, k.weight_dtype, "W");
+
+    check_same_device({{&L1_in, "L1_in"}, {&L2_in, "L2_in"}, {&W, "W"},
+                       {&L3_grad, "L3_grad"}, {&rows, "rows"}, {&cols, "cols"},
+                       {&workspace, "workspace"}});
+    if (k.deterministic)
+        check_same_device({{&L1_in, "L1_in"}, {&transpose_perm, "transpose_perm"}});
 
     Tensor L1_grad = tensor_zeros_like(L1_in, tensor_sizes_vec(L1_in));
     Tensor L2_grad = tensor_zeros_like(L2_in, tensor_sizes_vec(L2_in));
@@ -551,7 +602,10 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
         Tensor transpose_perm) {
 
     auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
-    Stream stream = get_current_stream();
+
+    const int32_t device_index = static_cast<int32_t>(L1_in.get_device());
+    DeviceGuard device_guard(device_index);
+    Stream stream = get_current_stream(device_index);
 
     const int64_t nnz = rows.size(0);
     const int64_t node_count = L1_in.size(0);
@@ -578,6 +632,13 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
         check_tensor(W, {nnz, k.weight_numel}, k.weight_dtype, "W");
         check_tensor(W_dgrad, {nnz, k.weight_numel}, k.weight_dtype, "W_dgrad");
     }
+
+    check_same_device({{&L1_in, "L1_in"}, {&L2_in, "L2_in"}, {&W, "W"},
+                       {&L3_grad, "L3_grad"}, {&L1_dgrad, "L1_dgrad"},
+                       {&L2_dgrad, "L2_dgrad"}, {&W_dgrad, "W_dgrad"},
+                       {&rows, "rows"}, {&cols, "cols"}, {&workspace, "workspace"}});
+    if (k.deterministic)
+        check_same_device({{&L1_in, "L1_in"}, {&transpose_perm, "transpose_perm"}});
 
     Tensor L1_grad = tensor_zeros_like(L1_in, tensor_sizes_vec(L1_in));
     Tensor L2_grad = tensor_zeros_like(L2_in, tensor_sizes_vec(L2_in));
@@ -623,6 +684,14 @@ inline Tensor group_gemm(
         int64_t num_W, int64_t batch_size, int64_t m, int64_t k, int64_t ragged_inner) {
     TCHECK(A.scalar_type() == B.scalar_type(), "group_gemm: A and B must have the same dtype");
     TCHECK(ragged_counts.scalar_type() == kLong, "group_gemm: ragged_counts must be int64");
+    TCHECK(A.is_cuda(), "group_gemm: A must be a GPU tensor");
+    TCHECK(B.is_cuda(), "group_gemm: B must be a GPU tensor");
+    check_same_device({{&A, "A"}, {&B, "B"}});
+    TCHECK(ragged_counts.is_cpu(),
+          "group_gemm: ragged_counts must be a CPU tensor; its values are read on the host");
+
+    const int32_t device_index = static_cast<int32_t>(A.get_device());
+    DeviceGuard device_guard(device_index);
 
     Tensor A_c    = tensor_contiguous(A);
     Tensor B_c    = tensor_contiguous(B);

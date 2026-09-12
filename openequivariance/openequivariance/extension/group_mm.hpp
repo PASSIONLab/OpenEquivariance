@@ -8,38 +8,21 @@
     #include "cublas_v2.h"
     #include <cuda_runtime.h>
 
-    struct BlasHandle {
-        cublasHandle_t handle;
-        BlasHandle() {
-            if (cublasCreate(&handle) != CUBLAS_STATUS_SUCCESS)
-                throw std::logic_error("CUBLAS initialization failed");
-        }
-        ~BlasHandle() { cublasDestroy(handle); }
-    };
+    using BlasHandleT = cublasHandle_t;
 #elif defined(HIP_BACKEND)
-    #include "rocblas/rocblas.h"
+    #include <hipblas/hipblas.h>
     #include <hip/hip_runtime.h>
 
-    struct BlasHandle {
-        rocblas_handle handle;
-        BlasHandle() {
-            if (rocblas_create_handle(&handle) != rocblas_status_success)
-                throw std::logic_error("rocBLAS initialization failed");
-        }
-        ~BlasHandle() { rocblas_destroy_handle(handle); }
-    };
+    using BlasHandleT = hipblasHandle_t;
 #endif
 
-inline BlasHandle& get_blas_handle() {
-    static BlasHandle handle;
-    return handle;
-}
+BlasHandleT get_op_blas_handle();
 
 template<typename T>
 void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
         int64_t* ragged_counts, int num_W, int batch_size, int m, int k, int ragged_inner) {
 
-    auto& blas = get_blas_handle();
+    BlasHandleT handle = get_op_blas_handle();
     T alpha = 1.0, beta = 0.0;
     T* A_base = reinterpret_cast<T*>(A_raw);
     T* B_base = reinterpret_cast<T*>(B_raw);
@@ -52,7 +35,7 @@ void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
 #ifdef CUDA_BACKEND
         cublasOperation_t transa, transb;
 #elif defined(HIP_BACKEND)
-        rocblas_operation transa, transb;
+        hipblasOperation_t transa, transb;
 #endif
 
         if (ragged_inner == 0) {
@@ -66,7 +49,7 @@ void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
 #ifdef CUDA_BACKEND
             transa = CUBLAS_OP_T; transb = CUBLAS_OP_N;
 #elif defined(HIP_BACKEND)
-            transa = rocblas_operation_transpose; transb = rocblas_operation_none;
+            transa = HIPBLAS_OP_T; transb = HIPBLAS_OP_N;
 #endif
         } else {
             M = k; K = static_cast<int>(ragged_counts[i]); N = m;
@@ -79,7 +62,7 @@ void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
 #ifdef CUDA_BACKEND
             transa = CUBLAS_OP_N; transb = CUBLAS_OP_T;
 #elif defined(HIP_BACKEND)
-            transa = rocblas_operation_none; transb = rocblas_operation_transpose;
+            transa = HIPBLAS_OP_N; transb = HIPBLAS_OP_T;
 #endif
         }
         ragged_offset += ragged_counts[i];
@@ -88,7 +71,7 @@ void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
 #ifdef CUDA_BACKEND
             cublasStatus_t stat;
             if (std::is_same<T, float>::value) {
-                stat = cublasSgemmStridedBatched(blas.handle,
+                stat = cublasSgemmStridedBatched(handle,
                     transa, transb, M, N, K,
                     reinterpret_cast<float*>(&alpha),
                     reinterpret_cast<float*>(A), lda, strideA,
@@ -97,7 +80,7 @@ void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
                     reinterpret_cast<float*>(C), ldc, strideC,
                     batch_size);
             } else if (std::is_same<T, double>::value) {
-                stat = cublasDgemmStridedBatched(blas.handle,
+                stat = cublasDgemmStridedBatched(handle,
                     transa, transb, M, N, K,
                     reinterpret_cast<double*>(&alpha),
                     reinterpret_cast<double*>(A), lda, strideA,
@@ -111,9 +94,9 @@ void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
             if (stat != CUBLAS_STATUS_SUCCESS)
                 throw std::logic_error("Grouped GEMM failed!");
 #elif defined(HIP_BACKEND)
-            rocblas_status stat;
+            hipblasStatus_t stat;
             if (std::is_same<T, float>::value) {
-                stat = rocblas_sgemm_strided_batched(blas.handle,
+                stat = hipblasSgemmStridedBatched(handle,
                     transa, transb, M, N, K,
                     reinterpret_cast<float*>(&alpha),
                     reinterpret_cast<float*>(A), lda, strideA,
@@ -122,7 +105,7 @@ void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
                     reinterpret_cast<float*>(C), ldc, strideC,
                     batch_size);
             } else if (std::is_same<T, double>::value) {
-                stat = rocblas_dgemm_strided_batched(blas.handle,
+                stat = hipblasDgemmStridedBatched(handle,
                     transa, transb, M, N, K,
                     reinterpret_cast<double*>(&alpha),
                     reinterpret_cast<double*>(A), lda, strideA,
@@ -133,7 +116,7 @@ void group_gemm_blas(void* A_raw, void* B_raw, void* C_raw,
             } else {
                 throw std::logic_error("Unsupported datatype for grouped GEMM!");
             }
-            if (stat != rocblas_status_success)
+            if (stat != HIPBLAS_STATUS_SUCCESS)
                 throw std::logic_error("Grouped GEMM failed!");
 #endif
         }
