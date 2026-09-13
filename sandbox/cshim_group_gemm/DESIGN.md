@@ -49,6 +49,8 @@ The source/JIT loader explicitly links the installed `torch_cuda` or `torch_hip`
 
 The stable wheel build uses CPU LibTorch plus small GPU link stubs. [The stub](../../openequivariance/openequivariance/extension/stubs/stream.cpp) now declares and defines BMM-out using the official generated header, alongside the existing stream symbol. Stub bodies return failure if accidentally invoked. Only the real Torch GPU libraries are intended at runtime; CMake installs the OEQ targets, not the stubs. Both the Python extension and AOTI targets use this arrangement.
 
+CMake installs the stable libraries into the wheel's package directory. The previous absolute destination wrote them into the source tree, where the wheel's ignore rules excluded them. The loader now resolves the compiled extension's location to find its companion AOTI library; this also supports editable installations where Python sources and compiled libraries live in different directories. Build CI installs a normal wheel and asserts that the stable extension is selected before running the import checks.
+
 The HIP CMake target is named `oeq_stable_hip`, matching its module entry point and expected artifact name. It explicitly links `hiprtc::hiprtc`. The existing Python loader still selects JIT compilation for HIP; enabling precompiled HIP loading is outside this change. The ROCm JIT path uses the same BMM helper as the stable CUDA build.
 
 ## ROCm evidence
@@ -65,9 +67,9 @@ JAX's public FFI provides buffers and a GPU stream, without an equivalent BMM C 
 
 ## Validation and next GPU run
 
-Local checks passed for the new operator and both adapters against Torch 2.10 headers, the link stub, and the shared helper against Torch 2.4 headers. These were host syntax checks, not full CUDA/ROCm extension builds. The unmodified production view helper also passed eight cases using real Torch 2.10 CPU tensors with the GPU BMM entry point redirected to CPU BMM for this check: both modes/dtypes, nonzero storage offsets, empty groups, and output guard values. All 30 GPU integration cases collect successfully; none has run on a GPU yet.
+Local checks passed for the new operator and both adapters against Torch 2.10 headers, the link stub, and the shared helper against Torch 2.4 headers. These were host syntax checks, not full CUDA/ROCm extension builds. The unmodified production view helper also passed eight cases using real Torch 2.10 CPU tensors with the GPU BMM entry point redirected to CPU BMM for this check: both modes/dtypes, nonzero storage offsets, empty groups, and output guard values. All 46 GPU integration cases collect successfully; none has run on a GPU yet.
 
-[The integration tests](../../tests/group_gemm_test.py) call the real registered operator. They cover both modes/dtypes, noncontiguous inputs and counts, nonzero input storage offsets, empty groups/dimensions, backward gradients, the current stream, device guarding, and invalid counts. The device-guard test requires two GPUs. The same test file supports CUDA and ROCm.
+[The integration tests](../../tests/group_gemm_test.py) call the real registered operator. They cover both modes/dtypes, noncontiguous inputs and counts, nonzero input storage offsets, empty and singleton dimensions, varied group sizes, backward and double-backward gradients, the current stream, device guarding, invalid counts, graph replay, compiled training, and AOTI inference in a fresh process that loads only the exported OEQ library. The device-guard test requires two GPUs. The same test file supports CUDA and ROCm.
 
 [The import tests](../../tests/import_test.py) also inspect the extension and AOTI library's ELF dependencies and undefined symbols to check that OEQ has no direct vendor BLAS dependency. These checks run in the existing build-verification workflow for precompiled and JIT imports.
 
