@@ -621,13 +621,40 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
 inline Tensor group_gemm(
         Tensor A, Tensor B, Tensor ragged_counts,
         int64_t num_W, int64_t batch_size, int64_t m, int64_t k, int64_t ragged_inner) {
+    TCHECK(A.is_cuda() && B.is_cuda(), "group_gemm: A and B must be GPU tensors");
+    TCHECK(A.get_device() == B.get_device(), "group_gemm: A and B must be on the same device");
     TCHECK(A.scalar_type() == B.scalar_type(), "group_gemm: A and B must have the same dtype");
+    TCHECK(A.scalar_type() == kFloat || A.scalar_type() == kDouble,
+        "group_gemm: unsupported dtype, expected float32 or float64");
+    TCHECK(ragged_counts.is_cpu(), "group_gemm: ragged_counts must be on the CPU");
     TCHECK(ragged_counts.scalar_type() == kLong, "group_gemm: ragged_counts must be int64");
+    TCHECK(num_W >= 0 && batch_size >= 0 && m >= 0 && k >= 0,
+        "group_gemm: dimensions must be nonnegative");
+    TCHECK(ragged_inner == 0 || ragged_inner == 1, "group_gemm: ragged_inner must be 0 or 1");
+    TCHECK(ragged_counts.dim() == 1 && ragged_counts.size(0) == num_W,
+        "group_gemm: ragged_counts must contain num_W entries");
+    TCHECK(B.dim() == 3, "group_gemm: B must have shape [rows, batch_size, k]");
+    const int64_t rows = B.size(0);
+    check_tensor(B, {rows, batch_size, k}, A.scalar_type(), "group_gemm B");
+    if (ragged_inner == 0)
+        check_tensor(A, {num_W, batch_size, m, k}, A.scalar_type(), "group_gemm A");
+    else
+        check_tensor(A, {rows, batch_size, m}, A.scalar_type(), "group_gemm A");
 
+    Tensor rc_c = tensor_contiguous(ragged_counts);
+    const auto* rc_ptr = static_cast<const int64_t*>(data_ptr(rc_c));
+    int64_t row_count = 0;
+    for (int64_t i = 0; i < num_W; ++i) {
+        TCHECK(rc_ptr[i] >= 0 && rc_ptr[i] <= rows - row_count,
+            "group_gemm: ragged_counts must be nonnegative and sum to the number of rows");
+        row_count += rc_ptr[i];
+    }
+    TCHECK(row_count == rows,
+        "group_gemm: ragged_counts must sum to the number of rows");
+
+    TensorDeviceGuard device_guard(A);
     Tensor A_c    = tensor_contiguous(A);
     Tensor B_c    = tensor_contiguous(B);
-    Tensor rc_c   = tensor_contiguous(ragged_counts);
-    int64_t* rc_ptr = reinterpret_cast<int64_t*>(data_ptr(rc_c));
 
     Tensor C;
     if (ragged_inner == 0) {
@@ -637,15 +664,8 @@ inline Tensor group_gemm(
         C = tensor_zeros_like(A, make_sizes({num_W, batch_size, m, k}));
     }
 
-    if (A.scalar_type() == kFloat) {
-        group_gemm_blas<float>(data_ptr(A_c), data_ptr(B_c), data_ptr(C), rc_ptr,
-            (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner);
-    } else if (A.scalar_type() == kDouble) {
-        group_gemm_blas<double>(data_ptr(A_c), data_ptr(B_c), data_ptr(C), rc_ptr,
-            (int)num_W, (int)batch_size, (int)m, (int)k, (int)ragged_inner);
-    } else {
-        throw std::logic_error("group_gemm: unsupported dtype, expected float32 or float64");
-    }
+    oeq::group_gemm_torch(tensor_handle(A_c), tensor_handle(B_c), tensor_handle(C),
+        rc_ptr, num_W, batch_size, m, k, ragged_inner);
 
     return C;
 }

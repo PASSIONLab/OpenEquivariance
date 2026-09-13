@@ -2,7 +2,7 @@
 #include <pybind11/pybind11.h>
 
 #ifdef CUDA_BACKEND
-    #include <ATen/cuda/CUDAContext.h>
+    #include <c10/cuda/CUDAStream.h>
 #endif
 
 #ifdef HIP_BACKEND
@@ -10,9 +10,11 @@
 #endif
 
 #include <ATen/Operators.h>
+#include <c10/core/DeviceGuard.h>
 #include <c10/macros/Macros.h>
 #include <c10/util/Exception.h>
 #include <torch/all.h>
+#include <torch/csrc/inductor/aoti_torch/utils.h>
 #include <torch/library.h>
 
 using Tensor = torch::Tensor;
@@ -28,6 +30,16 @@ constexpr Dtype kByte = torch::kByte;
 #define BOX(x) x
 #define REGISTER_LIBRARY_IMPL TORCH_LIBRARY_IMPL
 #define REGISTER_LIBRARY TORCH_LIBRARY
+
+class TensorDeviceGuard {
+    c10::DeviceGuard guard;
+public:
+    explicit TensorDeviceGuard(const Tensor& tensor) : guard(tensor.device()) {}
+};
+
+AtenTensorHandle tensor_handle(Tensor& tensor) {
+    return torch::aot_inductor::tensor_pointer_to_tensor_handle(&tensor);
+}
 
 #include "torch_core.hpp"
 
