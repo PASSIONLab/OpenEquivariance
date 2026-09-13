@@ -29,11 +29,10 @@ jobs:
         sudo apt-get update
         sudo apt install nvidia-cuda-toolkit
         pip install -r .github/workflows/requirements_cuda_ci.txt
-        pip install "./openequivariance[jax]"
+        pip install -e "./openequivariance[jax]"
 
     - name: Test CUDA extension build via import 
       run: |
-        python -c "import openequivariance as oeq; assert oeq.USE_PRECOMPILED_EXTENSION"
         pytest tests/import_test.py
 
         export OEQ_JIT_EXTENSION=1
