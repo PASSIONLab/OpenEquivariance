@@ -260,6 +260,11 @@ def test_group_gemm_compile(group_gemm, inner):
             actual_grad.cpu(), expected_grad, rtol=1e-10, atol=1e-10
         )
 
+    next_counts = [0, 3, 2]
+    next_actual = compiled(A, B, torch.tensor(next_counts, device="cpu"))
+    next_expected = reference(A_ref, B_ref, next_counts, inner)
+    torch.testing.assert_close(next_actual.cpu(), next_expected, rtol=1e-10, atol=1e-10)
+
 
 @pytest.mark.parametrize("inner", [0, 1])
 def test_group_gemm_aoti(group_gemm, inner, tmp_path):
