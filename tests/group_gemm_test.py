@@ -295,6 +295,7 @@ def test_group_gemm_aoti(group_gemm, inner, tmp_path):
             """
 import sys
 import torch
+import torch._inductor.codecache
 
 torch.ops.load_library(sys.argv[1])
 model = torch._inductor.aoti_load_package(sys.argv[2])
