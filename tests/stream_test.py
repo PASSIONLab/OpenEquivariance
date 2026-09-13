@@ -242,7 +242,7 @@ def oeq_conv_atomic_double_bwd(tpp, conv_buffers):
 def oeq_conv_det_fwd(tpp, conv_buffers):
     tp_conv = TensorProductConv(tpp, torch_op=True, deterministic=False)
 
-    return Executable(tp_conv, conv_buffers, [KE("forward", 1), KE("fixup_forward", 1)])
+    return Executable(tp_conv, conv_buffers, [KE("forward", 1)])
 
 
 @pytest.fixture
@@ -265,9 +265,7 @@ def oeq_conv_det_bwd(tpp, conv_buffers):
         conv_buffers,
         [
             KE("forward", 1),
-            KE("fixup_forward", 1),
             KE("backward", 1),
-            KE("fixup_backward", 1),
         ],
     )
 
@@ -311,12 +309,9 @@ def oeq_conv_det_double_bwd(tpp, conv_buffers):
         conv_buffers,
         [
             KE("forward", 1),
-            KE("fixup_forward", 2),
             KE("backward", 1),
-            KE("fixup_backward", 1),
             KE("double_backward_A", 1),
             KE("double_backward_B", 1),
-            KE("fixup_double_backwardB", 1),
         ],
     )
 

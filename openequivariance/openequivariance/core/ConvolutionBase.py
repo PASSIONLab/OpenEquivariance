@@ -112,7 +112,6 @@ class ConvolutionBase:
             global torch
             import torch
 
-        self.workspace_ptr = 0
         self.workspace_size = 0
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):

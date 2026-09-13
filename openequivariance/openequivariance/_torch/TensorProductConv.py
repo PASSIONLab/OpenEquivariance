@@ -85,7 +85,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             kahan=self.input_args["kahan"],
         )
 
-        self.allocate_workspace(self.workspace_size)
 
         self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device="cuda")
         self.weight_numel = self.config.weight_numel
@@ -180,17 +179,8 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             self.L3_dim,
             rows,
             cols,
-            self.workspace_buffer,
             sender_perm,
         )
-
-    def allocate_workspace(self, size_bytes):
-        self.workspace_size = size_bytes
-        self.workspace_buffer = torch.zeros(
-            size_bytes, dtype=torch.uint8, device="cuda"
-        )
-        self.workspace_ptr = self.workspace_buffer.data_ptr()
-        logger.info(f"Convolution requires {size_bytes // 1000000}MB of workspace.")
 
     def reorder_weights_from_e3nn(self, weights, has_batch_dim=True):
         return reorder_torch(
@@ -282,9 +272,7 @@ def register_torch_fakes():
     import torch
 
     @torch.library.register_fake("libtorch_tp_jit::jit_conv_forward")
-    def fake_forward(
-        kernel, hash, L1_in, L2_in, W, L3_dim, rows, cols, workspace_buffer, sender_perm
-    ):
+    def fake_forward(kernel, hash, L1_in, L2_in, W, L3_dim, rows, cols, sender_perm):
         return torch.empty(L1_in.shape[0], L3_dim, device="cuda", dtype=L1_in.dtype)
 
     @torch.library.register_fake("libtorch_tp_jit::jit_conv_backward")
@@ -297,7 +285,6 @@ def register_torch_fakes():
         L3_grad,
         rows,
         cols,
-        workspace_buffer,
         sender_perm,
     ):
         return torch.empty_like(L1_in), torch.empty_like(L2_in), torch.empty_like(W)
@@ -315,7 +302,6 @@ def register_torch_fakes():
         w_dgrad,
         rows,
         cols,
-        workspace_buffer,
         transpose_perm=None,
     ):
         return [
@@ -345,7 +331,6 @@ def register_autograd():
             ctx.L3_dim,
             ctx.rows,
             ctx.cols,
-            ctx.workspace_buffer,
             ctx.sender_perm,
         ) = inputs
 
@@ -359,10 +344,9 @@ def register_autograd():
             grad_output,
             ctx.rows,
             ctx.cols,
-            ctx.workspace_buffer,
             ctx.sender_perm,
         )
-        return None, None, L1_grad, L2_grad, W_grad, None, None, None, None, None
+        return None, None, L1_grad, L2_grad, W_grad, None, None, None, None
 
     torch.library.register_autograd(
         "libtorch_tp_jit::jit_conv_forward", backward, setup_context=setup_context
@@ -378,7 +362,6 @@ def register_autograd():
             ctx.grad_output,
             ctx.rows,
             ctx.cols,
-            ctx.workspace_buffer,
             ctx.sender_perm,
         ) = inputs
         ctx.inputs = inputs
@@ -396,7 +379,6 @@ def register_autograd():
             G,
             ctx.rows,
             ctx.cols,
-            ctx.workspace_buffer,
             ctx.sender_perm,
         )
         return (
@@ -406,7 +388,6 @@ def register_autograd():
             result[1],
             result[2],
             result[3],
-            None,
             None,
             None,
             None,
@@ -431,7 +412,6 @@ def register_autograd():
             ctx.W_dgrad,
             ctx.rows,
             ctx.cols,
-            ctx.workspace_buffer,
             ctx.sender_perm,
         ) = inputs
 
@@ -444,7 +424,6 @@ def register_autograd():
         common_args = (
             ctx.rows,
             ctx.cols,
-            ctx.workspace_buffer,
             ctx.sender_perm,
         )
 
@@ -543,7 +522,6 @@ def register_autograd():
             grad_L1_dgrad,
             grad_L2_dgrad,
             grad_W_dgrad,
-            None,
             None,
             None,
             None,

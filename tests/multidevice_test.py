@@ -55,3 +55,21 @@ if __name__ == "__main__":
 
     with torch.cuda.device(device):
         result = tp.forward(X, Y, W)
+
+    node_count, nnz = 500, 5000
+    rows = torch.randint(0, node_count, (nnz,), device=device, generator=gen)
+    cols = torch.randint(0, node_count, (nnz,), device=device, generator=gen)
+    order = torch.argsort(rows * node_count + cols)
+    rows, cols = rows[order], cols[order]
+    sender_perm = torch.argsort(cols * node_count + rows)
+
+    conv = oeq.TensorProductConv(problem, deterministic=True)
+    Xc = torch.rand(node_count, X_ir.dim, device=device, generator=gen)
+    Yc = torch.rand(nnz, Y_ir.dim, device=device, generator=gen)
+    Wc = torch.rand(nnz, problem.weight_numel, device=device, generator=gen)
+
+    with torch.cuda.device(device):
+        conv_result = conv.forward(Xc, Yc, Wc, rows, cols, sender_perm)
+        torch.cuda.synchronize(device)
+        assert conv_result.device == Xc.device
+        assert torch.isfinite(conv_result).all()
