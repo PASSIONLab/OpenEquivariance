@@ -2,7 +2,7 @@
 
 The production Torch extension now implements `libtorch_tp_jit::group_gemm` through `aoti_torch_cuda_bmm_out` on CUDA and ROCm. Both the stable extension and the source/JIT extension use this C entry point. The operator schema, fake implementation, output layouts, and custom backward formulas remain compatible.
 
-The production implementation passed CUDA validation on an H100 with Torch 2.10's stable and JIT extensions and Torch 2.7's JIT extension. The complete matrix and its hardware limits are recorded in [the validation report](VALIDATION.md).
+The production implementation passed CUDA validation on an H100 and ROCm validation on an MI300X. Both runs covered Torch 2.10's stable and JIT implementations and Torch 2.7's JIT implementation; stable HIP artifact testing used an isolated loader override because production still selects JIT on ROCm. The complete matrices and hardware limits are recorded in the [CUDA report](VALIDATION.md) and [AMD report](AMD_VALIDATION.md).
 
 ## Implementation
 
@@ -53,13 +53,13 @@ The stable wheel build uses CPU LibTorch plus small GPU link stubs. [The stub](.
 
 CMake installs the stable libraries into the wheel's package directory. The previous absolute destination wrote them into the source tree, where the wheel's ignore rules excluded them. The loader now resolves the compiled extension's location to find its companion AOTI library; this also supports editable installations where Python sources and compiled libraries live in different directories. Build CI installs a normal wheel and asserts that the stable extension is selected before running the import checks.
 
-The HIP CMake target is named `oeq_stable_hip`, matching its module entry point and expected artifact name. It explicitly links `hiprtc::hiprtc`. The existing Python loader still selects JIT compilation for HIP; enabling precompiled HIP loading is outside this change. The ROCm JIT path uses the same BMM helper as the stable CUDA build.
+The HIP CMake target is named `oeq_stable_hip`, matching its module entry point and expected artifact name. It explicitly links `hiprtc::hiprtc`. The existing Python loader still selects JIT compilation for HIP; enabling precompiled HIP loading is outside this change. The ROCm JIT path uses the same BMM helper as the stable CUDA build. The HIP wheel built successfully, and its stable artifacts passed hardware tests with the existing loader restriction removed only in an isolated test copy.
 
 ## ROCm evidence
 
 PyTorch v2.10 adds the generated `c_shim_cuda.cpp` to `torch_hip` under `USE_ROCM`. The C symbol retains the `cuda` spelling on ROCm. The underlying GEMM implementations are converted to HIP BLAS calls, and Torch handles backend selection, including the double-precision fallback from hipBLASLt. [ROCm library construction](https://github.com/pytorch/pytorch/blob/v2.10.0/caffe2/CMakeLists.txt#L941), [HIP BLAS mappings](https://github.com/pytorch/pytorch/blob/v2.10.0/torch/utils/hipify/cuda_to_hip_mappings.py#L6826), [backend selection](https://github.com/pytorch/pytorch/blob/v2.10.0/aten/src/ATen/cuda/CUDABlas.cpp#L779).
 
-This supports the implementation choice but does not establish AMD hardware correctness. ROCm execution has not been validated.
+Hardware validation confirmed these entry points in Torch 2.10 / ROCm 7.1 and Torch 2.7 / ROCm 6.3. On an MI300X, both normal JIT configurations and the stable HIP artifacts passed the focused integration suite; both Torch 2.10 implementations also passed all model tests. The AMD matrix contains 192 successful checks and three skips requiring a second GPU. Binary inspection confirmed no direct vendor BLAS dependency in either stable library or either JIT library. [AMD validation and loader-policy details](AMD_VALIDATION.md).
 
 ## JAX scope
 
@@ -69,7 +69,7 @@ JAX's public FFI provides buffers and a GPU stream, without an equivalent BMM C 
 
 ## Validation
 
-The stable wheel and JIT extensions compiled and loaded successfully. Wheel and editable-install checks verified that the installed stable libraries are found and that the build stub is excluded. GPU validation produced 192 successful checks across the three extension configurations and the surrounding model tests, with three skips for the device-guard test that requires two GPUs. [Results, environment corrections, and reproduction commands](VALIDATION.md).
+The stable wheels and JIT extensions compiled and loaded successfully on CUDA and ROCm. Wheel and editable-install checks verified that the installed stable libraries are found and that the build stubs are excluded. Each platform's validation matrix produced 192 successful checks across the three extension configurations and the surrounding model tests, with three skips for the device-guard test that requires two GPUs. [CUDA results](VALIDATION.md), [AMD results](AMD_VALIDATION.md).
 
 Earlier local checks also passed for the new operator and both adapters against Torch 2.10 headers, the link stub, and the shared helper against Torch 2.4 headers. The unmodified production view helper passed eight cases using real Torch 2.10 CPU tensors with the GPU BMM entry point redirected to CPU BMM for that check: both modes/dtypes, nonzero storage offsets, empty groups, and output guard values.
 
