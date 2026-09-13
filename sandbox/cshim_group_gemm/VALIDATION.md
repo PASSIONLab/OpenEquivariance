@@ -2,6 +2,8 @@
 
 The production implementation passed CUDA validation on 2026-09-13. The final test matrix contains 192 successful checks and three skips, all for the same device-guard test requiring two GPUs. These results cover the registered production operator and installed artifacts, not the earlier standalone prototype.
 
+Subsequent ROCm hardware validation is recorded in [the AMD report](AMD_VALIDATION.md).
+
 ## Source and artifact
 
 - Branch: `move-bmm-calls-to-stable-cshim`, based on main at `dbe854415da7771eba33195534c171adbca5677b`.
@@ -64,7 +66,6 @@ The allowlist is only needed for the older e3nn dependency described above. The 
 
 ## Scope limits
 
-- ROCm has source-level support evidence in [the design](DESIGN.md), but no AMD hardware run has been performed.
 - Multi-GPU device guarding remains unverified on hardware because only one GPU was available.
 - Torch 2.4 received header checks only; GPU execution covered Torch 2.7 and 2.10. CUDA versions other than 12.8 were not exercised by this production test matrix.
 - Direct GPU graph replay requires fixed ragged counts, as described in the design.
