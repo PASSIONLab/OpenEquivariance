@@ -37,6 +37,8 @@ The registered operator guards A's device before making GPU contiguous copies or
 
 BMM uses Torch's current stream on that device. OEQ neither creates a BLAS handle nor changes a BLAS stream. Calls remain asynchronous and follow PyTorch's normal storage/stream lifetime contract.
 
+GPU graph capture records the group sizes read by the host loop during capture. Direct graph replay requires those counts to remain unchanged; changing group sizes requires recapture. Ordinary calls and compiled execution without graph replay read the counts on each invocation.
+
 Following Torch's precision, determinism, and preferred-BLAS settings is an intentional behavior change relative to main's independently created handle. There is no OEQ-specific precision override. Custom backward registration remains responsible for differentiation through the grouped operator; the internal BMM-out invocation does not replace that registration.
 
 ## ABI and build paths
