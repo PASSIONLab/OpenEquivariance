@@ -32,6 +32,8 @@ constexpr Dtype kByte = torch::headeronly::ScalarType::Byte;
 #define REGISTER_LIBRARY_IMPL STABLE_TORCH_LIBRARY_IMPL
 #define REGISTER_LIBRARY STABLE_TORCH_LIBRARY
 
+namespace {
+
 class TensorDeviceGuard {
     torch::stable::accelerator::DeviceGuard guard;
 public:
@@ -40,6 +42,8 @@ public:
 
 AtenTensorHandle tensor_handle(Tensor& tensor) {
     return tensor.get();
+}
+
 }
 
 #include "torch_core.hpp"
