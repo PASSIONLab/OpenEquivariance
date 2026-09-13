@@ -1,4 +1,6 @@
 import importlib
+import subprocess
+import sys
 
 import pytest
 import torch
@@ -171,3 +173,136 @@ def test_group_gemm_requires_cpu_counts(group_gemm):
     B = torch.empty((5, 2, 4), device="cuda")
     with pytest.raises(RuntimeError, match="ragged_counts must be on the CPU"):
         group_gemm(A, B, torch.tensor([2, 0, 3], device="cuda"), 3, 2, 3, 4, 0)
+
+
+@pytest.mark.parametrize("inner", [0, 1])
+@pytest.mark.parametrize(
+    "counts,batch,m,k",
+    [
+        ([1, 0, 5], 1, 1, 7),
+        ([1, 0, 5], 3, 7, 1),
+        ([1, 0, 5], 3, 1, 1),
+        ([1, 7, 0, 13], 4, 17, 29),
+    ],
+)
+def test_group_gemm_varied_shapes(group_gemm, inner, counts, batch, m, k):
+    A_shape = (len(counts), batch, m, k) if inner == 0 else (sum(counts), batch, m)
+    A = make_input(A_shape, torch.float64, "offset")
+    B = make_input((sum(counts), batch, k), torch.float64, "offset")
+    actual = group_gemm(
+        A, B, torch.tensor(counts, device="cpu"), len(counts), batch, m, k, inner
+    )
+    expected = reference(A.cpu(), B.cpu(), counts, inner)
+    torch.testing.assert_close(actual.cpu(), expected, rtol=1e-10, atol=1e-10)
+
+
+@pytest.mark.parametrize("inner", [0, 1])
+def test_group_gemm_double_backward(group_gemm, inner):
+    counts = torch.tensor([1, 0, 2], device="cpu")
+    A_shape = (3, 2, 2, 3) if inner == 0 else (3, 2, 2)
+    A = make_input(A_shape, torch.float64).requires_grad_()
+    B = make_input((3, 2, 3), torch.float64).requires_grad_()
+
+    def operation(A, B):
+        return group_gemm(A, B, counts, 3, 2, 2, 3, inner)
+
+    assert torch.autograd.gradgradcheck(operation, (A, B), fast_mode=True)
+
+
+@pytest.mark.parametrize("inner", [0, 1])
+def test_group_gemm_graph_replay(group_gemm, inner):
+    counts = [2, 0, 3]
+    counts_tensor = torch.tensor(counts, device="cpu")
+    A_shape = (3, 2, 3, 4) if inner == 0 else (5, 2, 3)
+    A = make_input(A_shape, torch.float64)
+    B = make_input((5, 2, 4), torch.float64)
+    stream = torch.cuda.Stream()
+    stream.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(stream):
+        for _ in range(3):
+            group_gemm(A, B, counts_tensor, 3, 2, 3, 4, inner)
+    torch.cuda.current_stream().wait_stream(stream)
+
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph, stream=stream):
+        actual = group_gemm(A, B, counts_tensor, 3, 2, 3, 4, inner)
+
+    for scale in (2, 3):
+        A.mul_(scale)
+        B.add_(0.25)
+        graph.replay()
+        expected = reference(A.cpu(), B.cpu(), counts, inner)
+        torch.testing.assert_close(actual.cpu(), expected, rtol=1e-10, atol=1e-10)
+
+
+@pytest.mark.parametrize("inner", [0, 1])
+def test_group_gemm_compile(group_gemm, inner):
+    counts = [2, 0, 3]
+    counts_tensor = torch.tensor(counts, device="cpu")
+    A_shape = (3, 2, 3, 4) if inner == 0 else (5, 2, 3)
+    A = make_input(A_shape, torch.float64).requires_grad_()
+    B = make_input((5, 2, 4), torch.float64).requires_grad_()
+
+    def operation(A, B, counts):
+        return group_gemm(A, B, counts, 3, 2, 3, 4, inner)
+
+    compiled = torch.compile(operation, fullgraph=True)
+    actual = compiled(A, B, counts_tensor)
+    A_ref = A.detach().cpu().requires_grad_()
+    B_ref = B.detach().cpu().requires_grad_()
+    expected = reference(A_ref, B_ref, counts, inner)
+    torch.testing.assert_close(actual.cpu(), expected, rtol=1e-10, atol=1e-10)
+
+    actual_grads = torch.autograd.grad(actual.sum(), (A, B))
+    expected_grads = torch.autograd.grad(expected.sum(), (A_ref, B_ref))
+    for actual_grad, expected_grad in zip(actual_grads, expected_grads):
+        torch.testing.assert_close(
+            actual_grad.cpu(), expected_grad, rtol=1e-10, atol=1e-10
+        )
+
+
+@pytest.mark.parametrize("inner", [0, 1])
+def test_group_gemm_aoti(group_gemm, inner, tmp_path):
+    import openequivariance
+
+    class Model(torch.nn.Module):
+        def forward(self, A, B, counts):
+            return group_gemm(A, B, counts, 3, 2, 3, 4, inner)
+
+    counts = [2, 0, 3]
+    counts_tensor = torch.tensor(counts, device="cpu")
+    A_shape = (3, 2, 3, 4) if inner == 0 else (5, 2, 3)
+    A = make_input(A_shape, torch.float64)
+    B = make_input((5, 2, 4), torch.float64)
+    exported = torch.export.export(Model(), (A, B, counts_tensor), strict=False)
+    package_path = torch._inductor.aoti_compile_and_package(
+        exported, package_path=str(tmp_path / "group_gemm.pt2")
+    )
+    inputs_path = tmp_path / "inputs.pt"
+    torch.save(
+        (A.cpu(), B.cpu(), counts_tensor, reference(A.cpu(), B.cpu(), counts, inner)),
+        inputs_path,
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            """
+import sys
+import torch
+
+torch.ops.load_library(sys.argv[1])
+model = torch._inductor.aoti_load_package(sys.argv[2])
+A, B, counts, expected = torch.load(sys.argv[3], weights_only=True)
+actual = model(A.cuda(), B.cuda(), counts)
+torch.testing.assert_close(actual.cpu(), expected, rtol=1e-10, atol=1e-10)
+""",
+            openequivariance.torch_ext_so_path(),
+            package_path,
+            str(inputs_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
