@@ -31,6 +31,8 @@ constexpr Dtype kByte = torch::kByte;
 #define REGISTER_LIBRARY_IMPL TORCH_LIBRARY_IMPL
 #define REGISTER_LIBRARY TORCH_LIBRARY
 
+namespace {
+
 class TensorDeviceGuard {
     c10::DeviceGuard guard;
 public:
@@ -39,6 +41,8 @@ public:
 
 AtenTensorHandle tensor_handle(Tensor& tensor) {
     return torch::aot_inductor::tensor_pointer_to_tensor_handle(&tensor);
+}
+
 }
 
 #include "torch_core.hpp"
