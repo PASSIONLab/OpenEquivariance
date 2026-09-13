@@ -2,7 +2,7 @@
 
 The production Torch extension now implements `libtorch_tp_jit::group_gemm` through `aoti_torch_cuda_bmm_out` on CUDA and ROCm. Both the stable extension and the source/JIT extension use this C entry point. The operator schema, fake implementation, output layouts, and custom backward formulas remain compatible.
 
-GPU execution of this implementation is pending. GPU access is paused at the user's request; the earlier prototype results below are not results for this implementation.
+The production implementation passed CUDA validation on an H100 with Torch 2.10's stable and JIT extensions and Torch 2.7's JIT extension. The complete matrix and its hardware limits are recorded in [the validation report](VALIDATION.md).
 
 ## Implementation
 
@@ -59,7 +59,7 @@ The HIP CMake target is named `oeq_stable_hip`, matching its module entry point 
 
 PyTorch v2.10 adds the generated `c_shim_cuda.cpp` to `torch_hip` under `USE_ROCM`. The C symbol retains the `cuda` spelling on ROCm. The underlying GEMM implementations are converted to HIP BLAS calls, and Torch handles backend selection, including the double-precision fallback from hipBLASLt. [ROCm library construction](https://github.com/pytorch/pytorch/blob/v2.10.0/caffe2/CMakeLists.txt#L941), [HIP BLAS mappings](https://github.com/pytorch/pytorch/blob/v2.10.0/torch/utils/hipify/cuda_to_hip_mappings.py#L6826), [backend selection](https://github.com/pytorch/pytorch/blob/v2.10.0/aten/src/ATen/cuda/CUDABlas.cpp#L779).
 
-This supports the implementation choice but does not establish AMD hardware correctness. ROCm execution remains pending.
+This supports the implementation choice but does not establish AMD hardware correctness. ROCm execution has not been validated.
 
 ## JAX scope
 
@@ -67,28 +67,17 @@ JAX does not call this grouped-GEMM helper and has no BLAS dependency in its ext
 
 JAX's public FFI provides buffers and a GPU stream, without an equivalent BMM C shim. Future JAX grouped GEMM would require native JAX graph operations where shapes permit, or a separate FFI BLAS integration. [JAX FFI](https://docs.jax.dev/en/latest/ffi.html#ffi-calls-on-a-gpu).
 
-## Validation and next GPU run
+## Validation
 
-Local checks passed for the new operator and both adapters against Torch 2.10 headers, the link stub, and the shared helper against Torch 2.4 headers. These were host syntax checks, not full CUDA/ROCm extension builds. The unmodified production view helper also passed eight cases using real Torch 2.10 CPU tensors with the GPU BMM entry point redirected to CPU BMM for this check: both modes/dtypes, nonzero storage offsets, empty groups, and output guard values. All 46 GPU integration cases collect successfully; none has run on a GPU yet.
+The stable wheel and JIT extensions compiled and loaded successfully. Wheel and editable-install checks verified that the installed stable libraries are found and that the build stub is excluded. GPU validation produced 192 successful checks across the three extension configurations and the surrounding model tests, with three skips for the device-guard test that requires two GPUs. [Results, environment corrections, and reproduction commands](VALIDATION.md).
+
+Earlier local checks also passed for the new operator and both adapters against Torch 2.10 headers, the link stub, and the shared helper against Torch 2.4 headers. The unmodified production view helper passed eight cases using real Torch 2.10 CPU tensors with the GPU BMM entry point redirected to CPU BMM for that check: both modes/dtypes, nonzero storage offsets, empty groups, and output guard values.
 
 [The integration tests](../../tests/group_gemm_test.py) call the real registered operator. They cover both modes/dtypes, noncontiguous inputs and counts, nonzero input storage offsets, empty and singleton dimensions, varied group sizes, backward and double-backward gradients, the current stream, device guarding, invalid counts, graph replay, compiled training, and AOTI inference in a fresh process that loads only the exported OEQ library. The device-guard test requires two GPUs. The same test file supports CUDA and ROCm.
 
 [The import tests](../../tests/import_test.py) also inspect the extension and AOTI library's ELF dependencies and undefined symbols to check that OEQ has no direct vendor BLAS dependency. These checks run in the existing build-verification workflow for precompiled and JIT imports.
 
-After GPU access resumes, start with one case of the production operator:
-
-```sh
-pytest -q 'tests/group_gemm_test.py::test_group_gemm_matches_reference[contiguous-0-dtype0]'
-```
-
-Then run the focused integration suite against the stable build and the JIT build in separate processes:
-
-```sh
-pytest -q tests/import_test.py tests/group_gemm_test.py
-OEQ_JIT_EXTENSION=1 pytest -q tests/import_test.py tests/group_gemm_test.py
-```
-
-Existing symmetric-contraction integration tests exercise the surrounding model and its higher-order derivatives when the optional MACE dependency is available. No end-to-end performance claim is made before measurement.
+The existing symmetric-contraction integration tests passed all 24 cases for both the stable and JIT extensions under Torch 2.10, including comparison with MACE and higher-order derivatives. No end-to-end performance claim is made by this correctness validation.
 
 ## Earlier experiments
 
