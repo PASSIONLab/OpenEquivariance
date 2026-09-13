@@ -135,7 +135,7 @@ def load_jit_extension():
                 ],
             )
         if BACKEND == "cuda":
-            extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc", "-lcublas"])
+            extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc", "-ltorch_cuda"])
 
             try:
                 torch_libs, cuda_libs = library_paths("cuda")
@@ -148,8 +148,10 @@ def load_jit_extension():
 
             extra_cflags.append("-DCUDA_BACKEND")
         elif BACKEND == "hip":
-            torch_libs = library_paths("cuda")[0]
-            extra_link_args.append("-Wl,-rpath," + torch_libs)
+            hip_lib_dirs = library_paths("cuda")
+            extra_link_args.append("-Wl,-rpath," + hip_lib_dirs[0])
+            extra_link_args.extend("-L" + directory for directory in hip_lib_dirs)
+            extra_link_args.extend(["-ltorch_hip", "-lhiprtc"])
             extra_cflags.append("-DHIP_BACKEND")
         elif BACKEND == "sycl":
             import shutil

@@ -2,6 +2,9 @@
 
 **Added**:
 - Beta support for Intel XPUs. 
+- Route Torch grouped GEMM through the stable BMM C shim on CUDA and ROCm,
+  using Torch's current device stream and precision settings. Remove OEQ's
+  direct cuBLAS and rocBLAS dependencies.
 
 ### v0.7.0 (2026-09-10)
 **Added**: 
