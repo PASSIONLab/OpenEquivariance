@@ -67,7 +67,6 @@ function(add_stable_extension target_name backend_define link_libraries)
     # Enforce CXX11 ABI to match LibTorch
     target_compile_definitions(${target_name} PRIVATE 
         ${backend_define}=1
-        TORCH_TARGET_VERSION=0x020a000000000000ULL
         _GLIBCXX_USE_CXX11_ABI=1
         INCLUDE_NB_EXTENSION
     )
@@ -98,7 +97,6 @@ function(add_stable_extension target_name backend_define link_libraries)
     
     target_compile_definitions(${aoti_target_name} PRIVATE 
         ${backend_define}=1
-        TORCH_TARGET_VERSION=0x020a000000000000ULL
         _GLIBCXX_USE_CXX11_ABI=1
     )
     
