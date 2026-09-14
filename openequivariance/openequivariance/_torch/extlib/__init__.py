@@ -112,7 +112,7 @@ def load_jit_extension():
                 ],
             )
         if torch.version.cuda:
-            extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc", "-lcublas"])
+            extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc", "-ltorch_cuda"])
 
             try:
                 torch_libs, cuda_libs = library_paths("cuda")
@@ -127,6 +127,8 @@ def load_jit_extension():
         elif torch.version.hip:
             torch_libs = library_paths("cuda")[0]
             extra_link_args.append("-Wl,-rpath," + torch_libs)
+            extra_link_args.extend("-L" + path for path in library_paths("cuda"))
+            extra_link_args.extend(["-ltorch_hip", "-lhiprtc"])
             extra_cflags.append("-DHIP_BACKEND")
 
         torch_sources = [oeq_root + "/extension/" + src for src in torch_sources]
