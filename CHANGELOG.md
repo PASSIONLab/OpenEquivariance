@@ -2,7 +2,7 @@
 
 **Added**:
 - Beta support for Intel XPUs. 
-- Removed OEQ's direct cuBLAS and rocBLAS dependencies. Use torch's cuda c shim to instead. 
+- Removed OEQ's direct cuBLAS and rocBLAS dependencies. Use torch's cuda c shim instead. 
 
 ### v0.7.0 (2026-09-10)
 **Added**: 
