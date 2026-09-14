@@ -163,7 +163,7 @@ if(hip_FOUND)
 	    hip::host
         hiprtc::hiprtc
     )
-    add_stable_extension(oeq_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
+    add_stable_extension(torch_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
 endif()
 
 if(NOT CUDAToolkit_FOUND AND NOT hip_FOUND)
