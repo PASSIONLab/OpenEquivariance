@@ -85,7 +85,6 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             kahan=self.input_args["kahan"],
         )
 
-
         self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device="cuda")
         self.weight_numel = self.config.weight_numel
         self.kernel = string_to_tensor(self.kernel_string)
