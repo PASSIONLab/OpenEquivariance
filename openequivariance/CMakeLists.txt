@@ -52,7 +52,7 @@ set(OEQ_SOURCES
     ${EXT_JSON_DIR}/json11.cpp
 )
 
-set(OEQ_INSTALL_DIR "openequivariance/_torch/extlib")
+set(OEQ_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/openequivariance/_torch/extlib")
 
 function(add_stable_extension target_name backend_define link_libraries)
     # Create nanobind extension

@@ -5,7 +5,6 @@ import time
 import warnings
 import sysconfig
 import contextlib
-import importlib.util
 from pathlib import Path
 from packaging.version import Version
 
@@ -181,16 +180,6 @@ def load_precompiled_extension():
         )
 
 
-def _has_precompiled_extension():
-    backend = "hip" if IS_HIP else "cuda"
-    spec = importlib.util.find_spec(f"{__name__}.oeq_stable_{backend}")
-    return (
-        spec is not None
-        and spec.origin is not None
-        and Path(spec.origin).with_name(f"liboeq_stable_{backend}_aoti.so").is_file()
-    )
-
-
 USE_PRECOMPILED_EXTENSION = True
 WARNING_MESSAGE = ""
 
@@ -206,7 +195,9 @@ if torch.version.hip:
     WARNING_MESSAGE += "HIP does not support precompiled extension yet.\n"
     USE_PRECOMPILED_EXTENSION = False
 
-if not _has_precompiled_extension():
+if not os.path.exists(
+    os.path.join(os.path.dirname(__file__), "liboeq_stable_cuda_aoti.so")
+):
     WARNING_MESSAGE += "Precompiled extension shared object not found.\n"
     USE_PRECOMPILED_EXTENSION = False
 
