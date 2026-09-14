@@ -5,7 +5,6 @@ import time
 import warnings
 import sysconfig
 import contextlib
-import importlib.util
 from pathlib import Path
 from packaging.version import Version
 
@@ -225,16 +224,6 @@ def load_precompiled_extension():
         )
 
 
-def _has_precompiled_extension():
-    backend = BACKEND
-    spec = importlib.util.find_spec(f"{__name__}.oeq_stable_{backend}")
-    return (
-        spec is not None
-        and spec.origin is not None
-        and Path(spec.origin).with_name(f"liboeq_stable_{backend}_aoti.so").is_file()
-    )
-
-
 USE_PRECOMPILED_EXTENSION = True
 WARNING_MESSAGE = ""
 
@@ -256,7 +245,7 @@ if BACKEND == "sycl":
 
 AOTI_SO_NAME = f"liboeq_stable_{BACKEND}_aoti.so"
 
-if not _has_precompiled_extension():
+if not os.path.exists(os.path.join(os.path.dirname(__file__), AOTI_SO_NAME)):
     WARNING_MESSAGE += "Precompiled extension shared object not found.\n"
     USE_PRECOMPILED_EXTENSION = False
 
