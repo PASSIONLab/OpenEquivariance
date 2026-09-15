@@ -1,4 +1,12 @@
-"""Build schedules for receiver-streaming convolutions."""
+"""Build schedules for receiver-streaming convolutions.
+
+This implementation adapts the streaming concept and computational schedule
+proposed by Chorošajev and Bény [CB2026]_.
+
+.. [CB2026] Chorošajev and Bény, *Sobek: Streaming Equivariant Tensor Product
+    Convolutions*, arXiv (2026).
+    https://doi.org/10.48550/arXiv.2607.18074
+"""
 
 from dataclasses import dataclass
 from enum import IntEnum

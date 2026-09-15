@@ -18,17 +18,14 @@ from openequivariance.jax.StreamingTensorProductConv import (
 
 
 class TensorProductConv:
-    r"""Apply a tensor-product convolution with an explicit implementation mode.
+    r"""Apply a tensor-product convolution to a directed graph.
 
-    ``mode="standard"`` preserves the established loop-unroll implementation.
-    ``mode="auto"`` uses receiver-row streaming convolution for supported
-    external unshared UVU problems and exact ``[1, V, 1]`` UVW reductions. It
-    selects the established loop-unroll implementation for other problems.
-    ``mode="streaming"`` requires receiver-row streaming. ``mode="standard"``
-    always selects the established loop-unroll implementation.
-    Both public feature layouts are accepted. The standard implementation uses
-    differentiable boundary transposes when an ``"ir_mul"`` problem reaches
-    its native ``"mul_ir"`` kernel.
+    The mode selects between the general standard convolution, which supports
+    all tensor-product operations, and a more efficient streaming convolution
+    for UVU operations. The streaming implementation is based on the
+    computational schedule proposed by Chorošajev and Bény [CB2026]_.
+    ``mode="auto"`` uses streaming when supported and otherwise selects the
+    standard convolution.
 
     :param config: Specification of the tensor product.
     :param deterministic: Request deterministic aggregation. This selects the
@@ -36,8 +33,12 @@ class TensorProductConv:
         streaming mode.
     :param kahan: Request Kahan summation. This selects the standard
         implementation in automatic mode and is unavailable in streaming mode.
-    :param requires_jvp: Preserve JVP selection for the standard implementation.
+    :param requires_jvp: Enable JVP support for the standard implementation.
     :param mode: One of ``"auto"``, ``"streaming"``, or ``"standard"``.
+
+    .. [CB2026] Chorošajev and Bény, *Sobek: Streaming Equivariant Tensor
+        Product Convolutions*, arXiv (2026).
+        https://doi.org/10.48550/arXiv.2607.18074
     """
 
     _MODES = frozenset(("auto", "streaming", "standard"))

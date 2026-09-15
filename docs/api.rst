@@ -44,9 +44,9 @@ do not conform exactly to the e3nn-jax API, but perform the same computation.
 
 JAX ``TensorProductConv`` uses the established loop-unroll implementation by
 default. Select ``mode="streaming"`` to require receiver streaming, or
-``mode="auto"`` to use it when the problem is supported. Streaming accepts
-padded tail edges and optional receiver offsets, but vmapped calls must share
-one static topology.
+``mode="auto"`` to use it when the problem is supported. Streaming supports
+trailing padded edges represented by out-of-bounds node indices. Receiver row
+pointers may optionally be provided for receiver-sorted edges.
 
 If you plan to use ``oeq.jax`` without PyTorch installed, 
 you need to set ``OEQ_NOTORCH=1`` in your local environment (within Python,
