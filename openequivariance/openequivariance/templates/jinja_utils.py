@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 import numpy as np
 from jinja2 import Environment, PackageLoader
 
@@ -35,6 +37,7 @@ def cpp_scalar_literal(value, scalar):
     return f"static_cast<scalar_t>({float(value).hex()}{suffix})"
 
 
+@lru_cache(maxsize=2)
 def get_jinja_environment(is_hip=False):
     env = Environment(
         loader=PackageLoader("openequivariance"), extensions=["jinja2.ext.do"]
