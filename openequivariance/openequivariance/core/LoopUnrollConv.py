@@ -139,7 +139,7 @@ class LoopUnrollConv(ConvolutionBase):
         self.backward_workspace_offset = None
         self.double_backwardB_offset = None
 
-        self.workspace_size = 1
+        self.workspace_size = 0
         if deterministic:
             destination_index_bytes = 32  # Add extra to account for padding
             self.workspace_size = max(

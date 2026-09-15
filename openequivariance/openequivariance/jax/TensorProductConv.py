@@ -53,10 +53,6 @@ class TensorProductConv(LoopUnrollConv):
         self.weight_numel = config.weight_numel
         self.L3_dim = self.config.irreps_out.dim
 
-        self.workspace = jnp.zeros((self.workspace_size,), dtype=jnp.uint8)
-        logger.info(
-            f"Convolution requires {self.workspace_size // (2**20)}MB of workspace."
-        )
         self.dummy_transpose_perm = jnp.zeros((1,), dtype=jnp.int32)
 
     def forward(
@@ -86,7 +82,6 @@ class TensorProductConv(LoopUnrollConv):
             W,
             rows,
             cols,
-            self.workspace,
             sender_perm,
             L3_dim=self.L3_dim,
             kernel=self.kernel,

@@ -47,6 +47,10 @@ Tensor tensor_zeros_like(const Tensor &ref, const std::vector<int64_t> &sizes) {
     return torch::zeros(sizes, ref.options());
 }
 
+Tensor tensor_zeros_bytes(const Tensor &ref, int64_t nbytes) {
+    return torch::zeros({nbytes}, ref.options().dtype(torch::kByte));
+}
+
 void tensor_zero_(Tensor &tensor) {
     tensor.zero_();
 }
