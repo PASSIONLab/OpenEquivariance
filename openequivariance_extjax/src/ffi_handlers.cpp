@@ -32,6 +32,7 @@ using json = json11::Json;
 
 #include "tensorproducts.hpp"
 #include "convolution.hpp"
+#include "factorized_projected.hpp"
 
 xla::ffi::DataType enum_to_xla_dtype(int64_t i){
     switch(i) {
@@ -83,6 +84,10 @@ std::string xla_dtype_to_string(xla::ffi::DataType dtype) {
 
 inline void* data_ptr(ffi::AnyBuffer &buffer) {
     return buffer.untyped_data();
+}
+
+inline void* data_ptr(const ffi::AnyBuffer &buffer) {
+    return const_cast<void*>(buffer.untyped_data());
 }
 
 inline void* data_ptr(ffi::Result<ffi::AnyBuffer> &buffer) {
@@ -174,6 +179,9 @@ std::unordered_map<int64_t,
         std::unique_ptr<JITConvImpl<JITKernel>>,
         KernelProp
     >> conv_cache;
+
+std::unordered_map<int64_t, std::unique_ptr<JITFactorizedProjectedImpl<JITKernel>>>
+    factorized_projected_cache;
 std::mutex mut;
 
 template <typename Cache, typename Factory>
@@ -244,6 +252,19 @@ std::pair<JITConvImpl<JITKernel>*, KernelProp>
         });
     return {cached.first.get(), cached.second};
 }
+
+JITFactorizedProjectedImpl<JITKernel>* compile_factorized_projected_with_caching(
+    std::string_view source, int64_t hash, int64_t num_threads,
+    int64_t logical_cohort_width, int64_t shared_memory_bytes) {
+    auto& cached = find_or_compile_cached(
+        factorized_projected_cache, hash, [&] {
+            return std::make_unique<JITFactorizedProjectedImpl<JITKernel>>(
+                std::string(source), num_threads, logical_cohort_width,
+                shared_memory_bytes);
+        });
+    return cached.get();
+}
+
 
 inline void check_tensor(const ffi::AnyBuffer &buffer, 
                             std::initializer_list<int64_t> expected_shape,
@@ -741,6 +762,307 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Attr<int64_t>("hash"),
         {xla::ffi::Traits::kCmdBufferCompatible});
 
+// ------------------- Generated factorized convolution -------------------
+void validate_projected_inputs(ffi::AnyBuffer &x, ffi::AnyBuffer &sh,
+                               ffi::AnyBuffer &senders, int64_t input_dim,
+                               int64_t edge_dim) {
+    if (x.dimensions().size() != 2 || sh.dimensions().size() != 2) {
+        throw std::logic_error("projected factorized inputs must have rank two");
+    }
+    if (x.element_type() != xla::ffi::DataType::F32 &&
+        x.element_type() != xla::ffi::DataType::F64) {
+        throw std::logic_error("projected factorized kernels support only f32 and f64");
+    }
+    const int64_t edge_count = sh.dimensions()[0];
+    check_tensor(x, {x.dimensions()[0], input_dim}, x.element_type(), "x");
+    check_tensor(sh, {edge_count, edge_dim}, x.element_type(), "sh");
+    check_tensor(senders, {edge_count}, xla::ffi::DataType::S32, "senders");
+}
+
+ffi::Error factorized_projected_forward_impl(
+    ffi::AnyBuffer x, ffi::AnyBuffer sh, ffi::AnyBuffer weights, ffi::AnyBuffer senders,
+    ffi::AnyBuffer row_ptr, ffi::Result<ffi::AnyBuffer> out, stream_t stream,
+    std::string_view source, int64_t hash, int64_t channels,
+    int64_t input_dim, int64_t edge_dim, int64_t weight_dim, int64_t output_dim,
+    int64_t num_threads, int64_t logical_cohort_width,
+    int64_t shared_memory_bytes) {
+    validate_projected_inputs(x, sh, senders, input_dim, edge_dim);
+    const int64_t node_count = x.dimensions()[0], edge_count = sh.dimensions()[0];
+    check_tensor(weights, {edge_count, weight_dim}, x.element_type(), "weights");
+    check_tensor(row_ptr, {node_count + 1}, xla::ffi::DataType::S32, "row_ptr");
+    check_tensor(*out, {node_count, output_dim}, x.element_type(), "out");
+    auto* jit_kernel = compile_factorized_projected_with_caching(
+        source, hash, num_threads, logical_cohort_width, shared_memory_bytes);
+    jit_kernel->forward(
+        node_count, edge_count, channels, data_ptr(x), data_ptr(sh), data_ptr(weights),
+        data_ptr(senders), data_ptr(row_ptr), data_ptr(out), stream);
+    return ffi::Error::Success();
+}
+
+ffi::Error factorized_projected_forward_jvp_impl(
+    ffi::AnyBuffer x, ffi::AnyBuffer sh, ffi::AnyBuffer weights, ffi::AnyBuffer senders,
+    ffi::AnyBuffer row_ptr, const ffi::AnyBuffer* tx, const ffi::AnyBuffer* tsh,
+    const ffi::AnyBuffer* tweights, ffi::Result<ffi::AnyBuffer> out, stream_t stream,
+    std::string_view source, int64_t hash, int64_t channels,
+    int64_t input_dim, int64_t edge_dim, int64_t weight_dim, int64_t output_dim,
+    int64_t num_threads, int64_t logical_cohort_width,
+    int64_t shared_memory_bytes) {
+    validate_projected_inputs(x, sh, senders, input_dim, edge_dim);
+    const int64_t node_count = x.dimensions()[0], edge_count = sh.dimensions()[0];
+    check_tensor(weights, {edge_count, weight_dim}, x.element_type(), "weights");
+    check_tensor(row_ptr, {node_count + 1}, xla::ffi::DataType::S32, "row_ptr");
+    if (tx != nullptr) check_tensor(*tx, {node_count, input_dim}, x.element_type(), "tx");
+    if (tsh != nullptr) check_tensor(*tsh, {edge_count, edge_dim}, x.element_type(), "tsh");
+    if (tweights != nullptr) {
+        check_tensor(*tweights, {edge_count, weight_dim}, x.element_type(), "tweights");
+    }
+    check_tensor(*out, {node_count, output_dim}, x.element_type(), "out");
+    auto* jit_kernel = compile_factorized_projected_with_caching(
+        source, hash, num_threads, logical_cohort_width, shared_memory_bytes);
+    jit_kernel->forward_jvp(
+        node_count, edge_count, channels, data_ptr(x), data_ptr(sh), data_ptr(weights),
+        data_ptr(senders), data_ptr(row_ptr), tx == nullptr ? nullptr : data_ptr(*tx),
+        tsh == nullptr ? nullptr : data_ptr(*tsh),
+        tweights == nullptr ? nullptr : data_ptr(*tweights), data_ptr(out), stream);
+    return ffi::Error::Success();
+}
+
+ffi::Error factorized_projected_backward_impl(
+    ffi::AnyBuffer x, ffi::AnyBuffer sh, ffi::AnyBuffer weights, ffi::AnyBuffer senders,
+    ffi::AnyBuffer receivers, ffi::AnyBuffer dout, ffi::Result<ffi::AnyBuffer> dx,
+    ffi::Result<ffi::AnyBuffer> dsh, ffi::Result<ffi::AnyBuffer> dweights,
+    stream_t stream, std::string_view source, int64_t hash,
+    int64_t channels, int64_t input_dim, int64_t edge_dim, int64_t weight_dim,
+    int64_t output_dim, int64_t num_threads, int64_t logical_cohort_width,
+    int64_t shared_memory_bytes) {
+    validate_projected_inputs(x, sh, senders, input_dim, edge_dim);
+    const int64_t node_count = x.dimensions()[0], edge_count = sh.dimensions()[0];
+    check_tensor(weights, {edge_count, weight_dim}, x.element_type(), "weights");
+    check_tensor(receivers, {edge_count}, xla::ffi::DataType::S32, "receivers");
+    check_tensor(dout, {node_count, output_dim}, x.element_type(), "dout");
+    check_tensor(*dx, {node_count, input_dim}, x.element_type(), "dx");
+    check_tensor(*dsh, {edge_count, edge_dim}, x.element_type(), "dsh");
+    check_tensor(*dweights, {edge_count, weight_dim}, x.element_type(), "dweights");
+    zero_buffer(*dx, stream);
+    zero_buffer(*dsh, stream);
+    zero_buffer(*dweights, stream);
+    auto* jit_kernel = compile_factorized_projected_with_caching(
+        source, hash, num_threads, logical_cohort_width, shared_memory_bytes);
+    jit_kernel->backward(
+        node_count, edge_count, data_ptr(x), data_ptr(sh), data_ptr(weights), data_ptr(senders),
+        data_ptr(receivers), data_ptr(dout), data_ptr(dx), data_ptr(dsh),
+        data_ptr(dweights), stream);
+    return ffi::Error::Success();
+}
+
+ffi::Error factorized_projected_backward_jvp_impl(
+    ffi::AnyBuffer x, ffi::AnyBuffer sh, ffi::AnyBuffer weights, ffi::AnyBuffer senders,
+    ffi::AnyBuffer receivers, ffi::AnyBuffer dout, const ffi::AnyBuffer* tx,
+    const ffi::AnyBuffer* tsh, const ffi::AnyBuffer* tweights,
+    const ffi::AnyBuffer* tdout,
+    ffi::Result<ffi::AnyBuffer> tdx, ffi::Result<ffi::AnyBuffer> tdsh,
+    ffi::Result<ffi::AnyBuffer> tdweights, stream_t stream,
+    std::string_view source, int64_t hash, int64_t channels, int64_t input_dim,
+    int64_t edge_dim, int64_t weight_dim, int64_t output_dim,
+    int64_t num_threads, int64_t logical_cohort_width,
+    int64_t shared_memory_bytes) {
+    validate_projected_inputs(x, sh, senders, input_dim, edge_dim);
+    const int64_t node_count = x.dimensions()[0], edge_count = sh.dimensions()[0];
+    check_tensor(weights, {edge_count, weight_dim}, x.element_type(), "weights");
+    check_tensor(receivers, {edge_count}, xla::ffi::DataType::S32, "receivers");
+    check_tensor(dout, {node_count, output_dim}, x.element_type(), "dout");
+    if (tx != nullptr) check_tensor(*tx, {node_count, input_dim}, x.element_type(), "tx");
+    if (tsh != nullptr) check_tensor(*tsh, {edge_count, edge_dim}, x.element_type(), "tsh");
+    if (tweights != nullptr) {
+        check_tensor(*tweights, {edge_count, weight_dim}, x.element_type(), "tweights");
+    }
+    if (tdout != nullptr) {
+        check_tensor(*tdout, {node_count, output_dim}, x.element_type(), "tdout");
+    }
+    check_tensor(*tdx, {node_count, input_dim}, x.element_type(), "tdx");
+    check_tensor(*tdsh, {edge_count, edge_dim}, x.element_type(), "tdsh");
+    check_tensor(*tdweights, {edge_count, weight_dim}, x.element_type(), "tdweights");
+    zero_buffer(*tdx, stream);
+    zero_buffer(*tdsh, stream);
+    zero_buffer(*tdweights, stream);
+    auto* jit_kernel = compile_factorized_projected_with_caching(
+        source, hash, num_threads, logical_cohort_width, shared_memory_bytes);
+    jit_kernel->backward_jvp(
+        node_count, edge_count, data_ptr(x), data_ptr(sh), data_ptr(weights), data_ptr(senders),
+        data_ptr(receivers), data_ptr(dout), tx == nullptr ? nullptr : data_ptr(*tx),
+        tsh == nullptr ? nullptr : data_ptr(*tsh),
+        tweights == nullptr ? nullptr : data_ptr(*tweights),
+        tdout == nullptr ? nullptr : data_ptr(*tdout), data_ptr(tdx), data_ptr(tdsh),
+        data_ptr(tdweights), stream);
+    return ffi::Error::Success();
+}
+
+
+struct GeneratedBuffers {
+    std::vector<ffi::AnyBuffer> args;
+    std::vector<ffi::Result<ffi::AnyBuffer>> rets;
+};
+
+ffi::ErrorOr<GeneratedBuffers> decode_generated_buffers(
+    ffi::RemainingArgs args, ffi::RemainingRets rets, size_t expected_args,
+    size_t expected_rets, std::string_view family, int64_t operation) {
+    if (args.size() != expected_args || rets.size() != expected_rets) {
+        return ffi::Unexpected(ffi::Error::InvalidArgument(
+            std::string(family) + " operation " + std::to_string(operation) +
+            " received an unexpected number of buffers"));
+    }
+    GeneratedBuffers buffers;
+    buffers.args.reserve(expected_args);
+    buffers.rets.reserve(expected_rets);
+    for (size_t index = 0; index < expected_args; ++index) {
+        auto value = args.get<ffi::AnyBuffer>(index);
+        if (!value) return ffi::Unexpected(value.error());
+        buffers.args.push_back(*value);
+    }
+    for (size_t index = 0; index < expected_rets; ++index) {
+        auto value = rets.get<ffi::AnyBuffer>(index);
+        if (!value) return ffi::Unexpected(value.error());
+        buffers.rets.push_back(*value);
+    }
+    return buffers;
+}
+
+ffi::Error factorized_projected_execute_impl(
+    ffi::RemainingArgs args, ffi::RemainingRets rets, stream_t stream,
+    std::string_view source,
+    int64_t hash, int64_t operation, int64_t channels, int64_t input_dim,
+    int64_t edge_dim, int64_t weight_dim, int64_t output_dim,
+    int64_t num_threads, int64_t logical_cohort_width,
+    int64_t shared_memory_bytes) {
+    constexpr std::string_view kFamily = "factorized_projected";
+    const auto active_count = [](int64_t mask) {
+        size_t count = 0;
+        for (; mask != 0; mask >>= 1) count += static_cast<size_t>(mask & 1);
+        return count;
+    };
+    if (operation >= 17 && operation <= 23) {
+        const int64_t mask = operation - 16;
+        auto buffers = decode_generated_buffers(
+            args, rets, 5 + active_count(mask), 1, kFamily, operation);
+        if (!buffers) return buffers.error();
+        auto& a = buffers->args;
+        size_t index = 5;
+        const auto next = [&](int64_t bit) -> const ffi::AnyBuffer* {
+            return mask & bit ? &a[index++] : nullptr;
+        };
+        const auto* tx = next(1);
+        const auto* tsh = next(2);
+        const auto* tweights = next(4);
+        return factorized_projected_forward_jvp_impl(
+            a[0], a[1], a[2], a[3], a[4], tx, tsh, tweights,
+            buffers->rets[0], stream, source, hash, channels,
+            input_dim, edge_dim, weight_dim, output_dim, num_threads,
+            logical_cohort_width, shared_memory_bytes);
+    }
+    if (operation >= 33 && operation <= 47) {
+        const int64_t mask = operation - 32;
+        auto buffers = decode_generated_buffers(
+            args, rets, 6 + active_count(mask), 3, kFamily, operation);
+        if (!buffers) return buffers.error();
+        auto& a = buffers->args;
+        size_t index = 6;
+        const auto next = [&](int64_t bit) -> const ffi::AnyBuffer* {
+            return mask & bit ? &a[index++] : nullptr;
+        };
+        const auto* tx = next(1);
+        const auto* tsh = next(2);
+        const auto* tweights = next(4);
+        const auto* tdout = next(8);
+        return factorized_projected_backward_jvp_impl(
+            a[0], a[1], a[2], a[3], a[4], a[5], tx, tsh, tweights, tdout,
+            buffers->rets[0], buffers->rets[1], buffers->rets[2], stream,
+            source, hash, channels, input_dim, edge_dim,
+            weight_dim, output_dim, num_threads, logical_cohort_width,
+            shared_memory_bytes);
+    }
+    size_t expected_args;
+    size_t expected_rets;
+    switch (operation) {
+        case 0:
+            expected_args = 5;
+            expected_rets = 1;
+            break;
+        case 2:
+            expected_args = 6;
+            expected_rets = 3;
+            break;
+        default:
+            return ffi::Error::InvalidArgument("unknown factorized projected operation");
+    }
+    auto buffers = decode_generated_buffers(
+        args, rets, expected_args, expected_rets, kFamily, operation);
+    if (!buffers) return buffers.error();
+    auto& a = buffers->args;
+    auto& r = buffers->rets;
+    switch (operation) {
+        case 0:
+            return factorized_projected_forward_impl(
+                a[0], a[1], a[2], a[3], a[4], r[0], stream, source, hash,
+                channels, input_dim, edge_dim, weight_dim, output_dim,
+                num_threads, logical_cohort_width, shared_memory_bytes);
+        case 2:
+            return factorized_projected_backward_impl(
+                a[0], a[1], a[2], a[3], a[4], a[5], r[0], r[1], r[2], stream, source, hash, channels, input_dim, edge_dim, weight_dim,
+                output_dim, num_threads, logical_cohort_width,
+                shared_memory_bytes);
+    }
+    return ffi::Error::Internal("unreachable factorized projected operation");
+}
+
+
+ffi::Error factorized_projected_initialize_impl(
+    ffi::RemainingArgs, ffi::RemainingRets, stream_t, std::string_view source,
+    int64_t hash, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t,
+    int64_t num_threads, int64_t logical_cohort_width,
+    int64_t shared_memory_bytes) {
+    compile_factorized_projected_with_caching(
+        source, hash, num_threads, logical_cohort_width, shared_memory_bytes);
+    return ffi::Error::Success();
+}
+
+#define OEQ_GENERATED_INITIALIZE_CONTEXTS                                             \
+    .RemainingArgs()                                                                   \
+        .RemainingRets()                                                               \
+        .Ctx<ffi::PlatformStream<stream_t>>()
+
+#define OEQ_GENERATED_ATTRIBUTES                                                       \
+    .Attr<std::string_view>("source")                                                 \
+        .Attr<int64_t>("hash")                                                        \
+        .Attr<int64_t>("operation")
+
+#define OEQ_PROJECTED_ATTRIBUTES                                                       \
+    OEQ_GENERATED_ATTRIBUTES                                                           \
+        .Attr<int64_t>("channels")                                                    \
+        .Attr<int64_t>("input_dim")                                                   \
+        .Attr<int64_t>("edge_dim")                                                    \
+        .Attr<int64_t>("weight_dim")                                                  \
+        .Attr<int64_t>("output_dim")                                                  \
+        .Attr<int64_t>("num_threads")                                                \
+        .Attr<int64_t>("logical_cohort_width")                                       \
+        .Attr<int64_t>("shared_memory_bytes")
+
+XLA_FFI_DEFINE_HANDLER_SYMBOL(
+    factorized_projected_initialize, factorized_projected_initialize_impl,
+    ffi::Ffi::Bind<ffi::ExecutionStage::kInitialize>()
+        OEQ_GENERATED_INITIALIZE_CONTEXTS OEQ_PROJECTED_ATTRIBUTES);
+
+XLA_FFI_DEFINE_HANDLER_SYMBOL(
+    factorized_projected, factorized_projected_execute_impl,
+    ffi::Ffi::Bind()
+        .RemainingArgs()
+        .RemainingRets()
+        .Ctx<ffi::PlatformStream<stream_t>>() OEQ_PROJECTED_ATTRIBUTES,
+    {xla::ffi::Traits::kCmdBufferCompatible});
+
+#undef OEQ_PROJECTED_ATTRIBUTES
+#undef OEQ_GENERATED_ATTRIBUTES
+#undef OEQ_GENERATED_INITIALIZE_CONTEXTS
+
 namespace {
 
 #define OEQ_FFI_HANDLER(NAME, INITIALIZE)                                             \
@@ -754,6 +1076,7 @@ const OeqFfiHandler kFfiHandlers[] = {
     OEQ_FFI_HANDLER(conv_forward, conv_initialize),
     OEQ_FFI_HANDLER(conv_backward, conv_initialize),
     OEQ_FFI_HANDLER(conv_double_backward, conv_initialize),
+    OEQ_FFI_HANDLER(factorized_projected, factorized_projected_initialize),
 };
 
 #undef OEQ_FFI_HANDLER

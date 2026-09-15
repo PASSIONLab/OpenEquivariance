@@ -1,3 +1,5 @@
+"""JAX tensor-product and convolution interfaces."""
+
 import jax
 import jax.numpy as jnp
 
@@ -5,6 +7,14 @@ from openequivariance.core.e3nn_lite import Irreps
 from openequivariance.jax.TensorProduct import TensorProduct as TensorProduct
 from openequivariance.jax.TensorProductConv import (
     TensorProductConv as TensorProductConv,
+)
+from openequivariance.jax.LoopUnrollTensorProductConv import (
+    LoopUnrollTensorProductConv as LoopUnrollTensorProductConv,
+)
+from openequivariance.jax.StreamingTensorProductConv import (
+    StreamingTensorProductConv as StreamingTensorProductConv,
+    StreamingUnavailableError as StreamingUnavailableError,
+    streaming_support as streaming_support,
 )
 
 
@@ -78,4 +88,12 @@ def transpose_irreps(
     return out
 
 
-__all__ = ["TensorProduct", "TensorProductConv", "transpose_irreps"]
+__all__ = [
+    "TensorProduct",
+    "TensorProductConv",
+    "LoopUnrollTensorProductConv",
+    "StreamingTensorProductConv",
+    "StreamingUnavailableError",
+    "streaming_support",
+    "transpose_irreps",
+]
