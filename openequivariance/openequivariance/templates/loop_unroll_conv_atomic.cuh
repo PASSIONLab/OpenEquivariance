@@ -33,24 +33,6 @@ struct ConvData {
 
 __global__ void 
 {{ launch_bounds(forward_schedule) }}
-fixup_forward(void* workspace, IRREP_T* dst_ptr) {
-    // Empty, no fixup
-}
-
-__global__ void 
-{{ launch_bounds(backward_schedule) }}
-fixup_backward(void* workspace, IRREP_T* dst_ptr) {
-    // Empty, no fixup
-}
-
-__global__ void 
-{{ launch_bounds(double_backward_schedule) }}
-fixup_double_backwardB(void* workspace, IRREP_T* dst_ptr) {
-    // Empty, no fixup
-}
-
-__global__ void 
-{{ launch_bounds(forward_schedule) }}
 forward(IRREP_T* L1_in,
         IRREP_T* L2_in,
         WEIGHT_T* weights,

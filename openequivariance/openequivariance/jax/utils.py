@@ -1,7 +1,21 @@
+import functools
+import json
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax.interpreters import ad
+
+
+@functools.cache
+def conv_workspace_shape(kernel: str) -> jax.ShapeDtypeStruct:
+    size = json.loads(kernel)["kernel_prop"]["workspace_size"]
+    return jax.ShapeDtypeStruct((int(size),), jnp.uint8)
+
+
+def conv_workspace_empty(kernel: str) -> jax.Array:
+    shape = conv_workspace_shape(kernel)
+    return jnp.empty(shape.shape, shape.dtype)
 
 
 def reorder_jax_helper(schedule, weights_in, direction, has_batch_dim):

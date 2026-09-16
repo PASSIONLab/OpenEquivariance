@@ -1,5 +1,10 @@
 ## Latest Changes
 
+### Unreleased
+**Changed**:
+- The deterministic convolution workspace is now allocated by the framework (PyTorch / JAX) each call
+- Atomic convolutions no longer compile or launch fixup kernels.
+
 ### v0.7.0 (2026-09-10)
 **Added**: 
 - Public XLA FFI registration provider

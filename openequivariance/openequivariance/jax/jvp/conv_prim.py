@@ -2,7 +2,11 @@ import jax
 import jax.numpy as jnp
 from jax.extend import core
 from jax.interpreters import mlir, ad, batching
-from openequivariance.jax.utils import clean_tensors
+from openequivariance.jax.utils import (
+    clean_tensors,
+    conv_workspace_shape,
+    conv_workspace_empty,
+)
 
 # ==============================================================================
 # 1. Forward Primitive
@@ -11,16 +15,29 @@ from openequivariance.jax.utils import clean_tensors
 conv_fwd_p = core.Primitive("conv_fwd")
 
 
-def conv_fwd_impl(X, Y, W, rows, cols, workspace, sender_perm, *, L3_dim, kernel, hash):
+def conv_fwd_impl(X, Y, W, rows, cols, sender_perm, *, L3_dim, kernel, hash):
     irrep_dtype = X.dtype
     out_shape = jax.ShapeDtypeStruct((X.shape[0], L3_dim), irrep_dtype)
-    call = jax.ffi.ffi_call("conv_forward", out_shape)
-    return call(X, Y, W, rows, cols, workspace, sender_perm, kernel=kernel, hash=hash)
+    call = jax.ffi.ffi_call(
+        "conv_forward",
+        (out_shape, conv_workspace_shape(kernel)),
+        input_output_aliases={5: 1},
+    )
+    out, _workspace = call(
+        X,
+        Y,
+        W,
+        rows,
+        cols,
+        conv_workspace_empty(kernel),
+        sender_perm,
+        kernel=kernel,
+        hash=hash,
+    )
+    return out
 
 
-def conv_fwd_abstract_eval(
-    X, Y, W, rows, cols, workspace, sender_perm, *, L3_dim, kernel, hash
-):
+def conv_fwd_abstract_eval(X, Y, W, rows, cols, sender_perm, *, L3_dim, kernel, hash):
     return jax.core.ShapedArray((X.shape[0], L3_dim), X.dtype)
 
 
@@ -42,22 +59,31 @@ conv_bwd_p = core.Primitive("conv_bwd")
 conv_bwd_p.multiple_results = True
 
 
-def conv_bwd_impl(X, Y, W, dZ, rows, cols, workspace, sender_perm, *, kernel, hash):
+def conv_bwd_impl(X, Y, W, dZ, rows, cols, sender_perm, *, kernel, hash):
     irrep_dtype = X.dtype
     out_shapes = (
         jax.ShapeDtypeStruct(X.shape, irrep_dtype),
         jax.ShapeDtypeStruct(Y.shape, irrep_dtype),
         jax.ShapeDtypeStruct(W.shape, irrep_dtype),
+        conv_workspace_shape(kernel),
     )
-    call = jax.ffi.ffi_call("conv_backward", out_shapes)
-    return call(
-        X, Y, W, dZ, rows, cols, workspace, sender_perm, kernel=kernel, hash=hash
+    call = jax.ffi.ffi_call("conv_backward", out_shapes, input_output_aliases={6: 3})
+    dX, dY, dW, _workspace = call(
+        X,
+        Y,
+        W,
+        dZ,
+        rows,
+        cols,
+        conv_workspace_empty(kernel),
+        sender_perm,
+        kernel=kernel,
+        hash=hash,
     )
+    return dX, dY, dW
 
 
-def conv_bwd_abstract_eval(
-    X, Y, W, dZ, rows, cols, workspace, sender_perm, *, kernel, hash
-):
+def conv_bwd_abstract_eval(X, Y, W, dZ, rows, cols, sender_perm, *, kernel, hash):
     irrep_dtype = X.dtype
     return (
         jax.core.ShapedArray(X.shape, irrep_dtype),
@@ -85,7 +111,7 @@ conv_dbwd_p.multiple_results = True
 
 
 def conv_dbwd_impl(
-    X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, *, kernel, hash
+    X, Y, W, dZ, ddX, ddY, ddW, rows, cols, sender_perm, *, kernel, hash
 ):
     irrep_dtype = X.dtype
     out_shapes = (
@@ -93,9 +119,12 @@ def conv_dbwd_impl(
         jax.ShapeDtypeStruct(Y.shape, irrep_dtype),
         jax.ShapeDtypeStruct(W.shape, irrep_dtype),
         jax.ShapeDtypeStruct(dZ.shape, irrep_dtype),
+        conv_workspace_shape(kernel),
     )
-    call = jax.ffi.ffi_call("conv_double_backward", out_shapes)
-    return call(
+    call = jax.ffi.ffi_call(
+        "conv_double_backward", out_shapes, input_output_aliases={9: 4}
+    )
+    gX, gY, gW, gdZ, _workspace = call(
         X,
         Y,
         W,
@@ -105,15 +134,16 @@ def conv_dbwd_impl(
         ddW,
         rows,
         cols,
-        workspace,
+        conv_workspace_empty(kernel),
         sender_perm,
         kernel=kernel,
         hash=hash,
     )
+    return gX, gY, gW, gdZ
 
 
 def conv_dbwd_abstract_eval(
-    X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, *, kernel, hash
+    X, Y, W, dZ, ddX, ddY, ddW, rows, cols, sender_perm, *, kernel, hash
 ):
     irrep_dtype = X.dtype
     return (
@@ -142,10 +172,10 @@ conv_fwd_jvp_p = core.Primitive("conv_fwd_jvp")
 
 
 def conv_fwd_jvp_impl(
-    X, Y, W, dX, dY, dW, rows, cols, workspace, sender_perm, *, L3_dim, kernel, hash
+    X, Y, W, dX, dY, dW, rows, cols, sender_perm, *, L3_dim, kernel, hash
 ):
     kwargs = dict(L3_dim=L3_dim, kernel=kernel, hash=hash)
-    args_meta = (rows, cols, workspace, sender_perm)
+    args_meta = (rows, cols, sender_perm)
 
     term1 = conv_fwd_p.bind(dX, Y, W, *args_meta, **kwargs)
     term2 = conv_fwd_p.bind(X, dY, W, *args_meta, **kwargs)
@@ -154,7 +184,7 @@ def conv_fwd_jvp_impl(
 
 
 def conv_fwd_jvp_abstract_eval(
-    X, Y, W, dX, dY, dW, rows, cols, workspace, sender_perm, *, L3_dim, kernel, hash
+    X, Y, W, dX, dY, dW, rows, cols, sender_perm, *, L3_dim, kernel, hash
 ):
     return jax.core.ShapedArray((X.shape[0], L3_dim), X.dtype)
 
@@ -179,15 +209,15 @@ mlir.register_lowering(
 
 
 def conv_fwd_jvp_transpose(
-    ct, X, Y, W, dX, dY, dW, rows, cols, workspace, sender_perm, *, L3_dim, kernel, hash
+    ct, X, Y, W, dX, dY, dW, rows, cols, sender_perm, *, L3_dim, kernel, hash
 ):
     X, Y, W = clean_tensors(X, Y, W)
 
     grad_X, grad_Y, grad_W = conv_bwd_p.bind(
-        X, Y, W, ct, rows, cols, workspace, sender_perm, kernel=kernel, hash=hash
+        X, Y, W, ct, rows, cols, sender_perm, kernel=kernel, hash=hash
     )
 
-    return (None, None, None, grad_X, grad_Y, grad_W, None, None, None, None)
+    return (None, None, None, grad_X, grad_Y, grad_W, None, None, None)
 
 
 ad.primitive_transposes[conv_fwd_jvp_p] = conv_fwd_jvp_transpose
@@ -199,8 +229,8 @@ ad.primitive_transposes[conv_fwd_jvp_p] = conv_fwd_jvp_transpose
 
 
 def conv_fwd_jvp_rule(primals, tangents, *, L3_dim, kernel, hash):
-    X, Y, W, rows, cols, workspace, sender_perm = primals
-    dX, dY, dW, drows, dcols, dworkspace, dsender_perm = tangents
+    X, Y, W, rows, cols, sender_perm = primals
+    dX, dY, dW, drows, dcols, dsender_perm = tangents
 
     dX, dY, dW = clean_tensors(dX, dY, dW)
     out_primal = conv_fwd_p.bind(
@@ -209,7 +239,6 @@ def conv_fwd_jvp_rule(primals, tangents, *, L3_dim, kernel, hash):
         W,
         rows,
         cols,
-        workspace,
         sender_perm,
         L3_dim=L3_dim,
         kernel=kernel,
@@ -224,7 +253,6 @@ def conv_fwd_jvp_rule(primals, tangents, *, L3_dim, kernel, hash):
         dW,
         rows,
         cols,
-        workspace,
         sender_perm,
         L3_dim=L3_dim,
         kernel=kernel,
@@ -245,9 +273,9 @@ ad.primitive_jvps[conv_fwd_p] = conv_fwd_jvp_rule
 def conv_fwd_jvp_jvp_rule(primals, tangents, *, L3_dim, kernel, hash):
     tangents_clean = tuple(clean_tensors(*tangents))
 
-    def func(x, y, w, dx, dy, dw, r, c, ws, sp):
+    def func(x, y, w, dx, dy, dw, r, c, sp):
         return conv_fwd_jvp_impl(
-            x, y, w, dx, dy, dw, r, c, ws, sp, L3_dim=L3_dim, kernel=kernel, hash=hash
+            x, y, w, dx, dy, dw, r, c, sp, L3_dim=L3_dim, kernel=kernel, hash=hash
         )
 
     return jax.jvp(func, primals, tangents_clean)
@@ -265,10 +293,10 @@ conv_bwd_jvp_p.multiple_results = True
 
 
 def conv_bwd_jvp_impl(
-    X, Y, W, dZ, tX, tY, tW, tdZ, rows, cols, workspace, sender_perm, *, kernel, hash
+    X, Y, W, dZ, tX, tY, tW, tdZ, rows, cols, sender_perm, *, kernel, hash
 ):
     kwargs = dict(kernel=kernel, hash=hash)
-    args_meta = (rows, cols, workspace, sender_perm)
+    args_meta = (rows, cols, sender_perm)
 
     term_dZ = conv_bwd_p.bind(X, Y, W, tdZ, *args_meta, **kwargs)
     term_X = conv_bwd_p.bind(tX, Y, W, dZ, *args_meta, **kwargs)
@@ -283,7 +311,7 @@ def conv_bwd_jvp_impl(
 
 
 def conv_bwd_jvp_abstract_eval(
-    X, Y, W, dZ, tX, tY, tW, tdZ, rows, cols, workspace, sender_perm, *, kernel, hash
+    X, Y, W, dZ, tX, tY, tW, tdZ, rows, cols, sender_perm, *, kernel, hash
 ):
     irrep_dtype = X.dtype
     return (
@@ -324,7 +352,6 @@ def conv_bwd_jvp_transpose(
     tdZ,
     rows,
     cols,
-    workspace,
     sender_perm,
     *,
     kernel,
@@ -344,10 +371,10 @@ def conv_bwd_jvp_transpose(
     tensors_clean = clean_tensors(X, Y, W, dZ, ddX, ddY, ddW)
 
     g_X, g_Y, g_W, g_dZ = conv_dbwd_p.bind(
-        *tensors_clean, rows, cols, workspace, sender_perm, kernel=kernel, hash=hash
+        *tensors_clean, rows, cols, sender_perm, kernel=kernel, hash=hash
     )
 
-    return (None, None, None, None, g_X, g_Y, g_W, g_dZ, None, None, None, None)
+    return (None, None, None, None, g_X, g_Y, g_W, g_dZ, None, None, None)
 
 
 ad.primitive_transposes[conv_bwd_jvp_p] = conv_bwd_jvp_transpose
@@ -361,9 +388,9 @@ ad.primitive_transposes[conv_bwd_jvp_p] = conv_bwd_jvp_transpose
 def conv_bwd_jvp_jvp_rule(primals, tangents, *, kernel, hash):
     tangents_clean = tuple(clean_tensors(*tangents))
 
-    def func(x, y, w, dz, tx, ty, tw, tdz, r, c, ws, sp):
+    def func(x, y, w, dz, tx, ty, tw, tdz, r, c, sp):
         return conv_bwd_jvp_impl(
-            x, y, w, dz, tx, ty, tw, tdz, r, c, ws, sp, kernel=kernel, hash=hash
+            x, y, w, dz, tx, ty, tw, tdz, r, c, sp, kernel=kernel, hash=hash
         )
 
     return jax.jvp(func, primals, tangents_clean)
@@ -378,13 +405,13 @@ ad.primitive_jvps[conv_bwd_jvp_p] = conv_bwd_jvp_jvp_rule
 
 
 def conv_bwd_jvp_rule(primals, tangents, *, kernel, hash):
-    X, Y, W, dZ, rows, cols, workspace, sender_perm = primals
-    tX, tY, tW, tdZ, drows, dcols, dworkspace, dsender_perm = tangents
+    X, Y, W, dZ, rows, cols, sender_perm = primals
+    tX, tY, tW, tdZ, drows, dcols, dsender_perm = tangents
 
     tX, tY, tW, tdZ = clean_tensors(tX, tY, tW, tdZ)
 
     out_primal = conv_bwd_p.bind(
-        X, Y, W, dZ, rows, cols, workspace, sender_perm, kernel=kernel, hash=hash
+        X, Y, W, dZ, rows, cols, sender_perm, kernel=kernel, hash=hash
     )
     out_tangent = conv_bwd_jvp_p.bind(
         X,
@@ -397,7 +424,6 @@ def conv_bwd_jvp_rule(primals, tangents, *, kernel, hash):
         tdZ,
         rows,
         cols,
-        workspace,
         sender_perm,
         kernel=kernel,
         hash=hash,
@@ -424,7 +450,6 @@ def conv_dbwd_slow(
     ddW,
     rows,
     cols,
-    workspace,
     sender_perm,
     *,
     L3_dim,
@@ -432,7 +457,7 @@ def conv_dbwd_slow(
     hash,
 ):
     kwargs = dict(kernel=kernel, hash=hash)
-    args_meta = (rows, cols, workspace, sender_perm)
+    args_meta = (rows, cols, sender_perm)
 
     op1 = conv_bwd_p.bind(ddX, ddY, W, dZ, *args_meta, **kwargs)
     op2 = conv_bwd_p.bind(X, Y, ddW, dZ, *args_meta, **kwargs)
@@ -461,7 +486,7 @@ def conv_dbwd_jvp_rule(primals, tangents, *, kernel, hash):
     dZ = primals[3]  # Infer L3_dim from dZ (4th input)
     L3_dim = dZ.shape[1]
 
-    def func(x, y, w, dz, ddx, ddy, ddw, r, c, ws, sp):
+    def func(x, y, w, dz, ddx, ddy, ddw, r, c, sp):
         return conv_dbwd_slow(
             x,
             y,
@@ -472,7 +497,6 @@ def conv_dbwd_jvp_rule(primals, tangents, *, kernel, hash):
             ddw,
             r,
             c,
-            ws,
             sp,
             L3_dim=L3_dim,
             kernel=kernel,
@@ -492,13 +516,13 @@ ad.primitive_jvps[conv_dbwd_p] = conv_dbwd_jvp_rule
 
 
 def conv_dbwd_transpose(
-    ct, X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, *, kernel, hash
+    ct, X, Y, W, dZ, ddX, ddY, ddW, rows, cols, sender_perm, *, kernel, hash
 ):
     L3_dim = dZ.shape[1]
 
     X, Y, W, dZ, ddX, ddY, ddW = clean_tensors(X, Y, W, dZ, ddX, ddY, ddW)
 
-    def func(x, y, w, dz, ddx, ddy, ddw, r, c, ws, sp):
+    def func(x, y, w, dz, ddx, ddy, ddw, r, c, sp):
         return conv_dbwd_slow(
             x,
             y,
@@ -509,16 +533,13 @@ def conv_dbwd_transpose(
             ddw,
             r,
             c,
-            ws,
             sp,
             L3_dim=L3_dim,
             kernel=kernel,
             hash=hash,
         )
 
-    _, vjp_fun = jax.vjp(
-        func, X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm
-    )
+    _, vjp_fun = jax.vjp(func, X, Y, W, dZ, ddX, ddY, ddW, rows, cols, sender_perm)
     input_grads = vjp_fun(ct)
 
     return input_grads
@@ -555,17 +576,16 @@ def flatten_args(vector_arg_values, batch_axes):
     B = find_batch_size(vector_arg_values, batch_axes)
 
     new_args = []
-    for i, (arg, batch_axis) in enumerate(zip(vector_arg_values, batch_axes)):
-        if i != len(vector_arg_values) - 2:
-            if batch_axis is None and arg is not None:
-                arg = jnp.broadcast_to(arg, (B,) + arg.shape)
-            elif batch_axis is not None and batch_axis != 0:
-                arg = jnp.moveaxis(arg, batch_axis, 0)
+    for arg, batch_axis in zip(vector_arg_values, batch_axes):
+        if batch_axis is None and arg is not None:
+            arg = jnp.broadcast_to(arg, (B,) + arg.shape)
+        elif batch_axis is not None and batch_axis != 0:
+            arg = jnp.moveaxis(arg, batch_axis, 0)
         new_args.append(arg)
 
     vector_arg_values = new_args
 
-    rows, cols, workspace, sender_perm = vector_arg_values[-4:]
+    rows, cols, sender_perm = vector_arg_values[-3:]
     rows_offset, cols_offset, sender_perm_offset = rows, cols, sender_perm
     if B > 1:
         batch_offsets = (jnp.arange(B) * num_nodes).astype(rows.dtype)
@@ -575,10 +595,9 @@ def flatten_args(vector_arg_values, batch_axes):
         if sender_perm is not None:
             sender_perm_offset = sender_perm + batch_offsets[:, None]
 
-    new_args = [arg.reshape(-1, *arg.shape[2:]) for arg in vector_arg_values[:-4]] + [
+    new_args = [arg.reshape(-1, *arg.shape[2:]) for arg in vector_arg_values[:-3]] + [
         jnp.ravel(rows_offset),
         jnp.ravel(cols_offset),
-        workspace,
         jnp.ravel(sender_perm_offset),
     ]
 

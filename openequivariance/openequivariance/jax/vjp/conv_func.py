@@ -2,30 +2,46 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
+from openequivariance.jax.utils import conv_workspace_shape, conv_workspace_empty
+
 
 def zeros_like(x):
     return jnp.zeros_like(x)
 
 
-@partial(jax.custom_vjp, nondiff_argnums=(5, 6, 7, 8, 9))
-def forward(X, Y, W, rows, cols, workspace, sender_perm, L3_dim, kernel, hash):
+@partial(jax.custom_vjp, nondiff_argnums=(5, 6, 7, 8))
+def forward(X, Y, W, rows, cols, sender_perm, L3_dim, kernel, hash):
     forward_call = jax.ffi.ffi_call(
-        "conv_forward", jax.ShapeDtypeStruct((X.shape[0], L3_dim), X.dtype)
+        "conv_forward",
+        (
+            jax.ShapeDtypeStruct((X.shape[0], L3_dim), X.dtype),
+            conv_workspace_shape(kernel),
+        ),
+        input_output_aliases={5: 1},
     )
-    return forward_call(
-        X, Y, W, rows, cols, workspace, sender_perm, kernel=kernel, hash=hash
+    out, _workspace = forward_call(
+        X,
+        Y,
+        W,
+        rows,
+        cols,
+        conv_workspace_empty(kernel),
+        sender_perm,
+        kernel=kernel,
+        hash=hash,
     )
+    return out
 
 
-def forward_fwd(X, Y, W, rows, cols, workspace, sender_perm, L3_dim, kernel, hash):
-    out = forward(X, Y, W, rows, cols, workspace, sender_perm, L3_dim, kernel, hash)
+def forward_fwd(X, Y, W, rows, cols, sender_perm, L3_dim, kernel, hash):
+    out = forward(X, Y, W, rows, cols, sender_perm, L3_dim, kernel, hash)
     return out, (X, Y, W, rows, cols)
 
 
-def forward_bwd(workspace, sender_perm, L3_dim, kernel, hash, res, dZ):
+def forward_bwd(sender_perm, L3_dim, kernel, hash, res, dZ):
     X, Y, W, rows, cols = res
     dX, dY, dW = backward(
-        X, Y, W, dZ, rows, cols, workspace, sender_perm, kernel=kernel, hash=hash
+        X, Y, W, dZ, rows, cols, sender_perm, kernel=kernel, hash=hash
     )
     return dX, dY, dW, None, None
 
@@ -33,27 +49,39 @@ def forward_bwd(workspace, sender_perm, L3_dim, kernel, hash, res, dZ):
 forward.defvjp(forward_fwd, forward_bwd)
 
 
-@partial(jax.custom_vjp, nondiff_argnums=(6, 7, 8, 9))
-def backward(X, Y, W, dZ, rows, cols, workspace, sender_perm, kernel, hash):
+@partial(jax.custom_vjp, nondiff_argnums=(6, 7, 8))
+def backward(X, Y, W, dZ, rows, cols, sender_perm, kernel, hash):
     backward_call = jax.ffi.ffi_call(
         "conv_backward",
         (
             jax.ShapeDtypeStruct(X.shape, X.dtype),
             jax.ShapeDtypeStruct(Y.shape, Y.dtype),
             jax.ShapeDtypeStruct(W.shape, W.dtype),
+            conv_workspace_shape(kernel),
         ),
+        input_output_aliases={6: 3},
     )
-    return backward_call(
-        X, Y, W, dZ, rows, cols, workspace, sender_perm, kernel=kernel, hash=hash
+    dX, dY, dW, _workspace = backward_call(
+        X,
+        Y,
+        W,
+        dZ,
+        rows,
+        cols,
+        conv_workspace_empty(kernel),
+        sender_perm,
+        kernel=kernel,
+        hash=hash,
     )
+    return dX, dY, dW
 
 
-def backward_fwd(X, Y, W, dZ, rows, cols, workspace, sender_perm, kernel, hash):
-    out = backward(X, Y, W, dZ, rows, cols, workspace, sender_perm, kernel, hash)
+def backward_fwd(X, Y, W, dZ, rows, cols, sender_perm, kernel, hash):
+    out = backward(X, Y, W, dZ, rows, cols, sender_perm, kernel, hash)
     return out, (X, Y, W, dZ, rows, cols)
 
 
-def backward_bwd(workspace, sender_perm, kernel, hash, res, derivatives):
+def backward_bwd(sender_perm, kernel, hash, res, derivatives):
     X, Y, W, dZ, rows, cols = res
     ddX, ddY, ddW = derivatives
 
@@ -67,7 +95,6 @@ def backward_bwd(workspace, sender_perm, kernel, hash, res, derivatives):
         ddW,
         rows,
         cols,
-        workspace,
         sender_perm,
         kernel,
         hash,
@@ -79,10 +106,8 @@ def backward_bwd(workspace, sender_perm, kernel, hash, res, derivatives):
 backward.defvjp(backward_fwd, backward_bwd)
 
 
-@partial(jax.custom_vjp, nondiff_argnums=(9, 10, 11, 12))
-def double_backward(
-    X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, kernel, hash
-):
+@partial(jax.custom_vjp, nondiff_argnums=(9, 10, 11))
+def double_backward(X, Y, W, dZ, ddX, ddY, ddW, rows, cols, sender_perm, kernel, hash):
     double_backward_call = jax.ffi.ffi_call(
         "conv_double_backward",
         (
@@ -90,9 +115,11 @@ def double_backward(
             jax.ShapeDtypeStruct(Y.shape, Y.dtype),
             jax.ShapeDtypeStruct(W.shape, W.dtype),
             jax.ShapeDtypeStruct(dZ.shape, dZ.dtype),
+            conv_workspace_shape(kernel),
         ),
+        input_output_aliases={9: 4},
     )
-    return double_backward_call(
+    gX, gY, gW, gdZ, _workspace = double_backward_call(
         X,
         Y,
         W,
@@ -102,24 +129,24 @@ def double_backward(
         ddW,
         rows,
         cols,
-        workspace,
+        conv_workspace_empty(kernel),
         sender_perm,
         kernel=kernel,
         hash=hash,
     )
+    return gX, gY, gW, gdZ
 
 
 def double_backward_fwd(
-    X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, kernel, hash
+    X, Y, W, dZ, ddX, ddY, ddW, rows, cols, sender_perm, kernel, hash
 ):
     out = double_backward(
-        X, Y, W, dZ, ddX, ddY, ddW, rows, cols, workspace, sender_perm, kernel, hash
+        X, Y, W, dZ, ddX, ddY, ddW, rows, cols, sender_perm, kernel, hash
     )
     return out, (X, Y, W, dZ, ddX, ddY, ddW, rows, cols)
 
 
 def triple_backward(
-    workspace,
     sender_perm,
     kernel,
     hash,
@@ -129,7 +156,7 @@ def triple_backward(
     X, Y, W, dZ, ddX, ddY, ddW, rows, cols = residuals
     t_dX, t_dY, t_dW, t_ddZ = tangent_outputs
 
-    common_args = (rows, cols, workspace, sender_perm, kernel, hash)
+    common_args = (rows, cols, sender_perm, kernel, hash)
 
     op1_inputs = (ddX, ddY, W, dZ, t_dX, t_dY, zeros_like(W))
     g1_ddX, g1_ddY, g1_W, g1_dZ = double_backward(*op1_inputs, *common_args)

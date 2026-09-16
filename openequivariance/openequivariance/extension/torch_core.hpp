@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -39,6 +40,7 @@ Tensor tensor_to_cpu_contiguous(const Tensor &tensor);
 Tensor tensor_contiguous(const Tensor &tensor);
 Tensor tensor_empty_like(const Tensor &ref, const std::vector<int64_t> &sizes);
 Tensor tensor_zeros_like(const Tensor &ref, const std::vector<int64_t> &sizes);
+Tensor tensor_empty_bytes(const Tensor &ref, int64_t nbytes);
 void tensor_zero_(Tensor &tensor);
 
 void alert_not_deterministic(const char *name);
@@ -422,7 +424,6 @@ inline Tensor jit_conv_forward(
         int64_t L3_dim,
         Tensor rows,
         Tensor cols,
-        Tensor workspace,
         Tensor transpose_perm) {
 
     auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
@@ -433,7 +434,6 @@ inline Tensor jit_conv_forward(
 
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
-    check_tensor(workspace, {k.workspace_size}, k.workspace_dtype, "workspace");
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
@@ -454,7 +454,13 @@ inline Tensor jit_conv_forward(
     Tensor W_contig = tensor_contiguous(W);
     Tensor rows_contig = tensor_contiguous(rows);
     Tensor cols_contig = tensor_contiguous(cols);
-    Tensor workspace_contig = tensor_contiguous(workspace);
+
+    std::optional<Tensor> workspace;
+    void *workspace_ptr = nullptr;
+    if (k.deterministic) {
+        workspace.emplace(tensor_empty_bytes(L1_in, k.workspace_size));
+        workspace_ptr = data_ptr(*workspace);
+    }
 
     jit_kernel->exec_conv(
             data_ptr(L1_contig),
@@ -464,7 +470,7 @@ inline Tensor jit_conv_forward(
             data_ptr(rows_contig),
             data_ptr(cols_contig),
             nnz, node_count,
-            data_ptr(workspace_contig),
+            workspace_ptr,
             stream);
 
     return L3_out;
@@ -478,7 +484,6 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
         Tensor L3_grad,
         Tensor rows,
         Tensor cols,
-        Tensor workspace,
         Tensor transpose_perm) {
 
     auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
@@ -490,7 +495,6 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
     check_tensor(L3_grad, {node_count, k.L3_dim}, k.irrep_dtype, "L3_grad");
-    check_tensor(workspace, {k.workspace_size}, k.workspace_dtype, "workspace");
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
@@ -516,11 +520,17 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
 
     Tensor rows_contig = tensor_contiguous(rows);
     Tensor cols_contig = tensor_contiguous(cols);
-    Tensor workspace_contig = tensor_contiguous(workspace);
     Tensor transpose_perm_contig = tensor_contiguous(transpose_perm);
 
     if (k.shared_weights)
         tensor_zero_(W_grad);
+
+    std::optional<Tensor> workspace;
+    void *workspace_ptr = nullptr;
+    if (k.deterministic) {
+        workspace.emplace(tensor_empty_bytes(L1_in, k.workspace_size));
+        workspace_ptr = data_ptr(*workspace);
+    }
 
     jit_kernel->backward(
             data_ptr(L1_in_contig), data_ptr(L1_grad),
@@ -529,7 +539,7 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
             data_ptr(L3_grad_contig),
             data_ptr(rows_contig), data_ptr(cols_contig),
             nnz, node_count,
-            data_ptr(workspace_contig),
+            workspace_ptr,
             data_ptr(transpose_perm_contig),
             stream);
 
@@ -547,7 +557,6 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
         Tensor W_dgrad,
         Tensor rows,
         Tensor cols,
-        Tensor workspace,
         Tensor transpose_perm) {
 
     auto [jit_kernel, k] = compile_conv_with_caching(json_bytes, hash);
@@ -561,7 +570,6 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
     check_tensor(L3_grad, {node_count, k.L3_dim}, k.irrep_dtype, "L3_grad");
     check_tensor(L1_dgrad, {node_count, k.L1_dim}, k.irrep_dtype, "L1_dgrad");
     check_tensor(L2_dgrad, {nnz, k.L2_dim}, k.irrep_dtype, "L2_dgrad");
-    check_tensor(workspace, {k.workspace_size}, k.workspace_dtype, "workspace");
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
@@ -594,11 +602,17 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
 
     Tensor rows_contig = tensor_contiguous(rows);
     Tensor cols_contig = tensor_contiguous(cols);
-    Tensor workspace_contig = tensor_contiguous(workspace);
     Tensor transpose_perm_contig = tensor_contiguous(transpose_perm);
 
     if (k.shared_weights)
         tensor_zero_(W_grad);
+
+    std::optional<Tensor> workspace;
+    void *workspace_ptr = nullptr;
+    if (k.deterministic) {
+        workspace.emplace(tensor_empty_bytes(L1_in, k.workspace_size));
+        workspace_ptr = data_ptr(*workspace);
+    }
 
     jit_kernel->double_backward(
             data_ptr(L1_in_contig), data_ptr(L2_in_contig),
@@ -609,7 +623,7 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
             data_ptr(W_grad), data_ptr(L3_dgrad),
             data_ptr(rows_contig), data_ptr(cols_contig),
             nnz, node_count,
-            data_ptr(workspace_contig), data_ptr(transpose_perm_contig),
+            workspace_ptr, data_ptr(transpose_perm_contig),
             stream
     );
 
@@ -669,9 +683,9 @@ REGISTER_LIBRARY(libtorch_tp_jit, m) {
     m.def("jit_tp_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad) -> (Tensor, Tensor, Tensor)");
     m.def("jit_tp_double_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad) -> (Tensor, Tensor, Tensor, Tensor)");
 
-    m.def("jit_conv_forward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, int L3_dim, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> Tensor");
-    m.def("jit_conv_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor)");
-    m.def("jit_conv_double_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor, Tensor)");
+    m.def("jit_conv_forward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, int L3_dim, Tensor rows, Tensor cols, Tensor transpose_perm) -> Tensor");
+    m.def("jit_conv_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor rows, Tensor cols, Tensor transpose_perm) -> (Tensor, Tensor, Tensor)");
+    m.def("jit_conv_double_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad, Tensor rows, Tensor cols, Tensor transpose_perm) -> (Tensor, Tensor, Tensor, Tensor)");
 
     m.def("group_gemm(Tensor A, Tensor B, Tensor ragged_counts, int num_W, int batch_size, int m, int k, int ragged_inner) -> Tensor");
 };

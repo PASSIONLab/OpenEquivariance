@@ -466,9 +466,10 @@ ffi::Error conv_forward_impl(
         ffi::AnyBuffer W,
         ffi::AnyBuffer rows,
         ffi::AnyBuffer cols,
-        ffi::AnyBuffer workspace,
+        ffi::AnyBuffer workspace_in,
         ffi::AnyBuffer transpose_perm,
         ffi::Result<ffi::AnyBuffer> L3_out,
+        ffi::Result<ffi::AnyBuffer> workspace,
         stream_t stream, 
         std::string_view kernel_json,
         int64_t hash) {
@@ -477,19 +478,18 @@ ffi::Error conv_forward_impl(
         kernel_json, hash, true);
     const int64_t nnz = rows.dimensions()[0];
     const int64_t node_count = L1_in.dimensions()[0];
-    void* workspace_ptr = data_ptr(workspace);
+    void* workspace_ptr = nullptr;
 
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
-    check_tensor(workspace, {k.workspace_size}, k.workspace_dtype, "workspace");
+    check_tensor(workspace_in, {k.workspace_size}, k.workspace_dtype, "workspace");
+    check_tensor(*workspace, {k.workspace_size}, k.workspace_dtype, "workspace");
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
-    if (k.deterministic){
+    if (k.deterministic) {
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
-    }
-    else {
-        workspace_ptr = nullptr;
+        workspace_ptr = data_ptr(workspace);
     }
     zero_buffer(*L3_out, stream);
 
@@ -522,8 +522,9 @@ ffi::Error conv_backward_impl(
         ffi::Result<ffi::AnyBuffer> W_grad, 
         ffi::AnyBuffer rows,
         ffi::AnyBuffer cols,
-        ffi::AnyBuffer workspace,
+        ffi::AnyBuffer workspace_in,
         ffi::AnyBuffer transpose_perm,
+        ffi::Result<ffi::AnyBuffer> workspace,
         stream_t stream, 
         std::string_view kernel_json,
         int64_t hash) {
@@ -532,20 +533,19 @@ ffi::Error conv_backward_impl(
         kernel_json, hash, true);
     const int64_t nnz = rows.dimensions()[0];
     const int64_t node_count = L1_in.dimensions()[0];
-    void* workspace_ptr = data_ptr(workspace);
+    void* workspace_ptr = nullptr;
 
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
     check_tensor(L3_grad, {node_count, k.L3_dim}, k.irrep_dtype, "L3_grad");
-    check_tensor(workspace, {k.workspace_size}, k.workspace_dtype, "workspace");
+    check_tensor(workspace_in, {k.workspace_size}, k.workspace_dtype, "workspace");
+    check_tensor(*workspace, {k.workspace_size}, k.workspace_dtype, "workspace");
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
     if (k.deterministic) {
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
-    }
-    else {
-        workspace_ptr = nullptr;
+        workspace_ptr = data_ptr(workspace);
     }
     zero_buffer(*L1_grad, stream);
     zero_buffer(*L2_grad, stream);
@@ -591,8 +591,9 @@ ffi::Error conv_double_backward_impl(
         ffi::Result<ffi::AnyBuffer> L3_dgrad,
         ffi::AnyBuffer rows,
         ffi::AnyBuffer cols,
-        ffi::AnyBuffer workspace,
+        ffi::AnyBuffer workspace_in,
         ffi::AnyBuffer transpose_perm,
+        ffi::Result<ffi::AnyBuffer> workspace,
         stream_t stream, 
         std::string_view kernel_json,
         int64_t hash) {
@@ -601,22 +602,21 @@ ffi::Error conv_double_backward_impl(
         kernel_json, hash, true);
     const int64_t nnz = rows.dimensions()[0];
     const int64_t node_count = L1_in.dimensions()[0];
-    void* workspace_ptr = data_ptr(workspace);
+    void* workspace_ptr = nullptr;
 
     check_tensor(L1_in, {node_count, k.L1_dim}, k.irrep_dtype, "L1_in");
     check_tensor(L2_in, {nnz, k.L2_dim}, k.irrep_dtype, "L2_in");
     check_tensor(L3_grad, {node_count, k.L3_dim}, k.irrep_dtype, "L3_grad");
     check_tensor(L1_dgrad, {node_count, k.L1_dim}, k.irrep_dtype, "L1_dgrad");
     check_tensor(L2_dgrad, {nnz, k.L2_dim}, k.irrep_dtype, "L2_dgrad");
-    check_tensor(workspace, {k.workspace_size}, k.workspace_dtype, "workspace");
+    check_tensor(workspace_in, {k.workspace_size}, k.workspace_dtype, "workspace");
+    check_tensor(*workspace, {k.workspace_size}, k.workspace_dtype, "workspace");
     check_tensor(rows, {nnz}, k.idx_dtype, "rows");
     check_tensor(cols, {nnz}, k.idx_dtype, "cols");
 
     if (k.deterministic) {
         check_tensor(transpose_perm, {nnz}, k.idx_dtype, "transpose perm");
-    }
-    else {
-        workspace_ptr = nullptr;
+        workspace_ptr = data_ptr(workspace);
     }
     zero_buffer(*L1_grad, stream);
     zero_buffer(*L2_grad, stream);
@@ -694,6 +694,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
         .Ret<ffi::AnyBuffer>()
+        .Ret<ffi::AnyBuffer>()
         .Ctx<ffi::PlatformStream<stream_t>>()
         .Attr<std::string_view>("kernel")
         .Attr<int64_t>("hash"),
@@ -713,6 +714,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
+        .Ret<ffi::AnyBuffer>()
         .Ctx<ffi::PlatformStream<stream_t>>()
         .Attr<std::string_view>("kernel")
         .Attr<int64_t>("hash"),
@@ -736,6 +738,7 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
         .Arg<ffi::AnyBuffer>()
+        .Ret<ffi::AnyBuffer>()
         .Ctx<ffi::PlatformStream<stream_t>>()
         .Attr<std::string_view>("kernel")
         .Attr<int64_t>("hash"),
