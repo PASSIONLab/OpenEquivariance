@@ -62,7 +62,6 @@ static inline void oeq_syncthreads() {
 }
 
 #define __syncthreads() oeq_syncthreads()
-#define __threadfence_block() oeq_syncwarp()
 
 // ---------------------------------------------------------------------------
 // Warp-level primitives
