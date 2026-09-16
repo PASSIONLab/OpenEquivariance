@@ -40,7 +40,7 @@ Tensor tensor_to_cpu_contiguous(const Tensor &tensor);
 Tensor tensor_contiguous(const Tensor &tensor);
 Tensor tensor_empty_like(const Tensor &ref, const std::vector<int64_t> &sizes);
 Tensor tensor_zeros_like(const Tensor &ref, const std::vector<int64_t> &sizes);
-Tensor tensor_zeros_bytes(const Tensor &ref, int64_t nbytes);
+Tensor tensor_empty_bytes(const Tensor &ref, int64_t nbytes);
 void tensor_zero_(Tensor &tensor);
 
 void alert_not_deterministic(const char *name);
@@ -458,7 +458,7 @@ inline Tensor jit_conv_forward(
     std::optional<Tensor> workspace;
     void *workspace_ptr = nullptr;
     if (k.deterministic) {
-        workspace.emplace(tensor_zeros_bytes(L1_in, k.workspace_size));
+        workspace.emplace(tensor_empty_bytes(L1_in, k.workspace_size));
         workspace_ptr = data_ptr(*workspace);
     }
 
@@ -528,7 +528,7 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
     std::optional<Tensor> workspace;
     void *workspace_ptr = nullptr;
     if (k.deterministic) {
-        workspace.emplace(tensor_zeros_bytes(L1_in, k.workspace_size));
+        workspace.emplace(tensor_empty_bytes(L1_in, k.workspace_size));
         workspace_ptr = data_ptr(*workspace);
     }
 
@@ -610,7 +610,7 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
     std::optional<Tensor> workspace;
     void *workspace_ptr = nullptr;
     if (k.deterministic) {
-        workspace.emplace(tensor_zeros_bytes(L1_in, k.workspace_size));
+        workspace.emplace(tensor_empty_bytes(L1_in, k.workspace_size));
         workspace_ptr = data_ptr(*workspace);
     }
 

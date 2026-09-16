@@ -50,10 +50,10 @@ Tensor tensor_zeros_like(const Tensor &ref, const std::vector<int64_t> &sizes) {
     return out;
 }
 
-Tensor tensor_zeros_bytes(const Tensor &ref, int64_t nbytes) {
+Tensor tensor_empty_bytes(const Tensor &ref, int64_t nbytes) {
     std::vector<int64_t> sizes = {nbytes};
     auto sizes_ref = torch::headeronly::IntHeaderOnlyArrayRef(sizes.data(), sizes.size());
-    return torch::stable::new_zeros(ref, sizes_ref, kByte);
+    return torch::stable::new_empty(ref, sizes_ref, kByte);
 }
 
 void tensor_zero_(Tensor &tensor) {
