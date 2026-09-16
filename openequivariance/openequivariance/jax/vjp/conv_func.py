@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-from openequivariance.jax.utils import conv_workspace_shape, conv_workspace_zeros
+from openequivariance.jax.utils import conv_workspace_shape, conv_workspace_empty
 
 
 def zeros_like(x):
@@ -25,7 +25,7 @@ def forward(X, Y, W, rows, cols, sender_perm, L3_dim, kernel, hash):
         W,
         rows,
         cols,
-        conv_workspace_zeros(kernel),
+        conv_workspace_empty(kernel),
         sender_perm,
         kernel=kernel,
         hash=hash,
@@ -68,7 +68,7 @@ def backward(X, Y, W, dZ, rows, cols, sender_perm, kernel, hash):
         dZ,
         rows,
         cols,
-        conv_workspace_zeros(kernel),
+        conv_workspace_empty(kernel),
         sender_perm,
         kernel=kernel,
         hash=hash,
@@ -129,7 +129,7 @@ def double_backward(X, Y, W, dZ, ddX, ddY, ddW, rows, cols, sender_perm, kernel,
         ddW,
         rows,
         cols,
-        conv_workspace_zeros(kernel),
+        conv_workspace_empty(kernel),
         sender_perm,
         kernel=kernel,
         hash=hash,

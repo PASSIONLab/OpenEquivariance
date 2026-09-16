@@ -5,7 +5,7 @@ from jax.interpreters import mlir, ad, batching
 from openequivariance.jax.utils import (
     clean_tensors,
     conv_workspace_shape,
-    conv_workspace_zeros,
+    conv_workspace_empty,
 )
 
 # ==============================================================================
@@ -29,7 +29,7 @@ def conv_fwd_impl(X, Y, W, rows, cols, sender_perm, *, L3_dim, kernel, hash):
         W,
         rows,
         cols,
-        conv_workspace_zeros(kernel),
+        conv_workspace_empty(kernel),
         sender_perm,
         kernel=kernel,
         hash=hash,
@@ -75,7 +75,7 @@ def conv_bwd_impl(X, Y, W, dZ, rows, cols, sender_perm, *, kernel, hash):
         dZ,
         rows,
         cols,
-        conv_workspace_zeros(kernel),
+        conv_workspace_empty(kernel),
         sender_perm,
         kernel=kernel,
         hash=hash,
@@ -134,7 +134,7 @@ def conv_dbwd_impl(
         ddW,
         rows,
         cols,
-        conv_workspace_zeros(kernel),
+        conv_workspace_empty(kernel),
         sender_perm,
         kernel=kernel,
         hash=hash,

@@ -13,9 +13,9 @@ def conv_workspace_shape(kernel: str) -> jax.ShapeDtypeStruct:
     return jax.ShapeDtypeStruct((int(size),), jnp.uint8)
 
 
-def conv_workspace_zeros(kernel: str) -> jax.Array:
+def conv_workspace_empty(kernel: str) -> jax.Array:
     shape = conv_workspace_shape(kernel)
-    return jnp.zeros(shape.shape, shape.dtype)
+    return jnp.empty(shape.shape, shape.dtype)
 
 
 def reorder_jax_helper(schedule, weights_in, direction, has_batch_dim):
