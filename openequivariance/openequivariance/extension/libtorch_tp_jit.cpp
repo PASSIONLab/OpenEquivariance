@@ -9,6 +9,10 @@
     #include <c10/hip/HIPStream.h>
 #endif
 
+#ifdef SYCL_BACKEND
+    #include <c10/xpu/XPUStream.h>
+#endif
+
 #include <ATen/Operators.h>
 #include <c10/macros/Macros.h>
 #include <c10/util/Exception.h>
@@ -80,6 +84,18 @@ Stream get_current_stream() {
 #endif
 #ifdef HIP_BACKEND
     return c10::hip::getCurrentHIPStream();
+#endif
+#ifdef SYCL_BACKEND
+    // The queue is owned by PyTorch and outlives the kernel launch.
+    return &c10::xpu::getCurrentXPUStream().queue();
+#endif
+}
+
+bool tensor_is_on_gpu(const Tensor &tensor) {
+#ifdef SYCL_BACKEND
+    return tensor.is_xpu();
+#else
+    return tensor.is_cuda();
 #endif
 }
 

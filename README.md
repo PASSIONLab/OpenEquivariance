@@ -6,8 +6,9 @@
 [[JAX Examples]](#jax-examples)
 [[Citation and Acknowledgements]](#citation-and-acknowledgements)
 
-OpenEquivariance is a CUDA and HIP kernel generator for the Clebsch-Gordon tensor product, 
+OpenEquivariance is a CUDA, HIP, and SYCL kernel generator for the Clebsch-Gordon tensor product, 
 a key kernel in rotation-equivariant deep neural networks. 
+It targets NVIDIA, AMD, and Intel GPUs. 
 It implements some of the tensor products 
 that [e3nn](https://e3nn.org/) supports 
 commonly found in graph neural networks 
@@ -19,6 +20,11 @@ and GCC 9+ available before installing our package via
 ```bash
 pip install openequivariance
 ```
+
+On Intel GPUs, install a PyTorch build with XPU support and make the
+oneAPI DPC++ compiler (`icpx`) available on your `PATH`; the kernels are
+compiled at runtime through SYCL. Tensors live on the `xpu` device there
+instead of `cuda`.
 
 We provide up to an order of magnitude acceleration over e3nn perform on par with the latest
 version of [NVIDIA cuEquivariance](https://github.com/NVIDIA/cuEquivariance),
@@ -74,7 +80,8 @@ print(torch.norm(Z))
 ```
 
 And here's the same tensor product using openequivariance. We require that your
-tensors are stored on a CUDA device for this to work: 
+tensors are stored on a GPU device for this to work
+(``cuda`` for NVIDIA and AMD GPUs, ``xpu`` for Intel GPUs): 
 
 ```python
 import openequivariance as oeq

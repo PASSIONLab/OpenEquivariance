@@ -6,15 +6,15 @@
 OpenEquivariance
 ==============================
 
-`OpenEquivariance <https://github.com/PASSIONLab/OpenEquivariance>`_ is a CUDA and 
-HIP kernel generator for the Clebsch-Gordon
+`OpenEquivariance <https://github.com/PASSIONLab/OpenEquivariance>`_ is a CUDA, 
+HIP, and SYCL kernel generator for the Clebsch-Gordon
 tensor product, a key kernel in equivariant graph neural networks. We offer
 an identical interface to e3nn and produce the same results 
 (up to numerical roundoff). Our package exhibits up to an order of magnitude
 speedup over e3nn and competitive performance with NVIDIA's cuEquivariance. 
 
 Here, you can find our API reference, installation instructions, 
-and troubleshooting guide. We support for both NVIDIA and AMD GPUs through
+and troubleshooting guide. We support NVIDIA, AMD, and Intel GPUs through
 our PyTorch interface, including support for JITScript compilation accessible
 from C++.
 

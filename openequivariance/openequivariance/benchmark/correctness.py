@@ -19,6 +19,7 @@ from openequivariance.benchmark.test_buffers import (
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.TensorProductBase import TensorProductBase
 from openequivariance.core.utils import transpose_irrep_layout
+from openequivariance._torch.extlib import DEVICE_TYPE
 
 logger = getLogger()
 
@@ -562,7 +563,7 @@ def correctness_forward_conv(
                 args["transpose_perm"] = graph.transpose_perm
 
             for key in args:
-                args[key] = torch.tensor(args[key], device="cuda")
+                args[key] = torch.tensor(args[key], device=DEVICE_TYPE)
 
             run_out[:] = tp.forward(**args).cpu().numpy()
 

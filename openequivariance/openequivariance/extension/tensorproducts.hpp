@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <iostream>
 
+#include "kernel_args.hpp"
+
 template<typename JIT_IMPL>
 class __attribute__ ((visibility ("default"))) JITTPImpl {
 public:
@@ -80,8 +82,9 @@ public:
         void* weights,
         Stream stream) {
 
-        void *args[] = { &num_products, &L1_in, &L2_in, &L3_out, &weights};
-        jit.execute(0, args, with_stream(forward_config_ref, stream));
+        auto args = make_kernel_args(num_products, L1_in, L2_in, L3_out, weights);
+        jit.execute(0, args.data(), args.arg_sizes(), args.count(),
+                    with_stream(forward_config_ref, stream));
     }
 
     void backward(
@@ -90,8 +93,10 @@ public:
             void* L2_in, void* L2_grad,
             void* weight, void* weight_grad,
             void* L3_grad, Stream stream) {
-        void *args[] = { &num_products, &L1_in, &L1_grad, &L2_in, &L2_grad, &weight, &weight_grad, &L3_grad};
-        jit.execute(1, args, with_stream(backward_config_ref, stream));
+        auto args = make_kernel_args(num_products, L1_in, L1_grad, L2_in, L2_grad,
+                                     weight, weight_grad, L3_grad);
+        jit.execute(1, args.data(), args.arg_sizes(), args.count(),
+                    with_stream(backward_config_ref, stream));
     }
 
     void double_backward(
@@ -100,13 +105,14 @@ public:
         void* L1_dgrad, void* L2_dgrad, void* w_dgrad, // Gradients w.r.t outputs of backward op
         void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad, Stream stream) {
 
-        void* args[] = { 
-            &num_products, &L1_in, &L2_in, &W, &L3_grad, &L1_dgrad, &L2_dgrad, &w_dgrad, 
-            &L1_grad, &L2_grad, &W_grad, &L3_dgrad
-        };
+        auto args = make_kernel_args(
+            num_products, L1_in, L2_in, W, L3_grad, L1_dgrad, L2_dgrad, w_dgrad,
+            L1_grad, L2_grad, W_grad, L3_dgrad);
         double_backward_config_ref.hStream = stream; 
-        jit.execute(2, args, with_stream(forward_config_ref, stream));
-        jit.execute(3, args, with_stream(double_backward_config_ref, stream));
+        jit.execute(2, args.data(), args.arg_sizes(), args.count(),
+                    with_stream(forward_config_ref, stream));
+        jit.execute(3, args.data(), args.arg_sizes(), args.count(),
+                    with_stream(double_backward_config_ref, stream));
     }
 
     ~JITTPImpl() = default;

@@ -1,4 +1,8 @@
-#define USE_CUDA
+#ifdef SYCL_BACKEND
+    #define USE_XPU
+#else
+    #define USE_CUDA
+#endif
 
 #include <cstdint>
 #include <torch/csrc/stable/accelerator.h>
@@ -11,6 +15,9 @@
 #include <torch/headeronly/util/Exception.h>
 #include <torch/headeronly/util/shim_utils.h>
 #include <torch/csrc/inductor/aoti_torch/c/shim.h>
+#ifdef SYCL_BACKEND
+    #include <torch/csrc/inductor/aoti_torch/c/shim_xpu.h>
+#endif
 
 
 using Tensor = torch::stable::Tensor;
@@ -67,14 +74,28 @@ void *data_ptr(const Tensor &tensor) {
 }
 
 Stream get_current_stream() {
-    auto device_idx = torch::stable::accelerator::getCurrentDeviceIndex();
     void* stream_ptr = nullptr;
-    TORCH_ERROR_CODE_CHECK(aoti_torch_get_current_cuda_stream(device_idx, &stream_ptr));
 
-    #ifdef CUDA_BACKEND
-        return static_cast<Stream>(stream_ptr); 
-    #elif defined(HIP_BACKEND)
-        return static_cast<Stream>(stream_ptr);
+    #ifdef SYCL_BACKEND
+        // Returns the sycl::queue* backing the current XPU stream.
+        TORCH_ERROR_CODE_CHECK(aoti_torch_get_current_sycl_queue(&stream_ptr));
+    #else
+        auto device_idx = torch::stable::accelerator::getCurrentDeviceIndex();
+        TORCH_ERROR_CODE_CHECK(aoti_torch_get_current_cuda_stream(device_idx, &stream_ptr));
+    #endif
+
+    return static_cast<Stream>(stream_ptr);
+}
+
+bool tensor_is_on_gpu(const Tensor &tensor) {
+    #ifdef SYCL_BACKEND
+        // The stable Tensor has no is_xpu(), so compare the device type directly.
+        int32_t device_type;
+        TORCH_ERROR_CODE_CHECK(
+            aoti_torch_get_device_type(tensor.get(), &device_type));
+        return device_type == aoti_torch_device_type_xpu();
+    #else
+        return tensor.is_cuda();
     #endif
 }
 
@@ -83,6 +104,9 @@ Stream get_current_stream() {
 #endif
 #ifdef HIP_BACKEND
     #define EXTENSION_NAME oeq_stable_hip
+#endif
+#ifdef SYCL_BACKEND
+    #define EXTENSION_NAME oeq_stable_sycl
 #endif 
 
 #ifdef INCLUDE_NB_EXTENSION
