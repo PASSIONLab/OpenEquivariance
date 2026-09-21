@@ -82,7 +82,7 @@ public:
         void* weights,
         Stream stream) {
 
-        auto args = make_kernel_args(num_products, L1_in, L2_in, L3_out, weights);
+        auto args = KernelArgs(num_products, L1_in, L2_in, L3_out, weights);
         jit.execute(0, args.data(), args.arg_sizes(), args.count(),
                     with_stream(forward_config_ref, stream));
     }
@@ -93,7 +93,7 @@ public:
             void* L2_in, void* L2_grad,
             void* weight, void* weight_grad,
             void* L3_grad, Stream stream) {
-        auto args = make_kernel_args(num_products, L1_in, L1_grad, L2_in, L2_grad,
+        auto args = KernelArgs(num_products, L1_in, L1_grad, L2_in, L2_grad,
                                      weight, weight_grad, L3_grad);
         jit.execute(1, args.data(), args.arg_sizes(), args.count(),
                     with_stream(backward_config_ref, stream));
@@ -105,7 +105,7 @@ public:
         void* L1_dgrad, void* L2_dgrad, void* w_dgrad, // Gradients w.r.t outputs of backward op
         void* L1_grad, void* L2_grad, void* W_grad, void* L3_dgrad, Stream stream) {
 
-        auto args = make_kernel_args(
+        auto args = KernelArgs(
             num_products, L1_in, L2_in, W, L3_grad, L1_dgrad, L2_dgrad, w_dgrad,
             L1_grad, L2_grad, W_grad, L3_dgrad);
         double_backward_config_ref.hStream = stream; 

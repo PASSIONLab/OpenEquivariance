@@ -16,20 +16,12 @@
 using namespace std;
 namespace syclex = sycl::ext::oneapi::experimental;
 
-/*
-* SYCL streams are queues. Unlike CUDA / HIP, a sycl::queue is a
-* reference-counted handle rather than an opaque pointer, so the "stream" type
-* is a pointer to the queue owned by the caller (PyTorch).
-*/
 using Stream = sycl::queue *;
 
-// Defined by the translation unit that binds this header to the framework
-// (PyTorch / JAX). Returns the queue of the framework's current stream.
 Stream get_current_stream();
 
-// Returns the queue the kernels should be submitted to. A null stream means
-// "no queue was supplied", in which case we fall back to the framework's
-// current stream, and only then to a process-wide default queue.
+// A null stream falls back to the framework's current stream, then to a
+// process-wide default queue.
 inline sycl::queue &resolve_queue(Stream stream) {
     if (stream != nullptr) {
         return *stream;
@@ -68,11 +60,8 @@ public:
     }
 };
 
-/*
-* SYCL has no direct equivalent of cudaEvent elapsed time that works without
-* enabling profiling on the queue, so the timer brackets a wall-clock interval
-* around a queue synchronization.
-*/
+// No cudaEvent equivalent works without enabling profiling on the queue, so
+// this brackets a wall-clock interval around a queue synchronization.
 class GPUTimer {
     std::chrono::time_point<std::chrono::steady_clock> start_time;
 
@@ -129,8 +118,6 @@ public:
         multiprocessorCount =
             static_cast<int>(dev.get_info<sycl::info::device::max_compute_units>());
 
-        // A SYCL sub-group is the analogue of a CUDA warp / HIP wavefront. Pick
-        // the largest supported size that the kernel generator can target.
         auto sg_sizes = dev.get_info<sycl::info::device::sub_group_sizes>();
         warpsize = 32;
         if (!sg_sizes.empty()) {
@@ -146,8 +133,7 @@ public:
             static_cast<int>(dev.get_info<sycl::info::device::local_mem_size>());
         maxSharedMemoryPerMultiprocessor = maxSharedMemPerBlock;
 
-        // SYCL exposes no compute-capability equivalent. These fields exist
-        // only for parity with the CUDA backend and are unused on SYCL.
+        // Unused on SYCL; present for parity with the CUDA backend.
         major = 0;
         minor = 0;
     }
@@ -177,15 +163,8 @@ public:
     { }
 };
 
-/*
-* Runtime compilation uses the SYCL kernel_compiler extension with
-* source_language::sycl, documented at
-* https://github.com/intel/llvm/blob/sycl/sycl/doc/extensions/experimental/sycl_ext_oneapi_kernel_compiler_sycl.asciidoc
-*
-* The generated kernels are free functions marked with nd_range_kernel, so they
-* are launched with raw (untyped) arguments exactly like cuLaunchKernel takes a
-* void* array.
-*/
+// Uses the SYCL kernel_compiler extension with source_language::sycl:
+// https://github.com/intel/llvm/blob/sycl/sycl/doc/extensions/experimental/sycl_ext_oneapi_kernel_compiler_sycl.asciidoc
 class __attribute__((visibility("default"))) SYCLJITKernel {
 private:
     bool compiled = false;
@@ -219,7 +198,6 @@ public:
             string kernel_name = kernel_names_i[kernel];
             vector<int> &template_params = template_param_list[kernel];
 
-            // Step 1: Generate kernel names from the template parameters
             if(template_params.size() == 0) {
                 kernel_names.push_back(kernel_name);
             }
@@ -236,8 +214,8 @@ public:
             }
         }
 
-        // Build against the context the kernels will actually run in, so the
-        // resulting bundle is valid for every device that context spans.
+        // Build against the context the kernels run in, so the bundle is valid
+        // for every device that context spans.
         sycl::queue &q = resolve_queue(nullptr);
         sycl::context build_context = q.get_context();
 
@@ -278,10 +256,8 @@ public:
     }
 
     void set_max_smem(int kernel_id, uint32_t max_smem_bytes) {
-        // Shared (local) memory is declared statically inside the generated
-        // kernel via work_group_static, so there is no opt-in to perform here.
-        // Validate the request against the device limit so an oversubscription
-        // fails with a clear message instead of at launch.
+        // Local memory is declared statically in the generated kernel, so there
+        // is nothing to opt into; just validate against the device limit.
         if(!compiled)
             throw std::logic_error("JIT object has not been compiled!");
         if(static_cast<size_t>(kernel_id) >= kernels.size())

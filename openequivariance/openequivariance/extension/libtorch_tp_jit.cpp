@@ -86,7 +86,6 @@ Stream get_current_stream() {
     return c10::hip::getCurrentHIPStream();
 #endif
 #ifdef SYCL_BACKEND
-    // The queue is owned by PyTorch and outlives the kernel launch.
     return &c10::xpu::getCurrentXPUStream().queue();
 #endif
 }

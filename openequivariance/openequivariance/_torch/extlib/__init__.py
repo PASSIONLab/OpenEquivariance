@@ -24,16 +24,7 @@ extension_module = None
 
 
 def _detect_backend():
-    """
-    Determines which GPU backend this PyTorch build targets.
-
-    Returns one of ``"cuda"``, ``"hip"`` or ``"sycl"``. HIP builds report a
-    ``torch.version.cuda`` of ``None``, so HIP must be tested first.
-
-    All three checks are build-time properties of the PyTorch install, not
-    runtime device queries, so importing works on a machine with no
-    accelerator attached (a CI builder, for instance).
-    """
+    """HIP builds report a ``torch.version.cuda`` of None, so HIP is tested first."""
     if torch.version.hip:
         return "hip"
     if torch.version.cuda:
@@ -53,16 +44,11 @@ assert BACKEND is not None, (
 IS_HIP = BACKEND == "hip"
 IS_SYCL = BACKEND == "sycl"
 
-# The SYCL backend's own APIs arrive earlier (2.6 for the XPU device and
-# cpp_extension's SYCL support, 2.7 for torch.library.register_autocast), but
-# it is only tested against the 2.10 floor the rest of the project requires for
-# AOTI and export, so that is what is enforced.
 if IS_SYCL and Version(torch.__version__) < Version("2.10"):
     raise RuntimeError(
         f"The SYCL backend requires PyTorch >= 2.10, found {torch.__version__}."
     )
 
-# The torch device type that tensors passed to the kernels must live on.
 DEVICE_TYPE = "xpu" if IS_SYCL else "cuda"
 
 
@@ -166,8 +152,6 @@ def load_jit_extension():
             extra_link_args.append("-Wl,-rpath," + torch_libs)
             extra_cflags.append("-DHIP_BACKEND")
         elif BACKEND == "sycl":
-            # torch.utils.cpp_extension compiles with $CXX (default c++),
-            # which must be the oneAPI DPC++ driver for -fsycl to work.
             import shutil
 
             cxx = os.environ.get("CXX", "")
@@ -180,23 +164,12 @@ def load_jit_extension():
                     return
                 os.environ["CXX"] = "icpx"
 
-            # SYCL sources must be compiled and linked by the SYCL compiler
-            # driver; -fsycl is required on both the compile and link lines.
             extra_cflags.extend(["-fsycl", "-DSYCL_BACKEND"])
-            extra_link_args.extend(
-                ["-fsycl", "-ltorch_xpu", "-lc10_xpu", "-lmkl_sycl_blas"]
-            )
+            extra_link_args.extend(["-fsycl", "-ltorch_xpu", "-lc10_xpu"])
 
             for lib_dir in library_paths("xpu"):
                 extra_link_args.append("-Wl,-rpath," + lib_dir)
                 extra_link_args.append("-L" + lib_dir)
-
-            mkl_root = os.environ.get("MKLROOT")
-            if mkl_root:
-                mkl_lib = os.path.join(mkl_root, "lib")
-                extra_link_args.append("-L" + mkl_lib)
-                extra_link_args.append("-Wl,-rpath," + mkl_lib)
-                extra_include_dirs.append(os.path.join(mkl_root, "include"))
 
         torch_sources = [oeq_root + "/extension/" + src for src in torch_sources]
         include_dirs = (

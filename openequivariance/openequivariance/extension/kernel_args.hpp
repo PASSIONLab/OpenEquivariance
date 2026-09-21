@@ -3,30 +3,22 @@
 #include <array>
 #include <cstddef>
 
-/*
-* Packs kernel arguments as a list of (pointer, size) pairs.
-*
-* The CUDA and HIP driver APIs only need the pointer array, but SYCL launches
-* free-function kernels with raw (untyped) arguments and therefore also needs
-* the size of each argument. Collecting both here keeps a single call shape in
-* the backend-independent code.
-*
-* As with the raw `void*[]` form this replaces, the caller must keep the
-* referenced objects alive until the launch has been enqueued.
-*/
 template <size_t N>
-struct KernelArgs {
-    std::array<void *, N> ptrs;
-    std::array<size_t, N> sizes;
+class KernelArgs {
+    std::array<void *, N> ptrs_;
+    std::array<size_t, N> sizes_;
 
-    void **data() { return ptrs.data(); }
-    const size_t *arg_sizes() const { return sizes.data(); }
+public:
+    template <typename... Ts>
+    explicit KernelArgs(Ts &...args)
+        : ptrs_{static_cast<void *>(&args)...}, sizes_{sizeof(Ts)...} {
+        static_assert(sizeof...(Ts) == N, "argument count mismatch");
+    }
+
+    void **data() { return ptrs_.data(); }
+    const size_t *arg_sizes() const { return sizes_.data(); }
     static constexpr size_t count() { return N; }
 };
 
 template <typename... Ts>
-inline KernelArgs<sizeof...(Ts)> make_kernel_args(Ts &...args) {
-    return KernelArgs<sizeof...(Ts)>{
-        {static_cast<void *>(&args)...},
-        {sizeof(Ts)...}};
-}
+KernelArgs(Ts &...) -> KernelArgs<sizeof...(Ts)>;

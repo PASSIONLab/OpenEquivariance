@@ -7,8 +7,6 @@ from openequivariance import TPProblem, TensorProduct, TensorProductConv
 
 from conftest import device_type
 
-DEVICE = device_type()
-
 
 @pytest.fixture
 def tpp():
@@ -30,7 +28,7 @@ def edge_index():
         ],
         sort_order="row",
         sparse_size=(3, 4),
-        device=DEVICE,
+        device=device_type(),
         dtype=torch.long,
     )
     ei.fill_cache_()
@@ -39,28 +37,30 @@ def edge_index():
 
 @pytest.fixture
 def tp_buffers(tpp):
-    gen = torch.Generator(device=DEVICE)
+    gen = torch.Generator(device=device_type())
     gen.manual_seed(42)
     N = 1000
 
-    X = torch.rand(N, tpp.irreps_in1.dim, device=DEVICE, generator=gen)
-    Y = torch.rand(N, tpp.irreps_in2.dim, device=DEVICE, generator=gen)
-    W = torch.rand(N, tpp.weight_numel, device=DEVICE, generator=gen)
+    X = torch.rand(N, tpp.irreps_in1.dim, device=device_type(), generator=gen)
+    Y = torch.rand(N, tpp.irreps_in2.dim, device=device_type(), generator=gen)
+    W = torch.rand(N, tpp.weight_numel, device=device_type(), generator=gen)
     return [X, Y, W]
 
 
 @pytest.fixture
 def conv_buffers(edge_index, tpp):
-    gen = torch.Generator(device=DEVICE)
+    gen = torch.Generator(device=device_type())
     gen.manual_seed(42)
 
     X = torch.rand(
-        edge_index.num_rows, tpp.irreps_in1.dim, device=DEVICE, generator=gen
+        edge_index.num_rows, tpp.irreps_in1.dim, device=device_type(), generator=gen
     )
     Y = torch.rand(
-        edge_index.num_cols, tpp.irreps_in2.dim, device=DEVICE, generator=gen
+        edge_index.num_cols, tpp.irreps_in2.dim, device=device_type(), generator=gen
     )
-    W = torch.rand(edge_index.num_cols, tpp.weight_numel, device=DEVICE, generator=gen)
+    W = torch.rand(
+        edge_index.num_cols, tpp.weight_numel, device=device_type(), generator=gen
+    )
     _, inv_perm = edge_index.get_csc()
     return [X, Y, W, edge_index[0], edge_index[1], inv_perm]
 

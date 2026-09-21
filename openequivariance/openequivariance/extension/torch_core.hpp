@@ -32,7 +32,9 @@
     using GPU_Allocator = SYCL_Allocator;
 #endif
 
-#include "group_mm.hpp"
+#ifndef SYCL_BACKEND
+    #include "group_mm.hpp"
+#endif
 
 #include "tensorproducts.hpp"
 #include "convolution.hpp"
@@ -195,29 +197,23 @@ inline std::unordered_map<int64_t,
 inline std::mutex mut;
 
 #ifdef SYCL_BACKEND
-/*
-* SYCL kernel bundles must be released before the SYCL runtime tears itself
-* down. Both caches have static storage duration, so without this their
-* destructors run after the runtime is gone and segfault at exit.
-*
-* The registration is deliberately lazy rather than done at static init:
-* libsycl-jit is dlopened on the first runtime compilation and registers its
-* own teardown at that point. Since atexit handlers run in reverse order of
-* registration, registering only after the first compile guarantees the caches
-* are cleared before the JIT library unloads.
-*/
 inline void release_kernel_caches() {
     const std::lock_guard<std::mutex> lock(mut);
     tp_cache.clear();
     conv_cache.clear();
 }
 
+/*
+* Registered after the first compile, not at static init: libsycl-jit is
+* dlopened on the first runtime compilation and registers its own teardown
+* then. atexit runs handlers in reverse order of registration, so registering
+* later guarantees the caches are cleared before the JIT library unloads.
+*/
 inline void register_kernel_cache_cleanup() {
-    static const bool registered = [] {
-        std::atexit(release_kernel_caches);
-        return true;
-    }();
-    (void) registered;
+    struct RegisterOnce {
+        RegisterOnce() { std::atexit(release_kernel_caches); }
+    };
+    static RegisterOnce registered;
 }
 #endif
 
@@ -659,6 +655,7 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
 
 // ===========================================================
 
+#ifndef SYCL_BACKEND
 inline Tensor group_gemm(
         Tensor A, Tensor B, Tensor ragged_counts,
         int64_t num_W, int64_t batch_size, int64_t m, int64_t k, int64_t ragged_inner) {
@@ -690,6 +687,7 @@ inline Tensor group_gemm(
 
     return C;
 }
+#endif
 
 // ===========================================================
 
@@ -710,7 +708,9 @@ REGISTER_LIBRARY_IMPL(libtorch_tp_jit, OEQ_DISPATCH_KEY, m) {
     m.impl("jit_conv_backward", BOX(&jit_conv_backward));
     m.impl("jit_conv_double_backward", BOX(&jit_conv_double_backward));
 
+#ifndef SYCL_BACKEND
     m.impl("group_gemm", BOX(&group_gemm));
+#endif
 };
 
 REGISTER_LIBRARY(libtorch_tp_jit, m) {
@@ -722,5 +722,7 @@ REGISTER_LIBRARY(libtorch_tp_jit, m) {
     m.def("jit_conv_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor)");
     m.def("jit_conv_double_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor, Tensor)");
 
+#ifndef SYCL_BACKEND
     m.def("group_gemm(Tensor A, Tensor B, Tensor ragged_counts, int num_W, int batch_size, int m, int k, int ragged_inner) -> Tensor");
+#endif
 };

@@ -91,12 +91,12 @@ public:
 
         ConvData conv_data = {rows, cols, nnz, node_count};
 
-        auto args = make_kernel_args(L1_in, L2_in, weights, L3_out, conv_data, workspace);
+        auto args = KernelArgs(L1_in, L2_in, weights, L3_out, conv_data, workspace);
         jit.execute(0, args.data(), args.arg_sizes(), args.count(),
                     with_stream(forward_config_ref, stream));
 
         if(reinterpret_cast<uint64_t>(workspace) != 0) {
-            auto fixup_args = make_kernel_args(workspace, L3_out);
+            auto fixup_args = KernelArgs(workspace, L3_out);
             
             KernelLaunchConfig fixup_config(
                 forward_config_ref.num_blocks,
@@ -122,14 +122,14 @@ public:
             Stream stream) {
 
         ConvData conv_data = {rows, cols, nnz, node_count};
-        auto args = make_kernel_args(L1_in, L1_grad, L2_in, L2_grad, weight,
+        auto args = KernelArgs(L1_in, L1_grad, L2_in, L2_grad, weight,
                                      weight_grad, L3_grad, conv_data, workspace,
                                      transpose_perm);
         jit.execute(1, args.data(), args.arg_sizes(), args.count(),
                     with_stream(backward_config_ref, stream));
 
         if(reinterpret_cast<uint64_t>(workspace) != 0) {
-            auto fixup_args = make_kernel_args(workspace, L1_grad);
+            auto fixup_args = KernelArgs(workspace, L1_grad);
 
             KernelLaunchConfig fixup_config(
                 backward_config_ref.num_blocks,
@@ -153,14 +153,14 @@ public:
             Stream stream) {
 
         ConvData conv_data = {rows, cols, nnz, node_count};
-        auto args = make_kernel_args(
+        auto args = KernelArgs(
             L1_in, L2_in, W, L3_grad, L1_dgrad, L2_dgrad, w_dgrad,
             L1_grad, L2_grad, W_grad, L3_dgrad, conv_data, wspace, transpose_perm);
 
         jit.execute(4, args.data(), args.arg_sizes(), args.count(),
                     with_stream(forward_config_ref, stream));
         if(reinterpret_cast<uint64_t>(wspace) != 0) {
-            auto fixup_args = make_kernel_args(wspace, L3_dgrad);
+            auto fixup_args = KernelArgs(wspace, L3_dgrad);
             KernelLaunchConfig fixup_config(
                 forward_config_ref.num_blocks,
                 forward_config_ref.num_threads,
@@ -174,7 +174,7 @@ public:
         jit.execute(5, args.data(), args.arg_sizes(), args.count(),
                     with_stream(double_backward_config_ref, stream));
         if(reinterpret_cast<uint64_t>(wspace) != 0) {
-            auto fixup_args = make_kernel_args(wspace, L1_grad);
+            auto fixup_args = KernelArgs(wspace, L1_grad);
             KernelLaunchConfig fixup_config(
                     double_backward_config_ref.num_blocks,
                     double_backward_config_ref.num_threads,

@@ -173,8 +173,7 @@ def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
     else:
         from torch.profiler import ProfilerActivity, profile, record_function
 
-        # The profiler activity is per-accelerator: XPU kernels are not
-        # recorded under the CUDA activity.
+        # Profiler activity is per-accelerator.
         accelerator_activity = (
             ProfilerActivity.XPU
             if accelerator_device_type() == "xpu"
@@ -267,13 +266,7 @@ def transpose_irrep_layout(
 
 
 def accelerator_device_type():
-    """
-    Returns the ``torch`` device type the kernels run on: ``"xpu"`` for the
-    SYCL backend, ``"cuda"`` for CUDA and HIP (PyTorch exposes HIP tensors
-    under the ``cuda`` device type).
-
-    Imported lazily so that the backend-agnostic core does not pull in torch.
-    """
+    """Imported lazily so the backend-agnostic core does not pull in torch."""
     from openequivariance._torch.extlib import DEVICE_TYPE
 
     return DEVICE_TYPE

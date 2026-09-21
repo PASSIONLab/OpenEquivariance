@@ -24,8 +24,6 @@ from openequivariance.benchmark.problems import (
 
 from conftest import device_type
 
-DEVICE = device_type()
-
 
 @pytest.fixture(params=[np.float32, np.float64], ids=["F32", "F64"], scope="module")
 def dtype(request):
@@ -422,7 +420,7 @@ class TestTorchToSubmodule:
 
     def test_submodule_dtype_conversion(self, parent_module_and_problem, graph):
         parent, problem = parent_module_and_problem
-        device = DEVICE
+        device = device_type()
 
         rng = np.random.default_rng(12345)
         input_dtype = self._problem_dtype(problem)

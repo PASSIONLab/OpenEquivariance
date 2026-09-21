@@ -16,7 +16,9 @@ class TensorProduct(LoopUnrollTP):
 
     def __init__(self, problem: TPProblem):
         dp = extlib.DeviceProp(0)
-        super().__init__(problem, dp, extlib.BACKEND, torch_op=False)
+        super().__init__(
+            problem, dp, "hip" if extlib.IS_HIP else "cuda", torch_op=False
+        )
 
         self.kernel = self.kernel_string
         self.weight_numel = problem.weight_numel

@@ -3,8 +3,6 @@ import os
 
 from conftest import device_type
 
-DEVICE = device_type()
-
 
 def test_tutorial_torch(with_jax):
     if with_jax:
@@ -13,19 +11,21 @@ def test_tutorial_torch(with_jax):
     import torch
     import e3nn.o3 as o3
 
-    gen = torch.Generator(device=DEVICE)
+    gen = torch.Generator(device=device_type())
 
     batch_size = 1000
     X_ir, Y_ir, Z_ir = o3.Irreps("1x2e"), o3.Irreps("1x3e"), o3.Irreps("1x2e")
-    X = torch.rand(batch_size, X_ir.dim, device=DEVICE, generator=gen)
-    Y = torch.rand(batch_size, Y_ir.dim, device=DEVICE, generator=gen)
+    X = torch.rand(batch_size, X_ir.dim, device=device_type(), generator=gen)
+    Y = torch.rand(batch_size, Y_ir.dim, device=device_type(), generator=gen)
 
     instructions = [(0, 0, 0, "uvu", True)]
 
     tp_e3nn = o3.TensorProduct(
         X_ir, Y_ir, Z_ir, instructions, shared_weights=False, internal_weights=False
-    ).to(DEVICE)
-    W = torch.rand(batch_size, tp_e3nn.weight_numel, device=DEVICE, generator=gen)
+    ).to(device_type())
+    W = torch.rand(
+        batch_size, tp_e3nn.weight_numel, device=device_type(), generator=gen
+    )
 
     Z = tp_e3nn(X, Y, W)
     print(torch.norm(Z))
@@ -55,13 +55,15 @@ def test_tutorial_torch(with_jax):
             [0, 1, 1, 2],  # Receiver
             [1, 0, 2, 1],
         ],  # Sender
-        device=DEVICE,
+        device=device_type(),
         dtype=torch.long,
     )
 
-    X = torch.rand(node_ct, X_ir.dim, device=DEVICE, generator=gen)
-    Y = torch.rand(nonzero_ct, Y_ir.dim, device=DEVICE, generator=gen)
-    W = torch.rand(nonzero_ct, problem.weight_numel, device=DEVICE, generator=gen)
+    X = torch.rand(node_ct, X_ir.dim, device=device_type(), generator=gen)
+    Y = torch.rand(nonzero_ct, Y_ir.dim, device=device_type(), generator=gen)
+    W = torch.rand(
+        nonzero_ct, problem.weight_numel, device=device_type(), generator=gen
+    )
 
     tp_conv = oeq.TensorProductConv(
         problem, deterministic=False

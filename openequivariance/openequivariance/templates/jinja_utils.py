@@ -20,14 +20,8 @@ def sizeof(dtype):
 
 @lru_cache(maxsize=8)
 def get_jinja_environment(backend="cuda", warp_size=32):
-    """
-    Builds the Jinja environment used to render the kernel templates.
-
-    :param backend: one of ``"cuda"``, ``"hip"`` or ``"sycl"``.
-    :param warp_size: size of a warp / wavefront / sub-group. Only consulted by
-                      the SYCL backend, which must bake the sub-group size into
-                      the generated kernel as a compile-time property.
-    """
+    """:param warp_size: only consulted by SYCL, which bakes the sub-group size
+    into the generated kernel as a compile-time property."""
     if backend not in ("cuda", "hip", "sycl"):
         raise ValueError(f"Unknown kernel backend '{backend}'")
 
@@ -42,16 +36,16 @@ def get_jinja_environment(backend="cuda", warp_size=32):
     is_hip = backend == "hip"
     is_sycl = backend == "sycl"
 
-    env.globals["backend"] = backend
     env.globals["is_hip"] = is_hip
     env.globals["is_sycl"] = is_sycl
     env.globals["warp_size"] = warp_size
 
     if is_sycl:
-        # Provided by templates/sycl_compat.cuh.
-        env.globals["syncwarp"] = "oeq_syncwarp()"
-        env.globals["atomic_add"] = "oeq_atomic_add"
-        env.globals["shfl_down"] = lambda val, offset: f"oeq_shfl_down({val}, {offset})"
+        env.globals["syncwarp"] = "_sycl_syncwarp()"
+        env.globals["atomic_add"] = "_sycl_atomic_add"
+        env.globals["shfl_down"] = (
+            lambda val, offset: f"_sycl_shfl_down({val}, {offset})"
+        )
     elif is_hip:
         env.globals["syncwarp"] = (
             '__builtin_amdgcn_fence(__ATOMIC_RELEASE, "wavefront");'

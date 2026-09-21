@@ -1,8 +1,4 @@
-#ifdef SYCL_BACKEND
-    #define USE_XPU
-#else
-    #define USE_CUDA
-#endif
+#define USE_CUDA
 
 #include <cstdint>
 #include <torch/csrc/stable/accelerator.h>
@@ -16,7 +12,9 @@
 #include <torch/headeronly/util/shim_utils.h>
 #include <torch/csrc/inductor/aoti_torch/c/shim.h>
 #ifdef SYCL_BACKEND
-    #include <torch/csrc/inductor/aoti_torch/c/shim_xpu.h>
+    // Declared in shim_xpu.h behind USE_XPU; declared here so the SYCL build
+    // does not have to define that macro as well as SYCL_BACKEND.
+    extern "C" AOTITorchError aoti_torch_get_current_sycl_queue(void** ret_queue);
 #endif
 
 
@@ -77,7 +75,6 @@ Stream get_current_stream() {
     void* stream_ptr = nullptr;
 
     #ifdef SYCL_BACKEND
-        // Returns the sycl::queue* backing the current XPU stream.
         TORCH_ERROR_CODE_CHECK(aoti_torch_get_current_sycl_queue(&stream_ptr));
     #else
         auto device_idx = torch::stable::accelerator::getCurrentDeviceIndex();
@@ -89,7 +86,7 @@ Stream get_current_stream() {
 
 bool tensor_is_on_gpu(const Tensor &tensor) {
     #ifdef SYCL_BACKEND
-        // The stable Tensor has no is_xpu(), so compare the device type directly.
+        // The stable Tensor has no is_xpu().
         int32_t device_type;
         TORCH_ERROR_CODE_CHECK(
             aoti_torch_get_device_type(tensor.get(), &device_type));

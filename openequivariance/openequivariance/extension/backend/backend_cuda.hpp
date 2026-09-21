@@ -323,10 +323,8 @@ public:
         }
     }
 
-    void execute(int kernel_id, void* args[], const size_t arg_sizes[],
-                 size_t num_args, KernelLaunchConfig config) {
-        (void) arg_sizes; // The CUDA driver infers argument sizes from the kernel signature.
-        (void) num_args;
+    void execute(int kernel_id, void* args[], [[maybe_unused]] const size_t arg_sizes[],
+                 [[maybe_unused]] size_t num_args, KernelLaunchConfig config) {
         if(kernel_id >= kernels.size())
             throw std::logic_error("Kernel index out of range!");
 

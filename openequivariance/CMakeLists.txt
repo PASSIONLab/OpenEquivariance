@@ -173,7 +173,6 @@ if(hip_FOUND)
     add_stable_extension(torch_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
 endif()
 
-# SYCL: detected via the compiler accepting -fsycl (IntelLLVM / icpx).
 set(OEQ_SYCL_FOUND FALSE)
 if(CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
     set(OEQ_SYCL_FOUND TRUE)
@@ -196,21 +195,12 @@ if(OEQ_SYCL_FOUND)
 
     target_compile_definitions(sycl_stub_lib PRIVATE SYCL_BACKEND=1)
 
-    find_package(MKL QUIET COMPONENTS SYCL)
-    if(TARGET MKL::MKL_SYCL::BLAS)
-        set(SYCL_BLAS_LIB MKL::MKL_SYCL::BLAS)
-    else()
-        set(SYCL_BLAS_LIB mkl_sycl_blas)
-    endif()
-
     set(SYCL_LINK_LIBS
         sycl_stub_lib
         sycl
-        ${SYCL_BLAS_LIB}
     )
     add_stable_extension(oeq_stable_sycl SYCL_BACKEND "${SYCL_LINK_LIBS}")
 
-    # -fsycl is required on both the compile and the link line.
     foreach(tgt oeq_stable_sycl oeq_stable_sycl_aoti)
         target_compile_options(${tgt} PRIVATE -fsycl)
         target_link_options(${tgt} PRIVATE -fsycl)

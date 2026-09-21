@@ -1,4 +1,6 @@
 import os
+import sys
+
 import pytest
 
 os.environ["JAX_ENABLE_X64"] = "True"
@@ -21,22 +23,18 @@ def with_jax(request):
 
 
 def device_type():
-    """
-    The torch device type the kernels run on for the detected backend:
-    ``"xpu"`` for SYCL, ``"cuda"`` for CUDA and HIP.
-    """
-    from openequivariance._torch.extlib import DEVICE_TYPE
+    # Called at module scope, before fixtures exist, so --jax is read from the
+    # command line rather than the with_jax fixture. This keeps JAX-only runs
+    # from importing the torch extension module.
+    if "--jax" in sys.argv:
+        from openequivariance.jax.extlib import DEVICE_TYPE
+    else:
+        from openequivariance._torch.extlib import DEVICE_TYPE
 
     return DEVICE_TYPE
 
 
 def torch_accelerator():
-    """The ``torch.cuda`` / ``torch.xpu`` module matching the active backend."""
     import torch
 
     return getattr(torch, device_type())
-
-
-@pytest.fixture(scope="session")
-def device():
-    return device_type()

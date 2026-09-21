@@ -56,17 +56,14 @@ jobs:
         cache: 'pip'
         cache-dependency-path: '**/requirements_sycl_ci.txt'
 
-    # The SYCL backend compiles the extension with the oneAPI DPC++ driver
-    # (icpx), so the compiler and the oneMKL headers both have to be present.
-    # No Intel GPU is attached to this runner; only the build is exercised.
-    - name: Install oneAPI DPC++ and oneMKL
+    - name: Install oneAPI DPC++
       run: |
         wget -qO- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
           | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
         echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" \
           | sudo tee /etc/apt/sources.list.d/oneAPI.list
         sudo apt-get update
-        sudo apt-get install -y intel-oneapi-compiler-dpcpp-cpp intel-oneapi-mkl-devel
+        sudo apt-get install -y intel-oneapi-compiler-dpcpp-cpp
 
     - name: Install dependencies
       run: |
