@@ -164,9 +164,6 @@ def load_jit_extension():
                     return
                 os.environ["CXX"] = "icpx"
 
-            # -lsycl is explicit: with -fsycl alone the driver may leave libsycl
-            # out of DT_NEEDED, which only shows up as an undefined symbol at
-            # import time.
             extra_cflags.extend(["-fsycl", "-DSYCL_BACKEND"])
             extra_link_args.extend(["-fsycl", "-lsycl", "-ltorch_xpu", "-lc10_xpu"])
 

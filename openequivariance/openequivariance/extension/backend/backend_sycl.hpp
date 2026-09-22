@@ -20,8 +20,6 @@ using Stream = sycl::queue *;
 
 Stream get_current_stream();
 
-// A null stream falls back to the framework's current stream, then to a
-// process-wide default queue.
 inline sycl::queue &resolve_queue(Stream stream) {
     if (stream != nullptr) {
         return *stream;
@@ -60,8 +58,6 @@ public:
     }
 };
 
-// No cudaEvent equivalent works without enabling profiling on the queue, so
-// this brackets a wall-clock interval around a queue synchronization.
 class GPUTimer {
     std::chrono::time_point<std::chrono::steady_clock> start_time;
 
@@ -133,7 +129,6 @@ public:
             static_cast<int>(dev.get_info<sycl::info::device::local_mem_size>());
         maxSharedMemoryPerMultiprocessor = maxSharedMemPerBlock;
 
-        // Unused on SYCL; present for parity with the CUDA backend.
         major = 0;
         minor = 0;
     }
@@ -163,8 +158,6 @@ public:
     { }
 };
 
-// Uses the SYCL kernel_compiler extension with source_language::sycl:
-// https://github.com/intel/llvm/blob/sycl/sycl/doc/extensions/experimental/sycl_ext_oneapi_kernel_compiler_sycl.asciidoc
 class __attribute__((visibility("default"))) SYCLJITKernel {
 private:
     bool compiled = false;
@@ -254,8 +247,6 @@ public:
     }
 
     void set_max_smem(int kernel_id, uint32_t max_smem_bytes) {
-        // Local memory is declared statically in the generated kernel, so there
-        // is nothing to opt into; just validate against the device limit.
         if(!compiled)
             throw std::logic_error("JIT object has not been compiled!");
         if(static_cast<size_t>(kernel_id) >= kernels.size())

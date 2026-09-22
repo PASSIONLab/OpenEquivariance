@@ -3,8 +3,6 @@ import openequivariance_extjax as oeq_extjax
 
 IS_HIP = oeq_extjax.is_hip()
 
-# The JAX frontend supports CUDA and ROCm only, both of which use torch's
-# "cuda" device naming.
 DEVICE_TYPE = "cuda"
 
 platform = "CUDA"
