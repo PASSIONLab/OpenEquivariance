@@ -203,12 +203,6 @@ inline void release_kernel_caches() {
     conv_cache.clear();
 }
 
-/*
-* Registered after the first compile, not at static init: libsycl-jit is
-* dlopened on the first runtime compilation and registers its own teardown
-* then. atexit runs handlers in reverse order of registration, so registering
-* later guarantees the caches are cleared before the JIT library unloads.
-*/
 inline void register_kernel_cache_cleanup() {
     struct RegisterOnce {
         RegisterOnce() { std::atexit(release_kernel_caches); }

@@ -6,8 +6,6 @@
 namespace syclex = sycl::ext::oneapi::experimental;
 namespace twi = sycl::ext::oneapi::this_work_item;
 
-// The sub-group size is fixed to the warp size the schedule was generated
-// against, which is what makes the warp-level code below well-defined.
 #define SYCL_SUBGROUP_SIZE {{ warp_size }}
 #define __global__ extern "C" SYCL_EXTERNAL                                    \
     SYCL_EXT_ONEAPI_FUNCTION_PROPERTY((syclex::nd_range_kernel<1>))            \
@@ -20,7 +18,6 @@ namespace twi = sycl::ext::oneapi::this_work_item;
 
 #define __launch_bounds__(...)
 
-// All generated kernels are launched as 1D nd_ranges, so only .x is meaningful.
 struct SyclIndex1D {
     size_t x;
     operator size_t() const { return x; }
@@ -60,7 +57,6 @@ static inline T _sycl_atomic_add(T* address, T val) {
     return ref.fetch_add(val);
 }
 
-// Templated on both operands to keep the mixed-width call sites working.
 template<typename A, typename B>
 static inline auto _sycl_min(A a, B b) -> typename std::common_type<A, B>::type {
     using C = typename std::common_type<A, B>::type;

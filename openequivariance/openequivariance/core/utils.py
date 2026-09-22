@@ -173,7 +173,6 @@ def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
     else:
         from torch.profiler import ProfilerActivity, profile, record_function
 
-        # Profiler activity is per-accelerator.
         accelerator_activity = (
             ProfilerActivity.XPU
             if accelerator_device_type() == "xpu"

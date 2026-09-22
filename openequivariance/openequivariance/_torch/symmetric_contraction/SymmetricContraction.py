@@ -123,7 +123,6 @@ def U_matrix_real(
 
 class GroupMM:
     def __init__(self, dtype, num_elements, batch_size):
-        # group_gemm is not built for SYCL, so the operator does not exist there.
         if extlib.DEVICE_TYPE == "xpu":
             raise NotImplementedError(
                 "Symmetric contraction is not supported on the SYCL backend."
@@ -411,7 +410,6 @@ def register_autograd():
     )
 
 
-# group_gemm is not built for SYCL, so the operator does not exist there.
 if extlib.BUILT_EXTENSION and extlib.DEVICE_TYPE != "xpu":
     register_torch_fakes()
     register_autograd()

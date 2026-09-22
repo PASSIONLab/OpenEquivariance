@@ -214,8 +214,6 @@ public:
             }
         }
 
-        // Build against the context the kernels run in, so the bundle is valid
-        // for every device that context spans.
         sycl::queue &q = resolve_queue(nullptr);
         sycl::context build_context = q.get_context();
 
