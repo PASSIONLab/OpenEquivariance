@@ -1,3 +1,7 @@
+{%- if is_sycl %}
+{% include 'sycl_compat.cuh' %}
+{%- endif %}
+
 #define ROW_OPERATION(ROW_LEN, LOOP_VAR, ...) \
     _Pragma ("unroll") \
     for(int LOOP_VAR = 0; LOOP_VAR < ROW_LEN; LOOP_VAR += THREADS_PER_WARP) { \

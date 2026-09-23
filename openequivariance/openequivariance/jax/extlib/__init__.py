@@ -3,6 +3,8 @@ import openequivariance_extjax as oeq_extjax
 
 IS_HIP = oeq_extjax.is_hip()
 
+DEVICE_TYPE = "cuda"
+
 platform = "CUDA"
 if IS_HIP:
     platform = "ROCM"
@@ -16,4 +18,5 @@ DeviceProp = oeq_extjax.DeviceProp
 __all__ = [
     "GPUTimer",
     "DeviceProp",
+    "DEVICE_TYPE",
 ]

@@ -9,6 +9,14 @@ from e3nn import o3
 
 from openequivariance._torch.symmetric_contraction import SymmetricContraction
 
+from conftest import device_type
+
+if device_type() == "xpu":
+    pytest.skip(
+        "Symmetric contraction is not supported on the SYCL backend.",
+        allow_module_level=True,
+    )
+
 mace_symmetric_contraction = pytest.importorskip("mace.modules.symmetric_contraction")
 MaceSymmetricContraction = mace_symmetric_contraction.SymmetricContraction
 
@@ -25,7 +33,6 @@ SCConfig = collections.namedtuple(
     ],
 )
 
-DEVICE = torch.device("cuda")
 
 SC_CONFIGS = [
     SCConfig(
@@ -34,7 +41,7 @@ SC_CONFIGS = [
         2,
         4,
         [0, 2, 3, 2, 0, 0, 2, 3, 2, 2],
-        DEVICE,
+        torch.device(device_type()),
     ),
     SCConfig(
         o3.Irreps("1x0e + 1x1o + 1x2e"),
@@ -42,7 +49,7 @@ SC_CONFIGS = [
         3,
         3,
         [0, 1, 2, 0, 1, 2, 0, 1],
-        DEVICE,
+        torch.device(device_type()),
     ),
     SCConfig(
         o3.Irreps("4x0e + 4x1o"),
@@ -50,7 +57,7 @@ SC_CONFIGS = [
         2,
         5,
         [0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
-        DEVICE,
+        torch.device(device_type()),
     ),
 ]
 

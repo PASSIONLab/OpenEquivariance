@@ -6,6 +6,7 @@ from openequivariance.core.ConvolutionBase import (
 )
 from openequivariance._torch.E3NNTensorProduct import E3NNTensorProduct
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixinConv
+from openequivariance._torch.extlib import DEVICE_TYPE
 
 
 class E3NNConv(ConvolutionBase, NumpyDoubleBackwardMixinConv):
@@ -31,7 +32,7 @@ class E3NNConv(ConvolutionBase, NumpyDoubleBackwardMixinConv):
             path_normalization=config.path_normalization,
             internal_weights=config.internal_weights,
             shared_weights=config.shared_weights,
-        ).to(device="cuda")
+        ).to(device=DEVICE_TYPE)
 
         self.reference_tp = E3NNTensorProduct(config)
 

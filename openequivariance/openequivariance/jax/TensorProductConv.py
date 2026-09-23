@@ -42,7 +42,7 @@ class TensorProductConv(LoopUnrollConv):
         super().__init__(
             config,
             dp,
-            extlib.IS_HIP,
+            "hip" if extlib.IS_HIP else "cuda",
             idx_dtype=np.int32,
             torch_op=False,
             deterministic=deterministic,

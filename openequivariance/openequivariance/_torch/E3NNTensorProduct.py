@@ -13,6 +13,7 @@ from openequivariance.core.TensorProductBase import TensorProductBase
 from openequivariance.core.e3nn_lite import TPProblem
 from openequivariance.core.logging import getLogger
 from openequivariance._torch.NPDoubleBackwardMixin import NumpyDoubleBackwardMixin
+from openequivariance._torch.extlib import DEVICE_TYPE
 
 TORCH_COMPILE_AUTOTUNING_DIR = pathlib.Path("triton_autotuning")
 
@@ -48,7 +49,7 @@ class E3NNTensorProduct(TensorProductBase, NumpyDoubleBackwardMixin):
             path_normalization=config.path_normalization,
             internal_weights=config.internal_weights,
             shared_weights=config.shared_weights,
-        ).to(device="cuda")
+        ).to(device=DEVICE_TYPE)
 
         if config.irrep_dtype == np.float64:
             torch.set_default_dtype(torch.float32)  # Reset to default
@@ -62,9 +63,9 @@ class E3NNTensorProduct(TensorProductBase, NumpyDoubleBackwardMixin):
         L3_out: np.ndarray,
         weights: np.ndarray,
     ) -> None:
-        torch_L1_in = torch.tensor(L1_in, device="cuda")
-        torch_L2_in = torch.tensor(L2_in, device="cuda")
-        torch_weights = torch.tensor(weights, device="cuda")
+        torch_L1_in = torch.tensor(L1_in, device=DEVICE_TYPE)
+        torch_L2_in = torch.tensor(L2_in, device=DEVICE_TYPE)
+        torch_weights = torch.tensor(weights, device=DEVICE_TYPE)
 
         torch_L3_out = self.e3nn_tp(torch_L1_in, torch_L2_in, torch_weights)
 
@@ -80,13 +81,13 @@ class E3NNTensorProduct(TensorProductBase, NumpyDoubleBackwardMixin):
         weights: np.ndarray,
         weights_grad: np.ndarray,
     ) -> None:
-        torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
-        torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
-        torch_weights = torch.tensor(weights, requires_grad=True, device="cuda")
+        torch_L1_in = torch.tensor(L1_in, requires_grad=True, device=DEVICE_TYPE)
+        torch_L2_in = torch.tensor(L2_in, requires_grad=True, device=DEVICE_TYPE)
+        torch_weights = torch.tensor(weights, requires_grad=True, device=DEVICE_TYPE)
 
         torch_out = self.e3nn_tp(torch_L1_in, torch_L2_in, torch_weights)
 
-        torch_L3_grad_in = torch.tensor(L3_grad, device="cuda")
+        torch_L3_grad_in = torch.tensor(L3_grad, device=DEVICE_TYPE)
 
         torch_out.backward(gradient=torch_L3_grad_in)
 

@@ -44,7 +44,7 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
             self,
             self.input_args["problem"],
             dp,
-            extlib.IS_HIP,
+            extlib.BACKEND,
             self.input_args["torch_op"],
         )
 
@@ -146,9 +146,9 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
             weights, not self.config.shared_weights
         )
 
-        torch_L1_in = torch.tensor(L1_in, device="cuda")
-        torch_L2_in = torch.tensor(L2_in, device="cuda")
-        torch_weights = torch.tensor(weights_chunked, device="cuda")
+        torch_L1_in = torch.tensor(L1_in, device=extlib.DEVICE_TYPE)
+        torch_L2_in = torch.tensor(L2_in, device=extlib.DEVICE_TYPE)
+        torch_weights = torch.tensor(weights_chunked, device=extlib.DEVICE_TYPE)
         torch_L3_out = self.forward(torch_L1_in, torch_L2_in, torch_weights)
 
         L3_out[:] = torch_L3_out.numpy(force=True)
@@ -160,13 +160,15 @@ class TensorProduct(torch.nn.Module, LoopUnrollTP, NumpyDoubleBackwardMixin):
             weights, not self.config.shared_weights
         )
 
-        torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
-        torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
-        torch_weights = torch.tensor(weights_chunked, requires_grad=True, device="cuda")
+        torch_L1_in = torch.tensor(L1_in, requires_grad=True, device=extlib.DEVICE_TYPE)
+        torch_L2_in = torch.tensor(L2_in, requires_grad=True, device=extlib.DEVICE_TYPE)
+        torch_weights = torch.tensor(
+            weights_chunked, requires_grad=True, device=extlib.DEVICE_TYPE
+        )
 
         torch_out = self.forward(torch_L1_in, torch_L2_in, torch_weights)
 
-        torch_L3_grad_in = torch.tensor(L3_grad, device="cuda")
+        torch_L3_grad_in = torch.tensor(L3_grad, device=extlib.DEVICE_TYPE)
 
         torch_out.backward(gradient=torch_L3_grad_in)
 
@@ -364,13 +366,13 @@ def register_autocast():
     import torch
 
     torch.library.register_autocast(
-        "libtorch_tp_jit::jit_tp_forward", "cuda", torch.float32
+        "libtorch_tp_jit::jit_tp_forward", extlib.DEVICE_TYPE, torch.float32
     )
     torch.library.register_autocast(
-        "libtorch_tp_jit::jit_tp_backward", "cuda", torch.float32
+        "libtorch_tp_jit::jit_tp_backward", extlib.DEVICE_TYPE, torch.float32
     )
     torch.library.register_autocast(
-        "libtorch_tp_jit::jit_tp_double_backward", "cuda", torch.float32
+        "libtorch_tp_jit::jit_tp_double_backward", extlib.DEVICE_TYPE, torch.float32
     )
 
 
