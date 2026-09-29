@@ -42,6 +42,12 @@ The JAX API consists of ``TensorProduct`` and ``TensorProductConv``
 classes that behave identically to their PyTorch counterparts. These classes
 do not conform exactly to the e3nn-jax API, but perform the same computation.
 
+JAX ``TensorProductConv`` uses the established loop-unroll implementation by
+default. Select ``mode="streaming"`` to require receiver streaming, or
+``mode="auto"`` to use it when the problem is supported. Streaming supports
+trailing padded edges represented by out-of-bounds node indices. Receiver row
+pointers may optionally be provided for receiver-sorted edges.
+
 If you plan to use ``oeq.jax`` without PyTorch installed, 
 you need to set ``OEQ_NOTORCH=1`` in your local environment (within Python,
 ``os.environ["OEQ_NOTORCH"] = 1``). For the moment, we require this to avoid 
@@ -54,6 +60,16 @@ breaking the PyTorch version of OpenEquivariance.
     :exclude-members:
 
 .. autoclass:: openequivariance.jax.TensorProductConv
+    :members: forward, reorder_weights_from_e3nn, reorder_weights_to_e3nn, implementation, uses_streaming_kernel
+    :undoc-members:
+    :exclude-members:
+
+.. autoclass:: openequivariance.jax.LoopUnrollTensorProductConv
+    :members: forward, reorder_weights_from_e3nn, reorder_weights_to_e3nn
+    :undoc-members:
+    :exclude-members:
+
+.. autoclass:: openequivariance.jax.StreamingTensorProductConv
     :members: forward, reorder_weights_from_e3nn, reorder_weights_to_e3nn
     :undoc-members:
     :exclude-members:
