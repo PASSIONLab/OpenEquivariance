@@ -6,7 +6,7 @@
 [[JAX Examples]](#jax-examples)
 [[Citation and Acknowledgements]](#citation-and-acknowledgements)
 
-OpenEquivariance is a CUDA and HIP kernel generator for the Clebsch-Gordon tensor product, 
+OpenEquivariance is a CUDA, HIP, and SYCL (new! beta) kernel generator for the Clebsch-Gordon tensor product, 
 a key kernel in rotation-equivariant deep neural networks. 
 It implements some of the tensor products 
 that [e3nn](https://e3nn.org/) supports 
@@ -30,9 +30,13 @@ computation and memory consumption significantly.
 For detailed instructions on tests, benchmarks, MACE / Nequip, and our API,
 check out the [documentation](https://passionlab.github.io/OpenEquivariance).
 
-⭐️ **JAX**: Our latest update brings
-support for JAX. For NVIDIA GPUs, 
-install it (after installing JAX) 
+⭐️ **SYCL (beta)**: Thanks to @abagusetty, 
+OpenEquivariance now supports Intel XPUs on PyTorch 
+by compiling SYCL kernels. See our 
+installation guide for more details.
+
+⭐️ **JAX**: We support JAX for NVIDIA and AMD GPUs. 
+For NVIDIA GPUs, install it (after installing JAX) 
 with the following two commands strictly in order:
 
 ``` bash

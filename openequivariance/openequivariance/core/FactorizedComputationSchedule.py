@@ -152,17 +152,23 @@ class FactorizedComputationSchedule:
         self,
         dtype: object,
         *,
-        is_hip: bool,
+        backend: str,
         forward_jvp_active: tuple[bool, bool, bool] = (True, True, True),
         backward_jvp_active: tuple[bool, bool, bool, bool] = (True, True, True, True),
     ) -> FactorizedKernel:
         """Render and cache one CUDA or HIP derivative specialization."""
+        if backend not in ("cuda", "hip"):
+            raise ValueError("streaming kernels support CUDA and HIP")
         if len(forward_jvp_active) != len(Input):
             raise ValueError("forward JVP activity must contain X, SH, and W")
         if len(backward_jvp_active) != len(Input) + 1:
             raise ValueError("backward JVP activity must also contain dout")
+        launch = self.launch_config
         source = (
-            get_jinja_environment(is_hip=is_hip)
+            get_jinja_environment(
+                backend=backend,
+                warp_size=launch.logical_cohort_width,
+            )
             .get_template("factorized_projected.cuh")
             .render(
                 scalar=cpp_scalar_type(dtype),
@@ -173,7 +179,6 @@ class FactorizedComputationSchedule:
                 backward_jvp_dout_active=backward_jvp_active[len(Input)],
             )
         )
-        launch = self.launch_config
         cache_source = (
             f"{source}\0{launch.num_threads}\0{launch.logical_cohort_width}"
             f"\0{launch.shared_memory_bytes}"

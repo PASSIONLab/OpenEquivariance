@@ -173,13 +173,17 @@ def benchmark(func, num_warmup, num_iter, mode="gpu_time", kernel_names=[]):
     else:
         from torch.profiler import ProfilerActivity, profile, record_function
 
+        accelerator_activity = (
+            ProfilerActivity.XPU
+            if accelerator_device_type() == "xpu"
+            else ProfilerActivity.CUDA
+        )
+
         trace_file = tempfile.NamedTemporaryFile().name
 
         for i in range(num_iter):
             timer.clear_L2_cache()
-            with profile(
-                activities=[ProfilerActivity.CUDA], record_shapes=True
-            ) as prof:
+            with profile(activities=[accelerator_activity], record_shapes=True) as prof:
                 with record_function("profile"):
                     func()
 
@@ -258,3 +262,10 @@ def transpose_irrep_layout(
             )
 
     return out
+
+
+def accelerator_device_type():
+    """Imported lazily so the backend-agnostic core does not pull in torch."""
+    from openequivariance._torch.extlib import DEVICE_TYPE
+
+    return DEVICE_TYPE

@@ -340,7 +340,7 @@ extern "C" __global__ void oeq_projected_backward(
     for (int offset = 16; offset > 0; offset >>= 1)
         for (int component = 0; component < EDGE_DIM; ++component)
             edge_gradient[component] +=
-                {{ shfl_down_32("edge_gradient[component]", "offset") }};
+                {{ shfl_down_width("edge_gradient[component]", "offset") }};
 
     if (lane == 0)
         for (int component = 0; component < EDGE_DIM; ++component)
@@ -465,7 +465,7 @@ extern "C" __global__ void oeq_projected_backward_jvp(
     for (int offset = 16; offset > 0; offset >>= 1)
         for (int component = 0; component < EDGE_DIM; ++component)
             tangent_edge_gradient[component] +=
-                {{ shfl_down_32("tangent_edge_gradient[component]", "offset") }};
+                {{ shfl_down_width("tangent_edge_gradient[component]", "offset") }};
 
     if (lane == 0)
         for (int component = 0; component < EDGE_DIM; ++component)

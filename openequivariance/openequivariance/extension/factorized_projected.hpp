@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "kernel_args.hpp"
+
 template<typename JIT_IMPL>
 class __attribute__ ((visibility ("default"))) JITFactorizedProjectedImpl {
 public:
@@ -34,8 +36,8 @@ public:
             int64_t node_count, int64_t edge_count, int64_t channels,
             void* x, void* sh, void* weights, void* senders, void* row_ptr,
             void* out, Stream stream) {
-        void* args[] = {
-            &node_count, &edge_count, &x, &sh, &weights, &senders, &row_ptr, &out};
+        auto args = KernelArgs(
+            node_count, edge_count, x, sh, weights, senders, row_ptr, out);
         execute(0, node_count * channels, args, stream);
     }
 
@@ -43,9 +45,9 @@ public:
             int64_t node_count, int64_t edge_count, int64_t channels,
             void* x, void* sh, void* weights, void* senders, void* row_ptr,
             void* tx, void* tsh, void* tweights, void* out, Stream stream) {
-        void* args[] = {
-            &node_count, &edge_count, &x, &sh, &weights, &senders, &row_ptr,
-            &tx, &tsh, &tweights, &out};
+        auto args = KernelArgs(
+            node_count, edge_count, x, sh, weights, senders, row_ptr, tx, tsh,
+            tweights, out);
         execute(1, node_count * channels, args, stream);
     }
 
@@ -53,9 +55,9 @@ public:
             int64_t node_count, int64_t edge_count,
             void* x, void* sh, void* weights, void* senders, void* receivers,
             void* dout, void* dx, void* dsh, void* dweights, Stream stream) {
-        void* args[] = {
-            &node_count, &edge_count, &x, &sh, &weights, &senders, &receivers,
-            &dout, &dx, &dsh, &dweights};
+        auto args = KernelArgs(
+            node_count, edge_count, x, sh, weights, senders, receivers, dout,
+            dx, dsh, dweights);
         execute(2, edge_count * logical_cohort_width_, args, stream);
     }
 
@@ -64,9 +66,9 @@ public:
             void* x, void* sh, void* weights, void* senders, void* receivers,
             void* dout, void* tx, void* tsh, void* tweights, void* tdout,
             void* tdx, void* tdsh, void* tdweights, Stream stream) {
-        void* args[] = {
-            &node_count, &edge_count, &x, &sh, &weights, &senders, &receivers, &dout,
-            &tx, &tsh, &tweights, &tdout, &tdx, &tdsh, &tdweights};
+        auto args = KernelArgs(
+            node_count, edge_count, x, sh, weights, senders, receivers, dout,
+            tx, tsh, tweights, tdout, tdx, tdsh, tdweights);
         execute(3, edge_count * logical_cohort_width_, args, stream);
     }
 
@@ -75,13 +77,16 @@ private:
     int64_t logical_cohort_width_;
     int64_t shared_memory_bytes_;
 
-    void execute(int kernel_index, int64_t work_items, void* args[], Stream stream) {
+    template<size_t N>
+    void execute(
+            int kernel_index, int64_t work_items, KernelArgs<N>& args,
+            Stream stream) {
         if (work_items == 0)
             return;
         const int64_t blocks =
             (work_items + num_threads_ - 1) / num_threads_;
         jit.execute(
-            kernel_index, args,
+            kernel_index, args.data(), args.arg_sizes(), args.count(),
             with_stream(
                 KernelLaunchConfig(blocks, num_threads_, shared_memory_bytes_),
                 stream));

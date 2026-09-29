@@ -6,6 +6,7 @@ import torch
 import numpy as np
 from openequivariance.core.ConvolutionBase import ConvolutionBase
 from openequivariance.core.utils import oeq_to_torch_dtype
+from openequivariance._torch.extlib import DEVICE_TYPE
 
 
 class FlashTPConv(ConvolutionBase):
@@ -30,7 +31,7 @@ class FlashTPConv(ConvolutionBase):
             config.irreps_in2,
             config.irreps_out,
             instructions,
-            device="cuda",
+            device=DEVICE_TYPE,
             dtype=oeq_to_torch_dtype(config.irrep_dtype),
         )
 

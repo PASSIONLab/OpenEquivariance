@@ -60,8 +60,8 @@ def test_factorized_schedule_preserves_layout_couplings_and_geometry():
 def test_factorized_schedule_caches_complete_ffi_specializations():
     """Create source and FFI metadata together once per specialization."""
     schedule = factorized_schedule_from_problem(_problem())
-    kernel = schedule.kernel(np.float32, is_hip=False)
-    assert kernel is schedule.kernel(np.float32, is_hip=False)
+    kernel = schedule.kernel(np.float32, backend="cuda")
+    assert kernel is schedule.kernel(np.float32, backend="cuda")
     assert kernel.ffi_attributes["source"] == kernel.jit_kernel
     assert kernel.ffi_attributes["hash"] == kernel.hash
     assert kernel.ffi_attributes["input_dim"] == schedule.input_dim
@@ -81,7 +81,7 @@ def test_factorized_schedule_caches_complete_ffi_specializations():
     tuned_schedule = replace(
         schedule, launch_config=FactorizedLaunchConfig(num_threads=256)
     )
-    tuned_kernel = tuned_schedule.kernel(np.float32, is_hip=False)
+    tuned_kernel = tuned_schedule.kernel(np.float32, backend="cuda")
     assert tuned_kernel.jit_kernel == kernel.jit_kernel
     assert tuned_kernel.hash != kernel.hash
 

@@ -15,6 +15,8 @@ from torch_geometric import EdgeIndex
 
 from openequivariance import TensorProduct, TensorProductConv, TPProblem
 
+from conftest import device_type, torch_accelerator
+
 
 class KernelExpectation(NamedTuple):
     kernel_name: str
@@ -34,12 +36,9 @@ class Executable:
         return self.func(*self.buffers)
 
 
-cuda = torch.device("cuda")
-
-
 @pytest.fixture
 def gen():
-    return torch.Generator(device="cuda")
+    return torch.Generator(device=device_type())
 
 
 @pytest.fixture
@@ -55,7 +54,7 @@ def edge_index():
             [1, 0, 2, 1],  # Sender
         ],
         sparse_size=(3, 4),
-        device="cuda",
+        device=device_type(),
         dtype=torch.long,
     )
 
@@ -73,21 +72,23 @@ def tpp():
 
 @pytest.fixture
 def tp_buffers(N, tpp, gen):
-    X = torch.rand(N, tpp.irreps_in1.dim, device="cuda", generator=gen)
-    Y = torch.rand(N, tpp.irreps_in2.dim, device="cuda", generator=gen)
-    W = torch.rand(N, tpp.weight_numel, device="cuda", generator=gen)
+    X = torch.rand(N, tpp.irreps_in1.dim, device=device_type(), generator=gen)
+    Y = torch.rand(N, tpp.irreps_in2.dim, device=device_type(), generator=gen)
+    W = torch.rand(N, tpp.weight_numel, device=device_type(), generator=gen)
     return (X, Y, W)
 
 
 @pytest.fixture
 def conv_buffers(edge_index, tpp, gen):
     X = torch.rand(
-        edge_index.num_rows, tpp.irreps_in1.dim, device="cuda", generator=gen
+        edge_index.num_rows, tpp.irreps_in1.dim, device=device_type(), generator=gen
     )
     Y = torch.rand(
-        edge_index.num_cols, tpp.irreps_in2.dim, device="cuda", generator=gen
+        edge_index.num_cols, tpp.irreps_in2.dim, device=device_type(), generator=gen
     )
-    W = torch.rand(edge_index.num_cols, tpp.weight_numel, device="cuda", generator=gen)
+    W = torch.rand(
+        edge_index.num_cols, tpp.weight_numel, device=device_type(), generator=gen
+    )
     return (X, Y, W, edge_index[0], edge_index[1])
 
 
@@ -139,7 +140,7 @@ def oeq_tp_double_bwd(tpp, tp_buffers):
         dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
 
         # Second backward
-        dummy_grad = torch.tensor(1.0, device="cuda")
+        dummy_grad = torch.tensor(1.0, device=device_type())
         dummy.backward(
             dummy_grad,
             retain_graph=True,
@@ -217,7 +218,7 @@ def oeq_conv_atomic_double_bwd(tpp, conv_buffers):
         dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
 
         # Second backward
-        dummy_grad = torch.tensor(1.0, device="cuda")
+        dummy_grad = torch.tensor(1.0, device=device_type())
         dummy.backward(
             dummy_grad,
             retain_graph=True,
@@ -297,7 +298,7 @@ def oeq_conv_det_double_bwd(tpp, conv_buffers):
         dummy = torch.norm(in1_grad) + torch.norm(in2_grad) + torch.norm(w_grad)
 
         # Second backward
-        dummy_grad = torch.tensor(1.0, device="cuda")
+        dummy_grad = torch.tensor(1.0, device=device_type())
         dummy.backward(
             dummy_grad,
             retain_graph=True,
@@ -345,8 +346,9 @@ def test_separate_streams(request, tmp_path, executable: Executable):
     ) as prof:
         streams = [-1, -2]
         for priority in streams:
-            s = torch.cuda.Stream(device=cuda, priority=priority)
-            with torch.cuda.stream(s):
+            accel = torch_accelerator()
+            s = accel.Stream(device=torch.device(device_type()), priority=priority)
+            with accel.stream(s):
                 with record_function(f"executable_{priority}"):
                     for _ in range(COUNT):
                         executable()

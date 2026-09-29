@@ -17,10 +17,10 @@ logger = getLogger()
 
 
 class LoopUnrollTP(TensorProductBase):
-    def __init__(self, config, dp, is_hip, torch_op):
+    def __init__(self, config, dp, backend, torch_op):
         super().__init__(config, torch_op=torch_op)
 
-        env = get_jinja_environment(is_hip=is_hip)
+        env = get_jinja_environment(backend=backend, warp_size=dp.warpsize)
         template = env.get_template("loop_unroll_batch.cuh")
 
         analysis = filter_and_analyze_problem(config)
