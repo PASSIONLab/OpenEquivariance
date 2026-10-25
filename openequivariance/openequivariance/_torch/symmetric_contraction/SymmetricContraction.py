@@ -123,10 +123,6 @@ def U_matrix_real(
 
 class GroupMM:
     def __init__(self, dtype, num_elements, batch_size):
-        if extlib.DEVICE_TYPE == "xpu":
-            raise NotImplementedError(
-                "Symmetric contraction is not supported on the SYCL backend."
-            )
         self.num_elements = num_elements
         self.batch_size = batch_size
 
@@ -245,7 +241,8 @@ class Contraction(torch.nn.Module):
 
             s = c_tensor.shape
             out = torch.sum(
-                c_tensor.view(s[0] * s[1], -1, s[-1]) * x.view(s[0] * s[1], 1, s[-1]),
+                c_tensor.view(s[0] * s[1], -1, s[-1])
+                * x.reshape(s[0] * s[1], 1, s[-1]),
                 dim=2,
             ).view(s[:-1])
             # out = torch.bmm(c_tensor.view(s[0] * s[1], -1, s[-1]), x.view(s[0] * s[1], s[-1], 1)).view(s[:-1])
@@ -323,6 +320,8 @@ class SymmetricContraction(CodeGenMixin, torch.nn.Module):
 
     def forward(self, x: torch.Tensor, y: torch.Tensor):
         indices = torch.argmax(y, dim=1)
+        # Recomputed once per forward call and shared by all output contractions.
+        # Autograd saves these CPU counts for backward and double backward.
         bincount = torch.bincount(indices, minlength=self.num_elements).to("cpu")
         permutation = torch.argsort(indices)
         inverse_perm = torch.argsort(permutation)
@@ -410,6 +409,6 @@ def register_autograd():
     )
 
 
-if extlib.BUILT_EXTENSION and extlib.DEVICE_TYPE != "xpu":
+if extlib.BUILT_EXTENSION:
     register_torch_fakes()
     register_autograd()

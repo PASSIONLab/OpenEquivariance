@@ -117,7 +117,6 @@ endfunction()
 
 find_package(CUDAToolkit QUIET)
 find_package(hip QUIET)
-find_package(rocblas QUIET)
 
 if(CUDAToolkit_FOUND)
     message(STATUS "Building stable extension with CUDA backend.")
@@ -138,7 +137,6 @@ if(CUDAToolkit_FOUND)
         CUDA::cudart
         CUDA::cuda_driver
         CUDA::nvrtc
-        CUDA::cublas
         cuda_stub_lib
     )
     add_stable_extension(oeq_stable_cuda CUDA_BACKEND "${CUDA_LINK_LIBS}")
@@ -146,6 +144,7 @@ endif()
 
 if(hip_FOUND)
     message(STATUS "Building stable extension with HIP backend.")
+    find_package(hiprtc REQUIRED)
 
     add_library(hip_stub_lib SHARED ${EXT_DIR}/stubs/stream.cpp)
 
@@ -159,16 +158,10 @@ if(hip_FOUND)
         CXX_STANDARD 17
     )
 
-    if(TARGET roc::rocblas)
-        set(HIP_BLAS_LIB roc::rocblas)
-    else()
-        set(HIP_BLAS_LIB rocblas)
-    endif()
-
     set(HIP_LINK_LIBS
         hip_stub_lib
 	    hip::host
-        ${HIP_BLAS_LIB}
+        hiprtc::hiprtc
     )
     add_stable_extension(torch_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
 endif()
