@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <initializer_list>
@@ -9,6 +10,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -16,30 +18,36 @@
 
 #ifdef CUDA_BACKEND
     #include "backend_cuda.hpp"
-    using JITKernel = CUJITKernel;
-    using GPU_Allocator = CUDA_Allocator;
 #endif
 
 #ifdef HIP_BACKEND
     #include "backend_hip.hpp"
-    using JITKernel = HIPJITKernel;
-    using GPU_Allocator = HIP_Allocator;
 #endif
 
 #ifdef SYCL_BACKEND
     #include "backend_sycl.hpp"
-    using JITKernel = SYCLJITKernel;
-    using GPU_Allocator = SYCL_Allocator;
-#endif
-
-#ifndef SYCL_BACKEND
-    #include "group_mm.hpp"
 #endif
 
 #include "tensorproducts.hpp"
 #include "convolution.hpp"
 
-using namespace std;
+namespace oeq {
+
+#ifdef CUDA_BACKEND
+    using JITKernel = CUJITKernel;
+    using GPU_Allocator = CUDA_Allocator;
+#endif
+
+#ifdef HIP_BACKEND
+    using JITKernel = HIPJITKernel;
+    using GPU_Allocator = HIP_Allocator;
+#endif
+
+#ifdef SYCL_BACKEND
+    using JITKernel = SYCLJITKernel;
+    using GPU_Allocator = SYCL_Allocator;
+#endif
+
 using json = json11::Json;
 
 Dtype enum_to_torch_dtype(int64_t i);
@@ -56,6 +64,16 @@ bool tensor_is_on_gpu(const Tensor &tensor);
 
 const uint8_t *tensor_data_ptr_u8(const Tensor &tensor);
 void *data_ptr(const Tensor &tensor);
+
+Tensor as_strided(const Tensor& tensor, std::array<int64_t, 3> sizes,
+    std::array<int64_t, 3> strides, int64_t storage_offset);
+Tensor& bmm_out(Tensor& out, const Tensor& self, const Tensor& mat2);
+
+} // namespace oeq
+
+#include "group_mm.hpp"
+
+namespace oeq {
 
 inline std::string shape_to_string(std::initializer_list<int64_t> shape) {
     std::ostringstream oss;
@@ -108,13 +126,13 @@ inline Dtype enum_to_torch_dtype(int64_t i) {
         case 4: return kLong;
         case 5: return kByte;
     }
-    throw logic_error("Unsupported tensor datatype!");
+    throw std::logic_error("Unsupported tensor datatype!");
 }
 
-inline void check_tensor(const Tensor &tensor,
-                         std::initializer_list<int64_t> expected_shape,
-                         Dtype expected_dtype,
-                         std::string tensor_name) {
+inline void check_tensor_metadata(const Tensor &tensor,
+                                  std::initializer_list<int64_t> expected_shape,
+                                  Dtype expected_dtype,
+                                  const std::string &tensor_name) {
     bool shape_ok = (tensor.dim() == static_cast<int64_t>(expected_shape.size()));
     if (shape_ok) {
         int64_t i = 0;
@@ -131,11 +149,19 @@ inline void check_tensor(const Tensor &tensor,
           "Shape mismatch for tensor '", tensor_name,
           "'. Expected: ", shape_to_string(expected_shape),
           ". Got: ", tensor_sizes_str(tensor));
-    TCHECK(tensor_is_on_gpu(tensor), "Tensor '", tensor_name, "' is not on the GPU.");
     TCHECK(tensor.scalar_type() == expected_dtype,
           "Dtype mismatch for tensor '", tensor_name,
           "'. Expected: ", static_cast<int>(expected_dtype),
           ". Got: ", static_cast<int>(tensor.scalar_type()));
+}
+
+inline void check_tensor(const Tensor &tensor,
+                         std::initializer_list<int64_t> expected_shape,
+                         Dtype expected_dtype,
+                         const std::string &tensor_name) {
+    check_tensor_metadata(tensor, expected_shape, expected_dtype, tensor_name);
+    TCHECK(tensor_is_on_gpu(tensor), "Tensor '", tensor_name,
+           "' is not on the GPU backend supported by this extension.");
 }
 
 inline std::unordered_map<std::string, int64_t> parse_json_config(const json &j_obj) {
@@ -165,7 +191,7 @@ struct KernelProp {
         idx_dtype(kInt), workspace_dtype(kByte) {}
 
     KernelProp(
-        std::unordered_map<string, int64_t> &kernel_dims, bool is_convolution) :
+        std::unordered_map<std::string, int64_t> &kernel_dims, bool is_convolution) :
             L1_dim(kernel_dims.at("L1_dim")),
             L2_dim(kernel_dims.at("L2_dim")),
             L3_dim(kernel_dims.at("L3_dim")),
@@ -335,7 +361,7 @@ inline Tensor jit_tp_forward(
     return L3_out;
 }
 
-inline tuple<Tensor, Tensor, Tensor> jit_tp_backward(
+inline std::tuple<Tensor, Tensor, Tensor> jit_tp_backward(
         Tensor json_bytes, int64_t hash,
         Tensor L1_in,
         Tensor L2_in,
@@ -377,10 +403,10 @@ inline tuple<Tensor, Tensor, Tensor> jit_tp_backward(
             stream
     );
 
-    return tuple(L1_grad, L2_grad, W_grad);
+    return std::tuple(L1_grad, L2_grad, W_grad);
 }
 
-inline tuple<Tensor, Tensor, Tensor, Tensor> jit_tp_double_backward(
+inline std::tuple<Tensor, Tensor, Tensor, Tensor> jit_tp_double_backward(
         Tensor json_bytes, int64_t hash,
         Tensor L1_in,
         Tensor L2_in,
@@ -439,7 +465,7 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_tp_double_backward(
             stream
     );
 
-    return tuple(L1_grad, L2_grad, W_grad, L3_dgrad);
+    return std::tuple(L1_grad, L2_grad, W_grad, L3_dgrad);
 }
 
 
@@ -501,7 +527,7 @@ inline Tensor jit_conv_forward(
     return L3_out;
 }
 
-inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
+inline std::tuple<Tensor, Tensor, Tensor> jit_conv_backward(
         Tensor json_bytes, int64_t hash,
         Tensor L1_in,
         Tensor L2_in,
@@ -564,10 +590,10 @@ inline tuple<Tensor, Tensor, Tensor> jit_conv_backward(
             data_ptr(transpose_perm_contig),
             stream);
 
-    return tuple(L1_grad, L2_grad, W_grad);
+    return std::tuple(L1_grad, L2_grad, W_grad);
 }
 
-inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
+inline std::tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
         Tensor json_bytes, int64_t hash,
         Tensor L1_in,
         Tensor L2_in,
@@ -644,16 +670,16 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
             stream
     );
 
-    return tuple(L1_grad, L2_grad, W_grad, L3_dgrad);
+    return std::tuple(L1_grad, L2_grad, W_grad, L3_dgrad);
 }
 
 // ===========================================================
 
-#ifndef SYCL_BACKEND
 inline Tensor group_gemm(
         Tensor A, Tensor B, Tensor ragged_counts,
         int64_t num_W, int64_t batch_size, int64_t m, int64_t k, int64_t ragged_inner) {
-    TCHECK(A.is_cuda() && B.is_cuda(), "group_gemm: A and B must be GPU tensors");
+    TCHECK(tensor_is_on_gpu(A) && tensor_is_on_gpu(B),
+        "group_gemm: A and B must be on the GPU backend supported by this extension");
     TCHECK(A.get_device() == B.get_device(), "group_gemm: A and B must be on the same device");
     TCHECK(A.scalar_type() == B.scalar_type(), "group_gemm: A and B must have the same dtype");
     TCHECK(A.scalar_type() == kFloat || A.scalar_type() == kDouble,
@@ -667,11 +693,11 @@ inline Tensor group_gemm(
         "group_gemm: ragged_counts must contain num_W entries");
     TCHECK(B.dim() == 3, "group_gemm: B must have shape [rows, batch_size, k]");
     const int64_t rows = B.size(0);
-    check_tensor(B, {rows, batch_size, k}, A.scalar_type(), "group_gemm B");
+    check_tensor_metadata(B, {rows, batch_size, k}, A.scalar_type(), "group_gemm B");
     if (ragged_inner == 0)
-        check_tensor(A, {num_W, batch_size, m, k}, A.scalar_type(), "group_gemm A");
+        check_tensor_metadata(A, {num_W, batch_size, m, k}, A.scalar_type(), "group_gemm A");
     else
-        check_tensor(A, {rows, batch_size, m}, A.scalar_type(), "group_gemm A");
+        check_tensor_metadata(A, {rows, batch_size, m}, A.scalar_type(), "group_gemm A");
 
     Tensor rc_c = tensor_contiguous(ragged_counts);
     const auto* rc_ptr = static_cast<const int64_t*>(data_ptr(rc_c));
@@ -684,7 +710,6 @@ inline Tensor group_gemm(
     TCHECK(row_count == rows,
         "group_gemm: ragged_counts must sum to the number of rows");
 
-    TensorDeviceGuard device_guard(A);
     Tensor A_c    = tensor_contiguous(A);
     Tensor B_c    = tensor_contiguous(B);
 
@@ -696,14 +721,15 @@ inline Tensor group_gemm(
         C = tensor_zeros_like(A, make_sizes({num_W, batch_size, m, k}));
     }
 
-    oeq::group_gemm_torch(tensor_handle(A_c), tensor_handle(B_c), tensor_handle(C),
+    oeq::grouped_gemm_via_torch_bmm(A_c, B_c, C,
         rc_ptr, num_W, batch_size, m, k, ragged_inner);
 
     return C;
 }
-#endif
 
 // ===========================================================
+
+} // namespace oeq
 
 // The dispatch key must match the device the tensors live on: XPU for SYCL,
 // CUDA for both CUDA and HIP (PyTorch maps HIP tensors onto the CUDA key).
@@ -714,17 +740,15 @@ inline Tensor group_gemm(
 #endif
 
 REGISTER_LIBRARY_IMPL(libtorch_tp_jit, OEQ_DISPATCH_KEY, m) {
-    m.impl("jit_tp_forward", BOX(&jit_tp_forward));
-    m.impl("jit_tp_backward", BOX(&jit_tp_backward));
-    m.impl("jit_tp_double_backward", BOX(&jit_tp_double_backward));
+    m.impl("jit_tp_forward", BOX(&oeq::jit_tp_forward));
+    m.impl("jit_tp_backward", BOX(&oeq::jit_tp_backward));
+    m.impl("jit_tp_double_backward", BOX(&oeq::jit_tp_double_backward));
 
-    m.impl("jit_conv_forward", BOX(&jit_conv_forward));
-    m.impl("jit_conv_backward", BOX(&jit_conv_backward));
-    m.impl("jit_conv_double_backward", BOX(&jit_conv_double_backward));
+    m.impl("jit_conv_forward", BOX(&oeq::jit_conv_forward));
+    m.impl("jit_conv_backward", BOX(&oeq::jit_conv_backward));
+    m.impl("jit_conv_double_backward", BOX(&oeq::jit_conv_double_backward));
 
-#ifndef SYCL_BACKEND
-    m.impl("group_gemm", BOX(&group_gemm));
-#endif
+    m.impl("group_gemm", BOX(&oeq::group_gemm));
 };
 
 REGISTER_LIBRARY(libtorch_tp_jit, m) {
@@ -736,7 +760,5 @@ REGISTER_LIBRARY(libtorch_tp_jit, m) {
     m.def("jit_conv_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor)");
     m.def("jit_conv_double_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor, Tensor)");
 
-#ifndef SYCL_BACKEND
     m.def("group_gemm(Tensor A, Tensor B, Tensor ragged_counts, int num_W, int batch_size, int m, int k, int ragged_inner) -> Tensor");
-#endif
 };

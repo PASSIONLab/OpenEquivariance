@@ -9,13 +9,7 @@ from e3nn import o3
 
 from openequivariance._torch.symmetric_contraction import SymmetricContraction
 
-from conftest import device_type
-
-if device_type() == "xpu":
-    pytest.skip(
-        "Symmetric contraction is not supported on the SYCL backend.",
-        allow_module_level=True,
-    )
+from conftest import device_type, torch_accelerator
 
 mace_symmetric_contraction = pytest.importorskip("mace.modules.symmetric_contraction")
 MaceSymmetricContraction = mace_symmetric_contraction.SymmetricContraction
@@ -71,8 +65,18 @@ def symmetric_contraction_config(request):
 
 
 @pytest.fixture(params=[torch.float32, torch.float64], ids=["F32", "F64"])
-def dtype(request):
+def dtype(request, symmetric_contraction_config):
+    require_dtype(symmetric_contraction_config.device, request.param)
     return request.param
+
+
+def require_dtype(device, dtype):
+    if (
+        device.type == "xpu"
+        and dtype == torch.float64
+        and not torch.xpu.get_device_properties(device).has_fp64
+    ):
+        pytest.skip("This XPU does not support float64")
 
 
 @pytest.fixture
@@ -102,6 +106,20 @@ def node_feats(dtype, symmetric_contraction_config):
         generator=gen,
         requires_grad=True,
     )
+
+
+@pytest.fixture(params=["contiguous", "transposed", "offset"])
+def node_feats_with_layout(request, node_feats):
+    match request.param:
+        case "contiguous":
+            assert node_feats.is_contiguous()
+        case "transposed":
+            node_feats = node_feats.transpose(0, 2).contiguous().transpose(0, 2)
+            assert not node_feats.is_contiguous()
+        case "offset":
+            node_feats = torch.cat((torch.zeros_like(node_feats[:1]), node_feats))[1:]
+            assert node_feats.is_contiguous() and node_feats.storage_offset() > 0
+    return node_feats.detach().requires_grad_()
 
 
 @pytest.fixture
@@ -171,32 +189,48 @@ def random_like(tensor, seed):
     )
 
 
+def assert_matches_mace_forward_backward(
+    modules, node_feats, node_attrs, dtype, oeq_forward=None
+):
+    oeq_module, mace_module = modules
+    mace_node_feats = node_feats.detach().clone().requires_grad_()
+    if oeq_forward is None:
+        oeq_forward = oeq_module
+
+    oeq_output = oeq_forward(node_feats, node_attrs)
+    mace_output = mace_module(mace_node_feats, node_attrs)
+
+    torch.testing.assert_close(oeq_output, mace_output, **tolerance(dtype))
+
+    output_grad = random_like(oeq_output, seed=4321)
+    oeq_params, mace_params = matching_trainable_parameters(oeq_module, mace_module)
+
+    oeq_grads = torch.autograd.grad(
+        oeq_output, (node_feats, *oeq_params), grad_outputs=output_grad
+    )
+    mace_grads = torch.autograd.grad(
+        mace_output, (mace_node_feats, *mace_params), grad_outputs=output_grad
+    )
+
+    for oeq_grad, mace_grad in zip(oeq_grads, mace_grads):
+        torch.testing.assert_close(oeq_grad, mace_grad, **tolerance(dtype))
+    return oeq_output
+
+
 class TestSymmetricContraction:
     def test_matches_mace_forward_backward(
-        self, modules, node_feats, node_attrs, dtype, symmetric_contraction_config
+        self,
+        modules,
+        node_feats_with_layout,
+        node_attrs,
+        dtype,
+        symmetric_contraction_config,
     ):
+        output = assert_matches_mace_forward_backward(
+            modules, node_feats_with_layout, node_attrs, dtype
+        )
         cfg = symmetric_contraction_config
-        oeq_module, mace_module = modules
-        mace_node_feats = node_feats.detach().clone().requires_grad_()
-
-        oeq_output = oeq_module(node_feats, node_attrs)
-        mace_output = mace_module(mace_node_feats, node_attrs)
-
-        assert oeq_output.shape == (len(cfg.label_values), cfg.irreps_out.dim)
-        torch.testing.assert_close(oeq_output, mace_output, **tolerance(dtype))
-
-        output_grad = random_like(oeq_output, seed=4321)
-        oeq_params, mace_params = matching_trainable_parameters(oeq_module, mace_module)
-
-        oeq_grads = torch.autograd.grad(
-            oeq_output, (node_feats, *oeq_params), grad_outputs=output_grad
-        )
-        mace_grads = torch.autograd.grad(
-            mace_output, (mace_node_feats, *mace_params), grad_outputs=output_grad
-        )
-
-        for oeq_grad, mace_grad in zip(oeq_grads, mace_grads):
-            torch.testing.assert_close(oeq_grad, mace_grad, **tolerance(dtype))
+        assert output.shape == (len(cfg.label_values), cfg.irreps_out.dim)
 
     def test_matches_mace_double_backward(
         self, modules, node_feats, node_attrs, dtype, symmetric_contraction_config
@@ -250,13 +284,48 @@ class TestSymmetricContraction:
         for oeq_grad, mace_grad in zip(oeq_second_grads, mace_second_grads):
             torch.testing.assert_close(oeq_grad, mace_grad, **tolerance(dtype))
 
-    def test_compile(self, modules, node_feats, node_attrs):
+    def test_compile(self, modules, node_feats, node_attrs, dtype):
         sc, _ = modules
-        ref = sc(node_feats, node_attrs)
-        assert torch.allclose(ref, torch.compile(sc)(node_feats, node_attrs), atol=1e-5)
+        compiled = torch.compile(sc)
+        single_element_attrs = torch.zeros_like(node_attrs)
+        single_element_attrs[:, -1] = 1
+        for attrs in (node_attrs, single_element_attrs):
+            assert_matches_mace_forward_backward(
+                modules, node_feats, attrs, dtype, oeq_forward=compiled
+            )
 
-    def test_export(self, modules, node_feats, node_attrs):
+    def test_export(self, modules, node_feats, node_attrs, dtype):
         sc, _ = modules
         ref = sc(node_feats, node_attrs)
         exported = torch.export.export(sc, args=(node_feats, node_attrs), strict=False)
-        assert torch.allclose(ref, exported.module()(node_feats, node_attrs), atol=1e-5)
+        torch.testing.assert_close(
+            ref, exported.module()(node_feats, node_attrs), **tolerance(dtype)
+        )
+
+    def test_nondefault_stream(self, modules, node_feats, node_attrs, dtype):
+        accel = torch_accelerator()
+        current = accel.current_stream(node_feats.device)
+        stream = accel.Stream(device=node_feats.device)
+        stream.wait_stream(current)
+        try:
+            with accel.stream(stream):
+                stream_feats = (node_feats.detach() * 1.5).requires_grad_()
+                assert_matches_mace_forward_backward(
+                    modules, stream_feats, node_attrs, dtype
+                )
+        finally:
+            stream.synchronize()
+
+    def test_noncurrent_device(self, modules, node_feats, node_attrs, dtype):
+        accel = torch_accelerator()
+        if accel.device_count() < 2:
+            pytest.skip("Requires two GPUs")
+        current = accel.current_device()
+        target = torch.device(device_type(), (current + 1) % accel.device_count())
+        require_dtype(target, dtype)
+        modules = tuple(module.to(target) for module in modules)
+        node_feats = node_feats.detach().to(target).requires_grad_()
+        node_attrs = node_attrs.to(target)
+        with accel.device(current):
+            assert_matches_mace_forward_backward(modules, node_feats, node_attrs, dtype)
+            assert accel.current_device() == current
