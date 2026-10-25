@@ -241,7 +241,8 @@ class Contraction(torch.nn.Module):
 
             s = c_tensor.shape
             out = torch.sum(
-                c_tensor.view(s[0] * s[1], -1, s[-1]) * x.view(s[0] * s[1], 1, s[-1]),
+                c_tensor.view(s[0] * s[1], -1, s[-1])
+                * x.reshape(s[0] * s[1], 1, s[-1]),
                 dim=2,
             ).view(s[:-1])
             # out = torch.bmm(c_tensor.view(s[0] * s[1], -1, s[-1]), x.view(s[0] * s[1], s[-1], 1)).view(s[:-1])
