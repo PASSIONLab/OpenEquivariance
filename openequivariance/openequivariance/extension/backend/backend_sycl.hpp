@@ -18,13 +18,15 @@ namespace syclex = sycl::ext::oneapi::experimental;
 
 using Stream = sycl::queue *;
 
-Stream get_current_stream();
+namespace oeq {
+    Stream get_current_stream();
+}
 
 inline sycl::queue &resolve_queue(Stream stream) {
     if (stream != nullptr) {
         return *stream;
     }
-    if (Stream current = get_current_stream()) {
+    if (Stream current = oeq::get_current_stream()) {
         return *current;
     }
     static sycl::queue default_queue{sycl::gpu_selector_v};

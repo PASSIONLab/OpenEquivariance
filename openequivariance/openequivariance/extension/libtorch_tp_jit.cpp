@@ -1,25 +1,36 @@
+#include <array>
 #include <cstdint>
+#include <stdexcept>
+#include <vector>
 #include <pybind11/pybind11.h>
 
 #ifdef CUDA_BACKEND
     #include <c10/cuda/CUDAStream.h>
+    #include "backend_cuda.hpp"
 #endif
 
 #ifdef HIP_BACKEND
     #include <c10/hip/HIPStream.h>
+    #include "backend_hip.hpp"
 #endif
 
 #ifdef SYCL_BACKEND
     #include <c10/xpu/XPUStream.h>
+    #include "backend_sycl.hpp"
 #endif
 
 #include <ATen/Operators.h>
-#include <c10/core/DeviceGuard.h>
 #include <c10/macros/Macros.h>
 #include <c10/util/Exception.h>
 #include <torch/all.h>
-#include <torch/csrc/inductor/aoti_torch/utils.h>
 #include <torch/library.h>
+
+#define TCHECK TORCH_CHECK
+#define BOX(x) x
+#define REGISTER_LIBRARY_IMPL TORCH_LIBRARY_IMPL
+#define REGISTER_LIBRARY TORCH_LIBRARY
+
+namespace oeq {
 
 using Tensor = torch::Tensor;
 using Dtype = torch::Dtype;
@@ -30,26 +41,20 @@ constexpr Dtype kInt = torch::kInt;
 constexpr Dtype kLong = torch::kLong;
 constexpr Dtype kByte = torch::kByte;
 
-#define TCHECK TORCH_CHECK
-#define BOX(x) x
-#define REGISTER_LIBRARY_IMPL TORCH_LIBRARY_IMPL
-#define REGISTER_LIBRARY TORCH_LIBRARY
-
-namespace {
-
-class TensorDeviceGuard {
-    c10::DeviceGuard guard;
-public:
-    explicit TensorDeviceGuard(const Tensor& tensor) : guard(tensor.device()) {}
-};
-
-AtenTensorHandle tensor_handle(Tensor& tensor) {
-    return torch::aot_inductor::tensor_pointer_to_tensor_handle(&tensor);
-}
-
-}
+} // namespace oeq
 
 #include "torch_core.hpp"
+
+namespace oeq {
+
+Tensor as_strided(const Tensor& tensor, std::array<int64_t, 3> sizes,
+        std::array<int64_t, 3> strides, int64_t storage_offset) {
+    return at::as_strided(tensor, sizes, strides, storage_offset);
+}
+
+Tensor& bmm_out(Tensor& out, const Tensor& self, const Tensor& mat2) {
+    return at::bmm_out(out, self, mat2);
+}
 
 Tensor tensor_to_cpu_contiguous(const Tensor &tensor) {
     return tensor.to(torch::kCPU).contiguous();
@@ -114,7 +119,9 @@ bool tensor_is_on_gpu(const Tensor &tensor) {
 #endif
 }
 
-namespace py=pybind11;
+} // namespace oeq
+
+namespace py = pybind11;
 PYBIND11_MODULE(libtorch_tp_jit, m) {
     py::class_<DeviceProp>(m, "DeviceProp")
         .def(py::init<int>())
