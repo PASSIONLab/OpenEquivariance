@@ -1,4 +1,4 @@
-"""Names of JAX FFI handlers provided by the native extension."""
+"""Names of JAX FFI kernel targets."""
 
 TENSOR_PRODUCT_TARGETS = (
     "tp_forward",
@@ -12,4 +12,5 @@ CONVOLUTION_TARGETS = (
     "conv_double_backward",
 )
 
-FFI_TARGETS = TENSOR_PRODUCT_TARGETS + CONVOLUTION_TARGETS
+FACTORIZED_TARGET = "factorized_projected"
+FFI_TARGETS = TENSOR_PRODUCT_TARGETS + CONVOLUTION_TARGETS + (FACTORIZED_TARGET,)

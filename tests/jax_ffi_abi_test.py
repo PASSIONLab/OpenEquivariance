@@ -64,7 +64,7 @@ def test_exported_handler_table_matches_manifest(with_jax):
     ]
     assert table.abi_version == 2
     assert tuple(names) == FFI_TARGETS
-    assert len(names) == len(set(names)) == 6
+    assert len(names) == len(set(names)) == 7
     assert all(
         not table.handlers[index].instantiate for index in range(table.handler_count)
     )
@@ -87,7 +87,7 @@ def test_nanobind_registrations_match_handler_table(with_jax):
     ext, table = _handler_table()
     registrations = ext.registrations()
     assert tuple(registrations) == FFI_TARGETS
-    assert len(registrations) == table.handler_count == 6
+    assert len(registrations) == table.handler_count == 7
     for index, name in enumerate(FFI_TARGETS):
         handler = table.handlers[index]
         registration = registrations[name]
