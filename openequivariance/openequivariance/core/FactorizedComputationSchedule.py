@@ -133,7 +133,8 @@ class FactorizedComputationSchedule:
     layouts of the source :class:`~openequivariance.core.e3nn_lite.TPProblem`.
     Output and sender-gradient slots are fully resolved before rendering, so
     the CUDA or HIP template only executes this schedule. Graph size and edge
-    count remain runtime values because the forward pass follows CSR rows.
+    count remain runtime values because the forward pass follows receiver edge
+    ranges.
     """
 
     paths: tuple[FactorizedComputationPath, ...]

@@ -789,7 +789,7 @@ ffi::Error factorized_projected_forward_impl(
     validate_projected_inputs(x, sh, senders, input_dim, edge_dim);
     const int64_t node_count = x.dimensions()[0], edge_count = sh.dimensions()[0];
     check_tensor(weights, {edge_count, weight_dim}, x.element_type(), "weights");
-    check_tensor(row_ptr, {node_count + 1}, xla::ffi::DataType::S32, "row_ptr");
+    check_tensor(row_ptr, {node_count, 2}, xla::ffi::DataType::S32, "row_ptr");
     check_tensor(*out, {node_count, output_dim}, x.element_type(), "out");
     auto* jit_kernel = compile_factorized_projected_with_caching(
         source, hash, num_threads, logical_cohort_width, shared_memory_bytes);
@@ -810,7 +810,7 @@ ffi::Error factorized_projected_forward_jvp_impl(
     validate_projected_inputs(x, sh, senders, input_dim, edge_dim);
     const int64_t node_count = x.dimensions()[0], edge_count = sh.dimensions()[0];
     check_tensor(weights, {edge_count, weight_dim}, x.element_type(), "weights");
-    check_tensor(row_ptr, {node_count + 1}, xla::ffi::DataType::S32, "row_ptr");
+    check_tensor(row_ptr, {node_count, 2}, xla::ffi::DataType::S32, "row_ptr");
     if (tx != nullptr) check_tensor(*tx, {node_count, input_dim}, x.element_type(), "tx");
     if (tsh != nullptr) check_tensor(*tsh, {edge_count, edge_dim}, x.element_type(), "tsh");
     if (tweights != nullptr) {

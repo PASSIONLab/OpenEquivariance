@@ -109,8 +109,8 @@ def _validate(schedule, x, sh, weights, senders, receivers, row_ptr, dout=None):
         raise ValueError("senders/receivers must be equal int32 vectors")
     if receivers.dtype != np.dtype(np.int32) or row_ptr.dtype != np.dtype(np.int32):
         raise ValueError("topology must use int32")
-    if row_ptr.shape != (x.shape[0] + 1,):
-        raise ValueError("receiver row pointer must have shape [N+1]")
+    if row_ptr.shape != (x.shape[0], 2):
+        raise ValueError("receiver edge ranges must have shape [N, 2]")
     if sh.dtype != x.dtype or weights.dtype != x.dtype:
         raise ValueError("floating operand dtypes must match")
     if dout is not None and (
@@ -125,25 +125,18 @@ fwd_jvp_p = core.Primitive("factorized_projected_fwd_jvp")
 
 
 def _batch_factorized(primitive, value_kinds, result_kinds, tangent_start=None):
-    """Flatten a shared-topology batch into one generated convolution call.
+    """Flatten graph batches into one generated convolution call.
 
-    Valid graph blocks are packed before one global padded suffix. Graph-local
-    indices are offset before flattening, while invalid endpoints are mapped to
-    the single out-of-bounds node index of the flattened batch. This preserves
-    receiver order and lets the generated kernels discard padding immediately.
+    Graph-local indices receive node offsets. Edge arrays keep their original
+    order, including padding between graphs. Receiver offsets address these
+    physical edge positions, and kernels skip invalid endpoints.
     """
 
     def rule(args, axes, *, schedule, **params):
         value_count = len(value_kinds)
-        topology_axes = axes[value_count:]
-        if any(axis is not None for axis in topology_axes):
-            raise NotImplementedError(
-                "vmap over receiver topology is unsupported. Map X, Y, W, "
-                "and derivative arrays while keeping rows and cols static."
-            )
         sizes = [
             value.shape[axis]
-            for value, axis in zip(args[:value_count], axes[:value_count])
+            for value, axis in zip(args, axes)
             if axis is not None
         ]
         if not sizes:
@@ -171,48 +164,26 @@ def _batch_factorized(primitive, value_kinds, result_kinds, tangent_start=None):
             values.append(value if not is_active else leading_axis(value, axis))
 
         x = values[0]
-        nodes, edges = x.shape[1], args[value_count].shape[0]
+        senders, receivers, row_ptr = (
+            leading_axis(value, axis)
+            for value, axis in zip(args[value_count:], axes[value_count:])
+        )
+        nodes, edges = x.shape[1], senders.shape[1]
         node_offsets = jnp.arange(batch_size, dtype=jnp.int32) * nodes
-        senders, receivers, row_ptr = args[value_count:]
-        edge_indices = jnp.arange(edges, dtype=jnp.int32)
-        valid_count = row_ptr[-1]
-        valid_edges = edge_indices < valid_count
-        graph_indices = jnp.arange(batch_size, dtype=jnp.int32)[:, None]
-        destination = jnp.where(
-            valid_edges[None, :],
-            graph_indices * valid_count + edge_indices[None, :],
-            batch_size * valid_count
-            + graph_indices * (edges - valid_count)
-            + edge_indices[None, :]
-            - valid_count,
+        valid = (
+            (senders >= 0) & (senders < nodes)
+            & (receivers >= 0) & (receivers < nodes)
+        )
+        sentinel = jnp.asarray(batch_size * nodes, dtype=jnp.int32)
+        senders = jnp.where(
+            valid, senders + node_offsets[:, None], sentinel
+        ).reshape(-1)
+        receivers = jnp.where(
+            valid, receivers + node_offsets[:, None], sentinel
         ).reshape(-1)
 
-        def pack_edges(value):
-            flat = value.reshape((-1,) + value.shape[2:])
-            return jnp.zeros_like(flat).at[destination].set(flat)
-
-        sentinel = jnp.asarray(batch_size * nodes, dtype=jnp.int32)
-        senders = pack_edges(
-            jnp.where(
-                valid_edges[None, :],
-                senders[None, :] + node_offsets[:, None],
-                sentinel,
-            )
-        )
-        receivers = pack_edges(
-            jnp.where(
-                valid_edges[None, :],
-                receivers[None, :] + node_offsets[:, None],
-                sentinel,
-            )
-        )
-        row_offsets = jnp.arange(batch_size, dtype=jnp.int32) * valid_count
-        row_ptr = jnp.concatenate(
-            (
-                (row_offsets[:, None] + row_ptr[None, :-1]).reshape(-1),
-                jnp.asarray((batch_size * valid_count,), dtype=jnp.int32),
-            )
-        )
+        row_offsets = jnp.arange(batch_size, dtype=jnp.int32) * edges
+        row_ptr = (row_ptr + row_offsets[:, None, None]).reshape(-1, 2)
 
         flat_values = []
         for index, (value, kind) in enumerate(zip(values, value_kinds)):
@@ -223,10 +194,8 @@ def _batch_factorized(primitive, value_kinds, result_kinds, tangent_start=None):
             )
             if not is_active:
                 flat_values.append(value)
-            elif kind == "node":
-                flat_values.append(value.reshape(-1, value.shape[-1]))
             else:
-                flat_values.append(pack_edges(value))
+                flat_values.append(value.reshape(-1, value.shape[-1]))
 
         result = primitive.bind(
             *flat_values, senders, receivers, row_ptr, schedule=schedule, **params
@@ -235,7 +204,7 @@ def _batch_factorized(primitive, value_kinds, result_kinds, tangent_start=None):
         def restore(value, kind):
             if kind == "node":
                 return value.reshape(batch_size, nodes, value.shape[-1])
-            return value[destination].reshape(batch_size, edges, value.shape[-1])
+            return value.reshape(batch_size, edges, value.shape[-1])
 
         if primitive.multiple_results:
             return (

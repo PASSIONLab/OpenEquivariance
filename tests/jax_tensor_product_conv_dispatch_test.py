@@ -147,9 +147,9 @@ def test_streaming_row_ptr_requires_expected_shape_and_dtype():
 
     rows = jnp.asarray([0, 0, 2], dtype=jnp.int32)
     cols = jnp.asarray([1, 2, 0], dtype=jnp.int32)
-    correct = jnp.asarray([0, 2, 2, 3], dtype=jnp.int32)
+    correct = jnp.asarray([[0, 2], [0, 0], [2, 3]], dtype=jnp.int32)
     StreamingTensorProductConv._validate_row_ptr(correct, rows, cols, 3)
-    with pytest.raises(ValueError, match=r"shape \[N \+ 1\]"):
+    with pytest.raises(ValueError, match=r"shape \[N, 2\]"):
         StreamingTensorProductConv._validate_row_ptr(correct[:-1], rows, cols, 3)
     with pytest.raises(ValueError, match="int32"):
         StreamingTensorProductConv._validate_row_ptr(

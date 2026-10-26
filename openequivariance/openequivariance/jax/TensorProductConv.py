@@ -140,11 +140,12 @@ class TensorProductConv:
         topology sort and operand gathers. The standard implementation simply
         consumes that aligned order. A deterministic ``sender_perm`` must use
         the same order as the supplied edge operands. For streaming, valid
-        edges must form a nondecreasing receiver-row prefix and invalid padding
-        must be a tail. Under JIT this is a trusted contract, so it adds no
-        runtime validation. The standard implementation requires every
-        endpoint to be valid. ``row_ptr`` optionally reuses the cached receiver
-        offsets for a sorted streaming call.
+        edges must have nondecreasing receivers. Invalid endpoints may appear
+        between valid edges and are skipped. Under JIT this is a trusted
+        contract without runtime validation. The standard implementation
+        requires every endpoint to be valid. ``row_ptr`` optionally reuses the
+        cached receiver start and end positions, with shape ``[N, 2]``, for a
+        sorted streaming call.
         """
         if not isinstance(indices_are_sorted, bool):
             raise TypeError("indices_are_sorted must be a Python bool")

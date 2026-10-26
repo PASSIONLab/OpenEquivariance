@@ -20,9 +20,8 @@ class StreamingUnavailableError(ValueError):
 class StreamingConvTopology(NamedTuple):
     """Store receiver-sorted topology that can be reused by streaming calls.
 
-    Invalid padded edges are sorted after valid rows and assigned a sentinel
-    receiver. Forward traversal excludes the sentinel suffix, while reverse
-    kernels discard it before reading floating-point operands.
+    Each receiver stores the start and end of its valid edges. Padding stays
+    in place and is skipped before reading floating-point operands.
     """
 
     order: jax.Array
@@ -164,18 +163,20 @@ class StreamingTensorProductConv:
             if indices_are_sorted
             else jnp.argsort(receivers, stable=True).astype(jnp.int32)
         )
-        edges_per_receiver = jnp.bincount(
-            jnp.where(valid_edges, rows, 0),
-            weights=valid_edges.astype(rows.dtype),
-            length=num_nodes,
-        ).astype(rows.dtype)
-        row_ptr = jnp.concatenate(
-            (jnp.zeros((1,), dtype=rows.dtype), jnp.cumsum(edges_per_receiver))
-        )
+        receivers = receivers[order]
+        senders = jnp.where(valid_edges, cols, num_nodes)[order]
+
+        # Bound each receiver's real edges without moving feature arrays.
+        edge = jnp.arange(rows.shape[0], dtype=rows.dtype)
+        begin = jnp.full((num_nodes,), rows.shape[0], dtype=rows.dtype)
+        end = jnp.zeros((num_nodes,), dtype=rows.dtype)
+        begin = begin.at[receivers].min(edge, mode="drop")
+        end = end.at[receivers].max(edge + 1, mode="drop")
+        row_ptr = jnp.stack((jnp.minimum(begin, end), end), axis=-1)
         return StreamingConvTopology(
             order=order,
-            receivers=receivers[order],
-            senders=cols[order],
+            receivers=receivers,
+            senders=senders,
             row_ptr=row_ptr,
             valid_edges=valid_edges[order],
         )
@@ -186,8 +187,8 @@ class StreamingTensorProductConv:
     ) -> None:
         """Validate the shape and dtype of cached receiver offsets."""
         del rows, cols
-        if row_ptr.dtype != jnp.int32 or row_ptr.shape != (num_nodes + 1,):
-            raise ValueError("row_ptr must be an int32 vector with shape [N + 1]")
+        if row_ptr.dtype != jnp.int32 or row_ptr.shape != (num_nodes, 2):
+            raise ValueError("row_ptr must be an int32 array with shape [N, 2]")
 
     def _validate_native_operands(
         self,

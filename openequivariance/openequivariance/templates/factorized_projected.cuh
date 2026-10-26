@@ -23,8 +23,8 @@ __device__ __forceinline__ EdgeRange safe_edge_range(
     const int32_t* row_ptr,
     const int64_t node,
     const int64_t edge_count) {
-    const int64_t begin = row_ptr[node] < 0 ? 0 : row_ptr[node];
-    int64_t end = row_ptr[node + 1] < begin ? begin : row_ptr[node + 1];
+    const int64_t begin = row_ptr[2 * node] < 0 ? 0 : row_ptr[2 * node];
+    int64_t end = row_ptr[2 * node + 1] < begin ? begin : row_ptr[2 * node + 1];
     end = end > edge_count ? edge_count : end;
     return {begin, end};
 }
@@ -115,7 +115,7 @@ __device__ __forceinline__ EdgeRange safe_edge_range(
     {%- endif %}
 {%- endmacro %}
 
-// One thread owns (receiver node, channel), scans that receiver's CSR edges,
+// One thread owns (receiver node, channel), scans that receiver's edge range,
 // and directly writes all of its output components.
 extern "C" __global__ void oeq_projected_forward(
     int64_t node_count,
