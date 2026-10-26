@@ -292,7 +292,8 @@ public:
         // Ignore for AMD GPUs 
     }
 
-    void execute(int kernel_id, void* args[], KernelLaunchConfig config) {
+    void execute(int kernel_id, void* args[], [[maybe_unused]] const size_t arg_sizes[],
+                 [[maybe_unused]] size_t num_args, KernelLaunchConfig config) {
         int device_id; HIP_ERRCHK(hipGetDevice(&device_id));
         if(device_id != kernels->device) {
             kernels.reset();

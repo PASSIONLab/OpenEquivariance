@@ -6,7 +6,7 @@ from openequivariance.benchmark.test_buffers import (
     get_random_buffers_forward_conv,
 )
 from openequivariance.core.e3nn_lite import wigner_3j
-from openequivariance.core.utils import benchmark
+from openequivariance.core.utils import accelerator_device_type, benchmark
 
 logger = getLogger()
 
@@ -142,14 +142,14 @@ class ConvolutionBase:
         assert graph.rows.dtype == self.idx_dtype
         assert graph.cols.dtype == self.idx_dtype
 
-        torch_L1_in = torch.tensor(L1_in, device="cuda")
-        torch_L2_in = torch.tensor(L2_in, device="cuda")
-        torch_weights = torch.tensor(weights, device="cuda")
+        torch_L1_in = torch.tensor(L1_in, device=accelerator_device_type())
+        torch_L2_in = torch.tensor(L2_in, device=accelerator_device_type())
+        torch_weights = torch.tensor(weights, device=accelerator_device_type())
 
-        torch_rows = torch.tensor(graph.rows, device="cuda")
-        torch_cols = torch.tensor(graph.cols, device="cuda")
+        torch_rows = torch.tensor(graph.rows, device=accelerator_device_type())
+        torch_cols = torch.tensor(graph.cols, device=accelerator_device_type())
         torch_transpose_perm = (
-            torch.tensor(graph.transpose_perm, device="cuda")
+            torch.tensor(graph.transpose_perm, device=accelerator_device_type())
             if self.deterministic
             else None
         )
@@ -200,19 +200,27 @@ class ConvolutionBase:
         assert graph.rows.dtype == self.idx_dtype
         assert graph.cols.dtype == self.idx_dtype
 
-        torch_L1_in = torch.tensor(in1, device="cuda", requires_grad=True)
-        torch_L2_in = torch.tensor(in2, device="cuda", requires_grad=True)
-        torch_weights = torch.tensor(weights, device="cuda", requires_grad=True)
+        torch_L1_in = torch.tensor(
+            in1, device=accelerator_device_type(), requires_grad=True
+        )
+        torch_L2_in = torch.tensor(
+            in2, device=accelerator_device_type(), requires_grad=True
+        )
+        torch_weights = torch.tensor(
+            weights, device=accelerator_device_type(), requires_grad=True
+        )
 
-        torch_rows = torch.tensor(graph.rows, device="cuda").detach()
-        torch_cols = torch.tensor(graph.cols, device="cuda").detach()
-        torch_transpose_perm = torch.tensor(graph.transpose_perm, device="cuda")
+        torch_rows = torch.tensor(graph.rows, device=accelerator_device_type()).detach()
+        torch_cols = torch.tensor(graph.cols, device=accelerator_device_type()).detach()
+        torch_transpose_perm = torch.tensor(
+            graph.transpose_perm, device=accelerator_device_type()
+        )
 
         fwd_args = [torch_L1_in, torch_L2_in, torch_weights, torch_rows, torch_cols]
         if self.deterministic:
             fwd_args.append(torch_transpose_perm)
         torch_out = self.forward(*fwd_args)
-        torch_L3_grad = torch.tensor(out_grad, device="cuda")
+        torch_L3_grad = torch.tensor(out_grad, device=accelerator_device_type())
 
         mode = "gpu_time" if self.torch_op else "torch_kernel_time"
 

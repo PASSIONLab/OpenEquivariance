@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdlib>
 #include <initializer_list>
 #include <iostream>
 #include <memory>
@@ -25,7 +26,15 @@
     using GPU_Allocator = HIP_Allocator;
 #endif
 
-#include "group_mm.hpp"
+#ifdef SYCL_BACKEND
+    #include "backend_sycl.hpp"
+    using JITKernel = SYCLJITKernel;
+    using GPU_Allocator = SYCL_Allocator;
+#endif
+
+#ifndef SYCL_BACKEND
+    #include "group_mm.hpp"
+#endif
 
 #include "tensorproducts.hpp"
 #include "convolution.hpp"
@@ -43,6 +52,7 @@ void tensor_zero_(Tensor &tensor);
 
 void alert_not_deterministic(const char *name);
 Stream get_current_stream();
+bool tensor_is_on_gpu(const Tensor &tensor);
 
 const uint8_t *tensor_data_ptr_u8(const Tensor &tensor);
 void *data_ptr(const Tensor &tensor);
@@ -121,7 +131,7 @@ inline void check_tensor(const Tensor &tensor,
           "Shape mismatch for tensor '", tensor_name,
           "'. Expected: ", shape_to_string(expected_shape),
           ". Got: ", tensor_sizes_str(tensor));
-    TCHECK(tensor.is_cuda(), "Tensor '", tensor_name, "' is not on the GPU.");
+    TCHECK(tensor_is_on_gpu(tensor), "Tensor '", tensor_name, "' is not on the GPU.");
     TCHECK(tensor.scalar_type() == expected_dtype,
           "Dtype mismatch for tensor '", tensor_name,
           "'. Expected: ", static_cast<int>(expected_dtype),
@@ -186,6 +196,21 @@ inline std::unordered_map<int64_t,
 
 inline std::mutex mut;
 
+#ifdef SYCL_BACKEND
+inline void release_kernel_caches() {
+    const std::lock_guard<std::mutex> lock(mut);
+    tp_cache.clear();
+    conv_cache.clear();
+}
+
+inline void register_kernel_cache_cleanup() {
+    struct RegisterOnce {
+        RegisterOnce() { std::atexit(release_kernel_caches); }
+    };
+    static RegisterOnce registered;
+}
+#endif
+
 inline std::pair<JITTPImpl<JITKernel>*, KernelProp>
     compile_tp_with_caching(const Tensor &json_bytes,
                             int64_t hash) {
@@ -220,6 +245,9 @@ inline std::pair<JITTPImpl<JITKernel>*, KernelProp>
                 std::make_pair(std::move(jit_tp_impl),
                 KernelProp(kernel_prop_map, false))});
             it = tp_cache.find(hash);
+#ifdef SYCL_BACKEND
+            register_kernel_cache_cleanup();
+#endif
         }
         return {it->second.first.get(), it->second.second};
     }
@@ -259,6 +287,9 @@ inline std::pair<JITConvImpl<JITKernel>*, KernelProp>
                 std::make_pair(std::move(jit_conv_impl),
                 KernelProp(kernel_prop_map, true))});
             it = conv_cache.find(hash);
+#ifdef SYCL_BACKEND
+            register_kernel_cache_cleanup();
+#endif
         }
         return {it->second.first.get(), it->second.second};
     }
@@ -618,6 +649,7 @@ inline tuple<Tensor, Tensor, Tensor, Tensor> jit_conv_double_backward(
 
 // ===========================================================
 
+#ifndef SYCL_BACKEND
 inline Tensor group_gemm(
         Tensor A, Tensor B, Tensor ragged_counts,
         int64_t num_W, int64_t batch_size, int64_t m, int64_t k, int64_t ragged_inner) {
@@ -649,10 +681,19 @@ inline Tensor group_gemm(
 
     return C;
 }
+#endif
 
 // ===========================================================
 
-REGISTER_LIBRARY_IMPL(libtorch_tp_jit, CUDA, m) {
+// The dispatch key must match the device the tensors live on: XPU for SYCL,
+// CUDA for both CUDA and HIP (PyTorch maps HIP tensors onto the CUDA key).
+#ifdef SYCL_BACKEND
+    #define OEQ_DISPATCH_KEY XPU
+#else
+    #define OEQ_DISPATCH_KEY CUDA
+#endif
+
+REGISTER_LIBRARY_IMPL(libtorch_tp_jit, OEQ_DISPATCH_KEY, m) {
     m.impl("jit_tp_forward", BOX(&jit_tp_forward));
     m.impl("jit_tp_backward", BOX(&jit_tp_backward));
     m.impl("jit_tp_double_backward", BOX(&jit_tp_double_backward));
@@ -661,7 +702,9 @@ REGISTER_LIBRARY_IMPL(libtorch_tp_jit, CUDA, m) {
     m.impl("jit_conv_backward", BOX(&jit_conv_backward));
     m.impl("jit_conv_double_backward", BOX(&jit_conv_double_backward));
 
+#ifndef SYCL_BACKEND
     m.impl("group_gemm", BOX(&group_gemm));
+#endif
 };
 
 REGISTER_LIBRARY(libtorch_tp_jit, m) {
@@ -673,5 +716,7 @@ REGISTER_LIBRARY(libtorch_tp_jit, m) {
     m.def("jit_conv_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor)");
     m.def("jit_conv_double_backward(Tensor json_bytes, int hash, Tensor L1_in, Tensor L2_in, Tensor W, Tensor L3_grad, Tensor L1_dgrad, Tensor L2_dgrad, Tensor W_dgrad, Tensor rows, Tensor cols, Tensor workspace, Tensor transpose_perm) -> (Tensor, Tensor, Tensor, Tensor)");
 
+#ifndef SYCL_BACKEND
     m.def("group_gemm(Tensor A, Tensor B, Tensor ragged_counts, int num_W, int batch_size, int m, int k, int ragged_inner) -> Tensor");
+#endif
 };

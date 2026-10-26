@@ -62,7 +62,9 @@ class IrrepMapping:
 
 class CGTensor:
     def __init__(self, l1, l2, l3, normalization_factor, dtype):
-        suffix_map = {np.float32: "f", np.float64: "L"}
+        # A hex float literal is already exactly a double, so float64 needs no
+        # suffix; an "L" suffix would be rejected by SPIR-V targets.
+        suffix_map = {np.float32: "f", np.float64: ""}
 
         tensor = wigner_3j(l1, l2, l3)
         coord1, coord2, coord3 = [

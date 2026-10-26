@@ -236,3 +236,11 @@ Keys map to lists of tuples with (name, dtype, num_elements) of each subarray.
 {%- macro launch_bounds(schedule) %}
 __launch_bounds__({{schedule.launch_config.num_threads}})
 {%- endmacro %}
+
+{%- macro declare_smem(schedule) %}
+    {%- if is_sycl %}
+    SYCL_DECLARE_SMEM({{ schedule.launch_config.smem }})
+    {%- else %}
+    extern __shared__ char s[];
+    {%- endif %}
+{%- endmacro %}

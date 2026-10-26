@@ -6,7 +6,8 @@
         transpose_load, transpose_store, 
         load_ir_segments, store_ir_segments, 
         declare_smem_variables,
-        set_launch_bound_variables, launch_bounds
+        set_launch_bound_variables, launch_bounds,
+        declare_smem
         with context %}
 
 #define THREADS_PER_WARP {{ forward_schedule.launch_config.warp_size }} // Warp size should be the same for forward and backward
@@ -103,7 +104,7 @@ forward(
         ConvData c,
         void* workspace_raw) {
  
-    extern __shared__ char s[];
+    {{ declare_smem(forward_schedule) }}
     size_t num_products = c.nnz;
     {{idx_type}}* rows = ({{idx_type}}*) c.rows;
     {{idx_type}}* cols = ({{idx_type}}*) c.cols;
@@ -192,7 +193,7 @@ backward(IRREP_T* L1_in, IRREP_T* L1_grad,
         IRREP_T* L3_grad, ConvData c, void* workspace_raw, 
         {{idx_type}}* transpose_perm) {
 
-    extern __shared__ char s[];
+    {{ declare_smem(backward_schedule) }}
     size_t num_products = c.nnz;
 
     // Note the transpose below (cols -> rows, rows -> cols)
@@ -300,7 +301,7 @@ double_backward_A(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
         IRREP_T* L1_grad, IRREP_T* L2_grad, WEIGHT_T* W_grad, IRREP_T* L3_dgrad,
         ConvData c, void* workspace_raw, unsigned {{idx_type}}* transpose_perm) {
 
-    extern __shared__ char s[];
+    {{ declare_smem(forward_schedule) }}
     size_t num_products = c.nnz;
     unsigned {{idx_type}}* rows = (unsigned {{idx_type}}*) c.rows;
     unsigned {{idx_type}}* cols = (unsigned {{idx_type}}*) c.cols;
@@ -421,7 +422,7 @@ double_backward_B(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
     {{idx_type}}* cols = ({{idx_type}}*) c.rows;
     {{idx_type}}* tperm = ({{idx_type}}*) transpose_perm;
 
-    extern __shared__ char s[];
+    {{ declare_smem(double_backward_schedule) }}
     {{ set_launch_bound_variables(schedule.launch_config) }}
     char* smem = s + {{schedule.memory_per_warp}} * warp_loc; 
 

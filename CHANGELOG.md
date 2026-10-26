@@ -1,5 +1,8 @@
 ## Latest Changes
 
+**Added**:
+- Beta support for Intel XPUs. 
+
 ### v0.7.0 (2026-09-10)
 **Added**: 
 - Public XLA FFI registration provider

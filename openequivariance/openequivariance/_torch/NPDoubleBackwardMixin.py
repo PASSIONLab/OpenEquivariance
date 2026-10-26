@@ -1,4 +1,5 @@
 import torch
+from openequivariance._torch.extlib import DEVICE_TYPE
 
 
 def _none_to_zeros(values, refs):
@@ -19,14 +20,18 @@ class NumpyDoubleBackwardMixin:
     ):
         assert self.torch_op
 
-        in1_torch = torch.tensor(in1, device="cuda", requires_grad=True)
-        in2_torch = torch.tensor(in2, device="cuda", requires_grad=True)
-        weights_torch = torch.tensor(weights, device="cuda", requires_grad=True)
-        out_grad_torch = torch.tensor(out_grad, device="cuda", requires_grad=True)
-        in1_dgrad_torch = torch.tensor(in1_dgrad, device="cuda", requires_grad=False)
-        in2_dgrad_torch = torch.tensor(in2_dgrad, device="cuda", requires_grad=False)
+        in1_torch = torch.tensor(in1, device=DEVICE_TYPE, requires_grad=True)
+        in2_torch = torch.tensor(in2, device=DEVICE_TYPE, requires_grad=True)
+        weights_torch = torch.tensor(weights, device=DEVICE_TYPE, requires_grad=True)
+        out_grad_torch = torch.tensor(out_grad, device=DEVICE_TYPE, requires_grad=True)
+        in1_dgrad_torch = torch.tensor(
+            in1_dgrad, device=DEVICE_TYPE, requires_grad=False
+        )
+        in2_dgrad_torch = torch.tensor(
+            in2_dgrad, device=DEVICE_TYPE, requires_grad=False
+        )
         weights_dgrad_torch = torch.tensor(
-            weights_dgrad, device="cuda", requires_grad=False
+            weights_dgrad, device=DEVICE_TYPE, requires_grad=False
         )
         out_torch = self.forward(in1_torch, in2_torch, weights_torch)
 
@@ -67,20 +72,30 @@ class NumpyDoubleBackwardMixin:
     ):
         assert self.torch_op
 
-        in1_torch = torch.tensor(in1, device="cuda", requires_grad=True)
-        in2_torch = torch.tensor(in2, device="cuda", requires_grad=True)
-        weights_torch = torch.tensor(weights, device="cuda", requires_grad=True)
-        out_grad_torch = torch.tensor(out_grad, device="cuda", requires_grad=True)
-        in1_dgrad_torch = torch.tensor(in1_dgrad, device="cuda", requires_grad=True)
-        in2_dgrad_torch = torch.tensor(in2_dgrad, device="cuda", requires_grad=True)
-        weights_dgrad_torch = torch.tensor(
-            weights_dgrad, device="cuda", requires_grad=True
+        in1_torch = torch.tensor(in1, device=DEVICE_TYPE, requires_grad=True)
+        in2_torch = torch.tensor(in2, device=DEVICE_TYPE, requires_grad=True)
+        weights_torch = torch.tensor(weights, device=DEVICE_TYPE, requires_grad=True)
+        out_grad_torch = torch.tensor(out_grad, device=DEVICE_TYPE, requires_grad=True)
+        in1_dgrad_torch = torch.tensor(
+            in1_dgrad, device=DEVICE_TYPE, requires_grad=True
         )
-        out_tgrad_torch = torch.tensor(out_tgrad, device="cuda", requires_grad=False)
-        in1_tgrad_torch = torch.tensor(in1_tgrad, device="cuda", requires_grad=False)
-        in2_tgrad_torch = torch.tensor(in2_tgrad, device="cuda", requires_grad=False)
+        in2_dgrad_torch = torch.tensor(
+            in2_dgrad, device=DEVICE_TYPE, requires_grad=True
+        )
+        weights_dgrad_torch = torch.tensor(
+            weights_dgrad, device=DEVICE_TYPE, requires_grad=True
+        )
+        out_tgrad_torch = torch.tensor(
+            out_tgrad, device=DEVICE_TYPE, requires_grad=False
+        )
+        in1_tgrad_torch = torch.tensor(
+            in1_tgrad, device=DEVICE_TYPE, requires_grad=False
+        )
+        in2_tgrad_torch = torch.tensor(
+            in2_tgrad, device=DEVICE_TYPE, requires_grad=False
+        )
         weights_tgrad_torch = torch.tensor(
-            weights_tgrad, device="cuda", requires_grad=False
+            weights_tgrad, device=DEVICE_TYPE, requires_grad=False
         )
 
         out_torch = self.forward(in1_torch, in2_torch, weights_torch)
@@ -147,19 +162,23 @@ class NumpyDoubleBackwardMixinConv:
     ):
         assert self.torch_op
 
-        in1_torch = torch.tensor(in1, device="cuda", requires_grad=True)
-        in2_torch = torch.tensor(in2, device="cuda", requires_grad=True)
-        weights_torch = torch.tensor(weights, device="cuda", requires_grad=True)
-        out_grad_torch = torch.tensor(out_grad, device="cuda", requires_grad=True)
-        in1_dgrad_torch = torch.tensor(in1_dgrad, device="cuda", requires_grad=False)
-        in2_dgrad_torch = torch.tensor(in2_dgrad, device="cuda", requires_grad=False)
+        in1_torch = torch.tensor(in1, device=DEVICE_TYPE, requires_grad=True)
+        in2_torch = torch.tensor(in2, device=DEVICE_TYPE, requires_grad=True)
+        weights_torch = torch.tensor(weights, device=DEVICE_TYPE, requires_grad=True)
+        out_grad_torch = torch.tensor(out_grad, device=DEVICE_TYPE, requires_grad=True)
+        in1_dgrad_torch = torch.tensor(
+            in1_dgrad, device=DEVICE_TYPE, requires_grad=False
+        )
+        in2_dgrad_torch = torch.tensor(
+            in2_dgrad, device=DEVICE_TYPE, requires_grad=False
+        )
         weights_dgrad_torch = torch.tensor(
-            weights_dgrad, device="cuda", requires_grad=False
+            weights_dgrad, device=DEVICE_TYPE, requires_grad=False
         )
 
-        torch_rows = torch.tensor(graph.rows, device="cuda")
-        torch_cols = torch.tensor(graph.cols, device="cuda")
-        torch_transpose_perm = torch.tensor(graph.transpose_perm, device="cuda")
+        torch_rows = torch.tensor(graph.rows, device=DEVICE_TYPE)
+        torch_cols = torch.tensor(graph.cols, device=DEVICE_TYPE)
+        torch_transpose_perm = torch.tensor(graph.transpose_perm, device=DEVICE_TYPE)
 
         out_torch = self.forward(
             in1_torch,
@@ -208,25 +227,35 @@ class NumpyDoubleBackwardMixinConv:
     ):
         assert self.torch_op
 
-        in1_torch = torch.tensor(in1, device="cuda", requires_grad=True)
-        in2_torch = torch.tensor(in2, device="cuda", requires_grad=True)
-        weights_torch = torch.tensor(weights, device="cuda", requires_grad=True)
-        out_grad_torch = torch.tensor(out_grad, device="cuda", requires_grad=True)
-        in1_dgrad_torch = torch.tensor(in1_dgrad, device="cuda", requires_grad=True)
-        in2_dgrad_torch = torch.tensor(in2_dgrad, device="cuda", requires_grad=True)
-        weights_dgrad_torch = torch.tensor(
-            weights_dgrad, device="cuda", requires_grad=True
+        in1_torch = torch.tensor(in1, device=DEVICE_TYPE, requires_grad=True)
+        in2_torch = torch.tensor(in2, device=DEVICE_TYPE, requires_grad=True)
+        weights_torch = torch.tensor(weights, device=DEVICE_TYPE, requires_grad=True)
+        out_grad_torch = torch.tensor(out_grad, device=DEVICE_TYPE, requires_grad=True)
+        in1_dgrad_torch = torch.tensor(
+            in1_dgrad, device=DEVICE_TYPE, requires_grad=True
         )
-        out_tgrad_torch = torch.tensor(out_tgrad, device="cuda", requires_grad=False)
-        in1_tgrad_torch = torch.tensor(in1_tgrad, device="cuda", requires_grad=False)
-        in2_tgrad_torch = torch.tensor(in2_tgrad, device="cuda", requires_grad=False)
+        in2_dgrad_torch = torch.tensor(
+            in2_dgrad, device=DEVICE_TYPE, requires_grad=True
+        )
+        weights_dgrad_torch = torch.tensor(
+            weights_dgrad, device=DEVICE_TYPE, requires_grad=True
+        )
+        out_tgrad_torch = torch.tensor(
+            out_tgrad, device=DEVICE_TYPE, requires_grad=False
+        )
+        in1_tgrad_torch = torch.tensor(
+            in1_tgrad, device=DEVICE_TYPE, requires_grad=False
+        )
+        in2_tgrad_torch = torch.tensor(
+            in2_tgrad, device=DEVICE_TYPE, requires_grad=False
+        )
         weights_tgrad_torch = torch.tensor(
-            weights_tgrad, device="cuda", requires_grad=False
+            weights_tgrad, device=DEVICE_TYPE, requires_grad=False
         )
 
-        torch_rows = torch.tensor(graph.rows, device="cuda")
-        torch_cols = torch.tensor(graph.cols, device="cuda")
-        torch_transpose_perm = torch.tensor(graph.transpose_perm, device="cuda")
+        torch_rows = torch.tensor(graph.rows, device=DEVICE_TYPE)
+        torch_cols = torch.tensor(graph.cols, device=DEVICE_TYPE)
+        torch_transpose_perm = torch.tensor(graph.transpose_perm, device=DEVICE_TYPE)
 
         out_torch = self.forward(
             in1_torch,

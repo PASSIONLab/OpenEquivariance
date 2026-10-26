@@ -173,6 +173,40 @@ if(hip_FOUND)
     add_stable_extension(torch_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
 endif()
 
-if(NOT CUDAToolkit_FOUND AND NOT hip_FOUND)
-    message(WARNING "Neither CUDAToolkit nor HIP was found. The stable extension will not be built.")
+set(OEQ_SYCL_FOUND FALSE)
+if(CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
+    set(OEQ_SYCL_FOUND TRUE)
+endif()
+
+if(OEQ_SYCL_FOUND)
+    message(STATUS "Building stable extension with SYCL backend.")
+
+    add_library(sycl_stub_lib SHARED ${EXT_DIR}/stubs/stream.cpp)
+
+    target_include_directories(sycl_stub_lib PRIVATE
+        ${LIBTORCH_INCLUDE_DIR}
+    )
+
+    set_target_properties(sycl_stub_lib PROPERTIES
+        OUTPUT_NAME "torch_xpu"
+        POSITION_INDEPENDENT_CODE ON
+        CXX_STANDARD 17
+    )
+
+    target_compile_definitions(sycl_stub_lib PRIVATE SYCL_BACKEND=1)
+
+    set(SYCL_LINK_LIBS
+        sycl_stub_lib
+        sycl
+    )
+    add_stable_extension(oeq_stable_sycl SYCL_BACKEND "${SYCL_LINK_LIBS}")
+
+    foreach(tgt oeq_stable_sycl oeq_stable_sycl_aoti)
+        target_compile_options(${tgt} PRIVATE -fsycl)
+        target_link_options(${tgt} PRIVATE -fsycl)
+    endforeach()
+endif()
+
+if(NOT CUDAToolkit_FOUND AND NOT hip_FOUND AND NOT OEQ_SYCL_FOUND)
+    message(WARNING "None of CUDAToolkit, HIP or SYCL was found. The stable extension will not be built.")
 endif()

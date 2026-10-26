@@ -4,7 +4,8 @@ import numpy as np
 import torch
 
 from openequivariance._torch.extlib import (
-    IS_HIP,
+    BACKEND,
+    DEVICE_TYPE,
     DeviceProp,
     BUILT_EXTENSION,
 )
@@ -78,7 +79,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             self,
             self.input_args["problem"],
             dp,
-            IS_HIP,
+            BACKEND,
             idx_dtype=np.int64,
             torch_op=self.input_args["torch_op"],
             deterministic=self.input_args["deterministic"],
@@ -87,7 +88,9 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
 
         self.allocate_workspace(self.workspace_size)
 
-        self.dummy_transpose_perm = torch.zeros(1, dtype=torch.int64, device="cuda")
+        self.dummy_transpose_perm = torch.zeros(
+            1, dtype=torch.int64, device=DEVICE_TYPE
+        )
         self.weight_numel = self.config.weight_numel
         self.kernel = string_to_tensor(self.kernel_string)
         self.L3_dim = self.kernel_prop["L3_dim"]
@@ -187,7 +190,7 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
     def allocate_workspace(self, size_bytes):
         self.workspace_size = size_bytes
         self.workspace_buffer = torch.zeros(
-            size_bytes, dtype=torch.uint8, device="cuda"
+            size_bytes, dtype=torch.uint8, device=DEVICE_TYPE
         )
         self.workspace_ptr = self.workspace_buffer.data_ptr()
         logger.info(f"Convolution requires {size_bytes // 1000000}MB of workspace.")
@@ -214,14 +217,14 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             weights, not self.config.shared_weights
         )
 
-        torch_L1_in = torch.tensor(L1_in, device="cuda")
-        torch_L2_in = torch.tensor(L2_in, device="cuda")
-        torch_weights = torch.tensor(weights_chunked, device="cuda")
-        torch_rows = torch.tensor(graph.rows, device="cuda")
-        torch_cols = torch.tensor(graph.cols, device="cuda")
+        torch_L1_in = torch.tensor(L1_in, device=DEVICE_TYPE)
+        torch_L2_in = torch.tensor(L2_in, device=DEVICE_TYPE)
+        torch_weights = torch.tensor(weights_chunked, device=DEVICE_TYPE)
+        torch_rows = torch.tensor(graph.rows, device=DEVICE_TYPE)
+        torch_cols = torch.tensor(graph.cols, device=DEVICE_TYPE)
 
         if self.deterministic:
-            torch_sender_perm = torch.tensor(graph.transpose_perm, device="cuda")
+            torch_sender_perm = torch.tensor(graph.transpose_perm, device=DEVICE_TYPE)
         else:
             torch_sender_perm = None
 
@@ -245,15 +248,17 @@ class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixi
             weights, not self.config.shared_weights
         )
 
-        torch_L1_in = torch.tensor(L1_in, requires_grad=True, device="cuda")
-        torch_L2_in = torch.tensor(L2_in, requires_grad=True, device="cuda")
-        torch_weights = torch.tensor(weights_chunked, requires_grad=True, device="cuda")
-        torch_L3_grad = torch.tensor(L3_grad, device="cuda")
-        torch_rows = torch.tensor(graph.rows, device="cuda")
-        torch_cols = torch.tensor(graph.cols, device="cuda")
+        torch_L1_in = torch.tensor(L1_in, requires_grad=True, device=DEVICE_TYPE)
+        torch_L2_in = torch.tensor(L2_in, requires_grad=True, device=DEVICE_TYPE)
+        torch_weights = torch.tensor(
+            weights_chunked, requires_grad=True, device=DEVICE_TYPE
+        )
+        torch_L3_grad = torch.tensor(L3_grad, device=DEVICE_TYPE)
+        torch_rows = torch.tensor(graph.rows, device=DEVICE_TYPE)
+        torch_cols = torch.tensor(graph.cols, device=DEVICE_TYPE)
 
         if self.deterministic:
-            torch_sender_perm = torch.tensor(graph.transpose_perm, device="cuda")
+            torch_sender_perm = torch.tensor(graph.transpose_perm, device=DEVICE_TYPE)
         else:
             torch_sender_perm = None
 
@@ -285,7 +290,9 @@ def register_torch_fakes():
     def fake_forward(
         kernel, hash, L1_in, L2_in, W, L3_dim, rows, cols, workspace_buffer, sender_perm
     ):
-        return torch.empty(L1_in.shape[0], L3_dim, device="cuda", dtype=L1_in.dtype)
+        return torch.empty(
+            L1_in.shape[0], L3_dim, device=DEVICE_TYPE, dtype=L1_in.dtype
+        )
 
     @torch.library.register_fake("libtorch_tp_jit::jit_conv_backward")
     def fake_backward(
@@ -558,13 +565,13 @@ def register_autograd():
 
 def register_autocast():
     torch.library.register_autocast(
-        "libtorch_tp_jit::jit_conv_forward", "cuda", torch.float32
+        "libtorch_tp_jit::jit_conv_forward", DEVICE_TYPE, torch.float32
     )
     torch.library.register_autocast(
-        "libtorch_tp_jit::jit_conv_backward", "cuda", torch.float32
+        "libtorch_tp_jit::jit_conv_backward", DEVICE_TYPE, torch.float32
     )
     torch.library.register_autocast(
-        "libtorch_tp_jit::jit_conv_double_backward", "cuda", torch.float32
+        "libtorch_tp_jit::jit_conv_double_backward", DEVICE_TYPE, torch.float32
     )
 
 
