@@ -56,8 +56,11 @@ def verify(ctx, in_axes, args):
         if not sorted_edges:
             x, y, weights, rows, cols = args
             args = (
-                x, y[..., ::-1, :], weights[..., ::-1, :],
-                rows[..., ::-1], cols[..., ::-1],
+                x,
+                y[..., ::-1, :],
+                weights[..., ::-1, :],
+                rows[..., ::-1],
+                cols[..., ::-1],
             )
         forward = partial(ctx["conv"].forward, indices_are_sorted=sorted_edges)
         res_vmap = jax.vmap(forward, in_axes)(*args)

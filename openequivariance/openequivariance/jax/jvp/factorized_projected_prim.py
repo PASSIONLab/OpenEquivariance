@@ -137,9 +137,7 @@ def _batch_factorized(primitive, value_kinds, result_kinds, tangent_start=None):
     def rule(args, axes, *, schedule, **params):
         value_count = len(value_kinds)
         sizes = [
-            value.shape[axis]
-            for value, axis in zip(args, axes)
-            if axis is not None
+            value.shape[axis] for value, axis in zip(args, axes) if axis is not None
         ]
         if not sizes:
             result = primitive.bind(*args, schedule=schedule, **params)
@@ -173,13 +171,12 @@ def _batch_factorized(primitive, value_kinds, result_kinds, tangent_start=None):
         nodes, edges = x.shape[1], senders.shape[1]
         node_offsets = jnp.arange(batch_size, dtype=jnp.int32) * nodes
         valid = (
-            (senders >= 0) & (senders < nodes)
-            & (receivers >= 0) & (receivers < nodes)
+            (senders >= 0) & (senders < nodes) & (receivers >= 0) & (receivers < nodes)
         )
         sentinel = jnp.asarray(batch_size * nodes, dtype=jnp.int32)
-        senders = jnp.where(
-            valid, senders + node_offsets[:, None], sentinel
-        ).reshape(-1)
+        senders = jnp.where(valid, senders + node_offsets[:, None], sentinel).reshape(
+            -1
+        )
         receivers = jnp.where(
             valid, receivers + node_offsets[:, None], sentinel
         ).reshape(-1)
