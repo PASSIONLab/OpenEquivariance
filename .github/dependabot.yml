@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "semiannually"
+    groups:
+      actions:
+        patterns: ["*"]
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: "pip"
+    directory: "/.github/workflows"
+    # torch needs to match the oneAPI compiler pinned in
+    # verify_extension_build.yml, so excluding sycl ci for now.
+    exclude-paths:
+      - "**/requirements_sycl_ci.txt"
+    schedule:
+      interval: "semiannually"
+    groups:
+      ci-requirements:
+        patterns: ["*"]
+    cooldown:
+      default-days: 7

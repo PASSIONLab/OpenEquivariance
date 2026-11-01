@@ -8,18 +8,24 @@ jobs:
     name: Build oeq dist 
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        fetch-tags: true
     - name: set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
       with:
         python-version: '3.10'
+    - name: set version from tag
+      run: |
+        python3 -m pip install -r .github/workflows/requirements_release_ci.txt
+        python3 .github/autoversion.py openequivariance/pyproject.toml
     - name: install dependencies, then build source tarball
       run: |
         cd openequivariance
         python3 -m pip install build 
         python3 -m build --sdist
     - name: store the distribution packages 
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: oeq-package-distributions
         path: openequivariance/dist/
@@ -35,12 +41,12 @@ jobs:
       id-token: write
     steps:
       - name: download the distributions
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: oeq-package-distributions
           path: dist/ 
       - name: publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
 
   # ------------------------------------
 
@@ -48,18 +54,24 @@ jobs:
     name: Build extjax dist
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        fetch-tags: true
     - name: set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
       with:
         python-version: '3.10'
+    - name: set version from tag
+      run: |
+        python3 -m pip install -r .github/workflows/requirements_release_ci.txt
+        python3 .github/autoversion.py openequivariance_extjax/pyproject.toml
     - name: install dependencies, then build source tarball
       run: |
-        cd openequivariance_extjax 
+        cd openequivariance_extjax
         python3 -m pip install build 
         python3 -m build --sdist 
     - name: store the distribution packages 
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: oeqjax-package-distributions
         path: openequivariance_extjax/dist/
@@ -75,9 +87,9 @@ jobs:
       id-token: write
     steps:
       - name: download the distributions
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: oeqjax-package-distributions
           path: dist/ 
       - name: publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
