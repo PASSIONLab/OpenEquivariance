@@ -63,7 +63,8 @@ jobs:
         echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" \
           | sudo tee /etc/apt/sources.list.d/oneAPI.list
         sudo apt-get update
-        sudo apt-get install -y intel-oneapi-compiler-dpcpp-cpp
+        # Must match the intel-sycl-rt version required by torch in requirements_sycl_ci.txt
+        sudo apt-get install -y intel-oneapi-compiler-dpcpp-cpp-2026.0=2026.0.0-947
 
     - name: Install dependencies
       run: |
