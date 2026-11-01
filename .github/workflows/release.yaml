@@ -9,10 +9,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-tags: true
     - name: set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
+    - name: set version from tag
+      run: |
+        python3 -m pip install -r .github/workflows/requirements_release_ci.txt
+        python3 .github/autoversion.py openequivariance/pyproject.toml
     - name: install dependencies, then build source tarball
       run: |
         cd openequivariance
@@ -49,13 +55,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-tags: true
     - name: set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
+    - name: set version from tag
+      run: |
+        python3 -m pip install -r .github/workflows/requirements_release_ci.txt
+        python3 .github/autoversion.py openequivariance_extjax/pyproject.toml
     - name: install dependencies, then build source tarball
       run: |
-        cd openequivariance_extjax 
+        cd openequivariance_extjax
         python3 -m pip install build 
         python3 -m build --sdist 
     - name: store the distribution packages 

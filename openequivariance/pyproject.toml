@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "openequivariance"
-version = "0.8.0"
+version = "0.0.1"
 authors = [
   { name="Austin Glover" },
   { name="Vivek Bharadwaj" },
