@@ -1,5 +1,5 @@
 """
-Sets the version in a pyproject.toml from git tags of the form 
+Sets the version in a pyproject.toml from git tags of the form
 vX.Y.Z on HEAD.
 
 Usage: python3 .github/autoversion.py <path/to/pyproject.toml> [...]
