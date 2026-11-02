@@ -1,9 +1,13 @@
 ## Latest Changes
 
 **Added**:
-- Beta support for Intel XPUs. 
 - Route symmetric contraction's grouped matrix multiplications through PyTorch
   on CUDA, HIP, and SYCL, removing direct cuBLAS and rocBLAS dependencies.
+
+### v0.8.0 (2026-11-01)
+
+**Added**:
+- Beta support for Intel XPUs.
 
 ### v0.7.0 (2026-09-10)
 **Added**: 
