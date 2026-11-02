@@ -320,8 +320,6 @@ class SymmetricContraction(CodeGenMixin, torch.nn.Module):
 
     def forward(self, x: torch.Tensor, y: torch.Tensor):
         indices = torch.argmax(y, dim=1)
-        # Recomputed once per forward call and shared by all output contractions.
-        # Autograd saves these CPU counts for backward and double backward.
         bincount = torch.bincount(indices, minlength=self.num_elements).to("cpu")
         permutation = torch.argsort(indices)
         inverse_perm = torch.argsort(permutation)
