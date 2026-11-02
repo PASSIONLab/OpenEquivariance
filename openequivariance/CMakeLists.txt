@@ -66,10 +66,11 @@ function(add_stable_extension target_name backend_define link_libraries)
     )
     
     # Enforce CXX11 ABI to match LibTorch
-    target_compile_definitions(${target_name} PRIVATE 
+    target_compile_definitions(${target_name} PRIVATE
         ${backend_define}=1
         _GLIBCXX_USE_CXX11_ABI=1
         INCLUDE_NB_EXTENSION
+        EXTENSION_NAME=${target_name}
     )
     
     target_include_directories(${target_name} PRIVATE
@@ -116,7 +117,6 @@ function(add_stable_extension target_name backend_define link_libraries)
     install(TARGETS ${aoti_target_name} LIBRARY DESTINATION "${OEQ_INSTALL_DIR}")
 endfunction()
 
-find_package(CUDAToolkit QUIET)
 find_package(hip QUIET)
 
 # The rocm-sdk-core pip package (used for wheel builds) ships HIP headers and
@@ -139,29 +139,70 @@ if(NOT hip_FOUND AND DEFINED ENV{ROCM_PATH})
     endif()
 endif()
 
-if(CUDAToolkit_FOUND)
-    message(STATUS "Building stable extension with CUDA backend.")
+# CUDA: one extension per CUDA major version, named oeq_stable_cuda<major>, so
+# that it links the same libcudart/libnvrtc major as the user's PyTorch.
+#
+# OEQ_CUDA_ROOTS (CMake or environment variable, ;- or space-separated) lists
+# the toolkit roots to build against, e.g. "/usr/local/cuda-12.6 /usr/local/cuda-13.0".
+# If unset, a single extension is built against the toolkit find_package finds.
+set(OEQ_CUDA_ROOTS "$ENV{OEQ_CUDA_ROOTS}" CACHE STRING "CUDA toolkit roots to build against")
+string(REPLACE " " ";" OEQ_CUDA_ROOTS "${OEQ_CUDA_ROOTS}")
 
+set(OEQ_CUDA_FOUND FALSE)
+if(OEQ_CUDA_ROOTS)
+    set(OEQ_CUDA_FOUND TRUE)
+else()
+    find_package(CUDAToolkit QUIET)
+    set(OEQ_CUDA_FOUND ${CUDAToolkit_FOUND})
+endif()
+
+if(OEQ_CUDA_FOUND)
     add_library(cuda_stub_lib SHARED ${EXT_DIR}/stubs/stream.cpp)
 
     target_include_directories(cuda_stub_lib PRIVATE
         ${LIBTORCH_INCLUDE_DIR}
     )
 
-    set_target_properties(cuda_stub_lib PROPERTIES 
-        OUTPUT_NAME "torch_cuda"  
+    set_target_properties(cuda_stub_lib PROPERTIES
+        OUTPUT_NAME "torch_cuda"
         POSITION_INDEPENDENT_CODE ON
         CXX_STANDARD 17
     )
+endif()
 
+if(OEQ_CUDA_FOUND AND NOT OEQ_CUDA_ROOTS)
+    message(STATUS "Building stable extension with CUDA ${CUDAToolkit_VERSION} backend.")
     set(CUDA_LINK_LIBS
         CUDA::cudart
         CUDA::cuda_driver
         CUDA::nvrtc
         cuda_stub_lib
     )
-    add_stable_extension(oeq_stable_cuda CUDA_BACKEND "${CUDA_LINK_LIBS}")
+    add_stable_extension(oeq_stable_cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_LINK_LIBS}")
 endif()
+
+foreach(cuda_root ${OEQ_CUDA_ROOTS})
+    file(STRINGS "${cuda_root}/include/cuda.h" cuda_version_line REGEX "^#define CUDA_VERSION [0-9]+")
+    if(NOT cuda_version_line)
+        message(FATAL_ERROR "No CUDA toolkit found at ${cuda_root}")
+    endif()
+    string(REGEX REPLACE ".* ([0-9]+)$" "\\1" cuda_version "${cuda_version_line}")
+    math(EXPR cuda_major "${cuda_version} / 1000")
+    math(EXPR cuda_minor "(${cuda_version} % 1000) / 10")
+    message(STATUS "Building stable extension with CUDA ${cuda_major}.${cuda_minor} backend from ${cuda_root}.")
+
+    set(cuda_lib_dir "${cuda_root}/lib64")
+    add_library(oeq_cuda${cuda_major}_toolkit INTERFACE)
+    target_include_directories(oeq_cuda${cuda_major}_toolkit INTERFACE "${cuda_root}/include")
+    target_link_libraries(oeq_cuda${cuda_major}_toolkit INTERFACE
+        "${cuda_lib_dir}/libcudart.so"
+        "${cuda_lib_dir}/libnvrtc.so"
+        "${cuda_lib_dir}/stubs/libcuda.so"
+    )
+
+    set(CUDA_LINK_LIBS oeq_cuda${cuda_major}_toolkit cuda_stub_lib)
+    add_stable_extension(oeq_stable_cuda${cuda_major} CUDA_BACKEND "${CUDA_LINK_LIBS}")
+endforeach()
 
 if(hip_FOUND)
     message(STATUS "Building stable extension with HIP backend.")
@@ -223,6 +264,6 @@ if(OEQ_SYCL_FOUND)
     endforeach()
 endif()
 
-if(NOT CUDAToolkit_FOUND AND NOT hip_FOUND AND NOT OEQ_SYCL_FOUND)
+if(NOT OEQ_CUDA_FOUND AND NOT hip_FOUND AND NOT OEQ_SYCL_FOUND)
     message(WARNING "None of CUDAToolkit, HIP or SYCL was found. The stable extension will not be built.")
 endif()

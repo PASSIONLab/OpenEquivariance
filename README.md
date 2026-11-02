@@ -20,6 +20,11 @@ and GCC 9+ available before installing our package via
 pip install openequivariance
 ```
 
+Linux wheels include a precompiled extension for PyTorch built 
+with CUDA 12 or 13; other setups compile the extension on first import.
+To build from source against your local CUDA toolkit instead, run 
+`pip install --no-binary openequivariance openequivariance`.
+
 We provide up to an order of magnitude acceleration over e3nn perform on par with the latest
 version of [NVIDIA cuEquivariance](https://github.com/NVIDIA/cuEquivariance),
 which has a closed-source kernel package. 

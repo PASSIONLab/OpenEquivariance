@@ -94,8 +94,9 @@ before-all = "bash {project}/.github/cibw_before_all.sh"
 build-verbosity = 1
 
 [tool.cibuildwheel.linux.environment]
-PATH = "/usr/local/cuda-13.0/bin:$PATH"
-CUDAToolkit_ROOT = "/usr/local/cuda-13.0"
+# CUDA toolkits to build against: one extension per major version, chosen at
+# runtime from torch.version.cuda. Use the oldest minor PyTorch ships per major.
+OEQ_CUDA_ROOTS = "/usr/local/cuda-12.6 /usr/local/cuda-13.0"
 ROCM_PATH = "/opt/rocm-sdk-core/_rocm_sdk_core"
 
 [tool.cibuildwheel.linux]

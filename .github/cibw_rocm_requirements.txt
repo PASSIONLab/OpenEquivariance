@@ -1,0 +1,2 @@
+--index-url https://download.pytorch.org/whl/rocm10.0
+rocm-sdk-core==10.0.0 --hash=sha256:3bf4a72d11aa2a4ee1e90572c73630f937d38c1b7af4dda45b483b54655138a7

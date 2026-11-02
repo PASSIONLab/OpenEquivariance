@@ -5,6 +5,7 @@ import time
 import warnings
 import sysconfig
 import contextlib
+import importlib
 from pathlib import Path
 from packaging.version import Version
 
@@ -50,6 +51,12 @@ if IS_SYCL and Version(torch.__version__) < Version("2.10"):
     )
 
 DEVICE_TYPE = "xpu" if IS_SYCL else "cuda"
+
+# CUDA extensions are built per CUDA major version, matching torch's libcudart/libnvrtc.
+if BACKEND == "cuda":
+    EXTENSION_NAME = f"oeq_stable_cuda{torch.version.cuda.split('.')[0]}"
+else:
+    EXTENSION_NAME = f"oeq_stable_{BACKEND}"
 
 
 @contextlib.contextmanager
@@ -209,12 +216,9 @@ def load_precompiled_extension():
         True  # Doesn't actually use libpython, just set this as true anyway
     )
     try:
-        if BACKEND == "cuda":
-            import openequivariance._torch.extlib.oeq_stable_cuda as extension_module
-        elif BACKEND == "hip":
-            import openequivariance._torch.extlib.oeq_stable_hip as extension_module
-        elif BACKEND == "sycl":
-            import openequivariance._torch.extlib.oeq_stable_sycl as extension_module
+        extension_module = importlib.import_module(
+            f"openequivariance._torch.extlib.{EXTENSION_NAME}"
+        )
 
         torch.ops.load_library(extension_module.__file__)
         BUILT_EXTENSION = True
@@ -243,10 +247,10 @@ if BACKEND == "sycl":
     WARNING_MESSAGE += "SYCL does not support precompiled extension yet.\n"
     USE_PRECOMPILED_EXTENSION = False
 
-AOTI_SO_NAME = f"liboeq_stable_{BACKEND}_aoti.so"
+AOTI_SO_NAME = f"lib{EXTENSION_NAME}_aoti.so"
 
 if not os.path.exists(os.path.join(os.path.dirname(__file__), AOTI_SO_NAME)):
-    WARNING_MESSAGE += "Precompiled extension shared object not found.\n"
+    WARNING_MESSAGE += f"Precompiled extension {AOTI_SO_NAME} not found.\n"
     USE_PRECOMPILED_EXTENSION = False
 
 
