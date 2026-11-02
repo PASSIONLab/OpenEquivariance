@@ -1,6 +1,12 @@
 #include <cstdint>
 #include <stdexcept>
 #include <vector>
+
+#if defined(HIP_BACKEND) && __cplusplus >= 202002L && __has_include(<format>)
+// HIP macro collision: https://github.com/ROCm/rocm-systems/issues/9897
+#include <format>
+#endif
+
 #include <pybind11/pybind11.h>
 
 #ifdef CUDA_BACKEND
