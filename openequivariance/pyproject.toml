@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm", "scikit-build-core", "nanobind"]
+requires = ["setuptools", "setuptools-scm", "scikit-build-core", "nanobind>=3.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -12,13 +12,14 @@ authors = [
   { name="James Demmel" }
 ]
 description = "A fast GPU JIT kernel generator for the Clebsch-Gordon Tensor Product"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
   "setuptools",
   "ninja",
   "jinja2",
   "numpy",
-  "pybind11"
+  "pybind11",
+  "nanobind-backend>=1.0"
 ]
 readme = "README.md"
 
@@ -27,7 +28,6 @@ license-files = ["LICENSE"]
 
 classifiers = [
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -77,5 +77,31 @@ addopts = [
 [tool.ruff]
 lint.ignore = ["E741"]
 
+[tool.scikit-build]
+# Stable-ABI (abi3) wheel for CPython 3.11+, built with nanobind split mode.
+wheel.py-api = "cp311"
+
 [tool.scikit-build.cmake.define]
 AARCH64 = {env="AARCH64", default="0"}
+
+[tool.cibuildwheel]
+# The abi3 wheel built for cp311 covers all later CPython versions.
+build = "cp311-*"
+skip = "*-musllinux*"
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+before-all = "bash {project}/.github/cibw_before_all.sh"
+build-verbosity = 1
+
+[tool.cibuildwheel.linux.environment]
+PATH = "/usr/local/cuda-13.0/bin:$PATH"
+CUDAToolkit_ROOT = "/usr/local/cuda-13.0"
+ROCM_PATH = "/opt/rocm-sdk-core/_rocm_sdk_core"
+
+[tool.cibuildwheel.linux]
+# GPU runtimes and libtorch come from the user's PyTorch install; never bundle them.
+repair-wheel-command = """auditwheel repair -w {dest_dir} {wheel} \
+  --exclude libtorch_cpu.so --exclude libc10.so \
+  --exclude libtorch_cuda.so --exclude libtorch_hip.so \
+  --exclude libcuda.so.1 --exclude 'libcudart.so.*' --exclude 'libnvrtc.so.*' \
+  --exclude 'libamdhip64.so.*' --exclude 'libhiprtc.so.*'"""

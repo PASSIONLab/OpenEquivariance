@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15...3.30)
 project(openequivariance_stable_ext)
 
-find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
+find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development.Module ${SKBUILD_SABI_COMPONENT})
 
 # Download LibTorch 
 include(FetchContent)
@@ -55,8 +55,9 @@ set(OEQ_SOURCES
 set(OEQ_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/openequivariance/_torch/extlib")
 
 function(add_stable_extension target_name backend_define link_libraries)
-    # Create nanobind extension
-    nanobind_add_module(${target_name} NB_STATIC ${OEQ_SOURCES})
+    # Create nanobind extension in split mode: stable-ABI frontend, with
+    # libnanobind provided at runtime by the nanobind-backend package.
+    nanobind_add_module(${target_name} BACKEND_MODULE nanobind_backend ${OEQ_SOURCES})
 
     set_target_properties(${target_name} PROPERTIES
         CXX_STANDARD 17
@@ -118,6 +119,26 @@ endfunction()
 find_package(CUDAToolkit QUIET)
 find_package(hip QUIET)
 
+# The rocm-sdk-core pip package (used for wheel builds) ships HIP headers and
+# versioned libraries but no CMake configs, so locate them under ROCM_PATH.
+if(NOT hip_FOUND AND DEFINED ENV{ROCM_PATH})
+    find_path(HIP_INCLUDE_DIR hip/hip_runtime.h PATHS $ENV{ROCM_PATH}/include NO_DEFAULT_PATH)
+    find_library(AMDHIP64_LIB NAMES amdhip64 libamdhip64.so.7 PATHS $ENV{ROCM_PATH}/lib NO_DEFAULT_PATH)
+    find_library(HIPRTC_LIB NAMES hiprtc libhiprtc.so.7 PATHS $ENV{ROCM_PATH}/lib NO_DEFAULT_PATH)
+
+    if(HIP_INCLUDE_DIR AND AMDHIP64_LIB AND HIPRTC_LIB)
+        add_library(hip::host INTERFACE IMPORTED)
+        target_include_directories(hip::host INTERFACE ${HIP_INCLUDE_DIR})
+        target_compile_definitions(hip::host INTERFACE __HIP_PLATFORM_AMD__=1)
+        target_link_libraries(hip::host INTERFACE ${AMDHIP64_LIB})
+
+        add_library(hiprtc::hiprtc INTERFACE IMPORTED)
+        target_link_libraries(hiprtc::hiprtc INTERFACE ${HIPRTC_LIB})
+
+        set(hip_FOUND TRUE)
+    endif()
+endif()
+
 if(CUDAToolkit_FOUND)
     message(STATUS "Building stable extension with CUDA backend.")
 
@@ -144,7 +165,9 @@ endif()
 
 if(hip_FOUND)
     message(STATUS "Building stable extension with HIP backend.")
-    find_package(hiprtc REQUIRED)
+    if(NOT TARGET hiprtc::hiprtc)
+        find_package(hiprtc REQUIRED)
+    endif()
 
     add_library(hip_stub_lib SHARED ${EXT_DIR}/stubs/stream.cpp)
 
@@ -163,7 +186,7 @@ if(hip_FOUND)
 	    hip::host
         hiprtc::hiprtc
     )
-    add_stable_extension(torch_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
+    add_stable_extension(oeq_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
 endif()
 
 set(OEQ_SYCL_FOUND FALSE)
