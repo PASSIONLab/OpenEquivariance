@@ -8,11 +8,11 @@ Installation
 You need the following to install OpenEquivariance:
 
 - A Linux system equipped with an NVIDIA / AMD / Intel graphics card.
-- Either PyTorch >= 2.4 (>= 2.10 for AOTI, export, and Intel GPUs), or
-  JAX>0.5.0 with CUDA, RocM, or XPU support. 
-- GCC 9+ and the CUDA / HIP toolkit, or the oneAPI DPC++ compiler
-  (``icpx``) for Intel GPUs. The command
-  ``c++ --version`` should return >= 9.0; see below for details on 
+- Either PyTorch >= 2.10, or
+  JAX>0.5.0 with CUDA, RocM, or XPU support.
+- For source builds only: GCC 9+ and the CUDA / HIP toolkit, or the
+  oneAPI DPC++ compiler (``icpx``) for Intel GPUs. The command
+  ``c++ --version`` should return >= 9.0; see below for details on
   setting an alternate compiler.
 
 .. note::
@@ -32,32 +32,26 @@ You need the following to install OpenEquivariance:
         pip install openequivariance
         python -c "import openequivariance"
 
-    The second line triggers a build of the C++ extension we use to compile
-    kernels, which can take a couple of minutes. Subsequent imports are
-    much faster since this extension is cached.
+    On Linux, the wheel includes a precompiled C++ extension for PyTorch
+    built with CUDA 12, CUDA 13, or ROCm 7. If you see a warning that no
+    precompiled extension matches your PyTorch build, build it from
+    source instead (this requires GCC 9+ and the CUDA / HIP toolkit):
 
-    To support ``torch.compile``, ``torch.export``, and
-    JITScript, OpenEquivariance needs to compile a C++ extension
-    tightly integrated with PyTorch. If you see a warning that
-    this extension could not be compiled, first check:
+    .. code-block:: bash
 
-    .. code-block:: bash 
+        pip install --no-binary openequivariance openequivariance
 
-        c++ --version 
-        
-    To build the extension with an alternate compiler, set the 
-    ``CC`` and ``CXX``
-    environment variable and retry the import:
+    To build the extension with an alternate compiler, set the
+    ``CC`` and ``CXX`` environment variables before running ``pip``:
 
     .. code-block:: bash
 
         export CC=/path/to/your/gcc
         export CXX=/path/to/your/g++
-        python -c "import openequivariance"
 
-
-    These configuration steps are required only ONCE after 
-    installation (or upgrade) with pip. 
+    On Intel GPUs, the extension is still compiled on first import,
+    which can take a couple of minutes; subsequent imports use the
+    cached build.
 
 
 .. tab:: JAX NVIDIA GPUs 

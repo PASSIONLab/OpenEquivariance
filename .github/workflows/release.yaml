@@ -23,10 +23,12 @@ jobs:
       uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
         python-version: '3.12'
+    - name: replace symlinks with copies
+      run: python3 .github/release.py resolve-symlinks
     - name: set version from tag
       run: |
         python3 -m pip install -r .github/workflows/requirements_release_ci.txt
-        python3 .github/autoversion.py openequivariance/pyproject.toml
+        python3 .github/release.py set-version openequivariance/pyproject.toml
     - name: build wheels
       run: python3 -m cibuildwheel --output-dir wheelhouse openequivariance
     - name: store the wheels
@@ -46,10 +48,12 @@ jobs:
       uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
         python-version: '3.12'
+    - name: replace symlinks with copies
+      run: python3 .github/release.py resolve-symlinks
     - name: set version from tag
       run: |
         python3 -m pip install -r .github/workflows/requirements_release_ci.txt
-        python3 .github/autoversion.py openequivariance/pyproject.toml
+        python3 .github/release.py set-version openequivariance/pyproject.toml
     - name: install dependencies, then build source tarball
       run: |
         cd openequivariance
@@ -93,10 +97,12 @@ jobs:
       uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
         python-version: '3.10'
+    - name: replace symlinks with copies
+      run: python3 .github/release.py resolve-symlinks
     - name: set version from tag
       run: |
         python3 -m pip install -r .github/workflows/requirements_release_ci.txt
-        python3 .github/autoversion.py openequivariance_extjax/pyproject.toml
+        python3 .github/release.py set-version openequivariance_extjax/pyproject.toml
     - name: install dependencies, then build source tarball
       run: |
         cd openequivariance_extjax

@@ -13,16 +13,15 @@ that [e3nn](https://e3nn.org/) supports
 commonly found in graph neural networks 
 (e.g. [Nequip](https://github.com/mir-group/nequip) or
 [MACE](https://github.com/ACEsuit/mace)). To get 
-started with PyTorch, ensure that you have PyTorch 
-and GCC 9+ available before installing our package via 
+started with PyTorch (2.10 or newer), install our package via 
 
 ```bash
 pip install openequivariance
 ```
 
 Linux wheels include a precompiled extension for PyTorch built 
-with CUDA 12 or 13; other setups compile the extension on first import.
-To build from source against your local CUDA toolkit instead, run 
+with CUDA 12, CUDA 13, or ROCm 7. For other setups, build the
+extension from source (requires GCC 9+ and your CUDA / HIP toolkit) with 
 `pip install --no-binary openequivariance openequivariance`.
 
 We provide up to an order of magnitude acceleration over e3nn perform on par with the latest
