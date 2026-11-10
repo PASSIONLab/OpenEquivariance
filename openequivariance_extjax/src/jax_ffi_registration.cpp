@@ -10,6 +10,8 @@
 #include "backend/backend_hip.hpp"
 #endif
 
+#include "nb_utilities.hpp"
+
 namespace nb = nanobind;
 
 namespace {
@@ -47,18 +49,5 @@ NB_MODULE(openequivariance_extjax, m) {
     });
     m.def("is_hip", &IsHip);
 
-    nb::class_<DeviceProp>(m, "DeviceProp")
-        .def(nb::init<int>())
-        .def_ro("name", &DeviceProp::name)
-        .def_ro("warpsize", &DeviceProp::warpsize)
-        .def_ro("major", &DeviceProp::major)
-        .def_ro("minor", &DeviceProp::minor)
-        .def_ro("multiprocessorCount", &DeviceProp::multiprocessorCount)
-        .def_ro("maxSharedMemPerBlock", &DeviceProp::maxSharedMemPerBlock);
-
-    nb::class_<GPUTimer>(m, "GPUTimer")
-        .def(nb::init<>())
-        .def("start", &GPUTimer::start)
-        .def("stop_clock_get_elapsed", &GPUTimer::stop_clock_get_elapsed)
-        .def("clear_L2_cache", &GPUTimer::clear_L2_cache);
+    oeq::bind_utilities(m);
 }

@@ -67,8 +67,6 @@ class JITExtension(Extension):
 
     def __init__(self):
         super().__init__()
-        # The JIT extension is a pybind11 module, so it links libpython (when one
-        # exists) to stay loadable from AOTI C++ programs without an interpreter.
         python_lib_dir = sysconfig.get_config_var("LIBDIR") or ""
         python_lib_name = f"python{sys.version_info.major}.{sys.version_info.minor}"
         found_libpython = any(
@@ -161,8 +159,6 @@ class JITExtension(Extension):
 class PrecompiledExtension(Extension):
     def __init__(self, backend):
         super().__init__()
-        # CUDA extensions are built per CUDA major version, matching torch's
-        # libcudart / libnvrtc.
         if backend == "cuda":
             ext_module_py_name = f"oeq_stable_cuda{torch.version.cuda.split('.')[0]}"
         else:

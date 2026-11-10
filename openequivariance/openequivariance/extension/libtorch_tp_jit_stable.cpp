@@ -168,23 +168,8 @@ bool tensor_is_on_gpu(const Tensor &tensor) {
 #endif
 
 #ifdef INCLUDE_NB_EXTENSION
-    #include "nanobind/nanobind.h"
-    #include "nanobind/stl/string.h"
-    namespace nb = nanobind;
+    #include "nb_utilities.hpp"
     NB_MODULE(EXTENSION_NAME, m) {
-        nb::class_<DeviceProp>(m, "DeviceProp")
-            .def(nb::init<int>())
-            .def_ro("name", &DeviceProp::name)
-            .def_ro("warpsize", &DeviceProp::warpsize)
-            .def_ro("major", &DeviceProp::major)
-            .def_ro("minor", &DeviceProp::minor)
-            .def_ro("multiprocessorCount", &DeviceProp::multiprocessorCount)
-            .def_ro("maxSharedMemPerBlock", &DeviceProp::maxSharedMemPerBlock); 
-
-        nb::class_<GPUTimer>(m, "GPUTimer")
-            .def(nb::init<>())
-            .def("start", &GPUTimer::start)
-            .def("stop_clock_get_elapsed", &GPUTimer::stop_clock_get_elapsed)
-            .def("clear_L2_cache", &GPUTimer::clear_L2_cache);
+        oeq::bind_utilities(m);
     }
 #endif

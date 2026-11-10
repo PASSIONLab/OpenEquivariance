@@ -85,22 +85,18 @@ wheel.py-api = "cp311"
 AARCH64 = {env="AARCH64", default="0"}
 
 [tool.cibuildwheel]
-# The abi3 wheel built for cp311 covers all later CPython versions.
 build = "cp311-*"
 skip = "*-musllinux*"
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
-before-all = "bash {project}/.github/cibw_before_all.sh"
+before-all = "/opt/python/cp312-cp312/bin/python {project}/.github/release.py install-gpu-toolkits $OEQ_CUDA_ROOTS"
 build-verbosity = 1
 
 [tool.cibuildwheel.linux.environment]
-# CUDA toolkits to build against: one extension per major version, chosen at
-# runtime from torch.version.cuda. Use the oldest minor PyTorch ships per major.
 OEQ_CUDA_ROOTS = "/usr/local/cuda-12.6 /usr/local/cuda-13.0"
 ROCM_PATH = "/opt/rocm-sdk-core/_rocm_sdk_core"
 
 [tool.cibuildwheel.linux]
-# GPU runtimes and libtorch come from the user's PyTorch install; never bundle them.
 repair-wheel-command = """auditwheel repair -w {dest_dir} {wheel} \
   --exclude libtorch_cpu.so --exclude libc10.so \
   --exclude libtorch_cuda.so --exclude libtorch_hip.so \
