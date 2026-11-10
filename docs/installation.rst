@@ -51,7 +51,11 @@ You need the following to install OpenEquivariance:
 
     On Intel GPUs, the extension is still compiled on first import,
     which can take a couple of minutes; subsequent imports use the
-    cached build.
+    cached build. Install the extra build dependencies with:
+
+    .. code-block:: bash
+
+        pip install openequivariance[sycl]
 
 
 .. tab:: JAX NVIDIA GPUs 

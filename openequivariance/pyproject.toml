@@ -14,11 +14,8 @@ authors = [
 description = "A fast GPU JIT kernel generator for the Clebsch-Gordon Tensor Product"
 requires-python = ">=3.11"
 dependencies = [
-  "setuptools",
-  "ninja",
   "jinja2",
   "numpy",
-  "pybind11",
   "nanobind-backend>=1.0"
 ]
 readme = "README.md"
@@ -58,6 +55,11 @@ dev = [
   "pytest-subtests",
   "torch_geometric",
   "cmake"
+]
+
+sycl = [
+  "setuptools",
+  "ninja"
 ]
 
 jax = [

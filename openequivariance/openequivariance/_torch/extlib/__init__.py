@@ -6,6 +6,7 @@ import warnings
 import sysconfig
 import contextlib
 import importlib
+import importlib.util
 from pathlib import Path
 from packaging.version import Version
 
@@ -74,6 +75,19 @@ class JITExtension(Extension):
             for ext in (".so", ".a")
         )
 
+        missing = [
+            name
+            for name in ("setuptools", "ninja")
+            if importlib.util.find_spec(name) is None
+        ]
+        if missing:
+            self.built_extension_error = (
+                f"The SYCL backend compiles its extension at first import, which "
+                f"needs {', '.join(missing)}. Install them with:\n"
+                "    pip install openequivariance[sycl]"
+            )
+            return
+
         try:
             from torch.utils.cpp_extension import library_paths, include_paths
 
@@ -81,18 +95,6 @@ class JITExtension(Extension):
             torch_sources = ["libtorch_tp_jit.cpp", "json11/json11.cpp"]
 
             include_dirs, extra_link_args = (["backend"], ["-Wl,--no-as-needed"])
-            extra_include_dirs = []
-
-            try:
-                import pybind11
-
-                extra_include_dirs.append(pybind11.get_include())
-            except Exception as e:
-                self.built_extension_error = (
-                    "Could not locate pybind11 include path required for JIT "
-                    f"OpenEquivariance extension compilation: {e}"
-                )
-                return
 
             if found_libpython:
                 extra_link_args.pop()
@@ -123,11 +125,9 @@ class JITExtension(Extension):
                 extra_link_args.append("-L" + lib_dir)
 
             torch_sources = [oeq_root + "/extension/" + src for src in torch_sources]
-            include_dirs = (
-                [oeq_root + "/extension/" + d for d in include_dirs]
-                + extra_include_dirs
-                + include_paths("xpu")
-            )
+            include_dirs = [
+                oeq_root + "/extension/" + d for d in include_dirs
+            ] + include_paths("xpu")
 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
