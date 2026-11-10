@@ -59,8 +59,6 @@ if "OEQ_NOTORCH" not in os.environ or os.environ["OEQ_NOTORCH"] != "1":
     )
 
     from openequivariance._torch.extlib import (
-        LINKED_LIBPYTHON,
-        LINKED_LIBPYTHON_ERROR,
         BUILT_EXTENSION,
         BUILT_EXTENSION_ERROR,
         USE_PRECOMPILED_EXTENSION,
@@ -82,14 +80,6 @@ jax = None
 try:
     import openequivariance_extjax
     import openequivariance.jax as jax
-
-    # TODO-someday: enable
-    # extjax_version = version("openequivariance_extjax")
-    # if extjax_version != __version__:
-    #    warnings.warn(
-    #        f"openequivariance_extjax version {extjax_version} does not match "
-    #        f"openequivariance version {__version__}. Ensure both versions match."
-    #    )
 
 except Exception as e:
     error = e

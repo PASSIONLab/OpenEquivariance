@@ -144,7 +144,6 @@ def test_aoti(tp_and_inputs):
 
 
 def test_aoti_cpp_inference(problem_and_irreps):
-    assert oeq.LINKED_LIBPYTHON, oeq.LINKED_LIBPYTHON_ERROR
     problem, X_ir, Y_ir, _ = problem_and_irreps
     cmake_prefix_path = torch.utils.cmake_prefix_path
     torch_ext_so_path = oeq.torch_ext_so_path()
