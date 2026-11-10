@@ -117,7 +117,10 @@ def node_feats_with_layout(request, node_feats):
             node_feats = node_feats.transpose(0, 2).contiguous().transpose(0, 2)
             assert not node_feats.is_contiguous()
         case "offset":
-            node_feats = torch.cat((torch.zeros_like(node_feats[:1]), node_feats))[1:]
+            base = node_feats.new_zeros(node_feats.numel() + 1)
+            node_feats = base.as_strided(
+                node_feats.shape, node_feats.stride(), storage_offset=1
+            ).copy_(node_feats)
             assert node_feats.is_contiguous() and node_feats.storage_offset() > 0
     return node_feats.detach().requires_grad_()
 
@@ -304,9 +307,12 @@ class TestSymmetricContraction:
 
     def test_nondefault_stream(self, modules, node_feats, node_attrs, dtype):
         accel = torch_accelerator()
+        if not hasattr(accel, "_sleep"):
+            pytest.skip(f"torch.{device_type()} has no _sleep to delay a stream")
         current = accel.current_stream(node_feats.device)
         stream = accel.Stream(device=node_feats.device)
         stream.wait_stream(current)
+        accel._sleep(200_000_000)
         try:
             with accel.stream(stream):
                 stream_feats = (node_feats.detach() * 1.5).requires_grad_()
