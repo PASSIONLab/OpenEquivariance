@@ -12,13 +12,17 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 TAG_PATTERN = re.compile(r"v([0-9]+\.[0-9]+\.[0-9]+)")
 GIT_SYMLINK_MODE = "120000"
 CUDA_ROOT_PATTERN = re.compile(r"/usr/local/cuda-([0-9]+)\.([0-9]+)")
 CUDA_REPO_ARCH = {"x86_64": "x86_64", "aarch64": "sbsa"}
-ROCM_REQUIREMENTS = Path(__file__).parent / "cibw_rocm_requirements.txt"
+ROCM_REQUIREMENTS = """\
+--index-url https://download.pytorch.org/whl/rocm10.0
+rocm-sdk-core==10.0.0 --hash=sha256:3bf4a72d11aa2a4ee1e90572c73630f937d38c1b7af4dda45b483b54655138a7
+"""
 
 
 def resolve_symlinks(args):
@@ -70,9 +74,8 @@ def set_version(args):
 
 
 def install_gpu_toolkits(args):
-    """Installs the CUDA and HIP headers and link-time libraries inside the
-    manylinux container (cibuildwheel before-all); at runtime, the user's
-    PyTorch install provides them."""
+    """Installs the CUDA and HIP headers and link-time libraries inside a 
+    manylinux container.""" 
     arch = platform.machine()
     subprocess.run(
         [
@@ -101,21 +104,24 @@ def install_gpu_toolkits(args):
         )
 
     if arch == "x86_64":
-        subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
-                "--no-deps",
-                "--require-hashes",
-                "--target",
-                "/opt/rocm-sdk-core",
-                "-r",
-                str(ROCM_REQUIREMENTS),
-            ],
-            check=True,
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            requirements = Path(tmp) / "rocm_requirements.txt"
+            requirements.write_text(ROCM_REQUIREMENTS)
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--no-deps",
+                    "--require-hashes",
+                    "--target",
+                    "/opt/rocm-sdk-core",
+                    "-r",
+                    str(requirements),
+                ],
+                check=True,
+            )
 
 
 if __name__ == "__main__":
