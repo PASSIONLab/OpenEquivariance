@@ -58,17 +58,15 @@ if "OEQ_NOTORCH" not in os.environ or os.environ["OEQ_NOTORCH"] != "1":
         ]
     )
 
-    from openequivariance._torch.extlib import (
-        BUILT_EXTENSION,
-        BUILT_EXTENSION_ERROR,
-        USE_PRECOMPILED_EXTENSION,
-    )
+    from openequivariance._torch.extlib import BUILT_EXTENSION, BUILT_EXTENSION_ERROR
 
 
 def torch_ext_so_path():
     """
     :returns: Path to a ``.so`` file that must be linked to use OpenEquivariance
-              from the PyTorch C++ Interface.
+              from the PyTorch C++ Interface, or ``None`` if PyTorch support is
+              disabled (``OEQ_NOTORCH=1``).
+    :raises ImportError: If the OpenEquivariance extension failed to load.
     """
     try:
         return torch_ext_so_path_internal()

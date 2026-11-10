@@ -11,7 +11,10 @@ from packaging.version import Version
 
 import torch
 
-assert Version(torch.__version__) >= Version("2.10"):
+if Version(torch.__version__) < Version("2.10"):
+    raise RuntimeError(
+        f"OpenEquivariance requires PyTorch >= 2.10, found {torch.__version__}."
+    )
 oeq_root = str(Path(__file__).parent.parent.parent)
 
 SOURCE_BUILD_HINT = (
@@ -19,18 +22,22 @@ SOURCE_BUILD_HINT = (
     "    pip install --no-binary openequivariance openequivariance"
 )
 
+
 class Extension:
-    def __init__():
+    def __init__(self):
         self.built_extension = False
         self.built_extension_error = None
         self.ext_module_python = None
         self.aoti_module_path = None
+
 
 class JITExtension(Extension):
     """
     Only SYCL uses PyTorch's JIT compilation flow; CUDA and HIP now use
     precompiled extensions shipped with the wheel.
     """
+
+    @staticmethod
     @contextlib.contextmanager
     def maybe_set_max_jobs_env(limit=8):
         if "MAX_JOBS" in os.environ:
@@ -42,6 +49,7 @@ class JITExtension(Extension):
         finally:
             os.environ.pop("MAX_JOBS", None)
 
+    @staticmethod
     def wait_for_torch_build_lock(name, timeout=300):
         from torch.utils.cpp_extension import _get_build_directory
 
@@ -57,8 +65,8 @@ class JITExtension(Extension):
                 )
             time.sleep(1)
 
-
-    def __init__():
+    def __init__(self):
+        super().__init__()
         # The JIT extension is a pybind11 module, so it links libpython (when one
         # exists) to stay loadable from AOTI C++ programs without an interpreter.
         python_lib_dir = sysconfig.get_config_var("LIBDIR") or ""
@@ -127,8 +135,8 @@ class JITExtension(Extension):
                 warnings.simplefilter("ignore")
 
                 try:
-                    _wait_for_torch_build_lock("libtorch_tp_jit")
-                    with _maybe_set_max_jobs_env():
+                    self.wait_for_torch_build_lock("libtorch_tp_jit")
+                    with self.maybe_set_max_jobs_env():
                         self.ext_module_python = torch.utils.cpp_extension.load(
                             "libtorch_tp_jit",
                             torch_sources,
@@ -138,34 +146,49 @@ class JITExtension(Extension):
                         )
                     torch.ops.load_library(self.ext_module_python.__file__)
                     self.built_extension = True
-                    self.aoti_module_path =self.ext_module_python.__file__
+                    self.aoti_module_path = self.ext_module_python.__file__
 
                 except Exception as e:
                     # If compiling torch fails (e.g. low gcc version), we should fall back to the
                     # version that takes integer pointers as args (but is untraceable to PyTorch JIT / export).
                     self.built_extension_error = e
         except Exception as e:
-            self.built_extension_error = f"Error JIT-compiling OpenEquivariance Extension: {e}"
+            self.built_extension_error = (
+                f"Error JIT-compiling OpenEquivariance Extension: {e}"
+            )
 
 
 class PrecompiledExtension(Extension):
-    def __init__():
-        try:
+    def __init__(self, backend):
+        super().__init__()
+        # CUDA extensions are built per CUDA major version, matching torch's
+        # libcudart / libnvrtc.
+        if backend == "cuda":
             ext_module_py_name = f"oeq_stable_cuda{torch.version.cuda.split('.')[0]}"
+        else:
+            ext_module_py_name = f"oeq_stable_{backend}"
 
+        aoti_module_path = os.path.join(
+            os.path.dirname(__file__), f"lib{ext_module_py_name}_aoti.so"
+        )
+        if not os.path.exists(aoti_module_path):
+            self.built_extension_error = (
+                f"No precompiled OpenEquivariance extension {ext_module_py_name} "
+                f"for PyTorch {torch.__version__}. {SOURCE_BUILD_HINT}"
+            )
+            return
+
+        try:
             self.ext_module_python = importlib.import_module(
                 f"openequivariance._torch.extlib.{ext_module_py_name}"
             )
-
-            torch.ops.load_library(extension_module.__file__)
+            torch.ops.load_library(self.ext_module_python.__file__)
             self.built_extension = True
-
-            dirname = os.path.dirname(extension_module.__file__)
-            self.aoti_module_path = os.path.join(dirname, f"lib{ext_module_py_name}_aoti.so")
-
+            self.aoti_module_path = aoti_module_path
         except Exception as e:
             self.built_extension_error = (
-                f"Error loading precompiled OpenEquivariance Extension: {e}"
+                f"Error loading precompiled OpenEquivariance extension "
+                f"{ext_module_py_name}: {e}\n{SOURCE_BUILD_HINT}"
             )
 
 
@@ -177,7 +200,11 @@ def _detect_backend():
         return "cuda"
     if getattr(torch.version, "xpu", None):
         return "sycl"
-    assert False, "Invalid Backend"
+    raise RuntimeError(
+        "Only the CUDA, HIP and XPU (SYCL) backends are supported. "
+        "No supported accelerator was detected in this PyTorch build."
+    )
+
 
 BACKEND = _detect_backend()
 IS_HIP = BACKEND == "hip"
@@ -188,24 +215,25 @@ extension = None
 if BACKEND == "sycl":
     extension = JITExtension()
 else:
-    extension = PrecompiledExtension()
-sys.modules["oeq_utilities"] = extension.ext_module_python 
-BUILT_EXTENSION = extension.BUILT_EXTENSION
-BUILT_EXTENSION_ERROR = extension.BUILT_EXTENSION_ERROR
+    extension = PrecompiledExtension(BACKEND)
+BUILT_EXTENSION = extension.built_extension
+BUILT_EXTENSION_ERROR = extension.built_extension_error
 
 
 if BUILT_EXTENSION:
+    sys.modules["oeq_utilities"] = extension.ext_module_python
     from oeq_utilities import (
         DeviceProp,
         GPUTimer,
     )
 
     def torch_ext_so_path():
-        return extension.aoti_module_path()
+        return extension.aoti_module_path
 
 else:
-    if extension.built_extension_error is not None:
-        warnings.warn(str(BUILT_EXTENSION_ERRROR), stacklevel=3)
+    if BUILT_EXTENSION_ERROR is not None:
+        warnings.warn(str(BUILT_EXTENSION_ERROR), stacklevel=3)
+
     def _raise_import_error_helper(import_target: str):
         if not BUILT_EXTENSION:
             raise ImportError(
