@@ -117,6 +117,7 @@ endfunction()
 
 find_package(CUDAToolkit QUIET)
 find_package(hip QUIET)
+find_package(hiprtc QUIET)
 
 if(CUDAToolkit_FOUND)
     message(STATUS "Building stable extension with CUDA backend.")
@@ -144,7 +145,6 @@ endif()
 
 if(hip_FOUND)
     message(STATUS "Building stable extension with HIP backend.")
-    find_package(hiprtc REQUIRED)
 
     add_library(hip_stub_lib SHARED ${EXT_DIR}/stubs/stream.cpp)
 
