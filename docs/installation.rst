@@ -10,7 +10,7 @@ You need the following to install OpenEquivariance:
 - A Linux system equipped with an NVIDIA / AMD / Intel graphics card.
 - Either PyTorch >= 2.10, or
   JAX>0.5.0 with CUDA, RocM, or XPU support.
-- For source builds only: GCC 9+ and the CUDA / HIP toolkit, or the
+- To build from source: GCC 9+ and the CUDA / HIP toolkit, or the
   oneAPI DPC++ compiler (``icpx``) for Intel GPUs. The command
   ``c++ --version`` should return >= 9.0; see below for details on
   setting an alternate compiler.
@@ -32,17 +32,17 @@ You need the following to install OpenEquivariance:
         pip install openequivariance
         python -c "import openequivariance"
 
-    On Linux, the wheel includes a precompiled C++ extension for PyTorch
-    built with CUDA 12, CUDA 13, or ROCm 7. If you see a warning that no
-    precompiled extension matches your PyTorch build, build it from
-    source instead (this requires GCC 9+ and the CUDA / HIP toolkit):
+    OpenEquivariance bundles a precompiled `.so` files for two recent
+    CUDA versions and a HIP version. If you're building for an architecture
+    we don't support or need a different CUDA verison, you'll need to build
+    the package from source:
 
     .. code-block:: bash
 
         pip install --no-binary openequivariance openequivariance
 
-    To build the extension with an alternate compiler, set the
-    ``CC`` and ``CXX`` environment variables before running ``pip``:
+    Set the environment variables ``CC`` and ``CXX`` before the pip install
+    to build with a different compiler:
 
     .. code-block:: bash
 
