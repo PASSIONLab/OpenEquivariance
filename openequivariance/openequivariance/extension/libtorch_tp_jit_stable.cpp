@@ -1,14 +1,20 @@
 #define USE_CUDA
 
+#include <array>
 #include <cstdint>
+#include <vector>
 #include <torch/csrc/stable/accelerator.h>
+#include <torch/csrc/stable/c/shim.h>
 #include <torch/csrc/stable/library.h>
+#include <torch/csrc/stable/macros.h>
 #include <torch/csrc/stable/ops.h>
+#include <torch/csrc/stable/stableivalue_conversions.h>
 #include <torch/csrc/stable/tensor_struct.h>
 #include <torch/csrc/stable/tensor_inl.h>
 #include <torch/headeronly/core/DeviceType.h>
 #include <torch/headeronly/core/ScalarType.h>
 #include <torch/headeronly/util/Exception.h>
+#include <torch/headeronly/util/HeaderOnlyArrayRef.h>
 #include <torch/headeronly/util/shim_utils.h>
 #include <torch/csrc/inductor/aoti_torch/c/shim.h>
 #ifdef SYCL_BACKEND
@@ -17,6 +23,16 @@
     extern "C" AOTITorchError aoti_torch_get_current_sycl_queue(void** ret_queue);
 #endif
 
+#define TCHECK STD_TORCH_CHECK
+#define BOX(x) TORCH_BOX(x)
+#define REGISTER_LIBRARY_IMPL STABLE_TORCH_LIBRARY_IMPL
+#define REGISTER_LIBRARY STABLE_TORCH_LIBRARY
+
+#ifndef STABLE_TORCH_ERROR_CODE_CHECK
+#define STABLE_TORCH_ERROR_CODE_CHECK(call) TORCH_ERROR_CODE_CHECK(call)
+#endif
+
+namespace oeq {
 
 using Tensor = torch::stable::Tensor;
 using Dtype = torch::headeronly::ScalarType;
@@ -27,12 +43,38 @@ constexpr Dtype kInt = torch::headeronly::ScalarType::Int;
 constexpr Dtype kLong = torch::headeronly::ScalarType::Long;
 constexpr Dtype kByte = torch::headeronly::ScalarType::Byte;
 
-#define TCHECK STD_TORCH_CHECK
-#define BOX(x) TORCH_BOX(x)
-#define REGISTER_LIBRARY_IMPL STABLE_TORCH_LIBRARY_IMPL
-#define REGISTER_LIBRARY STABLE_TORCH_LIBRARY
+} // namespace oeq
 
 #include "torch_core.hpp"
+
+namespace oeq {
+
+Tensor tensor_transpose(const Tensor &tensor, int64_t dim0, int64_t dim1) {
+    return torch::stable::transpose(tensor, dim0, dim1);
+}
+
+Tensor tensor_narrow(const Tensor &tensor, int64_t dim, int64_t start, int64_t length) {
+    Tensor self = tensor;  // torch::stable::narrow takes a non-const reference
+    return torch::stable::narrow(self, dim, start, length);
+}
+
+Tensor tensor_select(const Tensor &tensor, int64_t dim, int64_t index) {
+    return torch::stable::select(tensor, dim, index);
+}
+
+// Copy of torch::stable::bmm_out from torch/csrc/stable/ops.h, added in
+// https://github.com/pytorch/pytorch/pull/197441
+Tensor& bmm_out(Tensor& out, const Tensor& self, const Tensor& mat2) {
+    std::array<StableIValue, 3> stack{
+        torch::stable::detail::from(self),
+        torch::stable::detail::from(mat2),
+        torch::stable::detail::from(out)};
+    STABLE_TORCH_ERROR_CODE_CHECK(torch_call_dispatcher(
+        "aten::bmm", "out", stack.data(), TORCH_ABI_VERSION));
+    // Clean up the handle in stack[0], discard the temporary
+    (void)torch::stable::detail::to<Tensor>(stack[0]);
+    return out;
+}
 
 Tensor tensor_to_cpu_contiguous(const Tensor &tensor) {
     torch::stable::Device device(torch::headeronly::DeviceType::CPU);
@@ -75,10 +117,10 @@ Stream get_current_stream() {
     void* stream_ptr = nullptr;
 
     #ifdef SYCL_BACKEND
-        TORCH_ERROR_CODE_CHECK(aoti_torch_get_current_sycl_queue(&stream_ptr));
+        STABLE_TORCH_ERROR_CODE_CHECK(aoti_torch_get_current_sycl_queue(&stream_ptr));
     #else
         auto device_idx = torch::stable::accelerator::getCurrentDeviceIndex();
-        TORCH_ERROR_CODE_CHECK(aoti_torch_get_current_cuda_stream(device_idx, &stream_ptr));
+        STABLE_TORCH_ERROR_CODE_CHECK(aoti_torch_get_current_cuda_stream(device_idx, &stream_ptr));
     #endif
 
     return static_cast<Stream>(stream_ptr);
@@ -88,13 +130,15 @@ bool tensor_is_on_gpu(const Tensor &tensor) {
     #ifdef SYCL_BACKEND
         // The stable Tensor has no is_xpu().
         int32_t device_type;
-        TORCH_ERROR_CODE_CHECK(
+        STABLE_TORCH_ERROR_CODE_CHECK(
             aoti_torch_get_device_type(tensor.get(), &device_type));
         return device_type == aoti_torch_device_type_xpu();
     #else
         return tensor.is_cuda();
     #endif
 }
+
+} // namespace oeq
 
 #ifdef CUDA_BACKEND
     #define EXTENSION_NAME oeq_stable_cuda

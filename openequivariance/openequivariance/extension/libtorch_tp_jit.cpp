@@ -1,8 +1,10 @@
 #include <cstdint>
+#include <stdexcept>
+#include <vector>
 #include <pybind11/pybind11.h>
 
 #ifdef CUDA_BACKEND
-    #include <ATen/cuda/CUDAContext.h>
+    #include <c10/cuda/CUDAStream.h>
 #endif
 
 #ifdef HIP_BACKEND
@@ -19,6 +21,13 @@
 #include <torch/all.h>
 #include <torch/library.h>
 
+#define TCHECK TORCH_CHECK
+#define BOX(x) x
+#define REGISTER_LIBRARY_IMPL TORCH_LIBRARY_IMPL
+#define REGISTER_LIBRARY TORCH_LIBRARY
+
+namespace oeq {
+
 using Tensor = torch::Tensor;
 using Dtype = torch::Dtype;
 
@@ -28,12 +37,27 @@ constexpr Dtype kInt = torch::kInt;
 constexpr Dtype kLong = torch::kLong;
 constexpr Dtype kByte = torch::kByte;
 
-#define TCHECK TORCH_CHECK
-#define BOX(x) x
-#define REGISTER_LIBRARY_IMPL TORCH_LIBRARY_IMPL
-#define REGISTER_LIBRARY TORCH_LIBRARY
+} // namespace oeq
 
 #include "torch_core.hpp"
+
+namespace oeq {
+
+Tensor tensor_transpose(const Tensor &tensor, int64_t dim0, int64_t dim1) {
+    return tensor.transpose(dim0, dim1);
+}
+
+Tensor tensor_narrow(const Tensor &tensor, int64_t dim, int64_t start, int64_t length) {
+    return tensor.narrow(dim, start, length);
+}
+
+Tensor tensor_select(const Tensor &tensor, int64_t dim, int64_t index) {
+    return tensor.select(dim, index);
+}
+
+Tensor& bmm_out(Tensor& out, const Tensor& self, const Tensor& mat2) {
+    return at::bmm_out(out, self, mat2);
+}
 
 Tensor tensor_to_cpu_contiguous(const Tensor &tensor) {
     return tensor.to(torch::kCPU).contiguous();
@@ -98,7 +122,9 @@ bool tensor_is_on_gpu(const Tensor &tensor) {
 #endif
 }
 
-namespace py=pybind11;
+} // namespace oeq
+
+namespace py = pybind11;
 PYBIND11_MODULE(libtorch_tp_jit, m) {
     py::class_<DeviceProp>(m, "DeviceProp")
         .def(py::init<int>())
