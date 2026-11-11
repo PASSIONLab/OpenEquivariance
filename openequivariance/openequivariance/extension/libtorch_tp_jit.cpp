@@ -1,4 +1,3 @@
-#include <array>
 #include <cstdint>
 #include <stdexcept>
 #include <vector>
@@ -6,17 +5,14 @@
 
 #ifdef CUDA_BACKEND
     #include <c10/cuda/CUDAStream.h>
-    #include "backend_cuda.hpp"
 #endif
 
 #ifdef HIP_BACKEND
     #include <c10/hip/HIPStream.h>
-    #include "backend_hip.hpp"
 #endif
 
 #ifdef SYCL_BACKEND
     #include <c10/xpu/XPUStream.h>
-    #include "backend_sycl.hpp"
 #endif
 
 #include <ATen/Operators.h>
@@ -47,9 +43,16 @@ constexpr Dtype kByte = torch::kByte;
 
 namespace oeq {
 
-Tensor as_strided(const Tensor& tensor, std::array<int64_t, 3> sizes,
-        std::array<int64_t, 3> strides, int64_t storage_offset) {
-    return at::as_strided(tensor, sizes, strides, storage_offset);
+Tensor tensor_transpose(const Tensor &tensor, int64_t dim0, int64_t dim1) {
+    return tensor.transpose(dim0, dim1);
+}
+
+Tensor tensor_narrow(const Tensor &tensor, int64_t dim, int64_t start, int64_t length) {
+    return tensor.narrow(dim, start, length);
+}
+
+Tensor tensor_select(const Tensor &tensor, int64_t dim, int64_t index) {
+    return tensor.select(dim, index);
 }
 
 Tensor& bmm_out(Tensor& out, const Tensor& self, const Tensor& mat2) {

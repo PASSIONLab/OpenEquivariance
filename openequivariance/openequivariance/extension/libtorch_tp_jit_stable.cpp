@@ -2,7 +2,6 @@
 
 #include <array>
 #include <cstdint>
-#include <optional>
 #include <vector>
 #include <torch/csrc/stable/accelerator.h>
 #include <torch/csrc/stable/c/shim.h>
@@ -22,18 +21,6 @@
     // Declared in shim_xpu.h behind USE_XPU; declared here so the SYCL build
     // does not have to define that macro as well as SYCL_BACKEND.
     extern "C" AOTITorchError aoti_torch_get_current_sycl_queue(void** ret_queue);
-#endif
-
-#ifdef CUDA_BACKEND
-    #include "backend_cuda.hpp"
-#endif
-
-#ifdef HIP_BACKEND
-    #include "backend_hip.hpp"
-#endif
-
-#ifdef SYCL_BACKEND
-    #include "backend_sycl.hpp"
 #endif
 
 #define TCHECK STD_TORCH_CHECK
@@ -62,22 +49,20 @@ constexpr Dtype kByte = torch::headeronly::ScalarType::Byte;
 
 namespace oeq {
 
-Tensor as_strided(const Tensor& tensor, std::array<int64_t, 3> sizes,
-        std::array<int64_t, 3> strides, int64_t storage_offset) {
-    auto sizes_ref = torch::headeronly::IntHeaderOnlyArrayRef(sizes.data(), sizes.size());
-    auto strides_ref = torch::headeronly::IntHeaderOnlyArrayRef(strides.data(), strides.size());
-    std::array<StableIValue, 4> stack{
-        torch::stable::detail::from(tensor),
-        torch::stable::detail::from(sizes_ref),
-        torch::stable::detail::from(strides_ref),
-        torch::stable::detail::from(std::optional<int64_t>(storage_offset))};
-    STABLE_TORCH_ERROR_CODE_CHECK(torch_call_dispatcher(
-        "aten::as_strided", "", stack.data(), TORCH_ABI_VERSION));
-    return torch::stable::detail::to<Tensor>(stack[0]);
+Tensor tensor_transpose(const Tensor &tensor, int64_t dim0, int64_t dim1) {
+    return torch::stable::transpose(tensor, dim0, dim1);
 }
 
-// Adapted from PyTorch PR #197441, commit
-// 646e5d175800d0cce119e9d8a92bd5d79bb926d1, torch/csrc/stable/ops.h:
+Tensor tensor_narrow(const Tensor &tensor, int64_t dim, int64_t start, int64_t length) {
+    Tensor self = tensor;  // torch::stable::narrow takes a non-const reference
+    return torch::stable::narrow(self, dim, start, length);
+}
+
+Tensor tensor_select(const Tensor &tensor, int64_t dim, int64_t index) {
+    return torch::stable::select(tensor, dim, index);
+}
+
+// Copy of torch::stable::bmm_out from torch/csrc/stable/ops.h, added in
 // https://github.com/pytorch/pytorch/pull/197441
 Tensor& bmm_out(Tensor& out, const Tensor& self, const Tensor& mat2) {
     std::array<StableIValue, 3> stack{
@@ -86,6 +71,7 @@ Tensor& bmm_out(Tensor& out, const Tensor& self, const Tensor& mat2) {
         torch::stable::detail::from(out)};
     STABLE_TORCH_ERROR_CODE_CHECK(torch_call_dispatcher(
         "aten::bmm", "out", stack.data(), TORCH_ABI_VERSION));
+    // Clean up the handle in stack[0], discard the temporary
     (void)torch::stable::detail::to<Tensor>(stack[0]);
     return out;
 }
@@ -144,7 +130,7 @@ bool tensor_is_on_gpu(const Tensor &tensor) {
     #ifdef SYCL_BACKEND
         // The stable Tensor has no is_xpu().
         int32_t device_type;
-        TORCH_ERROR_CODE_CHECK(
+        STABLE_TORCH_ERROR_CODE_CHECK(
             aoti_torch_get_device_type(tensor.get(), &device_type));
         return device_type == aoti_torch_device_type_xpu();
     #else

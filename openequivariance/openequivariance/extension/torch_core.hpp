@@ -1,6 +1,5 @@
 #pragma once
 
-#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <initializer_list>
@@ -65,8 +64,9 @@ bool tensor_is_on_gpu(const Tensor &tensor);
 const uint8_t *tensor_data_ptr_u8(const Tensor &tensor);
 void *data_ptr(const Tensor &tensor);
 
-Tensor as_strided(const Tensor& tensor, std::array<int64_t, 3> sizes,
-    std::array<int64_t, 3> strides, int64_t storage_offset);
+Tensor tensor_transpose(const Tensor &tensor, int64_t dim0, int64_t dim1);
+Tensor tensor_narrow(const Tensor &tensor, int64_t dim, int64_t start, int64_t length);
+Tensor tensor_select(const Tensor &tensor, int64_t dim, int64_t index);
 Tensor& bmm_out(Tensor& out, const Tensor& self, const Tensor& mat2);
 
 } // namespace oeq
@@ -710,19 +710,15 @@ inline Tensor group_gemm(
     TCHECK(row_count == rows,
         "group_gemm: ragged_counts must sum to the number of rows");
 
-    Tensor A_c    = tensor_contiguous(A);
-    Tensor B_c    = tensor_contiguous(B);
-
     Tensor C;
     if (ragged_inner == 0) {
-        C = tensor_zeros_like(A, make_sizes({B.size(0), batch_size, m}));
-    } 
+        C = tensor_empty_like(A, make_sizes({rows, batch_size, m}));
+    }
     else {
         C = tensor_zeros_like(A, make_sizes({num_W, batch_size, m, k}));
     }
 
-    oeq::grouped_gemm_via_torch_bmm(A_c, B_c, C,
-        rc_ptr, num_W, batch_size, m, k, ragged_inner);
+    oeq::grouped_gemm_via_torch_bmm(A, B, C, rc_ptr, num_W, ragged_inner);
 
     return C;
 }

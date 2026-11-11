@@ -123,6 +123,7 @@ function(add_stable_extension target_name backend_define link_libraries)
 endfunction()
 
 find_package(hip QUIET)
+find_package(hiprtc QUIET)
 
 if(NOT hip_FOUND AND DEFINED ENV{ROCM_PATH})
     find_path(HIP_INCLUDE_DIR hip/hip_runtime.h PATHS $ENV{ROCM_PATH}/include NO_DEFAULT_PATH)
@@ -203,9 +204,6 @@ endforeach()
 
 if(hip_FOUND)
     message(STATUS "Building stable extension with HIP backend.")
-    if(NOT TARGET hiprtc::hiprtc)
-        find_package(hiprtc REQUIRED)
-    endif()
 
     add_library(hip_stub_lib SHARED ${EXT_DIR}/stubs/stream.cpp)
 
