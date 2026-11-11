@@ -39,6 +39,27 @@ jobs:
       run: |
         XLA_DIRECT_DOWNLOAD=1 pip install -e "./openequivariance_extjax" --no-build-isolation
 
+  verify_hip_extension:
+    if: ${{ github.event.label.name == 'ci-ready' || github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - name: Set up Python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: "3.12"
+
+    - name: Install pinned rocm-sdk-core
+      run: |
+        python .github/release.py install-rocm-sdk openequivariance/pyproject.toml "$RUNNER_TEMP/rocm-sdk-core"
+
+    - name: Build HIP extension
+      env:
+        ROCM_PATH: ${{ runner.temp }}/rocm-sdk-core/_rocm_sdk_core
+      run: |
+        pip wheel --no-deps -w dist ./openequivariance
+
   verify_sycl_extension:
     if: ${{ github.event.label.name == 'ci-ready' || github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest

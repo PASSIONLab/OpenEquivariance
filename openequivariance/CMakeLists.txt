@@ -260,5 +260,5 @@ if(OEQ_SYCL_FOUND)
 endif()
 
 if(NOT OEQ_CUDA_FOUND AND NOT hip_FOUND AND NOT OEQ_SYCL_FOUND)
-    message(WARNING "None of CUDAToolkit, HIP or SYCL was found. The stable extension will not be built.")
+    message(FATAL_ERROR "None of CUDAToolkit, HIP or SYCL was found")
 endif()

@@ -96,19 +96,15 @@ build = "cp311-*"
 skip = "*-musllinux*"
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
-before-all = """/opt/python/cp312-cp312/bin/python {project}/.github/release.py install-gpu-toolkits \
-  --rocm-index-url $OEQ_ROCM_INDEX_URL \
-  --rocm-sdk-version $OEQ_ROCM_SDK_VERSION \
-  --rocm-sdk-sha256 $OEQ_ROCM_SDK_SHA256 \
-  $OEQ_CUDA_ROOTS"""
+before-all = [
+  "/opt/python/cp312-cp312/bin/python {project}/.github/release.py install-cuda-toolkits $OEQ_CUDA_ROOTS",
+  "/opt/python/cp312-cp312/bin/python {project}/.github/release.py install-rocm-sdk {package}/pyproject.toml /opt/rocm-sdk-core",
+]
 build-verbosity = 1
 
 [tool.cibuildwheel.linux.environment]
 OEQ_CUDA_ROOTS = "/usr/local/cuda-12.6 /usr/local/cuda-13.0"
 ROCM_PATH = "/opt/rocm-sdk-core/_rocm_sdk_core"
-OEQ_ROCM_INDEX_URL = "https://download.pytorch.org/whl/rocm10.0"
-OEQ_ROCM_SDK_VERSION = "10.0.0"
-OEQ_ROCM_SDK_SHA256 = "3bf4a72d11aa2a4ee1e90572c73630f937d38c1b7af4dda45b483b54655138a7"
 
 [tool.cibuildwheel.linux]
 repair-wheel-command = """auditwheel repair -w {dest_dir} {wheel} \
@@ -116,3 +112,8 @@ repair-wheel-command = """auditwheel repair -w {dest_dir} {wheel} \
   --exclude libtorch_cuda.so --exclude libtorch_hip.so \
   --exclude libcuda.so.1 --exclude 'libcudart.so.*' --exclude 'libnvrtc.so.*' \
   --exclude 'libamdhip64.so.*' --exclude 'libhiprtc.so.*'"""
+
+[tool.openequivariance.rocm-sdk-core]
+index-url = "https://download.pytorch.org/whl/rocm10.0"
+version = "10.0.0"
+sha256 = "3bf4a72d11aa2a4ee1e90572c73630f937d38c1b7af4dda45b483b54655138a7"

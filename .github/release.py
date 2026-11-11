@@ -3,7 +3,8 @@ Release pipeline steps for .github/workflows/release.yaml.
 
     python3 .github/release.py resolve-symlinks
     python3 .github/release.py set-version <path/to/pyproject.toml> [...]
-    python3 .github/release.py install-gpu-toolkits <cuda-root> [...]
+    python3 .github/release.py install-cuda-toolkits <cuda-root> [...]
+    python3 .github/release.py install-rocm-sdk <path/to/pyproject.toml> <target-dir>
 """
 
 import argparse
@@ -13,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 
 TAG_PATTERN = re.compile(r"v([0-9]+\.[0-9]+\.[0-9]+)")
@@ -74,17 +76,16 @@ def set_version(args):
         pyproject.write_text(tomlkit.dumps(doc))
 
 
-def install_gpu_toolkits(args):
-    """Installs the CUDA and HIP headers and link-time libraries inside a
-    manylinux container."""
-    arch = platform.machine()
+def install_cuda_toolkits(args):
+    """Installs the CUDA headers and link-time libraries for each toolkit root
+    inside a manylinux container."""
     subprocess.run(
         [
             "dnf",
             "config-manager",
             "--add-repo",
             "https://developer.download.nvidia.com/compute/cuda/repos/rhel8/"
-            f"{CUDA_REPO_ARCH[arch]}/cuda-rhel8.repo",
+            f"{CUDA_REPO_ARCH[platform.machine()]}/cuda-rhel8.repo",
         ],
         check=True,
     )
@@ -104,16 +105,23 @@ def install_gpu_toolkits(args):
             check=True,
         )
 
-    if arch == "x86_64":
-        assert ROCM_INDEX_PATTERN.fullmatch(args.rocm_index_url)
-        assert ROCM_VERSION_PATTERN.fullmatch(args.rocm_sdk_version)
-        assert SHA256_PATTERN.fullmatch(args.rocm_sdk_sha256)
+
+def install_rocm_sdk(args):
+    """Installs rocm-sdk-core (HIP headers, libamdhip64 and libhiprtc), pinned
+    in [tool.openequivariance.rocm-sdk-core] of pyproject.toml, into a target
+    directory; skipped on non-x86_64 machines."""
+    if platform.machine() == "x86_64":
+        with open(args.pyproject, "rb") as f:
+            pin = tomllib.load(f)["tool"]["openequivariance"]["rocm-sdk-core"]
+        assert ROCM_INDEX_PATTERN.fullmatch(pin["index-url"])
+        assert ROCM_VERSION_PATTERN.fullmatch(pin["version"])
+        assert SHA256_PATTERN.fullmatch(pin["sha256"])
         with tempfile.TemporaryDirectory() as tmp:
             requirements = Path(tmp) / "rocm_requirements.txt"
             requirements.write_text(
-                f"--index-url {args.rocm_index_url}\n"
-                f"rocm-sdk-core=={args.rocm_sdk_version} "
-                f"--hash=sha256:{args.rocm_sdk_sha256}\n"
+                f"--index-url {pin['index-url']}\n"
+                f"rocm-sdk-core=={pin['version']} "
+                f"--hash=sha256:{pin['sha256']}\n"
             )
             subprocess.run(
                 [
@@ -124,7 +132,7 @@ def install_gpu_toolkits(args):
                     "--no-deps",
                     "--require-hashes",
                     "--target",
-                    "/opt/rocm-sdk-core",
+                    str(args.target),
                     "-r",
                     str(requirements),
                 ],
@@ -143,12 +151,14 @@ if __name__ == "__main__":
     step.add_argument("pyprojects", nargs="+", type=Path)
     step.set_defaults(func=set_version)
 
-    step = steps.add_parser("install-gpu-toolkits", help=install_gpu_toolkits.__doc__)
-    step.add_argument("--rocm-index-url", required=True)
-    step.add_argument("--rocm-sdk-version", required=True)
-    step.add_argument("--rocm-sdk-sha256", required=True)
+    step = steps.add_parser("install-cuda-toolkits", help=install_cuda_toolkits.__doc__)
     step.add_argument("cuda_roots", nargs="+")
-    step.set_defaults(func=install_gpu_toolkits)
+    step.set_defaults(func=install_cuda_toolkits)
+
+    step = steps.add_parser("install-rocm-sdk", help=install_rocm_sdk.__doc__)
+    step.add_argument("pyproject", type=Path)
+    step.add_argument("target", type=Path)
+    step.set_defaults(func=install_rocm_sdk)
 
     args = parser.parse_args()
     args.func(args)
