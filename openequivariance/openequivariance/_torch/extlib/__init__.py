@@ -164,10 +164,12 @@ class PrecompiledExtension(Extension):
         else:
             ext_module_py_name = f"oeq_stable_{backend}"
 
-        aoti_module_path = os.path.join(
-            os.path.dirname(__file__), f"lib{ext_module_py_name}_aoti.so"
+        full_name = f"openequivariance._torch.extlib.{ext_module_py_name}"
+        spec = importlib.util.find_spec(full_name)
+        aoti_module_path = spec and os.path.join(
+            os.path.dirname(spec.origin), f"lib{ext_module_py_name}_aoti.so"
         )
-        if not os.path.exists(aoti_module_path):
+        if spec is None or not os.path.exists(aoti_module_path):
             self.built_extension_error = (
                 f"No precompiled OpenEquivariance extension {ext_module_py_name} "
                 f"for PyTorch {torch.__version__}. {SOURCE_BUILD_HINT}"
@@ -175,9 +177,7 @@ class PrecompiledExtension(Extension):
             return
 
         try:
-            self.ext_module_python = importlib.import_module(
-                f"openequivariance._torch.extlib.{ext_module_py_name}"
-            )
+            self.ext_module_python = importlib.import_module(full_name)
             torch.ops.load_library(self.ext_module_python.__file__)
             self.built_extension = True
             self.aoti_module_path = aoti_module_path

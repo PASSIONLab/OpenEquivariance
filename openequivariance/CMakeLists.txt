@@ -52,11 +52,9 @@ set(OEQ_SOURCES
     ${EXT_JSON_DIR}/json11.cpp
 )
 
-set(OEQ_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/openequivariance/_torch/extlib")
+set(OEQ_INSTALL_DIR "openequivariance/_torch/extlib")
 
 function(add_stable_extension target_name backend_define link_libraries)
-    # Create nanobind extension in split mode: stable-ABI frontend, with
-    # libnanobind provided at runtime by the nanobind-backend package.
     nanobind_add_module(${target_name} BACKEND_MODULE nanobind_backend ${OEQ_SOURCES})
 
     set_target_properties(${target_name} PROPERTIES
@@ -119,8 +117,6 @@ endfunction()
 
 find_package(hip QUIET)
 
-# The rocm-sdk-core pip package (used for wheel builds) ships HIP headers and
-# versioned libraries but no CMake configs, so locate them under ROCM_PATH.
 if(NOT hip_FOUND AND DEFINED ENV{ROCM_PATH})
     find_path(HIP_INCLUDE_DIR hip/hip_runtime.h PATHS $ENV{ROCM_PATH}/include NO_DEFAULT_PATH)
     find_library(AMDHIP64_LIB NAMES amdhip64 libamdhip64.so.7 PATHS $ENV{ROCM_PATH}/lib NO_DEFAULT_PATH)
@@ -139,12 +135,6 @@ if(NOT hip_FOUND AND DEFINED ENV{ROCM_PATH})
     endif()
 endif()
 
-# CUDA: one extension per CUDA major version, named oeq_stable_cuda<major>, so
-# that it links the same libcudart/libnvrtc major as the user's PyTorch.
-#
-# OEQ_CUDA_ROOTS (CMake or environment variable, ;- or space-separated) lists
-# the toolkit roots to build against, e.g. "/usr/local/cuda-12.6 /usr/local/cuda-13.0".
-# If unset, a single extension is built against the toolkit find_package finds.
 set(OEQ_CUDA_ROOTS "$ENV{OEQ_CUDA_ROOTS}" CACHE STRING "CUDA toolkit roots to build against")
 string(REPLACE " " ";" OEQ_CUDA_ROOTS "${OEQ_CUDA_ROOTS}")
 
@@ -175,7 +165,7 @@ if(OEQ_CUDA_FOUND AND NOT OEQ_CUDA_ROOTS)
     set(CUDA_LINK_LIBS
         CUDA::cudart
         CUDA::cuda_driver
-        CUDA::nvrtc
+        ${CUDA_nvrtc_LIBRARY}
         cuda_stub_lib
     )
     add_stable_extension(oeq_stable_cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_LINK_LIBS}")
