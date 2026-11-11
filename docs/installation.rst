@@ -8,11 +8,11 @@ Installation
 You need the following to install OpenEquivariance:
 
 - A Linux system equipped with an NVIDIA / AMD / Intel graphics card.
-- Either PyTorch >= 2.4 (>= 2.10 for AOTI, export, and Intel GPUs), or
-  JAX>0.5.0 with CUDA, RocM, or XPU support. 
-- GCC 9+ and the CUDA / HIP toolkit, or the oneAPI DPC++ compiler
-  (``icpx``) for Intel GPUs. The command
-  ``c++ --version`` should return >= 9.0; see below for details on 
+- Either PyTorch >= 2.10, or
+  JAX>0.5.0 with CUDA, RocM, or XPU support.
+- To build from source: GCC 9+ and the CUDA / HIP toolkit, or the
+  oneAPI DPC++ compiler (``icpx``) for Intel GPUs. The command
+  ``c++ --version`` should return >= 9.0; see below for details on
   setting an alternate compiler.
 
 .. note::
@@ -32,32 +32,30 @@ You need the following to install OpenEquivariance:
         pip install openequivariance
         python -c "import openequivariance"
 
-    The second line triggers a build of the C++ extension we use to compile
-    kernels, which can take a couple of minutes. Subsequent imports are
-    much faster since this extension is cached.
+    OpenEquivariance bundles a precompiled library files for two recent
+    CUDA versions and a HIP version. If you're building for an architecture
+    we don't support or need a different CUDA version, you'll need to build
+    the package from source:
 
-    To support ``torch.compile``, ``torch.export``, and
-    JITScript, OpenEquivariance needs to compile a C++ extension
-    tightly integrated with PyTorch. If you see a warning that
-    this extension could not be compiled, first check:
+    .. code-block:: bash
 
-    .. code-block:: bash 
+        pip install --no-binary openequivariance openequivariance
 
-        c++ --version 
-        
-    To build the extension with an alternate compiler, set the 
-    ``CC`` and ``CXX``
-    environment variable and retry the import:
+    Set the environment variables ``CC`` and ``CXX`` before the pip install
+    to build with a different compiler:
 
     .. code-block:: bash
 
         export CC=/path/to/your/gcc
         export CXX=/path/to/your/g++
-        python -c "import openequivariance"
 
+    On Intel GPUs, the extension is still compiled on first import,
+    which can take a couple of minutes; subsequent imports use the
+    cached build. Install the extra build dependencies with:
 
-    These configuration steps are required only ONCE after 
-    installation (or upgrade) with pip. 
+    .. code-block:: bash
+
+        pip install openequivariance[sycl]
 
 
 .. tab:: JAX NVIDIA GPUs 
@@ -93,11 +91,11 @@ You need the following to install OpenEquivariance:
 
     .. code-block:: bash 
 
-        pip install "git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance[jax]"
-        pip install "git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance_extjax --no-build-isolation"
+        pip install "openequivariance[jax] @ git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance"
+        pip install "git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance_extjax" --no-build-isolation
 
         # Use the command below for JAX+AMD
-        # JAX_HIP=1 pip install "git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance_extjax --no-build-isolation"
+        # JAX_HIP=1 pip install "git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance_extjax" --no-build-isolation
 
 
 If you're using JAX, set the environment variable 
@@ -114,45 +112,6 @@ Configurations on Major Platforms
 OpenEquivariance has been tested on both supercomputers and lab clusters.
 Here are some tested environment configuration files. If you use OpenEquivariance
 on a major cluster, send us a pull request to add your configuration! 
-
-
-.. tab:: NERSC Perlmutter (NVIDIA A100) 
-
-    .. code-block:: bash
-        :caption: env.sh (last updated June 2025)
-
-        module load gcc 
-        module load conda
-
-        # Deactivate any base environments
-        for i in $(seq ${CONDA_SHLVL}); do 
-            conda deactivate
-        done
-
-        conda activate <your-conda-env>
-
-
-.. tab:: OLCF Frontier (AMD MI250x)
-
-    You need to install a HIP-enabled verison of PyTorch to use our package. 
-    Follow the steps `here <https://docs.olcf.ornl.gov/software/analytics/pytorch_frontier.html>`_.
-
-
-    .. code-block:: bash
-        :caption: env.sh (last updated June 2025) 
-
-        module load PrgEnv-gnu/8.6.0
-        module load miniforge3/23.11.0-0
-        module load rocm/6.4.0
-        module load craype-accel-amd-gfx90a
-
-        for i in $(seq ${CONDA_SHLVL}); do
-            conda deactivate
-        done
-
-        conda activate <your-conda-env>
-        export CC=cc
-        export CXX=CC
 
 
 .. tab:: ALCF Aurora (Intel Data Center GPU Max)

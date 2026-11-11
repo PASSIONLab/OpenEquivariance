@@ -1,6 +1,7 @@
+--extra-index-url https://download.pytorch.org/whl/cu129
 numpy==2.2.5
-torch==2.13.0 --index-url https://download.pytorch.org/whl/cu129
+torch==2.13.0+cu129
 pytest==9.0.3
 ninja==1.11.1.4
-nanobind==2.10.2
+nanobind==3.1.0
 scikit-build-core==0.11.6

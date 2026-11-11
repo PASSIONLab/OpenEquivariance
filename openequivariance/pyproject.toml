@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm", "scikit-build-core", "nanobind"]
+requires = ["setuptools", "setuptools-scm", "scikit-build-core", "nanobind>=3.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -12,13 +12,11 @@ authors = [
   { name="James Demmel" }
 ]
 description = "A fast GPU JIT kernel generator for the Clebsch-Gordon Tensor Product"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-  "setuptools",
-  "ninja",
   "jinja2",
   "numpy",
-  "pybind11"
+  "nanobind-backend>=1.0"
 ]
 readme = "README.md"
 
@@ -27,7 +25,6 @@ license-files = ["LICENSE"]
 
 classifiers = [
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -60,6 +57,11 @@ dev = [
   "cmake"
 ]
 
+sycl = [
+  "setuptools",
+  "ninja"
+]
+
 jax = [
   "scikit-build-core",
   "setuptools-scm",
@@ -77,5 +79,41 @@ addopts = [
 [tool.ruff]
 lint.ignore = ["E741"]
 
+[tool.scikit-build]
+wheel.py-api = "cp311"
+build-dir = "build/{wheel_tag}"
+editable.rebuild = true
+
 [tool.scikit-build.cmake.define]
 AARCH64 = {env="AARCH64", default="0"}
+LIBTORCH_URL_X86_64 = "https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.10.0%2Bcpu.zip"
+LIBTORCH_SHA256_X86_64 = "c5bf8efda9224a2d971b19d1ef6cf3ba6fee8ab53e69c49427db003d1d300496"
+LIBTORCH_URL_AARCH64 = "https://github.com/PASSIONLab/libtorch_aarch64/raw/742ffd07f47a31a94f6b6aae2cbe129e6b667d94/pkg-libtorch.tar.zst"
+LIBTORCH_SHA256_AARCH64 = "9fdebdb56766317c71eb4c9f1b750baef4ebc4e6ba85b427f701fdc20844f909"
+
+[tool.cibuildwheel]
+build = "cp311-*"
+skip = "*-musllinux*"
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+before-all = [
+  "/opt/python/cp312-cp312/bin/python {project}/.github/release.py install-cuda-toolkits $OEQ_CUDA_ROOTS",
+  "/opt/python/cp312-cp312/bin/python {project}/.github/release.py install-rocm-sdk {package}/pyproject.toml /opt/rocm-sdk-core",
+]
+build-verbosity = 1
+
+[tool.cibuildwheel.linux.environment]
+OEQ_CUDA_ROOTS = "/usr/local/cuda-12.6 /usr/local/cuda-13.0"
+ROCM_PATH = "/opt/rocm-sdk-core/_rocm_sdk_core"
+
+[tool.cibuildwheel.linux]
+repair-wheel-command = """auditwheel repair -w {dest_dir} {wheel} \
+  --exclude libtorch_cpu.so --exclude libc10.so \
+  --exclude libtorch_cuda.so --exclude libtorch_hip.so \
+  --exclude libcuda.so.1 --exclude 'libcudart.so.*' --exclude 'libnvrtc.so.*' \
+  --exclude 'libamdhip64.so.*' --exclude 'libhiprtc.so.*'"""
+
+[tool.openequivariance.rocm-sdk-core]
+index-url = "https://download.pytorch.org/whl/rocm10.0"
+version = "10.0.0"
+sha256 = "3bf4a72d11aa2a4ee1e90572c73630f937d38c1b7af4dda45b483b54655138a7"

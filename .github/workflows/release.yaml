@@ -4,8 +4,41 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-oeq:
-    name: Build oeq dist 
+  build-oeq-wheels:
+    name: Build oeq wheels (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-tags: true
+    - name: set up Python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: '3.12'
+    - name: replace symlinks with copies
+      run: python3 .github/release.py resolve-symlinks
+    - name: set version from tag
+      run: |
+        python3 -m pip install -r .github/workflows/requirements_release_ci.txt
+        python3 .github/release.py set-version openequivariance/pyproject.toml
+    - name: build wheels
+      run: python3 -m cibuildwheel --output-dir wheelhouse openequivariance
+    - name: store the wheels
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: oeq-wheels-${{ matrix.arch }}
+        path: wheelhouse/*.whl
+
+  build-oeq-sdist:
+    name: Build oeq sdist
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -14,27 +47,29 @@ jobs:
     - name: set up Python
       uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
-        python-version: '3.10'
+        python-version: '3.12'
+    - name: replace symlinks with copies
+      run: python3 .github/release.py resolve-symlinks
     - name: set version from tag
       run: |
         python3 -m pip install -r .github/workflows/requirements_release_ci.txt
-        python3 .github/autoversion.py openequivariance/pyproject.toml
+        python3 .github/release.py set-version openequivariance/pyproject.toml
     - name: install dependencies, then build source tarball
       run: |
         cd openequivariance
-        python3 -m pip install build 
+        python3 -m pip install build
         python3 -m build --sdist
-    - name: store the distribution packages 
+    - name: store the distribution packages
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: oeq-package-distributions
+        name: oeq-sdist
         path: openequivariance/dist/
 
   pypi-publish:
     name: Upload oeq to PyPI
     runs-on: ubuntu-latest
-    needs: build-oeq
-    environment: 
+    needs: [build-oeq-wheels, build-oeq-sdist]
+    environment:
         name: pypi
         url: https://pypi.org/p/openequivariance
     permissions:
@@ -43,8 +78,9 @@ jobs:
       - name: download the distributions
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: oeq-package-distributions
-          path: dist/ 
+          pattern: oeq-*
+          merge-multiple: true
+          path: dist/
       - name: publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
 
@@ -61,16 +97,18 @@ jobs:
       uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
         python-version: '3.10'
+    - name: replace symlinks with copies
+      run: python3 .github/release.py resolve-symlinks
     - name: set version from tag
       run: |
         python3 -m pip install -r .github/workflows/requirements_release_ci.txt
-        python3 .github/autoversion.py openequivariance_extjax/pyproject.toml
+        python3 .github/release.py set-version openequivariance_extjax/pyproject.toml
     - name: install dependencies, then build source tarball
       run: |
         cd openequivariance_extjax
-        python3 -m pip install build 
-        python3 -m build --sdist 
-    - name: store the distribution packages 
+        python3 -m pip install build
+        python3 -m build --sdist
+    - name: store the distribution packages
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: oeqjax-package-distributions
@@ -80,7 +118,7 @@ jobs:
     name: Upload extjax to PyPI
     runs-on: ubuntu-latest
     needs: build-oeq-extjax
-    environment: 
+    environment:
         name: pypi
         url: https://pypi.org/p/openequivariance_extjax
     permissions:
@@ -90,6 +128,6 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: oeqjax-package-distributions
-          path: dist/ 
+          path: dist/
       - name: publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3

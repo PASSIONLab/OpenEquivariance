@@ -13,8 +13,7 @@ that [e3nn](https://e3nn.org/) supports
 commonly found in graph neural networks 
 (e.g. [Nequip](https://github.com/mir-group/nequip) or
 [MACE](https://github.com/ACEsuit/mace)). To get 
-started with PyTorch, ensure that you have PyTorch 
-and GCC 9+ available before installing our package via 
+started, make sure that you have PyTorch installed and run:
 
 ```bash
 pip install openequivariance
