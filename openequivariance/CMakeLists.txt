@@ -8,15 +8,22 @@ include(FetchContent)
 
 if (AARCH64 OR CMAKE_SYSTEM_PROCESSOR MATCHES "(arm)|(ARM)|(aarch64)")
     message(STATUS "Targeting ARM architecture (AARCH64 override or processor match)")
-    set(LIBTORCH_URL "https://github.com/PASSIONLab/libtorch_aarch64/raw/refs/heads/main/pkg-libtorch.tar.zst")
+    set(LIBTORCH_ARCH AARCH64)
 else()
     message(STATUS "Did not match arm/aarch64, performing x86 install")
-    set(LIBTORCH_URL "https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.10.0%2Bcpu.zip")
+    set(LIBTORCH_ARCH X86_64)
+endif()
+
+set(LIBTORCH_URL "${LIBTORCH_URL_${LIBTORCH_ARCH}}")
+set(LIBTORCH_SHA256 "${LIBTORCH_SHA256_${LIBTORCH_ARCH}}")
+if(NOT LIBTORCH_URL OR NOT LIBTORCH_SHA256)
+    message(FATAL_ERROR "LIBTORCH_URL / LIBTORCH_SHA256 not set")
 endif()
 
 FetchContent_Declare(
     libtorch
     URL "${LIBTORCH_URL}"
+    URL_HASH SHA256=${LIBTORCH_SHA256}
 )
 
 message(STATUS "Downloading LibTorch...")

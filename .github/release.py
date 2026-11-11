@@ -19,10 +19,11 @@ TAG_PATTERN = re.compile(r"v([0-9]+\.[0-9]+\.[0-9]+)")
 GIT_SYMLINK_MODE = "120000"
 CUDA_ROOT_PATTERN = re.compile(r"/usr/local/cuda-([0-9]+)\.([0-9]+)")
 CUDA_REPO_ARCH = {"x86_64": "x86_64", "aarch64": "sbsa"}
-ROCM_REQUIREMENTS = """\
---index-url https://download.pytorch.org/whl/rocm10.0
-rocm-sdk-core==10.0.0 --hash=sha256:3bf4a72d11aa2a4ee1e90572c73630f937d38c1b7af4dda45b483b54655138a7
-"""
+ROCM_INDEX_PATTERN = re.compile(
+    r"https://download\.pytorch\.org/whl/rocm[0-9]+\.[0-9]+"
+)
+ROCM_VERSION_PATTERN = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
+SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 
 
 def resolve_symlinks(args):
@@ -74,8 +75,8 @@ def set_version(args):
 
 
 def install_gpu_toolkits(args):
-    """Installs the CUDA and HIP headers and link-time libraries inside a 
-    manylinux container.""" 
+    """Installs the CUDA and HIP headers and link-time libraries inside a
+    manylinux container."""
     arch = platform.machine()
     subprocess.run(
         [
@@ -104,9 +105,16 @@ def install_gpu_toolkits(args):
         )
 
     if arch == "x86_64":
+        assert ROCM_INDEX_PATTERN.fullmatch(args.rocm_index_url)
+        assert ROCM_VERSION_PATTERN.fullmatch(args.rocm_sdk_version)
+        assert SHA256_PATTERN.fullmatch(args.rocm_sdk_sha256)
         with tempfile.TemporaryDirectory() as tmp:
             requirements = Path(tmp) / "rocm_requirements.txt"
-            requirements.write_text(ROCM_REQUIREMENTS)
+            requirements.write_text(
+                f"--index-url {args.rocm_index_url}\n"
+                f"rocm-sdk-core=={args.rocm_sdk_version} "
+                f"--hash=sha256:{args.rocm_sdk_sha256}\n"
+            )
             subprocess.run(
                 [
                     sys.executable,
@@ -136,6 +144,9 @@ if __name__ == "__main__":
     step.set_defaults(func=set_version)
 
     step = steps.add_parser("install-gpu-toolkits", help=install_gpu_toolkits.__doc__)
+    step.add_argument("--rocm-index-url", required=True)
+    step.add_argument("--rocm-sdk-version", required=True)
+    step.add_argument("--rocm-sdk-sha256", required=True)
     step.add_argument("cuda_roots", nargs="+")
     step.set_defaults(func=install_gpu_toolkits)
 
