@@ -32,9 +32,9 @@ You need the following to install OpenEquivariance:
         pip install openequivariance
         python -c "import openequivariance"
 
-    OpenEquivariance bundles a precompiled `.so` files for two recent
+    OpenEquivariance bundles a precompiled library files for two recent
     CUDA versions and a HIP version. If you're building for an architecture
-    we don't support or need a different CUDA verison, you'll need to build
+    we don't support or need a different CUDA version, you'll need to build
     the package from source:
 
     .. code-block:: bash
@@ -91,11 +91,11 @@ You need the following to install OpenEquivariance:
 
     .. code-block:: bash 
 
-        pip install "git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance[jax]"
-        pip install "git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance_extjax --no-build-isolation"
+        pip install "openequivariance[jax] @ git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance"
+        pip install "git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance_extjax" --no-build-isolation
 
         # Use the command below for JAX+AMD
-        # JAX_HIP=1 pip install "git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance_extjax --no-build-isolation"
+        # JAX_HIP=1 pip install "git+https://github.com/PASSIONLab/OpenEquivariance#subdirectory=openequivariance_extjax" --no-build-isolation
 
 
 If you're using JAX, set the environment variable 
