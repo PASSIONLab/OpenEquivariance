@@ -114,45 +114,6 @@ Here are some tested environment configuration files. If you use OpenEquivarianc
 on a major cluster, send us a pull request to add your configuration! 
 
 
-.. tab:: NERSC Perlmutter (NVIDIA A100) 
-
-    .. code-block:: bash
-        :caption: env.sh (last updated June 2025)
-
-        module load gcc 
-        module load conda
-
-        # Deactivate any base environments
-        for i in $(seq ${CONDA_SHLVL}); do 
-            conda deactivate
-        done
-
-        conda activate <your-conda-env>
-
-
-.. tab:: OLCF Frontier (AMD MI250x)
-
-    You need to install a HIP-enabled verison of PyTorch to use our package. 
-    Follow the steps `here <https://docs.olcf.ornl.gov/software/analytics/pytorch_frontier.html>`_.
-
-
-    .. code-block:: bash
-        :caption: env.sh (last updated June 2025) 
-
-        module load PrgEnv-gnu/8.6.0
-        module load miniforge3/23.11.0-0
-        module load rocm/6.4.0
-        module load craype-accel-amd-gfx90a
-
-        for i in $(seq ${CONDA_SHLVL}); do
-            conda deactivate
-        done
-
-        conda activate <your-conda-env>
-        export CC=cc
-        export CXX=CC
-
-
 .. tab:: ALCF Aurora (Intel Data Center GPU Max)
 
     Aurora provides a PyTorch build with XPU support in its ``frameworks``
