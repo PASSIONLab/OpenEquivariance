@@ -1,15 +1,40 @@
-import importlib
+import ctypes
 import importlib.metadata
+import importlib.util
 import os
 import pkgutil
 
 import jax
+
+from openequivariance.core.gpu_utilities import load_utilities
 
 JAX_PLUGINS = {
     "jax-cuda13-plugin": "cuda13",
     "jax-cuda12-plugin": "cuda12",
     "jax-rocm7-plugin": "hip",
 }
+
+FFI_ABI_VERSION = 2
+FFI_STAGES = ("instantiate", "prepare", "initialize", "execute")
+
+
+class _Handler(ctypes.Structure):
+    _fields_ = [
+        ("name", ctypes.c_char_p),
+        ("instantiate", ctypes.c_void_p),
+        ("prepare", ctypes.c_void_p),
+        ("initialize", ctypes.c_void_p),
+        ("execute", ctypes.c_void_p),
+        ("traits", ctypes.c_uint32),
+    ]
+
+
+class _HandlerTable(ctypes.Structure):
+    _fields_ = [
+        ("abi_version", ctypes.c_uint32),
+        ("handler_count", ctypes.c_uint32),
+        ("handlers", ctypes.POINTER(_Handler)),
+    ]
 
 
 def _jax_backend():
@@ -25,11 +50,11 @@ def _jax_backend():
     return None
 
 
-def _load_extension():
+def _load_library():
     built = sorted(
-        module.name.removeprefix("oeq_jax_")
+        module.name.removeprefix("liboeq_jax_")
         for module in pkgutil.iter_modules(__path__)
-        if module.name.startswith("oeq_jax_")
+        if module.name.startswith("liboeq_jax_")
     )
     backend = _jax_backend()
     if backend not in built:
@@ -42,20 +67,47 @@ def _load_extension():
         backend = built[0]
     if backend == "hip":
         jax.devices()
-    return backend, importlib.import_module(f"{__name__}.oeq_jax_{backend}")
+    path = importlib.util.find_spec(f"{__name__}.liboeq_jax_{backend}").origin
+    return backend, path, ctypes.CDLL(path)
 
 
-BACKEND, extension_module = _load_extension()
-IS_HIP = extension_module.is_hip()
+BACKEND, LIBRARY_PATH, library = _load_library()
+IS_HIP = BACKEND == "hip"
+
+library.oeq_ffi_handler_table.argtypes = []
+library.oeq_ffi_handler_table.restype = ctypes.POINTER(_HandlerTable)
+
+
+def handler_table():
+    table = library.oeq_ffi_handler_table().contents
+    if table.abi_version != FFI_ABI_VERSION:
+        raise ImportError(
+            f"OpenEquivariance FFI handler table has ABI version "
+            f"{table.abi_version}, expected {FFI_ABI_VERSION}"
+        )
+    return table
+
+
+def registrations():
+    table = handler_table()
+    targets = {}
+    for index in range(table.handler_count):
+        handler = table.handlers[index]
+        targets[handler.name.decode()] = {
+            stage: jax.ffi.pycapsule(getattr(handler, stage))
+            for stage in FFI_STAGES
+            if getattr(handler, stage)
+        }
+    return targets
+
 
 DEVICE_TYPE = "cuda"
 
 platform = "ROCM" if IS_HIP else "CUDA"
-for name, target in extension_module.registrations().items():
+for name, target in registrations().items():
     jax.ffi.register_ffi_target(name, target, platform=platform, api_version=1)
 
-GPUTimer = extension_module.GPUTimer
-DeviceProp = extension_module.DeviceProp
+DeviceProp, GPUTimer = load_utilities(BACKEND)
 
 __all__ = [
     "BACKEND",

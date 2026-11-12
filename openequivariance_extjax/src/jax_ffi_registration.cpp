@@ -1,1 +1,0 @@
-../../openequivariance/openequivariance/extension/jax/jax_ffi_registration.cpp

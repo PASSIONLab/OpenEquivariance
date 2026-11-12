@@ -12,6 +12,8 @@ from packaging.version import Version
 
 import torch
 
+from openequivariance.core.gpu_utilities import load_utilities
+
 if Version(torch.__version__) < Version("2.10"):
     raise RuntimeError(
         f"OpenEquivariance requires PyTorch >= 2.10, found {torch.__version__}."
@@ -30,6 +32,8 @@ class Extension:
         self.built_extension_error = None
         self.ext_module_python = None
         self.aoti_module_path = None
+        self.DeviceProp = None
+        self.GPUTimer = None
 
 
 class JITExtension(Extension):
@@ -145,6 +149,8 @@ class JITExtension(Extension):
                     torch.ops.load_library(self.ext_module_python.__file__)
                     self.built_extension = True
                     self.aoti_module_path = self.ext_module_python.__file__
+                    self.DeviceProp = self.ext_module_python.DeviceProp
+                    self.GPUTimer = self.ext_module_python.GPUTimer
 
                 except Exception as e:
                     # If compiling torch fails (e.g. low gcc version), we should fall back to the
@@ -160,31 +166,28 @@ class PrecompiledExtension(Extension):
     def __init__(self, backend):
         super().__init__()
         if backend == "cuda":
-            ext_module_py_name = f"oeq_stable_cuda{torch.version.cuda.split('.')[0]}"
-        else:
-            ext_module_py_name = f"oeq_stable_{backend}"
+            backend = f"cuda{torch.version.cuda.split('.')[0]}"
 
-        full_name = f"openequivariance._torch.extlib.{ext_module_py_name}"
-        spec = importlib.util.find_spec(full_name)
-        aoti_module_path = spec and os.path.join(
-            os.path.dirname(spec.origin), f"lib{ext_module_py_name}_aoti.so"
+        library_name = f"liboeq_stable_{backend}_aoti"
+        spec = importlib.util.find_spec(
+            f"openequivariance._torch.extlib.{library_name}"
         )
-        if spec is None or not os.path.exists(aoti_module_path):
+        if spec is None:
             self.built_extension_error = (
-                f"No precompiled OpenEquivariance extension {ext_module_py_name} "
+                f"No precompiled OpenEquivariance extension {library_name}.so "
                 f"for PyTorch {torch.__version__}. {SOURCE_BUILD_HINT}"
             )
             return
 
         try:
-            self.ext_module_python = importlib.import_module(full_name)
-            torch.ops.load_library(self.ext_module_python.__file__)
+            torch.ops.load_library(spec.origin)
+            self.DeviceProp, self.GPUTimer = load_utilities(backend)
             self.built_extension = True
-            self.aoti_module_path = aoti_module_path
+            self.aoti_module_path = spec.origin
         except Exception as e:
             self.built_extension_error = (
                 f"Error loading precompiled OpenEquivariance extension "
-                f"{ext_module_py_name}: {e}\n{SOURCE_BUILD_HINT}"
+                f"{library_name}.so: {e}\n{SOURCE_BUILD_HINT}"
             )
 
 
@@ -217,11 +220,8 @@ BUILT_EXTENSION_ERROR = extension.built_extension_error
 
 
 if BUILT_EXTENSION:
-    sys.modules["oeq_utilities"] = extension.ext_module_python
-    from oeq_utilities import (
-        DeviceProp,
-        GPUTimer,
-    )
+    DeviceProp = extension.DeviceProp
+    GPUTimer = extension.GPUTimer
 
     def torch_ext_so_path():
         return extension.aoti_module_path

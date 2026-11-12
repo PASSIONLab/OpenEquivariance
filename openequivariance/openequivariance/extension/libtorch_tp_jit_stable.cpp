@@ -139,23 +139,3 @@ bool tensor_is_on_gpu(const Tensor &tensor) {
 }
 
 } // namespace oeq
-
-// CMake passes EXTENSION_NAME to match the target name (e.g. oeq_stable_cuda13)
-#ifndef EXTENSION_NAME
-    #ifdef CUDA_BACKEND
-        #define EXTENSION_NAME oeq_stable_cuda
-    #endif
-    #ifdef HIP_BACKEND
-        #define EXTENSION_NAME oeq_stable_hip
-    #endif
-    #ifdef SYCL_BACKEND
-        #define EXTENSION_NAME oeq_stable_sycl
-    #endif
-#endif
-
-#ifdef INCLUDE_NB_EXTENSION
-    #include "nb_utilities.hpp"
-    NB_MODULE(EXTENSION_NAME, m) {
-        oeq::bind_utilities(m);
-    }
-#endif

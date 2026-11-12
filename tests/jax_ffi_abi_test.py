@@ -1,4 +1,4 @@
-"""Runtime checks for the OEQ-owned C handler table and nanobind registry."""
+"""Runtime checks for the OEQ-owned C handler table and its JAX registrations."""
 
 import ctypes
 from pathlib import Path
@@ -39,8 +39,8 @@ class _HandlerTable(ctypes.Structure):
 
 
 def _handler_table():
-    ext = pytest.importorskip("openequivariance.jax.extlib").extension_module
-    library = ctypes.CDLL(ext.__file__)
+    ext = pytest.importorskip("openequivariance.jax.extlib")
+    library = ctypes.CDLL(ext.LIBRARY_PATH)
     table_fn = library.oeq_ffi_handler_table
     table_fn.restype = ctypes.POINTER(_HandlerTable)
     return ext, table_fn().contents
@@ -79,8 +79,8 @@ def test_exported_handler_table_matches_manifest(with_jax):
     )
 
 
-def test_nanobind_registrations_match_handler_table(with_jax):
-    """Nanobind exposes each non-null ABI stage as a capsule."""
+def test_registrations_match_handler_table(with_jax):
+    """Each non-null ABI stage is registered as a capsule."""
     if not with_jax:
         pytest.skip("JAX ABI checks require --jax")
 
