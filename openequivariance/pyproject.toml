@@ -63,9 +63,7 @@ sycl = [
 ]
 
 jax = [
-  "scikit-build-core",
-  "setuptools-scm",
-  "nanobind"
+  "jax>=0.8.1"
 ]
 
 [tool.setuptools.packages.find]
@@ -90,6 +88,10 @@ LIBTORCH_URL_X86_64 = "https://download.pytorch.org/libtorch/cpu/libtorch-shared
 LIBTORCH_SHA256_X86_64 = "c5bf8efda9224a2d971b19d1ef6cf3ba6fee8ab53e69c49427db003d1d300496"
 LIBTORCH_URL_AARCH64 = "https://github.com/PASSIONLab/libtorch_aarch64/raw/742ffd07f47a31a94f6b6aae2cbe129e6b667d94/pkg-libtorch.tar.zst"
 LIBTORCH_SHA256_AARCH64 = "9fdebdb56766317c71eb4c9f1b750baef4ebc4e6ba85b427f701fdc20844f909"
+XLA_FFI_COMMIT = "a7e58876b73dfa9bb6bc785f6981a332c133bb55"
+XLA_FFI_C_API_SHA256 = "aca130ddbe816672f9d302364d28813b1922c90baf7bc4818f3169d375c5ecc3"
+XLA_FFI_API_SHA256 = "f7080e6a7d2578961c100c5042d1db8f85c57e1595ceb7a11f55422db808c62c"
+XLA_FFI_FFI_SHA256 = "fe6b5bfbaa3f13e72f9bc46f5e5fc62ef782e3dd4a41bb08867904602ed615e7"
 
 [tool.cibuildwheel]
 build = "cp311-*"

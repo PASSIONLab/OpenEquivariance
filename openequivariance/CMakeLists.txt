@@ -61,6 +61,57 @@ set(OEQ_SOURCES
 
 set(OEQ_INSTALL_DIR "openequivariance/_torch/extlib")
 
+if(NOT XLA_FFI_COMMIT OR NOT XLA_FFI_C_API_SHA256 OR NOT XLA_FFI_API_SHA256 OR NOT XLA_FFI_FFI_SHA256)
+    message(FATAL_ERROR "XLA_FFI_COMMIT / XLA_FFI_*_SHA256 not set")
+endif()
+
+set(XLA_FFI_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/xla_ffi")
+foreach(header c_api api ffi)
+    string(TOUPPER "${header}" header_var)
+    file(DOWNLOAD
+        "https://raw.githubusercontent.com/openxla/xla/${XLA_FFI_COMMIT}/xla/ffi/api/${header}.h"
+        "${XLA_FFI_INCLUDE_DIR}/xla/ffi/api/${header}.h"
+        EXPECTED_HASH SHA256=${XLA_FFI_${header_var}_SHA256}
+        TLS_VERIFY ON
+    )
+endforeach()
+
+set(OEQ_JAX_SOURCES
+    ${EXT_DIR}/jax/ffi_handlers.cpp
+    ${EXT_DIR}/jax/jax_ffi_registration.cpp
+    ${EXT_JSON_DIR}/json11.cpp
+)
+
+set(OEQ_JAX_INSTALL_DIR "openequivariance/jax/extlib")
+set(OEQ_JAX_CUDA12_RUNPATH "$ORIGIN/../../../nvidia/cuda_runtime/lib;$ORIGIN/../../../nvidia/cuda_nvrtc/lib")
+set(OEQ_JAX_CUDA13_RUNPATH "$ORIGIN/../../../nvidia/cu13/lib")
+
+function(add_jax_extension target_name backend_define link_libraries runpath)
+    nanobind_add_module(${target_name} BACKEND_MODULE nanobind_backend ${OEQ_JAX_SOURCES})
+
+    set_target_properties(${target_name} PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        POSITION_INDEPENDENT_CODE ON
+        INSTALL_RPATH "${runpath}"
+    )
+    target_compile_options(${target_name} PRIVATE -Wno-attributes -Wno-return-type)
+    target_compile_definitions(${target_name} PRIVATE
+        ${backend_define}=1
+        OEQ_JAX_MODULE_NAME=${target_name}
+    )
+    target_include_directories(${target_name} PRIVATE
+        ${EXT_DIR}
+        ${EXT_DIR}/jax
+        ${EXT_BACKEND_DIR}
+        ${EXT_JSON_DIR}
+        ${XLA_FFI_INCLUDE_DIR}
+    )
+    target_link_libraries(${target_name} PRIVATE ${link_libraries})
+
+    install(TARGETS ${target_name} LIBRARY DESTINATION "${OEQ_JAX_INSTALL_DIR}")
+endfunction()
+
 function(add_stable_extension target_name backend_define link_libraries)
     nanobind_add_module(${target_name} BACKEND_MODULE nanobind_backend ${OEQ_SOURCES})
 
@@ -177,6 +228,14 @@ if(OEQ_CUDA_FOUND AND NOT OEQ_CUDA_ROOTS)
         cuda_stub_lib
     )
     add_stable_extension(oeq_stable_cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_LINK_LIBS}")
+
+    set(CUDA_JAX_LINK_LIBS
+        CUDA::cudart
+        CUDA::cuda_driver
+        ${CUDA_nvrtc_LIBRARY}
+    )
+    add_jax_extension(oeq_jax_cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_JAX_LINK_LIBS}"
+        "${OEQ_JAX_CUDA${CUDAToolkit_VERSION_MAJOR}_RUNPATH}")
 endif()
 
 foreach(cuda_root ${OEQ_CUDA_ROOTS})
@@ -200,6 +259,8 @@ foreach(cuda_root ${OEQ_CUDA_ROOTS})
 
     set(CUDA_LINK_LIBS oeq_cuda${cuda_major}_toolkit cuda_stub_lib)
     add_stable_extension(oeq_stable_cuda${cuda_major} CUDA_BACKEND "${CUDA_LINK_LIBS}")
+    add_jax_extension(oeq_jax_cuda${cuda_major} CUDA_BACKEND oeq_cuda${cuda_major}_toolkit
+        "${OEQ_JAX_CUDA${cuda_major}_RUNPATH}")
 endforeach()
 
 if(hip_FOUND)
@@ -223,6 +284,7 @@ if(hip_FOUND)
         hiprtc::hiprtc
     )
     add_stable_extension(oeq_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
+    add_jax_extension(oeq_jax_hip HIP_BACKEND "hip::host;hiprtc::hiprtc" "")
 endif()
 
 set(OEQ_SYCL_FOUND FALSE)

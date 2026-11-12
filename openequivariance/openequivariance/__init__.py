@@ -76,7 +76,6 @@ def torch_ext_so_path():
 
 jax = None
 try:
-    import openequivariance_extjax
     import openequivariance.jax as jax
 
 except Exception as e:

@@ -39,7 +39,7 @@ class _HandlerTable(ctypes.Structure):
 
 
 def _handler_table():
-    ext = pytest.importorskip("openequivariance_extjax")
+    ext = pytest.importorskip("openequivariance.jax.extlib").extension_module
     library = ctypes.CDLL(ext.__file__)
     table_fn = library.oeq_ffi_handler_table
     table_fn.restype = ctypes.POINTER(_HandlerTable)

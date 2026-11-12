@@ -35,10 +35,6 @@ jobs:
       run: |
         pytest tests/import_test.py
 
-    - name: Test JAX extension build
-      run: |
-        XLA_DIRECT_DOWNLOAD=1 pip install -e "./openequivariance_extjax" --no-build-isolation
-
   verify_hip_extension:
     if: ${{ github.event.label.name == 'ci-ready' || github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
