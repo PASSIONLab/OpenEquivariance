@@ -77,6 +77,7 @@ endforeach()
 
 set(OEQ_JAX_SOURCES
     ${EXT_DIR}/jax/ffi_handlers.cpp
+    ${EXT_DIR}/jax/ffi_provider.cpp
     ${EXT_JSON_DIR}/json11.cpp
 )
 
