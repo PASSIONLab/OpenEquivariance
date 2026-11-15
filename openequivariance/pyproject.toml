@@ -62,10 +62,6 @@ sycl = [
   "ninja"
 ]
 
-jax = [
-  "jax>=0.8.1"
-]
-
 [tool.setuptools.packages.find]
 include = ["openequivariance*"]
 
