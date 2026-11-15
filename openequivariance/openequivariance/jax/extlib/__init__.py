@@ -1,12 +1,11 @@
 import ctypes
+import importlib
 import importlib.metadata
 import importlib.util
 import os
 import pkgutil
 
 import jax
-
-from openequivariance.core.gpu_utilities import load_utilities
 
 JAX_PLUGINS = {
     "jax-cuda13-plugin": "cuda13",
@@ -107,7 +106,11 @@ platform = "ROCM" if IS_HIP else "CUDA"
 for name, target in registrations().items():
     jax.ffi.register_ffi_target(name, target, platform=platform, api_version=1)
 
-DeviceProp, GPUTimer = load_utilities(BACKEND)
+ext_module_utilities = importlib.import_module(
+    f"openequivariance.core.oeq_utilities_{BACKEND}"
+)
+DeviceProp = ext_module_utilities.DeviceProp
+GPUTimer = ext_module_utilities.GPUTimer
 
 __all__ = [
     "BACKEND",

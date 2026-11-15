@@ -12,8 +12,6 @@ from packaging.version import Version
 
 import torch
 
-from openequivariance.core.gpu_utilities import load_utilities
-
 if Version(torch.__version__) < Version("2.10"):
     raise RuntimeError(
         f"OpenEquivariance requires PyTorch >= 2.10, found {torch.__version__}."
@@ -32,8 +30,7 @@ class Extension:
         self.built_extension_error = None
         self.ext_module_python = None
         self.aoti_module_path = None
-        self.DeviceProp = None
-        self.GPUTimer = None
+        self.ext_module_utilities = None
 
 
 class JITExtension(Extension):
@@ -149,8 +146,7 @@ class JITExtension(Extension):
                     torch.ops.load_library(self.ext_module_python.__file__)
                     self.built_extension = True
                     self.aoti_module_path = self.ext_module_python.__file__
-                    self.DeviceProp = self.ext_module_python.DeviceProp
-                    self.GPUTimer = self.ext_module_python.GPUTimer
+                    self.ext_module_utilities = self.ext_module_python
 
                 except Exception as e:
                     # If compiling torch fails (e.g. low gcc version), we should fall back to the
@@ -181,7 +177,9 @@ class PrecompiledExtension(Extension):
 
         try:
             torch.ops.load_library(spec.origin)
-            self.DeviceProp, self.GPUTimer = load_utilities(backend)
+            self.ext_module_utilities = importlib.import_module(
+                f"openequivariance.core.oeq_utilities_{backend}"
+            )
             self.built_extension = True
             self.aoti_module_path = spec.origin
         except Exception as e:
@@ -220,8 +218,8 @@ BUILT_EXTENSION_ERROR = extension.built_extension_error
 
 
 if BUILT_EXTENSION:
-    DeviceProp = extension.DeviceProp
-    GPUTimer = extension.GPUTimer
+    DeviceProp = extension.ext_module_utilities.DeviceProp
+    GPUTimer = extension.ext_module_utilities.GPUTimer
 
     def torch_ext_so_path():
         return extension.aoti_module_path

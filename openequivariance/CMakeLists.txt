@@ -60,15 +60,15 @@ set(OEQ_SOURCES
 
 set(OEQ_INSTALL_DIR "openequivariance/_torch/extlib")
 
-if(NOT XLA_FFI_COMMIT OR NOT XLA_FFI_C_API_SHA256 OR NOT XLA_FFI_API_SHA256 OR NOT XLA_FFI_FFI_SHA256)
-    message(FATAL_ERROR "XLA_FFI_COMMIT / XLA_FFI_*_SHA256 not set")
+if(NOT XLA_FFI_URL OR NOT XLA_FFI_C_API_SHA256 OR NOT XLA_FFI_API_SHA256 OR NOT XLA_FFI_FFI_SHA256)
+    message(FATAL_ERROR "XLA_FFI_URL / XLA_FFI_*_SHA256 not set")
 endif()
 
 set(XLA_FFI_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/xla_ffi")
 foreach(header c_api api ffi)
     string(TOUPPER "${header}" header_var)
     file(DOWNLOAD
-        "https://raw.githubusercontent.com/openxla/xla/${XLA_FFI_COMMIT}/xla/ffi/api/${header}.h"
+        "${XLA_FFI_URL}/${header}.h"
         "${XLA_FFI_INCLUDE_DIR}/xla/ffi/api/${header}.h"
         EXPECTED_HASH SHA256=${XLA_FFI_${header_var}_SHA256}
         TLS_VERIFY ON
