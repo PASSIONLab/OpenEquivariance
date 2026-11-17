@@ -1,6 +1,15 @@
 Installation
 ==============================
 
+.. admonition:: Deprecation of `openequivariance_extjax``
+   :class: tip
+
+   Installing `openequivariance_extjax` is no longer
+   required or supported since the regular
+   `openequivariance` package contains the
+   relevant binaries. 
+   
+
 .. toctree::
    :maxdepth: 1
    :caption: Contents:
