@@ -59,7 +59,7 @@ library.oeq_ffi_handler_table.restype = ctypes.POINTER(HandlerTable)
 
 def handler_table():
     table = library.oeq_ffi_handler_table().contents
-    assert table.abi_version == FFI_ABI_VERSION:
+    assert table.abi_version == FFI_ABI_VERSION
     return table
 
 

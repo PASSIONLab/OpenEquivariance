@@ -82,17 +82,14 @@ set(OEQ_JAX_SOURCES
 )
 
 set(OEQ_JAX_INSTALL_DIR "openequivariance/jax/extlib")
-set(OEQ_JAX_CUDA12_RUNPATH "$ORIGIN/../../../nvidia/cuda_runtime/lib;$ORIGIN/../../../nvidia/cuda_nvrtc/lib")
-set(OEQ_JAX_CUDA13_RUNPATH "$ORIGIN/../../../nvidia/cu13/lib")
 
-function(add_jax_extension target_name backend_define link_libraries runpath)
+function(add_jax_extension target_name backend_define link_libraries)
     add_library(${target_name} SHARED ${OEQ_JAX_SOURCES})
 
     set_target_properties(${target_name} PROPERTIES
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
         POSITION_INDEPENDENT_CODE ON
-        INSTALL_RPATH "${runpath}"
     )
     target_compile_options(${target_name} PRIVATE -Wno-attributes -Wno-return-type)
     target_compile_definitions(${target_name} PRIVATE ${backend_define}=1)
@@ -109,7 +106,7 @@ function(add_jax_extension target_name backend_define link_libraries runpath)
     install(TARGETS ${target_name} LIBRARY DESTINATION "${OEQ_JAX_INSTALL_DIR}")
 endfunction()
 
-function(add_stable_extension target_name backend_define link_libraries)
+function(add_torch_extension target_name backend_define link_libraries)
     set(aoti_target_name ${target_name}_aoti)
     add_library(${aoti_target_name} SHARED ${OEQ_SOURCES})
 
@@ -140,10 +137,8 @@ function(add_stable_extension target_name backend_define link_libraries)
 endfunction()
 
 set(OEQ_UTILITIES_INSTALL_DIR "openequivariance/core")
-set(OEQ_UTILITIES_CUDA12_RUNPATH "$ORIGIN/../../nvidia/cuda_runtime/lib")
-set(OEQ_UTILITIES_CUDA13_RUNPATH "$ORIGIN/../../nvidia/cu13/lib")
 
-function(add_utilities_library backend backend_define link_libraries runpath)
+function(add_utilities_library backend backend_define link_libraries)
     set(target_name oeq_utilities_${backend})
     nanobind_add_module(${target_name} BACKEND_MODULE nanobind_backend ${EXT_DIR}/utilities.cpp)
 
@@ -151,7 +146,6 @@ function(add_utilities_library backend backend_define link_libraries runpath)
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
         POSITION_INDEPENDENT_CODE ON
-        INSTALL_RPATH "${runpath}"
     )
     target_compile_definitions(${target_name} PRIVATE
         ${backend_define}=1
@@ -218,17 +212,15 @@ if(OEQ_CUDA_FOUND AND NOT OEQ_CUDA_ROOTS)
         ${CUDA_nvrtc_LIBRARY}
         cuda_stub_lib
     )
-    add_stable_extension(oeq_stable_cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_LINK_LIBS}")
+    add_torch_extension(oeq_stable_cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_LINK_LIBS}")
 
     set(CUDA_JAX_LINK_LIBS
         CUDA::cudart
         CUDA::cuda_driver
         ${CUDA_nvrtc_LIBRARY}
     )
-    add_jax_extension(oeq_jax_cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_JAX_LINK_LIBS}"
-        "${OEQ_JAX_CUDA${CUDAToolkit_VERSION_MAJOR}_RUNPATH}")
-    add_utilities_library(cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_JAX_LINK_LIBS}"
-        "${OEQ_UTILITIES_CUDA${CUDAToolkit_VERSION_MAJOR}_RUNPATH}")
+    add_jax_extension(oeq_jax_cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_JAX_LINK_LIBS}")
+    add_utilities_library(cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_JAX_LINK_LIBS}")
 endif()
 
 foreach(cuda_root ${OEQ_CUDA_ROOTS})
@@ -251,11 +243,9 @@ foreach(cuda_root ${OEQ_CUDA_ROOTS})
     )
 
     set(CUDA_LINK_LIBS oeq_cuda${cuda_major}_toolkit cuda_stub_lib)
-    add_stable_extension(oeq_stable_cuda${cuda_major} CUDA_BACKEND "${CUDA_LINK_LIBS}")
-    add_jax_extension(oeq_jax_cuda${cuda_major} CUDA_BACKEND oeq_cuda${cuda_major}_toolkit
-        "${OEQ_JAX_CUDA${cuda_major}_RUNPATH}")
-    add_utilities_library(cuda${cuda_major} CUDA_BACKEND oeq_cuda${cuda_major}_toolkit
-        "${OEQ_UTILITIES_CUDA${cuda_major}_RUNPATH}")
+    add_torch_extension(oeq_stable_cuda${cuda_major} CUDA_BACKEND "${CUDA_LINK_LIBS}")
+    add_jax_extension(oeq_jax_cuda${cuda_major} CUDA_BACKEND oeq_cuda${cuda_major}_toolkit)
+    add_utilities_library(cuda${cuda_major} CUDA_BACKEND oeq_cuda${cuda_major}_toolkit)
 endforeach()
 
 if(hip_FOUND)
@@ -278,9 +268,9 @@ if(hip_FOUND)
 	    hip::host
         hiprtc::hiprtc
     )
-    add_stable_extension(oeq_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
-    add_jax_extension(oeq_jax_hip HIP_BACKEND "hip::host;hiprtc::hiprtc" "")
-    add_utilities_library(hip HIP_BACKEND "hip::host;hiprtc::hiprtc" "")
+    add_torch_extension(oeq_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
+    add_jax_extension(oeq_jax_hip HIP_BACKEND "hip::host;hiprtc::hiprtc")
+    add_utilities_library(hip HIP_BACKEND "hip::host;hiprtc::hiprtc")
 endif()
 
 set(OEQ_SYCL_FOUND FALSE)
@@ -309,7 +299,7 @@ if(OEQ_SYCL_FOUND)
         sycl_stub_lib
         sycl
     )
-    add_stable_extension(oeq_stable_sycl SYCL_BACKEND "${SYCL_LINK_LIBS}")
+    add_torch_extension(oeq_stable_sycl SYCL_BACKEND "${SYCL_LINK_LIBS}")
 
     target_compile_options(oeq_stable_sycl_aoti PRIVATE -fsycl)
     target_link_options(oeq_stable_sycl_aoti PRIVATE -fsycl)
