@@ -57,14 +57,10 @@ library.oeq_ffi_handler_table.argtypes = []
 library.oeq_ffi_handler_table.restype = ctypes.POINTER(HandlerTable)
 
 
-def handler_table():
+def registrations():
     table = library.oeq_ffi_handler_table().contents
     assert table.abi_version == FFI_ABI_VERSION
-    return table
 
-
-def registrations():
-    table = handler_table()
     targets = {}
     for index in range(table.handler_count):
         handler = table.handlers[index]
