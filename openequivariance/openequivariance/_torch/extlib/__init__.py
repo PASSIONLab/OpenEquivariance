@@ -53,17 +53,24 @@ class JITExtension(Extension):
 
     @staticmethod
     def wait_for_torch_build_lock(name, timeout=300):
-        from torch.utils.cpp_extension import _get_build_directory
+        from torch.utils import cpp_extension
 
-        lock_path = os.path.join(_get_build_directory(name, False), "lock")
-        start = time.time()
+        if hasattr(cpp_extension, "FileLock") or not hasattr(
+            cpp_extension, "FileBaton"
+        ):
+            return
+
+        lock_path = os.path.join(
+            cpp_extension._get_build_directory(name, False), "lock"
+        )
+        start = time.monotonic()
         while os.path.exists(lock_path):
-            if time.time() - start > timeout:
+            if time.monotonic() - start > timeout:
                 raise RuntimeError(
-                    f"Timed out after {timeout} seconds waiting for another process "
-                    f"to finish building the OpenEquivariance extension '{name}'. "
-                    f"If no other build is running, a previous build was likely "
-                    f"killed partway; delete {lock_path} and retry."
+                    f"Timed out after {timeout} seconds waiting for the "
+                    f"PyTorch FileBaton build lock for '{name}': {lock_path}. "
+                    "The lock may be stale. Remove it only after confirming "
+                    "no process is building this extension."
                 )
             time.sleep(1)
 
