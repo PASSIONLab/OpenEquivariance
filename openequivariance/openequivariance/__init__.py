@@ -74,21 +74,13 @@ def torch_ext_so_path():
         return None
 
 
-jax = None
-try:
-    import openequivariance.jax as jax
+def __getattr__(name):
+    if name == "jax":
+        import openequivariance.jax as jax_module
 
-except Exception as e:
-    error = e
+        return jax_module
+    raise AttributeError(f"module 'openequivariance' has no attribute {name!r}")
 
-    class JAX_ERR:
-        def TensorProduct(*args, **kwargs):
-            raise error
-
-        def TensorProductConv(*args, **kwargs):
-            raise error
-
-    jax = JAX_ERR()
 
 __all__ = [
     "TPProblem",
@@ -98,6 +90,5 @@ __all__ = [
     "torch_to_oeq_dtype",
     "_check_package_editable",
     "torch_ext_so_path",
-    "jax",
     "transpose_irreps",
 ]
