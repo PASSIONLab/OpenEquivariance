@@ -1,11 +1,11 @@
 Installation
 ==============================
 
-.. admonition:: Deprecation of `openequivariance_extjax``
+.. admonition:: Deprecation of `openequivariance_extjax`
    :class: tip
 
    Installing `openequivariance_extjax` is no longer
-   required or supported since the regular
+   required or supported, since the regular
    `openequivariance` package contains the
    relevant binaries. 
    
@@ -17,33 +17,30 @@ Installation
 You need the following to install OpenEquivariance:
 
 - A Linux system equipped with an NVIDIA / AMD / Intel graphics card.
-- Either PyTorch >= 2.10, or JAX>0.5.0 with CUDA, RocM, or XPU support.
-- To build from source: GCC 9+ and the CUDA / HIP toolkit, or the
-  oneAPI DPC++ compiler (``icpx``) for Intel GPUs. The command
-  ``c++ --version`` should return >= 9.0; see below for details on
-  setting an alternate compiler.
-
-.. note::
-
-   On Intel GPUs the kernels are generated as SYCL and compiled at runtime
-   through the oneAPI kernel compiler, so ``icpx`` must be on your ``PATH``
-   (PyTorch locates the SYCL toolchain from it). Tensors passed to the
-   kernels live on the ``xpu`` device rather than ``cuda``. The precompiled
-   extension and the JAX frontend both remain CUDA/HIP only.
+- Either PyTorch >= 2.10, or JAX>0.8.0 with CUDA, RocM, or XPU support.
 
 .. tab:: CUDA or HIP Wheels
 
-    Installation is one easy command, followed by import verification: 
+    Installation is one easy command for all PyTorch, JAX, CUDA, and
+    HIP platforms: 
 
     .. code-block:: bash 
 
         pip install openequivariance
-        python -c "import openequivariance"
 
     OpenEquivariance bundles a precompiled library files for two recent
     CUDA versions and a HIP version. If you're building for an architecture
     we don't support or need a different CUDA version, see the source 
     distribution installation instructions. 
+
+
+    If you're using JAX, set the environment variable 
+    ``OEQ_NOTORCH=1`` to avoid a PyTorch import: 
+
+    .. code-block:: bash
+
+        export OEQ_NOTORCH=1
+        python -c "import openequivariance.jax"
 
 .. tab:: CUDA or HIP Source Distribution 
 
@@ -65,7 +62,13 @@ You need the following to install OpenEquivariance:
 
 .. tab:: SYCL 
 
-    On Intel GPUs, the extension is still compiled on first import,
+    You'll need the oneAPI DPC++ compiler (``icpx``) for Intel GPUs. 
+    Kernels are generated as SYCL and compiled at runtime
+    through the oneAPI kernel compiler, so ``icpx`` must be on your ``PATH``
+    (PyTorch locates the SYCL toolchain from it). Tensors passed to the
+    kernels are resident on the ``xpu`` device rather than ``cuda``. 
+
+    Our SYCL extension is still compiled on first import,
     which can take a couple of minutes; subsequent imports use the
     cached build. Install via 
 
@@ -90,7 +93,7 @@ You need the following to install OpenEquivariance:
         pip install $(python -c "import tomllib; print(*tomllib.load(open('openequivariance/pyproject.toml', 'rb'))['build-system']['requires'])")
         pip install --no-build-isolation -Ceditable.rebuild=true -e ./openequivariance
 
-.. tab:: Nightly Source Distribution
+.. tab:: Nightly
 
     .. code-block:: bash 
 
@@ -101,16 +104,6 @@ You need the following to install OpenEquivariance:
     .. code-block:: bash
 
         pip install --force-reinstall "git+https://github.com/PASSIONLab/OpenEquivariance@my-test-branch#subdirectory=openequivariance"
-
-
-
-If you're using JAX, set the environment variable 
-``OEQ_NOTORCH=1`` to avoid a PyTorch import: 
-
-.. code-block:: bash
-
-    export OEQ_NOTORCH=1
-    python -c "import openequivariance.jax"
 
 
 Configurations on Major Platforms 
