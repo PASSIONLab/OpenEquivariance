@@ -19,7 +19,7 @@ FFI_STAGES = ("instantiate", "prepare", "initialize", "execute")
 COMMAND_BUFFER_COMPATIBLE = 1
 
 
-class _Handler(ctypes.Structure):
+class Handler(ctypes.Structure):
     _fields_ = [
         ("name", ctypes.c_char_p),
         ("instantiate", ctypes.c_void_p),
@@ -30,23 +30,23 @@ class _Handler(ctypes.Structure):
     ]
 
 
-class _HandlerTable(ctypes.Structure):
+class HandlerTable(ctypes.Structure):
     _fields_ = [
         ("abi_version", ctypes.c_uint32),
         ("handler_count", ctypes.c_uint32),
-        ("handlers", ctypes.POINTER(_Handler)),
+        ("handlers", ctypes.POINTER(Handler)),
     ]
 
 
-def _handler_table():
+def handler_table():
     ext = pytest.importorskip("openequivariance.jax.extlib")
     library = ctypes.CDLL(ext.LIBRARY_PATH)
     table_fn = library.oeq_ffi_handler_table
-    table_fn.restype = ctypes.POINTER(_HandlerTable)
+    table_fn.restype = ctypes.POINTER(HandlerTable)
     return ext, table_fn().contents
 
 
-def _capsule_pointer(capsule):
+def capsule_pointer(capsule):
     get_pointer = ctypes.pythonapi.PyCapsule_GetPointer
     get_pointer.argtypes = [ctypes.py_object, ctypes.c_char_p]
     get_pointer.restype = ctypes.c_void_p
@@ -58,7 +58,7 @@ def test_exported_handler_table_matches_manifest(with_jax):
     if not with_jax:
         pytest.skip("JAX ABI checks require --jax")
 
-    _, table = _handler_table()
+    _, table = handler_table()
     names = [
         table.handlers[index].name.decode() for index in range(table.handler_count)
     ]
@@ -84,7 +84,7 @@ def test_registrations_match_handler_table(with_jax):
     if not with_jax:
         pytest.skip("JAX ABI checks require --jax")
 
-    ext, table = _handler_table()
+    ext, table = handler_table()
     registrations = ext.registrations()
     assert tuple(registrations) == FFI_TARGETS
     assert len(registrations) == table.handler_count == 6
@@ -94,7 +94,7 @@ def test_registrations_match_handler_table(with_jax):
         expected_stages = {stage for stage in FFI_STAGES if getattr(handler, stage)}
         assert set(registration) == expected_stages
         for stage in expected_stages:
-            assert _capsule_pointer(registration[stage]) == getattr(handler, stage)
+            assert capsule_pointer(registration[stage]) == getattr(handler, stage)
 
 
 def test_handler_families_share_one_initializer(with_jax):
@@ -102,7 +102,7 @@ def test_handler_families_share_one_initializer(with_jax):
     if not with_jax:
         pytest.skip("JAX ABI checks require --jax")
 
-    _, table = _handler_table()
+    _, table = handler_table()
     handlers = {
         table.handlers[index].name.decode(): table.handlers[index]
         for index in range(table.handler_count)
