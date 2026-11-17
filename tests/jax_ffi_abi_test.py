@@ -85,7 +85,7 @@ def test_registrations_match_handler_table(with_jax):
         pytest.skip("JAX ABI checks require --jax")
 
     ext, table = handler_table()
-    registrations = ext.registrations()
+    registrations = ext.registrations(ext.library)
     assert tuple(registrations) == FFI_TARGETS
     assert len(registrations) == table.handler_count == 6
     for index, name in enumerate(FFI_TARGETS):

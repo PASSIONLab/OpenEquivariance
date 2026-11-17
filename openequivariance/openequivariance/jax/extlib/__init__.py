@@ -50,15 +50,11 @@ def load_library():
     return backend, spec.origin, ctypes.CDLL(spec.origin)
 
 
-BACKEND, LIBRARY_PATH, library = load_library()
-IS_HIP = BACKEND == "hip"
-
-library.oeq_ffi_handler_table.argtypes = []
-library.oeq_ffi_handler_table.restype = ctypes.POINTER(HandlerTable)
-
-
-def registrations():
-    table = library.oeq_ffi_handler_table().contents
+def registrations(library):
+    table_fn = library.oeq_ffi_handler_table
+    table_fn.argtypes = []
+    table_fn.restype = ctypes.POINTER(HandlerTable)
+    table = table_fn().contents
     assert table.abi_version == FFI_ABI_VERSION
 
     targets = {}
@@ -72,10 +68,12 @@ def registrations():
     return targets
 
 
+BACKEND, LIBRARY_PATH, library = load_library()
+IS_HIP = BACKEND == "hip"
 DEVICE_TYPE = "cuda"
 
 platform = "ROCM" if IS_HIP else "CUDA"
-for name, target in registrations().items():
+for name, target in registrations(library).items():
     jax.ffi.register_ffi_target(name, target, platform=platform, api_version=1)
 
 ext_module_utilities = importlib.import_module(
