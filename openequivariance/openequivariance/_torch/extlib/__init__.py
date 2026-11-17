@@ -54,7 +54,6 @@ class JITExtension(Extension):
     def wait_for_torch_build_lock(name, timeout=300):
         from torch.utils import cpp_extension
 
-
         if hasattr(cpp_extension, "FileLock") or not hasattr(
             cpp_extension, "FileBaton"
         ):
