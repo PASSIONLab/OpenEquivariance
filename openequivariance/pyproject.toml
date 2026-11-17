@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm", "scikit-build-core", "nanobind>=3.0"]
+requires = ["setuptools", "setuptools-scm", "scikit-build-core", "nanobind>=3.0", "ninja"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -76,7 +76,7 @@ lint.ignore = ["E741"]
 [tool.scikit-build]
 wheel.py-api = "cp311"
 build-dir = "build/{wheel_tag}"
-editable.rebuild = true
+editable.rebuild = false
 
 [tool.scikit-build.cmake.define]
 AARCH64 = {env="AARCH64", default="0"}
