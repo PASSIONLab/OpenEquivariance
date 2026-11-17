@@ -1,5 +1,23 @@
 ## Latest Changes
 
+### v0.8.2 (2026-11-17)
+
+This release eliminates the need
+for `openequivariance_extjax` by moving
+the JAX extension to a precompiled library
+inside a wheeldist. Also introduces
+quality-of-life changes to JIT branch. 
+
+
+**Deprecated**: 
+- JAX users no longer need to
+install `openequivariance_extjax` in addition
+to the regular `openequivariance` package.
+
+### v0.8.1 (2026-11-10)
+
+This release is a preliminary test of precompiled library wheel distribution.
+
 **Added**:
 - Route symmetric contraction's grouped matrix multiplications through PyTorch
   on CUDA, HIP, and SYCL, removing direct cuBLAS and rocBLAS dependencies.

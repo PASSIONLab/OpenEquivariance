@@ -35,9 +35,8 @@ To set up an editable install and run our tests, use the following code:
         git clone https://github.com/PASSIONLab/OpenEquivariance 
         cd OpenEquivariance
 
-        pip install "./openequivariance[jax]"
+        pip install "./openequivariance"
         pip install "./openequivariance[dev]"
-        pip install "./openequivariance_extjax" --no-build-isolation
 
         pytest --jax tests/example_test.py
         pytest --jax tests/batch_test.py

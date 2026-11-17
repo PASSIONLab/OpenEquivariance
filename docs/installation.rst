@@ -1,12 +1,12 @@
 Installation
 ==============================
 
-.. admonition:: Deprecation of `openequivariance_extjax`
+.. admonition:: Deprecation of ``openequivariance_extjax``
    :class: tip
 
-   Installing `openequivariance_extjax` is no longer
+   Installing ``openequivariance_extjax`` is no longer
    required or supported, since the regular
-   `openequivariance` package contains the
+   ``openequivariance`` package contains the
    relevant binaries. 
    
 
@@ -17,7 +17,7 @@ Installation
 You need the following to install OpenEquivariance:
 
 - A Linux system equipped with an NVIDIA / AMD / Intel graphics card.
-- Either PyTorch >= 2.10, or JAX>0.8.0 with CUDA, RocM, or XPU support.
+- Either PyTorch >= 2.10, or JAX >= 0.8.1 with CUDA, ROCm, or XPU support.
 
 .. tab:: CUDA or HIP Wheels
 
@@ -74,7 +74,7 @@ You need the following to install OpenEquivariance:
 
     .. code-block:: bash
 
-        pip install openequivariance[sycl]
+        pip install "openequivariance[sycl]"
         export CC=/path/to/your/cc
         export CXX=/path/to/your/c++
         python -c "import openequivariance"
