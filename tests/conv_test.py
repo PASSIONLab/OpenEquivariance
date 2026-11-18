@@ -364,7 +364,7 @@ class TestNonsymmetricGraph(ConvCorrectness):
     @pytest.fixture(scope="class")
     def graph(self):
         # See https://github.com/PASSIONLab/OpenEquivariance/issues/227
-        # for a reference for this nonsymmetric graph generator. 
+        # for a reference for this nonsymmetric graph generator.
         n_recv, n_send, k = 225, 1208, 40
         rng = np.random.default_rng(12345)
         rows, cols = [], []
