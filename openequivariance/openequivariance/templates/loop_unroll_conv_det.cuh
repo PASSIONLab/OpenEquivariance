@@ -196,9 +196,8 @@ backward(IRREP_T* L1_in, IRREP_T* L1_grad,
     {{ declare_smem(backward_schedule) }}
     size_t num_products = c.nnz;
 
-    // Note the transpose below (cols -> rows, rows -> cols)
-    {{idx_type}}* rows = ({{idx_type}}*) c.cols;
-    {{idx_type}}* cols = ({{idx_type}}*) c.rows;
+    {{idx_type}}* rows = ({{idx_type}}*) c.rows;
+    {{idx_type}}* cols = ({{idx_type}}*) c.cols;
     {{idx_type}}* tperm = ({{idx_type}}*) transpose_perm;
 
     {{ set_launch_bound_variables(backward_schedule.launch_config) }}
@@ -211,7 +210,7 @@ backward(IRREP_T* L1_in, IRREP_T* L1_grad,
 
     if(lane_id == 0) {
         if(start < end) {
-            dst_idxs[warp_id] = cols[start];
+            dst_idxs[warp_id] = cols[tperm[start]];
         }
         else {
             dst_idxs[warp_id] = -1; 
@@ -231,8 +230,8 @@ backward(IRREP_T* L1_in, IRREP_T* L1_grad,
         {%- endif %}
 
         for(size_t i = start; i < end; i++) {
-            {{idx_type}} row = rows[i]; {{idx_type}} col = cols[i];
             {{idx_type}} tperm_idx = tperm[i];
+            {{idx_type}} row = rows[tperm_idx]; {{idx_type}} col = cols[tperm_idx];
 
             IRREP_T* l1_shft = L1_in + col * {{backward_schedule.L1.dim}} + lane_id;
             IRREP_T* l2_shft = L2_in + tperm_idx * {{backward_schedule.L2.dim}} + lane_id; 
@@ -272,7 +271,7 @@ backward(IRREP_T* L1_in, IRREP_T* L1_grad,
                 kahanAdd<{{segment.L1.dim}}>(L1_kahan_smem, L1_grad_smem);
             {%- endif %}
 
-            bool changeRow = (i < end - 1) && (col != cols[i+1]);
+            bool changeRow = (i < end - 1) && (col != cols[tperm[i+1]]);
             if(changeRow || i == end - 1) {
                 IRREP_T* dst = l1_grad_shft;
                 if(firstSegment) {
@@ -418,8 +417,8 @@ double_backward_B(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
         ConvData c, void* workspace_raw, unsigned {{idx_type}}* transpose_perm) {
 
     size_t num_products = c.nnz;
-    {{idx_type}}* rows = ({{idx_type}}*) c.cols;
-    {{idx_type}}* cols = ({{idx_type}}*) c.rows;
+    {{idx_type}}* rows = ({{idx_type}}*) c.rows;
+    {{idx_type}}* cols = ({{idx_type}}*) c.cols;
     {{idx_type}}* tperm = ({{idx_type}}*) transpose_perm;
 
     {{ declare_smem(double_backward_schedule) }}
@@ -431,7 +430,7 @@ double_backward_B(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
 
     if(lane_id == 0) {
         if(start < end) {
-            dst_idxs[warp_id] = cols[start];
+            dst_idxs[warp_id] = cols[tperm[start]];
         }
         else {
             dst_idxs[warp_id] = -1; 
@@ -453,8 +452,8 @@ double_backward_B(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
         {%- endif %}
 
         for(size_t i = start; i < end; i++) {
-            unsigned {{idx_type}} row = rows[i]; unsigned {{idx_type}} col = cols[i];
             {{idx_type}} tperm_idx = tperm[i];
+            unsigned {{idx_type}} row = rows[tperm_idx]; unsigned {{idx_type}} col = cols[tperm_idx];
 
             IRREP_T* l1_shft = L1_dgrad + col * {{schedule.L1.dim}} + lane_id;
             IRREP_T* l2_shft = L2_dgrad + tperm_idx * {{schedule.L2.dim}} + lane_id; 
@@ -527,7 +526,7 @@ double_backward_B(IRREP_T* L1_in, IRREP_T* L2_in, WEIGHT_T* W, IRREP_T* L3_grad,
                 WEIGHT_T* weights_grad_shft = W_grad + lane_id;
             {%- endif %}
 
-            bool changeRow = (i < end - 1) && (col != cols[i+1]);
+            bool changeRow = (i < end - 1) && (col != cols[tperm[i+1]]);
             if(changeRow || i == end - 1) {
                 IRREP_T* dst = l1_grad_shft;
                 if(firstSegment) {

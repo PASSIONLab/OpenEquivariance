@@ -1,11 +1,13 @@
+import functools
 import pytest
 import tempfile
-import urllib
+import urllib.request
 from pytest_check import check
 
 import numpy as np
 import openequivariance as oeq
 from openequivariance.benchmark.ConvBenchmarkSuite import load_graph
+from openequivariance.core.ConvolutionBase import CoordGraph
 from openequivariance.benchmark.correctness import (
     correctness_backward_conv,
     correctness_double_backward_conv,
@@ -30,18 +32,12 @@ def dtype(request):
     return request.param
 
 
-@pytest.fixture(params=["1drf_radius3.5.pickle"], ids=["1drf"], scope="module")
-def graph(request):
+@functools.cache
+def download_graph(filename):
     download_prefix = "https://portal.nersc.gov/project/m1982/equivariant_nn_graphs/"
-    filename = request.param
-
-    graph = None
     with tempfile.NamedTemporaryFile() as temp_file:
         urllib.request.urlretrieve(download_prefix + filename, temp_file.name)
-        graph = load_graph(temp_file.name)
-
-    # graph = load_graph("data/1drf_radius3.5.pickle")
-    return graph
+        return load_graph(temp_file.name)
 
 
 @pytest.fixture(scope="module")
@@ -50,6 +46,10 @@ def with_jax(request):
 
 
 class ConvCorrectness:
+    @pytest.fixture(params=["1drf_radius3.5.pickle"], ids=["1drf"], scope="class")
+    def graph(self, request):
+        return download_graph(request.param)
+
     def thresh(self, direction):
         return {
             "fwd": 3e-4,
@@ -360,8 +360,41 @@ class TestIrMulLayout(ConvCorrectness):
         return problem
 
 
+class TestNonsymmetricGraph(ConvCorrectness):
+    @pytest.fixture(scope="class")
+    def graph(self):
+        # See https://github.com/PASSIONLab/OpenEquivariance/issues/227
+        # for a reference for this nonsymmetric graph generator. 
+        n_recv, n_send, k = 225, 1208, 40
+        rng = np.random.default_rng(12345)
+        rows, cols = [], []
+        for r in range(n_recv):
+            senders = rng.choice(
+                [s for s in range(n_send) if s != r], size=k, replace=False
+            )
+            rows.extend([r] * k)
+            cols.extend(senders.tolist())
+
+        return CoordGraph(
+            np.zeros((n_send, 3)),
+            np.array(rows, dtype=np.int64),
+            np.array(cols, dtype=np.int64),
+            "nonsymmetric",
+        )
+
+    @pytest.fixture(params=mace_problems(), ids=lambda x: x.label, scope="class")
+    def problem(self, request, dtype):
+        problem = request.param.clone()
+        problem.irrep_dtype, problem.weight_dtype = dtype, dtype
+        return problem
+
+
 class TestTorchToSubmodule:
     """Test that TensorProductConv works as a submodule when parent's .to() is called"""
+
+    @pytest.fixture(scope="class")
+    def graph(self):
+        return download_graph("1drf_radius3.5.pickle")
 
     @pytest.fixture(params=["atomic", "deterministic"], scope="class")
     def parent_module_and_problem(self, request, dtype, with_jax):

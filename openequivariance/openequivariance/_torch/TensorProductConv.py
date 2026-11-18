@@ -32,7 +32,7 @@ logger = getLogger()
 
 class TensorProductConv(torch.nn.Module, LoopUnrollConv, NumpyDoubleBackwardMixinConv):
     r"""
-    Given a **symmetric, directed** graph :math:`G = (V, E)`, inputs :math:`x_1...x_{|V|}`,
+    Given a directed graph :math:`G = (V, E)`, inputs :math:`x_1...x_{|V|}`,
     :math:`y_1...y_{|E|}`, and weights :math:`W_1...W_{|E|}`, computes
 
     .. math::
