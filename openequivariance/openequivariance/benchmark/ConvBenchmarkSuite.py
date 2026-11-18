@@ -65,7 +65,7 @@ class ConvBenchmarkSuite:
         high_precision_ref=False,
     ):
         if output_folder is None:
-            if oeq._check_package_editable():
+            if oeq.check_package_editable():
                 output_folder = (
                     oeq._editable_install_output_path / f"{self.millis_since_epoch}"
                 )

@@ -22,15 +22,49 @@ except Exception as e:
     print(f"Warning: Could not determine oeq version: {e}", file=sys.stderr)
 
 
-def _check_package_editable():
+def check_package_editable():
     import json
     from importlib.metadata import Distribution
 
-    direct_url = Distribution.from_name("openequivariance").read_text("direct_url.json")
+    direct_url = (
+        Distribution.from_name("openequivariance").read_text("direct_url.json") or "{}"
+    )
     return json.loads(direct_url).get("dir_info", {}).get("editable", False)
 
 
 _editable_install_output_path = Path(__file__).parent.parent.parent / "outputs"
+
+
+def skip_rebuild_without_flock():
+    import errno
+    import fcntl
+
+    for finder in sys.meta_path:
+        build_dir = getattr(finder, "path", None)
+        if (
+            not getattr(finder, "rebuild_flag", False)
+            or "openequivariance" not in getattr(finder, "known_source_files", {})
+            or not build_dir
+            or not os.path.isdir(build_dir)
+        ):
+            continue
+        fd = os.open(
+            os.path.join(build_dir, "editable_rebuild.lock"), os.O_RDWR | os.O_CREAT
+        )
+        try:
+            fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        except OSError as e:
+            if e.errno not in (errno.EAGAIN, errno.EACCES):
+                skip = os.environ.get("SKBUILD_EDITABLE_SKIP", "")
+                os.environ["SKBUILD_EDITABLE_SKIP"] = os.pathsep.join((skip, build_dir))
+                warnings.warn(f"flock unsupported in {build_dir}, skipping rebuild.")
+        finally:
+            os.close(fd)
+
+
+if check_package_editable():
+    skip_rebuild_without_flock()
 
 if "OEQ_NOTORCH" not in os.environ or os.environ["OEQ_NOTORCH"] != "1":
     import torch
@@ -88,7 +122,7 @@ __all__ = [
     "TensorProduct",
     "TensorProductConv",
     "torch_to_oeq_dtype",
-    "_check_package_editable",
+    "check_package_editable",
     "torch_ext_so_path",
     "transpose_irreps",
 ]

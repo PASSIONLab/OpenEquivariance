@@ -112,7 +112,7 @@ class TestBenchmarkSuite:
         self.results = []
         millis_since_epoch = round(time.time() * 1000)
         if output_folder is None:
-            if oeq._check_package_editable():
+            if oeq.check_package_editable():
                 output_folder = (
                     oeq._editable_install_output_path / f"{millis_since_epoch}"
                 )
