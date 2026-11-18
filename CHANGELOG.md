@@ -1,5 +1,10 @@
 ## Latest Changes
 
+### v0.8.3 (2026-11-18)
+
+Adds support for nonsymmetric directed graphs in
+deterministic mode. 
+
 ### v0.8.2 (2026-11-17)
 
 This release eliminates the need
