@@ -34,21 +34,7 @@ OpenEquivariance now supports Intel XPUs on PyTorch
 by compiling SYCL kernels. See our 
 installation guide for more details.
 
-⭐️ **JAX**: We support JAX for NVIDIA and AMD GPUs. 
-For NVIDIA GPUs, install it (after installing JAX) 
-with the following two commands strictly in order:
-
-``` bash
-pip install openequivariance[jax]
-pip install openequivariance_extjax --no-build-isolation
-```
-
-For AMD GPUs:
-``` bash
-pip install openequivariance[jax]
-JAX_HIP=1 pip install openequivariance_extjax --no-build-isolation
-```
-
+⭐️ **JAX**: We support JAX for NVIDIA and AMD GPUs.
 See the section below for example usage and 
 our [API page](https://passionlab.github.io/OpenEquivariance/api/) for more details.
 

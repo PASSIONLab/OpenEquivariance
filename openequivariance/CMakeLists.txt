@@ -40,7 +40,6 @@ message(STATUS "LibTorch Lib: ${LIBTORCH_LIB_DIR}")
 message(STATUS "Torch CPU Library: ${TORCH_CPU_LIB}")
 message(STATUS "Torch C10 Library: ${C10_LIB}")
 
-# Setup Nanobind
 execute_process(
   COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
   OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT
@@ -61,38 +60,53 @@ set(OEQ_SOURCES
 
 set(OEQ_INSTALL_DIR "openequivariance/_torch/extlib")
 
-function(add_stable_extension target_name backend_define link_libraries)
-    nanobind_add_module(${target_name} BACKEND_MODULE nanobind_backend ${OEQ_SOURCES})
+if(NOT XLA_FFI_URL OR NOT XLA_FFI_C_API_SHA256 OR NOT XLA_FFI_API_SHA256 OR NOT XLA_FFI_FFI_SHA256)
+    message(FATAL_ERROR "XLA_FFI_URL / XLA_FFI_*_SHA256 not set")
+endif()
+
+set(XLA_FFI_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/xla_ffi")
+foreach(header c_api api ffi)
+    string(TOUPPER "${header}" header_var)
+    file(DOWNLOAD
+        "${XLA_FFI_URL}/${header}.h"
+        "${XLA_FFI_INCLUDE_DIR}/xla/ffi/api/${header}.h"
+        EXPECTED_HASH SHA256=${XLA_FFI_${header_var}_SHA256}
+        TLS_VERIFY ON
+    )
+endforeach()
+
+set(OEQ_JAX_SOURCES
+    ${EXT_DIR}/jax/ffi_handlers.cpp
+    ${EXT_DIR}/jax/ffi_provider.cpp
+    ${EXT_JSON_DIR}/json11.cpp
+)
+
+set(OEQ_JAX_INSTALL_DIR "openequivariance/jax/extlib")
+
+function(add_jax_extension target_name backend_define link_libraries)
+    add_library(${target_name} SHARED ${OEQ_JAX_SOURCES})
 
     set_target_properties(${target_name} PROPERTIES
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
         POSITION_INDEPENDENT_CODE ON
     )
-    
-    # Enforce CXX11 ABI to match LibTorch
-    target_compile_definitions(${target_name} PRIVATE
-        ${backend_define}=1
-        _GLIBCXX_USE_CXX11_ABI=1
-        INCLUDE_NB_EXTENSION
-        EXTENSION_NAME=${target_name}
-    )
-    
+    target_compile_options(${target_name} PRIVATE -Wno-attributes -Wno-return-type)
+    target_compile_definitions(${target_name} PRIVATE ${backend_define}=1)
     target_include_directories(${target_name} PRIVATE
         ${EXT_DIR}
+        ${EXT_DIR}/jax
         ${EXT_BACKEND_DIR}
         ${EXT_JSON_DIR}
-        ${LIBTORCH_INCLUDE_DIR}
+        ${XLA_FFI_INCLUDE_DIR}
     )
-    target_link_libraries(${target_name} PRIVATE
-        ${TORCH_CPU_LIB}
-        ${C10_LIB}
-        ${link_libraries}
-    )
-    
-    install(TARGETS ${target_name} LIBRARY DESTINATION "${OEQ_INSTALL_DIR}")
+    target_link_libraries(${target_name} PRIVATE ${link_libraries})
+    target_link_options(${target_name} PRIVATE -Wl,--no-undefined)
 
-    # AOTI C++ library (identical except without nanobind and without INCLUDE_NB_EXTENSION)
+    install(TARGETS ${target_name} LIBRARY DESTINATION "${OEQ_JAX_INSTALL_DIR}")
+endfunction()
+
+function(add_torch_extension target_name backend_define link_libraries)
     set(aoti_target_name ${target_name}_aoti)
     add_library(${aoti_target_name} SHARED ${OEQ_SOURCES})
 
@@ -101,12 +115,12 @@ function(add_stable_extension target_name backend_define link_libraries)
         CXX_STANDARD_REQUIRED ON
         POSITION_INDEPENDENT_CODE ON
     )
-    
-    target_compile_definitions(${aoti_target_name} PRIVATE 
+
+    target_compile_definitions(${aoti_target_name} PRIVATE
         ${backend_define}=1
         _GLIBCXX_USE_CXX11_ABI=1
     )
-    
+
     target_include_directories(${aoti_target_name} PRIVATE
         ${EXT_DIR}
         ${EXT_BACKEND_DIR}
@@ -118,8 +132,30 @@ function(add_stable_extension target_name backend_define link_libraries)
         ${C10_LIB}
         ${link_libraries}
     )
-    
+
     install(TARGETS ${aoti_target_name} LIBRARY DESTINATION "${OEQ_INSTALL_DIR}")
+endfunction()
+
+set(OEQ_UTILITIES_INSTALL_DIR "openequivariance/core")
+
+function(add_utilities_library backend backend_define link_libraries)
+    set(target_name oeq_utilities_${backend})
+    nanobind_add_module(${target_name} BACKEND_MODULE nanobind_backend ${EXT_DIR}/utilities.cpp)
+
+    set_target_properties(${target_name} PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        POSITION_INDEPENDENT_CODE ON
+    )
+    target_compile_definitions(${target_name} PRIVATE
+        ${backend_define}=1
+        OEQ_UTILITIES_MODULE_NAME=${target_name}
+    )
+    target_include_directories(${target_name} PRIVATE ${EXT_DIR} ${EXT_BACKEND_DIR})
+    target_link_libraries(${target_name} PRIVATE ${link_libraries})
+    target_link_options(${target_name} PRIVATE -Wl,--as-needed)
+
+    install(TARGETS ${target_name} LIBRARY DESTINATION "${OEQ_UTILITIES_INSTALL_DIR}")
 endfunction()
 
 find_package(hip QUIET)
@@ -176,7 +212,15 @@ if(OEQ_CUDA_FOUND AND NOT OEQ_CUDA_ROOTS)
         ${CUDA_nvrtc_LIBRARY}
         cuda_stub_lib
     )
-    add_stable_extension(oeq_stable_cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_LINK_LIBS}")
+    add_torch_extension(oeq_stable_cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_LINK_LIBS}")
+
+    set(CUDA_JAX_LINK_LIBS
+        CUDA::cudart
+        CUDA::cuda_driver
+        ${CUDA_nvrtc_LIBRARY}
+    )
+    add_jax_extension(oeq_jax_cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_JAX_LINK_LIBS}")
+    add_utilities_library(cuda${CUDAToolkit_VERSION_MAJOR} CUDA_BACKEND "${CUDA_JAX_LINK_LIBS}")
 endif()
 
 foreach(cuda_root ${OEQ_CUDA_ROOTS})
@@ -199,7 +243,9 @@ foreach(cuda_root ${OEQ_CUDA_ROOTS})
     )
 
     set(CUDA_LINK_LIBS oeq_cuda${cuda_major}_toolkit cuda_stub_lib)
-    add_stable_extension(oeq_stable_cuda${cuda_major} CUDA_BACKEND "${CUDA_LINK_LIBS}")
+    add_torch_extension(oeq_stable_cuda${cuda_major} CUDA_BACKEND "${CUDA_LINK_LIBS}")
+    add_jax_extension(oeq_jax_cuda${cuda_major} CUDA_BACKEND oeq_cuda${cuda_major}_toolkit)
+    add_utilities_library(cuda${cuda_major} CUDA_BACKEND oeq_cuda${cuda_major}_toolkit)
 endforeach()
 
 if(hip_FOUND)
@@ -222,7 +268,9 @@ if(hip_FOUND)
 	    hip::host
         hiprtc::hiprtc
     )
-    add_stable_extension(oeq_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
+    add_torch_extension(oeq_stable_hip HIP_BACKEND "${HIP_LINK_LIBS}")
+    add_jax_extension(oeq_jax_hip HIP_BACKEND "hip::host;hiprtc::hiprtc")
+    add_utilities_library(hip HIP_BACKEND "hip::host;hiprtc::hiprtc")
 endif()
 
 set(OEQ_SYCL_FOUND FALSE)
@@ -251,12 +299,10 @@ if(OEQ_SYCL_FOUND)
         sycl_stub_lib
         sycl
     )
-    add_stable_extension(oeq_stable_sycl SYCL_BACKEND "${SYCL_LINK_LIBS}")
+    add_torch_extension(oeq_stable_sycl SYCL_BACKEND "${SYCL_LINK_LIBS}")
 
-    foreach(tgt oeq_stable_sycl oeq_stable_sycl_aoti)
-        target_compile_options(${tgt} PRIVATE -fsycl)
-        target_link_options(${tgt} PRIVATE -fsycl)
-    endforeach()
+    target_compile_options(oeq_stable_sycl_aoti PRIVATE -fsycl)
+    target_link_options(oeq_stable_sycl_aoti PRIVATE -fsycl)
 endif()
 
 if(NOT OEQ_CUDA_FOUND AND NOT hip_FOUND AND NOT OEQ_SYCL_FOUND)
