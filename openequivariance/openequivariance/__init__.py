@@ -24,11 +24,13 @@ except Exception as e:
 
 def check_package_editable():
     import json
-    from importlib.metadata import Distribution
+    from importlib.metadata import Distribution, PackageNotFoundError
 
-    direct_url = (
-        Distribution.from_name("openequivariance").read_text("direct_url.json") or "{}"
-    )
+    try:
+        dist = Distribution.from_name("openequivariance")
+    except PackageNotFoundError:
+        return False
+    direct_url = dist.read_text("direct_url.json") or "{}"
     return json.loads(direct_url).get("dir_info", {}).get("editable", False)
 
 
